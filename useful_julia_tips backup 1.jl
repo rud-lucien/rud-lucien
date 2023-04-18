@@ -270,40 +270,6 @@ md"""
 ---
 """
 
-# ╔═╡ a213d3ac-b150-4d8d-8671-023eba4ca9a8
-md"""
-## Iterating over a collection
-
-
-"""
-
-# ╔═╡ 73aa0d89-32c6-499e-9562-32b3377c8d6e
-x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-# ╔═╡ bec524b7-a101-4047-83a4-b5c8eddc92c9
-md"""
-### Broadcasting method
-"""
-
-# ╔═╡ 61f2fa1e-3d18-4abe-a462-cf4c519746cc
-sqrt.(x)
-
-# ╔═╡ 1427ff4d-78f0-42ba-8414-8d92a9b4fc30
-md"""
-### Map function method
-"""
-
-# ╔═╡ 9cc92975-c0dc-44dc-b531-095360dd5b51
-map(sqrt, x)
-
-# ╔═╡ 4235a9aa-fa89-4dad-bfa4-77021617439e
-md"""
-### Array comprehension method
-"""
-
-# ╔═╡ bdff29eb-bb7f-4e98-9679-82d0757b6a7f
-[sqrt(v) for v in x]
-
 # ╔═╡ 76cf6c9e-3aaf-4c7c-a189-d9ecdac972eb
 md"""
 ## Pipping options in Julia
@@ -835,37 +801,6 @@ r_mapping
 md"""
 ---
 """
-
-# ╔═╡ cf7b9b04-7516-4449-bc7c-6d592dcb8507
-md"""
-## Useful Custom Functions
-"""
-
-# ╔═╡ 732b3ccb-862f-4a6e-95b1-fd6cfd0848b5
-md"""
-### Searching for files in directory
-
-This function searches if a given string is in file directory
-"""
-
-# ╔═╡ 12a15c43-bdae-48f3-8b6e-33d344e4aeeb
-function directorySearch(directory, searchString)
-    fileList = filter(x -> occursin(searchString, x), readdir(directory))
-	x = nothing
-	for file in fileList
-		x = fileList
-	end
-    return x
-
-end
-
-# ╔═╡ adf71176-a420-4c30-9b5a-124b6bea7e74
-begin
-	root = dirname(@__FILE__)
-	file_directory = joinpath(root, raw"manning_data_processing")
-	directorySearch(file_directory, "")
-	
-end
 
 # ╔═╡ 92127ab7-482c-45e7-a298-90da2226d98c
 md"""
@@ -2481,17 +2416,9 @@ version = "3.5.0+0"
 # ╟─9b22abed-7cc3-428e-a813-66e5e9b998a2
 # ╟─2d703e5c-21f6-4864-9426-bb58c6dfe7b2
 # ╟─bb600a0b-395a-42d6-b3fc-925bd52b2a40
-# ╟─ba89f6d2-0cdf-4064-a014-38b9c00a6830
+# ╠═ba89f6d2-0cdf-4064-a014-38b9c00a6830
 # ╟─b9b92a5e-49b2-4847-b12e-b0f0cee99ff1
-# ╟─a213d3ac-b150-4d8d-8671-023eba4ca9a8
-# ╠═73aa0d89-32c6-499e-9562-32b3377c8d6e
-# ╟─bec524b7-a101-4047-83a4-b5c8eddc92c9
-# ╠═61f2fa1e-3d18-4abe-a462-cf4c519746cc
-# ╟─1427ff4d-78f0-42ba-8414-8d92a9b4fc30
-# ╠═9cc92975-c0dc-44dc-b531-095360dd5b51
-# ╟─4235a9aa-fa89-4dad-bfa4-77021617439e
-# ╠═bdff29eb-bb7f-4e98-9679-82d0757b6a7f
-# ╠═76cf6c9e-3aaf-4c7c-a189-d9ecdac972eb
+# ╟─76cf6c9e-3aaf-4c7c-a189-d9ecdac972eb
 # ╟─7b647b3f-8f11-4b68-b72f-f701b9c5d574
 # ╟─9da201bb-666d-4c6f-a854-6b7084b7bce6
 # ╟─d87a560a-b683-49ce-b892-0b8e32657255
@@ -2521,9 +2448,13 @@ version = "3.5.0+0"
 # ╠═908aa274-561c-4c3a-909c-5358feddd564
 # ╟─b99d818e-03de-4c6c-841c-a7fcc7b1fb84
 # ╠═8f14684d-d431-459b-9147-aa7739fc0cc9
+# ╟─c377e42b-d74d-43cf-9942-12fcd665d502
 # ╟─4b66e501-a160-41b0-b2c4-58317cb29f4c
 # ╠═1b69d4df-9d8b-4ee1-89ab-721692ddc39c
 # ╠═93289abb-1984-48a6-aa8e-9654d824ae87
+# ╟─02383289-1cb8-46d5-898c-76150df51af2
+# ╟─6dde7e7e-3e8a-47d5-874b-d686790bc971
+# ╟─ffa3faf1-dd15-42c0-b70f-f3765006fe80
 # ╠═cb22b552-8a37-4875-a523-1f7b909a5c49
 # ╠═9ff85871-065b-47e3-b5a5-f7335990ef93
 # ╠═e5e7e401-580e-4203-8406-5bacbaef7e2f
@@ -2536,11 +2467,7 @@ version = "3.5.0+0"
 # ╠═0fcb2f0b-9325-4030-bc18-c7100dab410c
 # ╠═cdce46ad-e2c1-4157-8910-401ab717a7a6
 # ╟─2fd0014a-fd34-47e5-add9-38f3dfb643ee
-# ╟─cf7b9b04-7516-4449-bc7c-6d592dcb8507
-# ╟─732b3ccb-862f-4a6e-95b1-fd6cfd0848b5
-# ╠═12a15c43-bdae-48f3-8b6e-33d344e4aeeb
-# ╠═adf71176-a420-4c30-9b5a-124b6bea7e74
-# ╠═92127ab7-482c-45e7-a298-90da2226d98c
+# ╟─92127ab7-482c-45e7-a298-90da2226d98c
 # ╠═9be9754f-a333-4d53-9da8-f40d69d896a3
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
