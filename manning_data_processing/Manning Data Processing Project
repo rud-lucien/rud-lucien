@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.24
+# v0.19.25
 
 using Markdown
 using InteractiveUtils
@@ -219,14 +219,20 @@ md"""
 # ╔═╡ cd3f6fff-1dea-4f8e-baa0-51a9c08e7fe5
 cor_kendall = pairwise(corkendall, eachcol(outlier_free_housing))
 
+# ╔═╡ e5fb4a94-64b7-4f29-96da-d016cb40bfa6
+cor_kendall_row_sort = sortslices(cor_kendall,dims=1,by=x->x[14],rev=false)
+
+# ╔═╡ 718f76cc-8fb1-45e5-b933-2816249fdb18
+cor_kendall_column_and_row_sort = sortslices(cor_kendall_row_sort,dims=2,by=x->x[14],rev=false)
+
 # ╔═╡ 29cf90a2-3d7f-4a13-adc8-78142c5d9245
 md"""
 9. Visualize the correlation matrix as a heatmap, sorting the rows and columns by the correlation with the MEDV target variable. Heatmaps are often used to visualize correlation matrices as color scales to help easily spot the most and least correlated features in the dataset. You should produce a plot similar to the one below.
 """
 
 # ╔═╡ 2b346480-39a9-4faa-a0a1-905a283236c7
-begin
-	cor_kendall
+let
+	cor_kendall_column_and_row_sort
 
 	fig = Figure()
 	ax = Axis(
@@ -235,25 +241,30 @@ begin
     yticks = (1:14, names(outlier_free_housing))
     )  
 		
-	hm = heatmap!(ax, cor_kendall)
+	hm = heatmap!(ax, cor_kendall_column_and_row_sort, colormap=:coolwarm)
 	
 	
 	Colorbar(fig[1 ,2], hm; label = "values", width = 15, ticksize = 15)
 	ax.xticklabelrotation = π / 3
 	for i in 1:14, j in 1:14
-    txtcolor = cor_kendall[i, j] < 0.25 ? :white : :black
-    text!(ax, "$(round(cor_kendall[i,j], digits = 2))", position = (i, j),
+    txtcolor = -0.25 < cor_kendall_column_and_row_sort[i, j] < 0.25  ? :white : :black
+    text!(ax, "$(round(cor_kendall_column_and_row_sort[i,j], digits = 2))", position = (i, j),
         color = txtcolor, align = (:center, :center))
 	end
-	
+	ax.title = "Correlation Matrix"
 	fig
 end
 
-# ╔═╡ 62c4edac-2c83-4f56-a687-a1cb2f3a8107
-mm = (DataFrame(cor_kendall, :auto))
+# ╔═╡ 7d65292e-98d9-41ff-8de9-c82e5e2fd828
+md"""
+10. Produce a DataFrame showing all variables and their correlation with MEDV. Sort this DataFrame by absolute value of correlation (to group together the least and most correlated variables).
+"""
 
-# ╔═╡ 79675c06-9f7a-4473-95a1-972705d9784a
-round.(mm; digits=2)
+# ╔═╡ 1df3d77e-e7dd-4ecc-bca0-a11b3e519726
+sorted_correlation_matrix_df = sort(DataFrame(cor_kendall_column_and_row_sort, names(outlier_free_housing)), by=abs) 
+
+# ╔═╡ 6994d47d-0603-4c2b-a166-a532fa079450
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1683,9 +1694,12 @@ version = "3.5.0+0"
 # ╠═927dec5c-4a89-4eb9-beeb-053f5a4f5259
 # ╠═e400a52a-f90a-425f-a58f-f35408051d9e
 # ╠═cd3f6fff-1dea-4f8e-baa0-51a9c08e7fe5
+# ╠═e5fb4a94-64b7-4f29-96da-d016cb40bfa6
+# ╠═718f76cc-8fb1-45e5-b933-2816249fdb18
 # ╟─29cf90a2-3d7f-4a13-adc8-78142c5d9245
 # ╠═2b346480-39a9-4faa-a0a1-905a283236c7
-# ╠═62c4edac-2c83-4f56-a687-a1cb2f3a8107
-# ╠═79675c06-9f7a-4473-95a1-972705d9784a
+# ╟─7d65292e-98d9-41ff-8de9-c82e5e2fd828
+# ╠═1df3d77e-e7dd-4ecc-bca0-a11b3e519726
+# ╠═6994d47d-0603-4c2b-a166-a532fa079450
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
