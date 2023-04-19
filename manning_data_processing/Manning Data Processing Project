@@ -264,7 +264,22 @@ md"""
 sorted_correlation_matrix_df = sort(DataFrame(cor_kendall_column_and_row_sort, names(outlier_free_housing)), by=abs) 
 
 # ╔═╡ 6994d47d-0603-4c2b-a166-a532fa079450
+let
+	f = Figure()
+	axes = [Axis(f[i, j]) for j in 1:4, i in 1:3]
 
+	titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
+    Label(titlelayout[1, 1], "Housing data (outliers removed)", halign = :left, fontsize = 25, color = 	:grey)
+	
+	for (i, ax) in enumerate(axes)
+    ax.title = "$(names(outlier_free_housing_continuous)[i])"
+    scatter!(ax, outlier_free_housing_continuous[!, i],outlier_free_housing_continuous[!, :MEDV], color = (:black, 0.5), markersize = 5)
+	end
+	f		
+end
+
+# ╔═╡ 4ff1026a-7bc1-4e58-9f9c-a501e035a932
+names(outlier_free_housing)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1701,5 +1716,6 @@ version = "3.5.0+0"
 # ╟─7d65292e-98d9-41ff-8de9-c82e5e2fd828
 # ╠═1df3d77e-e7dd-4ecc-bca0-a11b3e519726
 # ╠═6994d47d-0603-4c2b-a166-a532fa079450
+# ╠═4ff1026a-7bc1-4e58-9f9c-a501e035a932
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
