@@ -39,18 +39,24 @@ import Downloads
 
 # ╔═╡ e5af32b6-f164-4914-8bfb-60255bd86fca
 if isfile("housing.data")
-	@info "file already present"
+    @info "file already present"
 else
-	@info "fetching file" 
-	Downloads.download("https://archive.ics.uci.edu/ml/machine-learning-databases/housing/housing.data", "housing.data")
+    @info "fetching file"
+    Downloads.download(
+        "https://archive.ics.uci.edu/ml/machine-learning-databases/housing/housing.data",
+        "housing.data",
+    )
 end
 
 # ╔═╡ 09e8c445-ad94-41b9-892a-b2bb90c88399
 if isfile("housing.names")
-	@info "file already present"
+    @info "file already present"
 else
-	@info "fetching file" 
-	Downloads.download("https://archive.ics.uci.edu/ml/machine-learning-databases/housing/housing.names", "housing.names")
+    @info "fetching file"
+    Downloads.download(
+        "https://archive.ics.uci.edu/ml/machine-learning-databases/housing/housing.names",
+        "housing.names",
+    )
 end
 
 # ╔═╡ 919474ec-3066-4dc5-a6fa-855800be8673
@@ -66,20 +72,56 @@ md"""
 
 # ╔═╡ e48b2455-36f8-4a1a-9b5b-76bc3bb9cffb
 open("housing.data") do f
-	           sha1(f)
-end == [0xad, 0xfa, 0x6b, 0x6d, 0xca,
-	 0x24, 0xa6, 0x3f, 0xe1, 0x66,
-	 0xa9, 0xe7, 0xfa, 0x01, 0xce,
-	 0xe4, 0x33, 0x58, 0x57, 0xd1]
+    sha1(f)
+end == [
+    0xad,
+    0xfa,
+    0x6b,
+    0x6d,
+    0xca,
+    0x24,
+    0xa6,
+    0x3f,
+    0xe1,
+    0x66,
+    0xa9,
+    0xe7,
+    0xfa,
+    0x01,
+    0xce,
+    0xe4,
+    0x33,
+    0x58,
+    0x57,
+    0xd1,
+]
 
 
 # ╔═╡ e92874a7-3e37-4ed4-bf5d-30cd99eadbf1
 open("housing.names") do f
-           sha1(f)
-end == [0xad, 0xfa, 0x6b, 0x6d, 0xca,
- 0x24, 0xa6, 0x3f, 0xe1, 0x66,
- 0xa9, 0xe7, 0xfa, 0x01, 0xce,
- 0xe4, 0x33, 0x58, 0x57, 0xd1]
+    sha1(f)
+end == [
+    0xad,
+    0xfa,
+    0x6b,
+    0x6d,
+    0xca,
+    0x24,
+    0xa6,
+    0x3f,
+    0xe1,
+    0x66,
+    0xa9,
+    0xe7,
+    0xfa,
+    0x01,
+    0xce,
+    0xe4,
+    0x33,
+    0x58,
+    0x57,
+    0xd1,
+]
 
 
 # ╔═╡ c001df7c-5056-40cd-8b43-6012a6743029
@@ -96,7 +138,29 @@ housing_data = nothing
 housing_names = nothing
 
 # ╔═╡ ece62398-0539-4b77-96e7-c37428703e3c
-housing = CSV.read("housing.data", DataFrame; header=["CRIM","ZN", "INDUS", "CHAS", "NOX", "RM", "AGE", "DIS", "RAD", "TAX", "PTRATIO", "B", "LSTAT", "MEDV"], delim=' ', ignorerepeated=true, normalizenames=true)
+housing = CSV.read(
+    "housing.data",
+    DataFrame;
+    header = [
+        "CRIM",
+        "ZN",
+        "INDUS",
+        "CHAS",
+        "NOX",
+        "RM",
+        "AGE",
+        "DIS",
+        "RAD",
+        "TAX",
+        "PTRATIO",
+        "B",
+        "LSTAT",
+        "MEDV",
+    ],
+    delim = ' ',
+    ignorerepeated = true,
+    normalizenames = true,
+)
 
 # ╔═╡ ccb50899-8db7-4c0d-a872-93fc7e1e973e
 describe(housing)
@@ -135,18 +199,24 @@ md"""
 
 # ╔═╡ 4562811a-7369-459f-a716-6efe65a59072
 let
-	f = Figure()
-	axes = [Axis(f[i, j]) for j in 1:4, i in 1:3]
+    f = Figure()
+    axes = [Axis(f[i, j]) for j = 1:4, i = 1:3]
 
-	titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
-    Label(titlelayout[1, 1], "Continuous variables for housing data", halign = :left, fontsize = 25, color = 	:grey)
-	
-	for (i, ax) in enumerate(axes)
-    ax.title = "$(names(housing_continuous)[i])"
-    hist!(ax, housing_continuous[!, i], strokewidth = 1, strokecolor = :black)
-	end
+    titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
+    Label(
+        titlelayout[1, 1],
+        "Continuous variables for housing data",
+        halign = :left,
+        fontsize = 25,
+        color = :grey,
+    )
 
-	f		
+    for (i, ax) in enumerate(axes)
+        ax.title = "$(names(housing_continuous)[i])"
+        hist!(ax, housing_continuous[!, i], strokewidth = 1, strokecolor = :black)
+    end
+
+    f
 end
 
 # ╔═╡ 6454d8b3-08e8-4065-9e6d-c7247385c651
@@ -176,42 +246,70 @@ outlier_indicator_vector = housing_continuous[:, :MEDV] .>= MEDV_maximum
 countmap(outlier_indicator_vector)
 
 # ╔═╡ 296f9c3e-ab50-4766-a114-3b357cf5bd5d
-outlier_index = [i for i in eachindex(housing_continuous[:, :MEDV]) if housing_continuous[:, :MEDV][i] >= MEDV_maximum]
+outlier_index = [
+    i for i in eachindex(housing_continuous[:, :MEDV]) if
+    housing_continuous[:, :MEDV][i] >= MEDV_maximum
+]
 
 # ╔═╡ 5024eef0-50c5-45c9-bb56-05b44b98b97b
-outlier_free_housing = housing[Not(housing[:, :MEDV] .>=  MEDV_maximum), :]
+outlier_free_housing = housing[Not(housing[:, :MEDV] .>= MEDV_maximum), :]
 
 # ╔═╡ 9fcd3982-c627-4714-b0a1-b24e4169a5cb
 let
-	f = Figure()
-	axes = [Axis(f[i, j]) for j in 1:4, i in 1:3]
+    f = Figure()
+    axes = [Axis(f[i, j]) for j = 1:4, i = 1:3]
 
-	titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
-    Label(titlelayout[1, 1], "Housing data (outliers removed)", halign = :left, fontsize = 25, color = 	:grey)
-	
-	for (i, ax) in enumerate(axes)
-    ax.title = "$(names(outlier_free_housing)[i])"
-    hist!(ax, outlier_free_housing[!, i], color = :lightgreen, strokewidth = 	1, strokecolor = :black)
-	end
-	f		
+    titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
+    Label(
+        titlelayout[1, 1],
+        "Housing data (outliers removed)",
+        halign = :left,
+        fontsize = 25,
+        color = :grey,
+    )
+
+    for (i, ax) in enumerate(axes)
+        ax.title = "$(names(outlier_free_housing)[i])"
+        hist!(
+            ax,
+            outlier_free_housing[!, i],
+            color = :lightgreen,
+            strokewidth = 1,
+            strokecolor = :black,
+        )
+    end
+    f
 end
 
 # ╔═╡ 7579fc4d-50b5-4225-b883-e8c032f9c6b2
-outlier_free_housing_continuous = housing_continuous[Not(housing_continuous[:, :MEDV] .>=  MEDV_maximum), :]
+outlier_free_housing_continuous =
+    housing_continuous[Not(housing_continuous[:, :MEDV] .>= MEDV_maximum), :]
 
 # ╔═╡ 927dec5c-4a89-4eb9-beeb-053f5a4f5259
 let
-	f = Figure()
-	axes = [Axis(f[i, j]) for j in 1:4, i in 1:3]
+    f = Figure()
+    axes = [Axis(f[i, j]) for j = 1:4, i = 1:3]
 
-	titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
-    Label(titlelayout[1, 1], "Continuous variables for housing data (outliers removed)", halign = :left, fontsize = 25, color = 	:grey)
-	
-	for (i, ax) in enumerate(axes)
-    ax.title = "$(names(outlier_free_housing_continuous)[i])"
-    hist!(ax, outlier_free_housing_continuous[!, i], color = :lightblue, strokewidth = 	1, strokecolor = :black)
-	end
-	f		
+    titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
+    Label(
+        titlelayout[1, 1],
+        "Continuous variables for housing data (outliers removed)",
+        halign = :left,
+        fontsize = 25,
+        color = :grey,
+    )
+
+    for (i, ax) in enumerate(axes)
+        ax.title = "$(names(outlier_free_housing_continuous)[i])"
+        hist!(
+            ax,
+            outlier_free_housing_continuous[!, i],
+            color = :lightblue,
+            strokewidth = 1,
+            strokecolor = :black,
+        )
+    end
+    f
 end
 
 # ╔═╡ e400a52a-f90a-425f-a58f-f35408051d9e
@@ -223,10 +321,11 @@ md"""
 cor_kendall = pairwise(corkendall, eachcol(outlier_free_housing))
 
 # ╔═╡ e5fb4a94-64b7-4f29-96da-d016cb40bfa6
-cor_kendall_row_sort = sortslices(cor_kendall,dims=1,by=x->x[14],rev=false)
+cor_kendall_row_sort = sortslices(cor_kendall, dims = 1, by = x -> x[14], rev = false)
 
 # ╔═╡ 718f76cc-8fb1-45e5-b933-2816249fdb18
-cor_kendall_column_and_row_sort = sortslices(cor_kendall_row_sort,dims=2,by=x->x[14],rev=false)
+cor_kendall_column_and_row_sort =
+    sortslices(cor_kendall_row_sort, dims = 2, by = x -> x[14], rev = false)
 
 # ╔═╡ 29cf90a2-3d7f-4a13-adc8-78142c5d9245
 md"""
@@ -235,27 +334,32 @@ md"""
 
 # ╔═╡ 2b346480-39a9-4faa-a0a1-905a283236c7
 let
-	cor_kendall_column_and_row_sort
+    cor_kendall_column_and_row_sort
 
-	fig = Figure()
-	ax = Axis(
-    fig[1, 1], 
-    xticks = (1:14, names(outlier_free_housing)), 
-    yticks = (1:14, names(outlier_free_housing))
-    )  
-		
-	hm = heatmap!(ax, cor_kendall_column_and_row_sort, colormap=:coolwarm)
-	
-	
-	Colorbar(fig[1 ,2], hm; label = "values", width = 15, ticksize = 15)
-	ax.xticklabelrotation = π / 3
-	for i in 1:14, j in 1:14
-    txtcolor = -0.25 < cor_kendall_column_and_row_sort[i, j] < 0.25  ? :white : :black
-    text!(ax, "$(round(cor_kendall_column_and_row_sort[i,j], digits = 2))", position = (i, j),
-        color = txtcolor, align = (:center, :center))
-	end
-	ax.title = "Correlation Matrix"
-	fig
+    fig = Figure()
+    ax = Axis(
+        fig[1, 1],
+        xticks = (1:14, names(outlier_free_housing)),
+        yticks = (1:14, names(outlier_free_housing)),
+    )
+
+    hm = heatmap!(ax, cor_kendall_column_and_row_sort, colormap = :coolwarm)
+
+
+    Colorbar(fig[1, 2], hm; label = "values", width = 15, ticksize = 15)
+    ax.xticklabelrotation = π / 3
+    for i = 1:14, j = 1:14
+        txtcolor = -0.25 < cor_kendall_column_and_row_sort[i, j] < 0.25 ? :white : :black
+        text!(
+            ax,
+            "$(round(cor_kendall_column_and_row_sort[i,j], digits = 2))",
+            position = (i, j),
+            color = txtcolor,
+            align = (:center, :center),
+        )
+    end
+    ax.title = "Correlation Matrix"
+    fig
 end
 
 # ╔═╡ 7d65292e-98d9-41ff-8de9-c82e5e2fd828
@@ -264,78 +368,192 @@ md"""
 """
 
 # ╔═╡ 1df3d77e-e7dd-4ecc-bca0-a11b3e519726
-sorted_correlation_matrix_df = sort(DataFrame(cor_kendall_column_and_row_sort, names(outlier_free_housing)), by=abs) 
+sorted_correlation_matrix_df =
+    sort(DataFrame(cor_kendall_column_and_row_sort, names(outlier_free_housing)), by = abs)
 
 # ╔═╡ 6994d47d-0603-4c2b-a166-a532fa079450
 let
-	f = Figure()
-	axes = [Axis(f[i, j]) for j in 1:4, i in 1:3]
+    f = Figure()
+    axes = [Axis(f[i, j]) for j = 1:4, i = 1:3]
 
-	titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
-    Label(titlelayout[1, 1], "Housing data (outliers removed)", halign = :left, fontsize = 25, color = 	:grey)
-	
-	for (i, ax) in enumerate(axes)
-    ax.title = "$(names(outlier_free_housing_continuous)[i])"
-    scatter!(ax, outlier_free_housing_continuous[!, i],outlier_free_housing_continuous[!, :MEDV], color = (:black, 0.5), markersize = 5)
-		
-	end
-	f		
+    titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
+    Label(
+        titlelayout[1, 1],
+        "Housing data (outliers removed)",
+        halign = :left,
+        fontsize = 25,
+        color = :grey,
+    )
+
+    for (i, ax) in enumerate(axes)
+        ax.title = "$(names(outlier_free_housing_continuous)[i])"
+        scatter!(
+            ax,
+            outlier_free_housing_continuous[!, i],
+            outlier_free_housing_continuous[!, :MEDV],
+            color = (:black, 0.5),
+            markersize = 5,
+        )
+
+    end
+    f
 end
-
-# ╔═╡ 4ff1026a-7bc1-4e58-9f9c-a501e035a932
-names(outlier_free_housing)
 
 # ╔═╡ e7be87a3-fa44-46bc-8b03-abd3cde56018
+# ╠═╡ disabled = true
+#=╠═╡
 let
-	f = Figure()
-	
-	plt1 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[1], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    f = Figure()
 
-	plt2 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[2], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt1 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[1], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt3 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[3], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt2 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[2], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt4 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[4], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt3 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[3], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt5 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[5], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt4 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[4], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt6 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[6], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt5 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[5], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt7 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[7], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt6 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[6], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt8 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[8], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt7 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[7], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt9 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[9], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt8 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[8], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt10 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[10], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt9 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[9], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt11 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[11], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    plt10 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[10], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	plt12 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[12], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
-	
+    plt11 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[11], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
-	
-	pros = [plt1 plt2 plt3 plt4
-	plt5 plt6 plt7 plt8
-	plt9 plt10 plt11 plt12]
-	
-	[draw!(f[1,1][i,j], pros[i, j]) for i in 1:3, j in 1:4]
-	
-	f
+    plt12 =
+        data(outlier_free_housing_continuous) *
+        mapping(names(outlier_free_housing_continuous)[12], :MEDV) *
+        (
+            visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+            linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+        )
 
+
+
+    pros = [
+        plt1 plt2 plt3 plt4
+        plt5 plt6 plt7 plt8
+        plt9 plt10 plt11 plt12
+    ]
+
+    [draw!(f[1, 1][i, j], pros[i, j]) for i = 1:3, j = 1:4]
+
+    f
 
 
 end
+  ╠═╡ =#
 
-# ╔═╡ ae471e61-c47c-400d-b38c-afcf759d56f9
+# ╔═╡ 95b2742f-d900-4c58-a47b-1b340bf62397
 let
-	f = Figure()
-	
-	plt1 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[1], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+    f = Figure()
 
-	draw(plt1)
+    plts = Layers[]
+    col_names = names(outlier_free_housing_continuous)
 
-	
+    for i in eachindex(col_names)
+        df = hcat(
+            outlier_free_housing_continuous[:, [i]],
+            outlier_free_housing_continuous[:, [12]];
+            makeunique = true,
+        )
+
+        plt =
+            data(df) *
+            mapping(names(df)[1], names(df)[2]) *
+            (
+                visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+                linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+            )
+
+        push!(plts, plt)
+
+    end
+
+
+    plt_layout = [
+        plts[1] plts[2] plts[3] plts[4]
+        plts[5] plts[6] plts[7] plts[8]
+        plts[9] plts[10] plts[11] plts[12]
+    ]
+
+    [draw!(f[1, 1][i, j], plt_layout[i, j]) for i = 1:3, j = 1:4]
+
+    f
+
 
 end
 
@@ -1822,9 +2040,8 @@ version = "3.5.0+0"
 # ╟─7d65292e-98d9-41ff-8de9-c82e5e2fd828
 # ╠═1df3d77e-e7dd-4ecc-bca0-a11b3e519726
 # ╠═6994d47d-0603-4c2b-a166-a532fa079450
-# ╠═4ff1026a-7bc1-4e58-9f9c-a501e035a932
 # ╠═44f79469-2a67-45a3-8562-43614458a428
-# ╠═e7be87a3-fa44-46bc-8b03-abd3cde56018
-# ╠═ae471e61-c47c-400d-b38c-afcf759d56f9
+# ╟─e7be87a3-fa44-46bc-8b03-abd3cde56018
+# ╠═95b2742f-d900-4c58-a47b-1b340bf62397
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
