@@ -16,6 +16,9 @@ using StatsBase
 # ╔═╡ bd157afe-ddfb-4067-8990-a0ed403fd9ce
 using CairoMakie
 
+# ╔═╡ 44f79469-2a67-45a3-8562-43614458a428
+using AlgebraOfGraphics
+
 # ╔═╡ ae388ba9-329c-4cf7-a1ed-8a563aa2a31b
 md"""
 # Analyze and Prepare the Boston Housing Dataset
@@ -274,6 +277,7 @@ let
 	for (i, ax) in enumerate(axes)
     ax.title = "$(names(outlier_free_housing_continuous)[i])"
     scatter!(ax, outlier_free_housing_continuous[!, i],outlier_free_housing_continuous[!, :MEDV], color = (:black, 0.5), markersize = 5)
+		
 	end
 	f		
 end
@@ -281,9 +285,64 @@ end
 # ╔═╡ 4ff1026a-7bc1-4e58-9f9c-a501e035a932
 names(outlier_free_housing)
 
+# ╔═╡ e7be87a3-fa44-46bc-8b03-abd3cde56018
+let
+	f = Figure()
+	
+	plt1 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[1], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt2 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[2], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt3 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[3], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt4 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[4], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt5 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[5], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt6 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[6], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt7 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[7], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt8 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[8], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt9 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[9], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt10 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[10], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt11 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[11], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	plt12 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[12], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+	
+
+	
+	pros = [plt1 plt2 plt3 plt4
+	plt5 plt6 plt7 plt8
+	plt9 plt10 plt11 plt12]
+	
+	[draw!(f[1,1][i,j], pros[i, j]) for i in 1:3, j in 1:4]
+	
+	f
+
+
+
+end
+
+# ╔═╡ ae471e61-c47c-400d-b38c-afcf759d56f9
+let
+	f = Figure()
+	
+	plt1 = data(outlier_free_housing_continuous) * mapping(names(outlier_free_housing_continuous)[1], :MEDV) * (visual(Scatter; markersize = 10, color = :black, alpha =0.5) + linear()) 
+
+	draw(plt1)
+
+	
+
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -292,6 +351,7 @@ SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
+AlgebraOfGraphics = "~0.6.14"
 CSV = "~0.10.9"
 CairoMakie = "~0.10.4"
 DataFrames = "~1.5.0"
@@ -304,7 +364,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.0-rc2"
 manifest_format = "2.0"
-project_hash = "ee51f41527f52ac3b741bc7cf9009f64e6fb6b48"
+project_hash = "01dfd17b28c62b7e78cb61370392556dc1ad60ac"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -330,6 +390,12 @@ weakdeps = ["StaticArrays"]
 
     [deps.Adapt.extensions]
     AdaptStaticArraysExt = "StaticArrays"
+
+[[deps.AlgebraOfGraphics]]
+deps = ["Colors", "Dates", "Dictionaries", "FileIO", "GLM", "GeoInterface", "GeometryBasics", "GridLayoutBase", "KernelDensity", "Loess", "Makie", "PlotUtils", "PooledArrays", "RelocatableFolders", "SnoopPrecompile", "StatsBase", "StructArrays", "Tables"]
+git-tree-sha1 = "43c2ef89ca0cdaf77373401a989abae4410c7b8a"
+uuid = "cbdf2221-f076-402e-a563-3d30da359d67"
+version = "0.6.14"
 
 [[deps.Animations]]
 deps = ["Colors"]
@@ -513,6 +579,18 @@ version = "1.0.0"
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 
+[[deps.Dictionaries]]
+deps = ["Indexing", "Random", "Serialization"]
+git-tree-sha1 = "e82c3c97b5b4ec111f3c1b55228cebc7510525a2"
+uuid = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
+version = "0.3.25"
+
+[[deps.Distances]]
+deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
+git-tree-sha1 = "49eba9ad9f7ead780bfb7ee319f962c811c6d3b2"
+uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+version = "0.10.8"
+
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -656,6 +734,12 @@ version = "1.0.10+0"
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
+[[deps.GLM]]
+deps = ["Distributions", "LinearAlgebra", "Printf", "Reexport", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "StatsModels"]
+git-tree-sha1 = "cd3e314957dc11c4c905d54d1f5a65c979e4748a"
+uuid = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
+version = "1.8.2"
+
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
 git-tree-sha1 = "1cd7f0af1aa58abc02ea1d872953a97359cb87fa"
@@ -756,6 +840,11 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "3d09a9f60edf77f8a4d99f9e015e8fbf9989605d"
 uuid = "905a6f67-0a94-5f89-b386-d35d92009cd1"
 version = "3.1.7+0"
+
+[[deps.Indexing]]
+git-tree-sha1 = "ce1566720fd6b19ff3411404d4b977acd4814f9f"
+uuid = "313cdc1a-70c2-5d6a-ae34-0150d3930a38"
+version = "1.1.1"
 
 [[deps.IndirectArrays]]
 git-tree-sha1 = "012e604e1c7458645cb8b436f8fba789a51b257f"
@@ -938,6 +1027,12 @@ version = "2.36.0+0"
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[[deps.Loess]]
+deps = ["Distances", "LinearAlgebra", "Statistics"]
+git-tree-sha1 = "46efcea75c890e5d820e670516dc156689851722"
+uuid = "4345ca2d-374a-55d4-8d30-97f9976e7612"
+version = "0.5.4"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
@@ -1320,6 +1415,11 @@ version = "1.1.1"
 deps = ["Distributed", "Mmap", "Random", "Serialization"]
 uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
+[[deps.ShiftedArrays]]
+git-tree-sha1 = "503688b59397b3307443af35cd953a13e8005c16"
+uuid = "1277b4bf-5013-50f5-be3d-901d8477a67a"
+version = "2.0.0"
+
 [[deps.Showoff]]
 deps = ["Dates", "Grisu"]
 git-tree-sha1 = "91eddf657aca81df9ae6ceb20b959ae5653ad1de"
@@ -1426,6 +1526,12 @@ version = "1.3.0"
     [deps.StatsFuns.weakdeps]
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
     InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
+
+[[deps.StatsModels]]
+deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Printf", "REPL", "ShiftedArrays", "SparseArrays", "StatsBase", "StatsFuns", "Tables"]
+git-tree-sha1 = "51cdf1afd9d78552e7a08536930d7abc3b288a5c"
+uuid = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
+version = "0.7.1"
 
 [[deps.StringManipulation]]
 git-tree-sha1 = "46da2434b41f41ac3594ee9816ce5541c6096123"
@@ -1717,5 +1823,8 @@ version = "3.5.0+0"
 # ╠═1df3d77e-e7dd-4ecc-bca0-a11b3e519726
 # ╠═6994d47d-0603-4c2b-a166-a532fa079450
 # ╠═4ff1026a-7bc1-4e58-9f9c-a501e035a932
+# ╠═44f79469-2a67-45a3-8562-43614458a428
+# ╠═e7be87a3-fa44-46bc-8b03-abd3cde56018
+# ╠═ae471e61-c47c-400d-b38c-afcf759d56f9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
