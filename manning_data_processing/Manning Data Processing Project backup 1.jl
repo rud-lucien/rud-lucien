@@ -439,18 +439,6 @@ let
 
 end
 
-# ╔═╡ 38ffc87b-117e-41ae-b340-b1cb8d97167c
-outlier_free_housing_continuous_noB = select(outlier_free_housing_continuous, Not(:B))
-
-# ╔═╡ fb84b0a7-026c-4088-8e56-dcf3152d37ed
-outlier_free_housing_continuous_noB.CRIM = log.(outlier_free_housing_continuous_noB.CRIM)
-
-# ╔═╡ 00f9166c-00fd-459a-9dab-212096d538b1
-outlier_free_housing_continuous_noB.DIS = log.(outlier_free_housing_continuous_noB.DIS)
-
-# ╔═╡ bc048fe1-01f5-4f53-a4cd-97145fa095bb
-outlier_free_housing_continuous_noB
-
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -1935,10 +1923,7 @@ version = "3.5.0+0"
 # ╠═1df3d77e-e7dd-4ecc-bca0-a11b3e519726
 # ╠═6994d47d-0603-4c2b-a166-a532fa079450
 # ╠═44f79469-2a67-45a3-8562-43614458a428
+# ╟─e7be87a3-fa44-46bc-8b03-abd3cde56018
 # ╠═95b2742f-d900-4c58-a47b-1b340bf62397
-# ╠═38ffc87b-117e-41ae-b340-b1cb8d97167c
-# ╠═fb84b0a7-026c-4088-8e56-dcf3152d37ed
-# ╠═00f9166c-00fd-459a-9dab-212096d538b1
-# ╠═bc048fe1-01f5-4f53-a4cd-97145fa095bb
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
