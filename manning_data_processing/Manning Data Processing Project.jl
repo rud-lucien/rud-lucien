@@ -403,6 +403,15 @@ end
 let
     f = Figure()
 
+    titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
+    Label(
+        titlelayout[1, 1],
+        "Correlation with MEDV variable (outliers removed)",
+        halign = :left,
+        fontsize = 25,
+        color = :grey,
+    )
+
     plts = Layers[]
     col_names = names(outlier_free_housing_continuous)
 
@@ -437,19 +446,78 @@ let
     f
 
 
+
 end
 
 # ╔═╡ 38ffc87b-117e-41ae-b340-b1cb8d97167c
 outlier_free_housing_continuous_noB = select(outlier_free_housing_continuous, Not(:B))
 
-# ╔═╡ fb84b0a7-026c-4088-8e56-dcf3152d37ed
-outlier_free_housing_continuous_noB.CRIM = log.(outlier_free_housing_continuous_noB.CRIM)
+# ╔═╡ 29d9b422-641f-4107-837e-54347cea0b0a
+transform!(
+    outlier_free_housing_continuous_noB,
+    [:CRIM, :DIS] .=> (x -> log.(x)) .=> [:CRIM, :DIS],
+)
 
-# ╔═╡ 00f9166c-00fd-459a-9dab-212096d538b1
-outlier_free_housing_continuous_noB.DIS = log.(outlier_free_housing_continuous_noB.DIS)
+# ╔═╡ c140fb28-6755-47d8-8e5a-22d23dd8a607
+outlier_free_housing_continuous_noB[:, :ZN]
 
-# ╔═╡ bc048fe1-01f5-4f53-a4cd-97145fa095bb
-outlier_free_housing_continuous_noB
+# ╔═╡ 6f16f93e-f54f-4f8b-8f13-ab63f23cb96c
+transform!(outlier_free_housing_continuous_noB, :ZN .=> (x -> x == 0 ? 0 : 1) .=> :ZN)
+
+# ╔═╡ d5d4f05f-e449-4242-89b4-b08fbc3f6cf7
+outlier_free_housing_continuous_noB_noZN =
+    select(outlier_free_housing_continuous_noB, Not(:ZN))
+
+# ╔═╡ ee6cdee3-d34f-4051-bafe-f9f91678fc94
+ncol(outlier_free_housing_continuous_noB_noZN)
+
+# ╔═╡ 46989bfc-431a-4461-9979-0f4c85e5800b
+let
+    f = Figure(resolution = (1000, 700))
+
+    titlelayout = GridLayout(f[0, :], halign = :left, tellwidth = false)
+    Label(
+        titlelayout[1, 1],
+        "Correlation with MEDV variable (log of CRIM and DIS, no ZN and B)",
+        halign = :left,
+        fontsize = 25,
+        color = :grey,
+    )
+
+    plts = Layers[]
+    col_names = names(outlier_free_housing_continuous_noB_noZN)
+
+    for i in eachindex(col_names)
+        df = hcat(
+            outlier_free_housing_continuous_noB_noZN[:, [i]],
+            outlier_free_housing_continuous_noB_noZN[:, [10]];
+            makeunique = true,
+        )
+
+        plt =
+            data(df) *
+            mapping(names(df)[1], names(df)[2]) *
+            (
+                visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+                linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
+            )
+
+        push!(plts, plt)
+
+    end
+
+
+    plt_layout = [
+        plts[1] plts[2] plts[3] plts[4] plts[5]
+        plts[6] plts[7] plts[8] plts[9] plts[10]
+    ]
+
+    [draw!(f[1, 1][i, j], plt_layout[i, j]) for i = 1:2, j = 1:5]
+
+    f
+
+
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1937,8 +2005,11 @@ version = "3.5.0+0"
 # ╠═44f79469-2a67-45a3-8562-43614458a428
 # ╠═95b2742f-d900-4c58-a47b-1b340bf62397
 # ╠═38ffc87b-117e-41ae-b340-b1cb8d97167c
-# ╠═fb84b0a7-026c-4088-8e56-dcf3152d37ed
-# ╠═00f9166c-00fd-459a-9dab-212096d538b1
-# ╠═bc048fe1-01f5-4f53-a4cd-97145fa095bb
+# ╠═29d9b422-641f-4107-837e-54347cea0b0a
+# ╠═c140fb28-6755-47d8-8e5a-22d23dd8a607
+# ╠═6f16f93e-f54f-4f8b-8f13-ab63f23cb96c
+# ╠═d5d4f05f-e449-4242-89b4-b08fbc3f6cf7
+# ╠═ee6cdee3-d34f-4051-bafe-f9f91678fc94
+# ╠═46989bfc-431a-4461-9979-0f4c85e5800b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
