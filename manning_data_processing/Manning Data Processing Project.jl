@@ -524,7 +524,7 @@ end
 
 # ╔═╡ c9ea24f7-ba35-4f60-89af-ce30cfa5f8cf
 new_housing_nominal = hcat(
-    outlier_free_housing[:, [:CHAS, :RAD]],
+    outlier_free_housing[:, [:MEDV, :CHAS, :RAD]],
     outlier_free_housing_continuous_noB[:, [:ZN]],
 )
 
