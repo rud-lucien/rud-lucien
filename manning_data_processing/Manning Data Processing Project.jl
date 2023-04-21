@@ -173,6 +173,9 @@ md"""
 # ╔═╡ 4510bce9-8421-44bc-aa2a-f19c53c366a7
 housing_nominal = housing[:, [:CHAS, :RAD]]
 
+# ╔═╡ f2275fd9-edf7-41df-a8b1-13ab7d8e8bb2
+
+
 # ╔═╡ 78058231-1030-42ab-abec-1598b8289e70
 housing_continuous = housing[:, Not([:CHAS, :RAD])]
 
@@ -426,7 +429,7 @@ let
             data(df) *
             mapping(names(df)[1], names(df)[2]) *
             (
-                visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+                visual(Scatter; markersize = 5, color = :black, alpha = 0.5) +
                 linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
             )
 
@@ -498,7 +501,7 @@ let
             data(df) *
             mapping(names(df)[1], names(df)[2]) *
             (
-                visual(Scatter; markersize = 10, color = :black, alpha = 0.5) +
+                visual(Scatter; markersize = 5, color = :black, alpha = 0.5) +
                 linear() * visual(; linewidth = 3, color = :red, alpha = 0.5)
             )
 
@@ -518,6 +521,12 @@ let
 
 
 end
+
+# ╔═╡ c9ea24f7-ba35-4f60-89af-ce30cfa5f8cf
+new_housing_nominal = hcat(
+    outlier_free_housing[:, [:CHAS, :RAD]],
+    outlier_free_housing_continuous_noB[:, [:ZN]],
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1971,6 +1980,7 @@ version = "3.5.0+0"
 # ╠═ccb50899-8db7-4c0d-a872-93fc7e1e973e
 # ╟─04348863-cdb4-43c7-b6ab-099c289d7d9f
 # ╠═4510bce9-8421-44bc-aa2a-f19c53c366a7
+# ╠═f2275fd9-edf7-41df-a8b1-13ab7d8e8bb2
 # ╠═78058231-1030-42ab-abec-1598b8289e70
 # ╟─8258f47e-9010-4b63-a7f7-7c745a78de3d
 # ╠═d3410d1b-5bd2-419d-beb3-e6f645db619b
@@ -2011,5 +2021,6 @@ version = "3.5.0+0"
 # ╠═d5d4f05f-e449-4242-89b4-b08fbc3f6cf7
 # ╠═ee6cdee3-d34f-4051-bafe-f9f91678fc94
 # ╠═46989bfc-431a-4461-9979-0f4c85e5800b
+# ╠═c9ea24f7-ba35-4f60-89af-ce30cfa5f8cf
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

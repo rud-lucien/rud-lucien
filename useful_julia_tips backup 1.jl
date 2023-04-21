@@ -7,7 +7,14 @@ using InteractiveUtils
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
     quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local iv = try
+            Base.loaded_modules[Base.PkgId(
+                Base.UUID("6e696c72-6542-2067-7265-42206c756150"),
+                "AbstractPlutoDingetjes",
+            )].Bonds.initial_value
+        catch
+            b -> missing
+        end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
         el
@@ -772,26 +779,26 @@ end
 
 
 # ╔═╡ 1e640996-868d-4acf-9406-7234e9c06794
-r = rand(1:10,30)
+r = rand(1:10, 30)
 
 # ╔═╡ cd165160-9ca7-41e0-b339-8dc424cc08a8
 countmap(r)
 
 # ╔═╡ 19ec85b9-1ad3-4666-86c8-fdb6cb98465a
-r_mapping = Dict{Int, Vector{Int}}()
+r_mapping = Dict{Int,Vector{Int}}()
 
 # ╔═╡ 950bbc99-d34e-4cab-8733-27aa32b484e2
 for (index, value) in enumerate(r)
-       println((index, value))
+    println((index, value))
 end
 
 # ╔═╡ 0fcb2f0b-9325-4030-bc18-c7100dab410c
 for (index, value) in enumerate(r)
-	if haskey(r_mapping, value)
-		push!(r_mapping[value], index)
-	else
-		r_mapping[value] = [index]
-	end
+    if haskey(r_mapping, value)
+        push!(r_mapping[value], index)
+    else
+        r_mapping[value] = [index]
+    end
 end
 
 # ╔═╡ cdce46ad-e2c1-4157-8910-401ab717a7a6
