@@ -1,50 +1,42 @@
 """
-    module SerialPortReader
+    SerialPortReader
 
-A module for reading data from a serial port.
-
-This module provides the following functions:
-
-- `read_serial_data(portname::String, baudrate::Int; databits::Int=8, parity::Symbol=:none, stopbits::Int=1, flowcontrol::Symbol=:none)::String`: Read and parse data from the serial port specified by `portname` at the given `baudrate`. Prints parsed data values to the console.
-- `start_reading()::Nothing`: Start reading data from the serial port in a separate task.
-- `stop_reading()::Nothing`: Stop reading data from the serial port.
-
+This module provides functionality to read data from a serial port, 
+parse it and pass it to a user-specified function for further processing.
 """
 module SerialPortReader
 
     # Import serial port package
     using LibSerialPort
 
-    # Define global variables
-    const portname = "COM9"  # Arduino serial port
-    const baudrate = 9600  # Communication baud rate
+    # Flag to control data reading
     global continue_reading = false
 
     """
-        read_serial_data(portname::String, baudrate::Int; databits::Int=8, parity::Symbol=:none, stopbits::Int=1, flowcontrol::Symbol=:none)::String
+        read_serial_data(ch::Channel, portname::String, baudrate::Int)
 
-    Read and parse data from the serial port specified by `portname` at the given `baudrate`.
-    Prints parsed data values to the console.
+    Reads data from the serial port specified by `portname` at the given `baudrate`, 
+    splits the incoming string into substrings, drops the first element and puts the 
+    rest into the passed `Channel` `ch`.
 
     # Arguments
+    - `ch`: Channel where the read data is put (Channel)
     - `portname`: Name of the serial port (String)
     - `baudrate`: Baud rate for the serial communication (Int)
-    - `databits`: Number of data bits (Int, default=8)
-    - `parity`: Parity type (Symbol, default=:none)
-    - `stopbits`: Number of stop bits (Int, default=1)
-    - `flowcontrol`: Flow control type (Symbol, default=:none)
 
     # Returns
-    - `data_str`: String containing the read data
+    - `nothing`
     """
-    function read_serial_data(portname::String, baudrate::Int; databits::Int=8, parity::Symbol=:none, stopbits::Int=1, flowcontrol::Symbol=:none)::String
+    function read_serial_data(ch::Channel, portname::String, baudrate::Int)
         try
-            LibSerialPort.open(portname, baudrate, databits, parity, stopbits, flowcontrol) do sp
+            LibSerialPort.open(portname, baudrate) do sp
                 while (continue_reading)
                     if bytesavailable(sp) > 0
                         data = readuntil(sp, '\n')
                         data_str = String(data)
-                        return data_str
+                        str_values = split(data_str)  # Split the string into an array of substrings
+                        str_values = str_values[2:end]  # Drop the first element
+                        put!(ch, str_values)  # Put the data line into the channel
                     end
                     sleep(0.1)  # Pause to prevent high CPU usage
                 end
@@ -55,37 +47,48 @@ module SerialPortReader
     end
 
     """
-        start_reading()
+        start_reading(portname::String, baudrate::Int, parse_func=println)
 
-    Start reading data from the serial port in a separate task.
+    Starts reading data from the serial port specified by `portname` at the given `baudrate`. 
+    The data is parsed according to `parse_func`, which should be a function that takes an array of 
+    substrings as input and processes it in some way. If `parse_func` is set to `nothing`, the data 
+    is read but not processed.
 
     # Arguments
-    - None
+    - `portname`: Name of the serial port (String)
+    - `baudrate`: Baud rate for the serial communication (Int)
+    - `parse_func`: Function to parse the read data. Should take an array of substrings as input 
+      and process it in some way. If set to `nothing`, the data is read but not processed. 
+      (Function, default=println)
 
     # Returns
-    - None
+    - `nothing`
     """
-    function start_reading()::Nothing
+    function start_reading(portname::String, baudrate::Int, parse_func=println)
         global continue_reading = true
-        @async read_serial_data(portname, baudrate)  # Run in a separate task
+        ch = Channel{Array{SubString{String},1}}(Inf)  # Create a channel to store the data lines
+        @async read_serial_data(ch, portname, baudrate)  # Run read_serial_data in a separate task
+        @async while continue_reading  # Process the data lines in another task
+            data_line = take!(ch)  # Take a data line from the channel
+            if parse_func !== nothing
+                parse_func(data_line)  # Call the parsing function with the data line
+            end
+        end
     end
 
     """
         stop_reading()
 
-    Stop reading data from the serial port.
-
-    # Arguments
-    - None
+    Stops reading data from the serial port.
 
     # Returns
-    - None
+    - `nothing`
     """
-    function stop_reading()::Nothing
+    function stop_reading()
         global continue_reading = false
     end
 
-    # Export functions
-    export read_serial_data, start_reading, stop_reading
+    # Export the functions
+    export start_reading, stop_reading
 
 end
