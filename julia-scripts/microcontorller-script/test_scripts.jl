@@ -6,6 +6,8 @@ include("SerialPortReader.jl")
 using .SerialPortReader  # Import your SerialPortReader module
 using Dates
 
+# Define an empty DataFrame outside the function
+df = DataFrame(Float32[], Symbol[:col1, :col2, :col3, :col4, :col5])
 
 # Define a global variable to control the viewing process
 global continue_viewing = true
@@ -53,11 +55,17 @@ function view_data(portname::String, baudrate::Int)
     global continue_viewing = true
     data_ch = SerialPortReader.start_reading(portname, baudrate)
     start_time = now()
+    
+    # While loop to continuously read data
     @async while continue_viewing
         data = take!(data_ch)
         parsed_data = parse_data(data)
         elapsed_time = (now() - start_time).value / 1000
         parsed_data = [elapsed_time; parsed_data]
+        
+        # Add parsed_data to the DataFrame
+        push!(df, parsed_data')
+        
         @show parsed_data
     end
 end
@@ -74,4 +82,9 @@ function stop_viewing()
     global continue_viewing = false
     SerialPortReader.stop_reading()
 end
+
+# Call the functions
+view_data("COM12", 9600)
+sleep(15)
+stop_viewing()
 

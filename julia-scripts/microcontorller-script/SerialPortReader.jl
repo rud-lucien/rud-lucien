@@ -85,8 +85,10 @@ module SerialPortReader
     # Returns
     - `nothing`
     """
-    function stop_reading()
+    function stop_reading(port::SerialPort)::Nothing
+        close(port)
         global continue_reading = false
+        return nothing
     end
 
     # Export the functions
