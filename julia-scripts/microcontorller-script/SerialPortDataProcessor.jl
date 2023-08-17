@@ -1,6 +1,7 @@
 # Import serial port package
 using LibSerialPort
 using Dates
+using DataFrames
 # Create a fuction called open_serial_port that takes portname and baudrate as arguments and opens the serial port.
 function open_serial_port(portname::String, baudrate::Int)::SerialPort
     try
@@ -49,7 +50,7 @@ end
 
 
 # Create a function called read_serial_data that reads data from the data_ch if its open and returns it as an array of strings, else it notifies the user
-function read_serial_data(port::SerialPort)::Channel{Array{SubString{String},1}}
+function read_serial_data(port::SerialPort)::Union{Channel{Array{SubString{String},1}}, Nothing}
     if check_serial_port(port) == true
         data_ch = Channel{Array{SubString{String},1}}(1)
 
@@ -66,6 +67,7 @@ function read_serial_data(port::SerialPort)::Channel{Array{SubString{String},1}}
         return data_ch
     else
         println("Serial port not open")
+        return nothing
     end
 end
 
@@ -82,21 +84,38 @@ function parse_data(data::Array{SubString{String},1})
 end
 
 
-function view_data_for_live_plot(incoming_data::Channel{Array{SubString{String},1}})
+function view_data_for_live_plot(incoming_data::Union{Channel{Array{SubString{String},1}}, Nothing}, df::DataFrame)
+    if incoming_data == nothing
+        println("No data channel available")
+        return
+    end
+
     start_time = now()
     @async while true
         data = take!(incoming_data)
         parsed_data = parse_data(data)
         elapsed_time = (now() - start_time).value / 1000
         parsed_data = [elapsed_time; parsed_data]
-        #@show parsed_data
+        push!(df, parsed_data)
     end
 end
 
-data_ch = open_serial_port("COM12", 9600)
+df_live = DataFrame(DataFrame(Time=Float64[], Humidity=Float64[], Temperature_C=Float64[], Temperature_F=Float64[], Heat_Index_C=Float64[], Heat_Index_F=Float64[])
+)
 
+# Open the serial port and start reading data
+data_ch = open_serial_port("COM12", 9600)
+incoming_data = read_serial_data(data_ch)
+view_data_for_live_plot(incoming_data, df_live)
+
+# Wait for some data to be read
+sleep(5)
+
+# Close the serial port
+close_serial_port(data_ch)
+vscodedisplay(df_live)
 # Call the read_serial_data function
-read_serial_data(data_ch)
+#read_serial_data(data_ch)
 
 # Call the parse_live_data function
 view_data_for_live_plot(read_serial_data(data_ch))
