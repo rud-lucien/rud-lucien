@@ -76,6 +76,9 @@ end
 function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{SubString{String},1}}, Nothing}, df::DataFrame)
     global continue_reading = true
 
+    # Re-initialize df_live
+    empty!(df)
+
     if incoming_data == nothing
         println("No data channel available")
         return
