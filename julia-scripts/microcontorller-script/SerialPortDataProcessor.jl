@@ -14,6 +14,7 @@ function open_serial_port(portname::String, baudrate::Int)::SerialPort
         return port
     catch e
         println("Could not open port $portname: $e")  # Error handling
+        return nothing
     end
 end
 
@@ -57,7 +58,7 @@ function read_serial_data(port::SerialPort)::Union{Channel{Array{SubString{Strin
 end
 
 # Function to parse data from an array of strings to an array of floats
-function parse_data(data::Array{SubString{String},1})
+function parse_data(data::Array{SubString{String},1})::Array{Float64,1}
     # Remove any non-numeric strings
     numeric_data = filter(x -> isdigit(x[1]) || x[1] == '.', data)
 
@@ -68,12 +69,13 @@ function parse_data(data::Array{SubString{String},1})
 end
 
 # Function to stop reading data for live plot
-function stop_reading_data_for_live_plot()
+function stop_reading_data_for_live_plot()::Nothing
     global continue_reading = false
+    return nothing
 end
 
 # Function to start reading data for live plot
-function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{SubString{String},1}}, Nothing}, df::DataFrame)
+function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{SubString{String},1}}, Nothing}, df::DataFrame)::Nothing
     global continue_reading = true
 
     # Re-initialize df_live
@@ -81,7 +83,7 @@ function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{Sub
 
     if incoming_data == nothing
         println("No data channel available")
-        return
+        return nothing
     end
 
     start_time = now()
@@ -93,6 +95,7 @@ function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{Sub
         push!(df, parsed_data)
         sleep(0.1)  # Pause to prevent high CPU usage
     end
+    return nothing
 end
 
 # Define a DataFrame to store the live data
