@@ -1,7 +1,9 @@
 # Import necessary packages
-using LibSerialPort
-using Dates
 using DataFrames
+using Dates
+using GLMakie
+using LibSerialPort
+#using Observables
 
 # Global flag to control the data reading process
 global continue_reading = false
@@ -75,13 +77,13 @@ function stop_reading_data_for_live_plot()::Nothing
 end
 
 # Function to start reading data for live plot
-function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{SubString{String},1}}, Nothing}, df::DataFrame)::Nothing
+function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{SubString{String},1}},Nothing}, df::DataFrame)::Nothing
     global continue_reading = true
 
     # Re-initialize df_live
     empty!(df)
 
-    if incoming_data == nothing
+    if incoming_data == empty
         println("No data channel available")
         return nothing
     end
@@ -93,23 +95,61 @@ function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{Sub
         elapsed_time = (now() - start_time).value / 1000
         parsed_data = [elapsed_time; parsed_data]
         push!(df, parsed_data)
-        sleep(0.1)  # Pause to prevent high CPU usage
+        notify(obs_time)
+        sleep(0.1)
+        # Pause to prevent high CPU usage
     end
     return nothing
 end
 
-# Define a DataFrame to store the live data
-df_live = DataFrame(DataFrame(Time=Float64[], Humidity=Float64[], Temperature_C=Float64[], Temperature_F=Float64[], Heat_Index_C=Float64[], Heat_Index_F=Float64[]))
+# Define an Observable DataFrame to store the live data
+df_live = DataFrame(Time=Float64[0.0], Humidity=Float64[0.0], Temperature_C=Float64[0.0], 
+                    Temperature_F=Float64[0.0], Heat_Index_C=Float64[0.0], Heat_Index_F=Float64[0.0])
+
+
+obs_time = Observable(df_live.Time)
+obs_humidity = Observable(df_live.Humidity)
+
+
+# Define a figure to plot the live data
+fig = Figure(resolution = (800, 600))
+ax = Axis(fig[1, 1])
+limits!(ax, 0, 300, 0, 100)
+#on(obs_time) do _
+    #reset_limits!(ax)
+#end
+
+lines!(ax, obs_time, obs_humidity, color = :red, linewidth = 2, linestyle = :solid, label = "Humidity")
+
+
+display(fig)
+
+fig[2, 1] = buttongrid = GridLayout(tellwidth = false, height = 100)
+labels = ["Start", "Stop", "Clear"]
+
+buttons = buttongrid[1, 1:3] = [
+    Button(fig, label = l, height =  60, width = 250, fontsize = 20
+    )
+    for l in labels
+]
+
+on(buttons[3].clicks) do _
+    for col in names(df_live)
+        df_live[!, col] .= 0
+    end
+    notify(obs_time)
+    lines!(ax, obs_time, obs_humidity, color = :red, linewidth = 2, linestyle = :solid, label = "Humidity")
+end
+
 
 # Open the serial port and start reading data
-data_ch = open_serial_port("COM12", 9600)
+data_ch = open_serial_port("COM18", 9600)
 incoming_data = read_serial_data(data_ch)
 
 # Start reading data for live plot
 start_reading_data_for_live_plot(incoming_data, df_live)
 
-# Wait for some data to be read
-sleep(5)
+sleep(15)
 
 # Stop reading data for live plot
 stop_reading_data_for_live_plot()
