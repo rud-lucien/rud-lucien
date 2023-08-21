@@ -83,7 +83,7 @@ function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{Sub
     # Re-initialize df_live
     empty!(df)
 
-    if incoming_data == empty
+    if incoming_data == nothing
         println("No data channel available")
         return nothing
     end
@@ -102,29 +102,121 @@ function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{Sub
     return nothing
 end
 
-# Define an Observable DataFrame to store the live data
+################################################################################
+# DataFrame
+################################################################################
+
+# Define a DataFrame to store the live data
 df_live = DataFrame(Time=Float64[0.0], Humidity=Float64[0.0], Temperature_C=Float64[0.0], 
                     Temperature_F=Float64[0.0], Heat_Index_C=Float64[0.0], Heat_Index_F=Float64[0.0])
 
-
+# Define Observables for the live data
 obs_time = Observable(df_live.Time)
 obs_humidity = Observable(df_live.Humidity)
 
+################################################################################
+# Initialize the serial port
+################################################################################
+
+fig = Figure(resolution = (800, 600))
+ax1 = Axis(fig[1, 1], title = "Open/Close Serial Port")
+hidedecorations!(ax1)
+
+ports = get_port_list()
+baudrates = [9600, 19200, 38400, 57600, 115200]
+
+portsmenu = Menu(fig, options = ports, fontsize = 20)
+baudratemenu = Menu(fig, options = baudrates, fontsize = 20)
+
+data_ch = Observable{Union{SerialPort, Nothing}}(nothing)
+
+open_button = Button(fig, label = "Open Port", height = 60, width = 250, fontsize = 20)
+close_button = Button(fig, label = "Close Port", height = 60, width = 250, fontsize = 20)
+
+fig[1, 1] = vgrid!(
+    Label(fig, "Ports:", fontsize = 30, width = 400), portsmenu,
+    Label(fig, "Baudrate:", fontsize = 30, width = 400), baudratemenu,
+    Label(fig, "", fontsize = 30, width = 400),
+    open_button, 
+    Label(fig, "", fontsize = 30, width = 400),
+    close_button;
+    tellheight = false, width = 500
+)
+
+selected_port = Observable(ports[1])
+selected_baudrate = Observable(baudrates[1])
+
+on(portsmenu.selection) do select
+    selected_port[] = select
+    println("Selected port: $select")
+end
+
+on(baudratemenu.selection) do select
+    selected_baudrate[] = select
+    println("Selected baudrate: $select")
+end
+
+on(open_button.clicks) do _
+    # Open the serial port and start reading data
+    data_ch[] = open_serial_port(selected_port[], selected_baudrate[])
+    incoming_data = read_serial_data(data_ch[])
+    println("Port opened")
+end
+
+on(close_button.clicks) do _
+    # Close the serial port
+    if data_ch[] != nothing
+        close_serial_port(data_ch[])
+        println("Port closed")
+    else
+        println("No port to close")
+    end
+end
+
+# Open the serial port and start reading data
+#data_ch = open_serial_port(selected_port[], selected_baudrate[])
+#incoming_data = read_serial_data(data_ch)
+
+################################################################################
+# Initialize the serial port
+################################################################################
+
+#Create buttons to open and close the serial port in f[1, 1]
+fig[2, 1] = buttongrid_for_ports = GridLayout(tellwidth = false, height = 100)
+port_button_labels = ["Open Port", "Close Port"]
+buttons = [
+    Button(fig, label = "Open Port", height = 60, width = 250, fontsize = 20),
+    Button(fig, label = "Close Port", height = 60, width = 250, fontsize = 20)
+]
+
+buttongrid_for_ports[1, 1] = buttons[1]
+buttongrid_for_ports[2, 1] = buttons[2]
+
+
+
+
+
+################################################################################
+# Plot
+################################################################################
 
 # Define a figure to plot the live data
 fig = Figure(resolution = (800, 600))
-ax = Axis(fig[1, 1])
-limits!(ax, 0, 300, 0, 100)
-#on(obs_time) do _
-    #reset_limits!(ax)
-#end
+ax2 = Axis(fig[1, 2])
+limits!(ax2, 0, 300, 0, 100)
 
-lines!(ax, obs_time, obs_humidity, color = :red, linewidth = 2, linestyle = :solid, label = "Humidity")
 
+lines!(ax2, obs_time, obs_humidity, color = :red, linewidth = 2, linestyle = :solid, label = "Humidity")
 
 display(fig)
 
-fig[2, 1] = buttongrid = GridLayout(tellwidth = false, height = 100)
+
+
+
+################################################################################
+# Plot Buttons
+################################################################################
+fig[2, 2] = buttongrid = GridLayout(tellwidth = false, nrows = 2, height = 100)
 labels = ["Start", "Stop", "Clear"]
 
 buttons = buttongrid[1, 1:3] = [
@@ -133,18 +225,17 @@ buttons = buttongrid[1, 1:3] = [
     for l in labels
 ]
 
-on(buttons[3].clicks) do _
-    for col in names(df_live)
-        df_live[!, col] .= 0
-    end
-    notify(obs_time)
-    lines!(ax, obs_time, obs_humidity, color = :red, linewidth = 2, linestyle = :solid, label = "Humidity")
+on(buttons[1].clicks) do _
+    start_reading_data_for_live_plot(incoming_data, df_live)
 end
 
+on(buttons[2].clicks) do _
+    stop_reading_data_for_live_plot()
+end
 
-# Open the serial port and start reading data
-data_ch = open_serial_port("COM18", 9600)
-incoming_data = read_serial_data(data_ch)
+on(buttons[3].clicks) do _
+    empty!(ax)
+end
 
 # Start reading data for live plot
 start_reading_data_for_live_plot(incoming_data, df_live)
