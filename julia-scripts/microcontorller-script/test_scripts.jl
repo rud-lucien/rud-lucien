@@ -88,3 +88,18 @@ view_data("COM12", 9600)
 sleep(15)
 stop_viewing()
 
+fig = Figure(resolution = (800, 600))
+ax = Axis(fig[1, 1])
+
+# Create an Observable to hold the mouse position text
+mouse_position = Observable("Mouse position: (0, 0)")
+
+# Add the text to the plot
+text!(ax, mouse_position, position = (10, 10), fontsize = 20)
+
+# Update the Observable with the current mouse position whenever the mouse is moved
+on(fig.scene.events.mouseposition) do pos
+    mouse_position[] = "Mouse position: " * string(pos)
+end
+scatter!(ax, markersize = ms, color = color)
+fig

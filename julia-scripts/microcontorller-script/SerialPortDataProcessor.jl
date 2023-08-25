@@ -39,7 +39,9 @@ end
 
 # Function to read data from a serial port
 # It reads data continuously in an asynchronous loop
-function read_serial_data(port::SerialPort)::Union{Channel{Array{SubString{String},1}}, Nothing}
+function read_serial_data(
+    port::SerialPort,
+)::Union{Channel{Array{SubString{String},1}},Nothing}
     if check_serial_port(port) == true
         data_ch = Channel{Array{SubString{String},1}}(1)
 
@@ -77,11 +79,15 @@ function stop_reading_data_for_live_plot()::Nothing
 end
 
 # Function to start reading data for live plot
-function start_reading_data_for_live_plot(incoming_data::Union{Channel{Array{SubString{String},1}},Nothing}, df::DataFrame)::Nothing
+function start_reading_data_for_live_plot(
+    incoming_data::Union{Channel{Array{SubString{String},1}},Nothing},
+    df::DataFrame,
+)::Nothing
     global continue_reading = true
 
     # Re-initialize df_live
     empty!(df)
+
 
     if incoming_data == nothing
         println("No data channel available")
@@ -107,8 +113,14 @@ end
 ################################################################################
 
 # Define a DataFrame to store the live data
-df_live = DataFrame(Time=Float64[0.0], Humidity=Float64[0.0], Temperature_C=Float64[0.0], 
-                    Temperature_F=Float64[0.0], Heat_Index_C=Float64[0.0], Heat_Index_F=Float64[0.0])
+df_live = DataFrame(
+    Time = Float64[0.0],
+    Humidity = Float64[0.0],
+    Temperature_C = Float64[0.0],
+    Temperature_F = Float64[0.0],
+    Heat_Index_C = Float64[0.0],
+    Heat_Index_F = Float64[0.0],
+)
 
 # Define Observables for the live data
 obs_time = Observable(df_live.Time)
@@ -119,8 +131,7 @@ obs_humidity = Observable(df_live.Humidity)
 ################################################################################
 
 fig = Figure(resolution = (800, 600))
-ax1 = Axis(fig[1, 1], title = "Open/Close Serial Port")
-hidedecorations!(ax1)
+
 
 ports = get_port_list()
 baudrates = [9600, 19200, 38400, 57600, 115200]
@@ -128,20 +139,36 @@ baudrates = [9600, 19200, 38400, 57600, 115200]
 portsmenu = Menu(fig, options = ports, fontsize = 20)
 baudratemenu = Menu(fig, options = baudrates, fontsize = 20)
 
-data_ch = Observable{Union{SerialPort, Nothing}}(nothing)
+data_ch = Observable{Union{SerialPort,Nothing}}(nothing)
+
 
 open_button = Button(fig, label = "Open Port", height = 60, width = 250, fontsize = 20)
 close_button = Button(fig, label = "Close Port", height = 60, width = 250, fontsize = 20)
 
-fig[1, 1] = vgrid!(
-    Label(fig, "Ports:", fontsize = 30, width = 400), portsmenu,
-    Label(fig, "Baudrate:", fontsize = 30, width = 400), baudratemenu,
-    Label(fig, "", fontsize = 30, width = 400),
-    open_button, 
-    Label(fig, "", fontsize = 30, width = 400),
-    close_button;
-    tellheight = false, width = 500
+led_color = [:honeydew4, :chartreuse]
+assigned_led_color = Observable(led_color[1])
+led = Box(
+    fig,
+    color = assigned_led_color,
+    height = 30,
+    width = 30,
+    strokewidth = 3,
+    strokecolor = :grey63,
 )
+
+fig[1, 1] = vgrid!(
+    Label(fig, "Ports:", fontsize = 30, width = 400),
+    portsmenu,
+    Label(fig, "Baudrate:", fontsize = 30, width = 400),
+    baudratemenu,
+    Label(fig, "", fontsize = 30, width = 400),
+    open_button,
+    led,
+    close_button;
+    tellheight = false,
+    width = 500,
+)
+
 
 selected_port = Observable(ports[1])
 selected_baudrate = Observable(baudrates[1])
@@ -159,7 +186,7 @@ end
 on(open_button.clicks) do _
     # Open the serial port and start reading data
     data_ch[] = open_serial_port(selected_port[], selected_baudrate[])
-    incoming_data = read_serial_data(data_ch[])
+    assigned_led_color[] = led_color[2]
     println("Port opened")
 end
 
@@ -167,51 +194,31 @@ on(close_button.clicks) do _
     # Close the serial port
     if data_ch[] != nothing
         close_serial_port(data_ch[])
+        assigned_led_color[] = led_color[1]
         println("Port closed")
     else
         println("No port to close")
     end
 end
 
-# Open the serial port and start reading data
-#data_ch = open_serial_port(selected_port[], selected_baudrate[])
-#incoming_data = read_serial_data(data_ch)
-
 ################################################################################
-# Initialize the serial port
-################################################################################
-
-#Create buttons to open and close the serial port in f[1, 1]
-fig[2, 1] = buttongrid_for_ports = GridLayout(tellwidth = false, height = 100)
-port_button_labels = ["Open Port", "Close Port"]
-buttons = [
-    Button(fig, label = "Open Port", height = 60, width = 250, fontsize = 20),
-    Button(fig, label = "Close Port", height = 60, width = 250, fontsize = 20)
-]
-
-buttongrid_for_ports[1, 1] = buttons[1]
-buttongrid_for_ports[2, 1] = buttons[2]
-
-
-
-
-
-################################################################################
-# Plot
+# Live Plot
 ################################################################################
 
 # Define a figure to plot the live data
-fig = Figure(resolution = (800, 600))
-ax2 = Axis(fig[1, 2])
-limits!(ax2, 0, 300, 0, 100)
+ax1 = Axis(fig[1, 2])
+limits!(ax1, 0, 300, 0, 100)
 
 
-lines!(ax2, obs_time, obs_humidity, color = :red, linewidth = 2, linestyle = :solid, label = "Humidity")
-
-display(fig)
-
-
-
+lines!(
+    ax1,
+    obs_time,
+    obs_humidity,
+    color = :red,
+    linewidth = 2,
+    linestyle = :solid,
+    label = "Humidity",
+)
 
 ################################################################################
 # Plot Buttons
@@ -219,37 +226,35 @@ display(fig)
 fig[2, 2] = buttongrid = GridLayout(tellwidth = false, nrows = 2, height = 100)
 labels = ["Start", "Stop", "Clear"]
 
-buttons = buttongrid[1, 1:3] = [
-    Button(fig, label = l, height =  60, width = 250, fontsize = 20
-    )
-    for l in labels
-]
+buttons =
+    buttongrid[1, 1:3] =
+        [Button(fig, label = l, height = 60, width = 250, fontsize = 20) for l in labels]
 
 on(buttons[1].clicks) do _
+    incoming_data = read_serial_data(data_ch[])
     start_reading_data_for_live_plot(incoming_data, df_live)
+    lines!(
+        ax1,
+        obs_time,
+        obs_humidity,
+        color = :red,
+        linewidth = 2,
+        linestyle = :solid,
+        label = "Humidity",
+    )
+    println("Start Reading Data")
 end
 
 on(buttons[2].clicks) do _
     stop_reading_data_for_live_plot()
+    println("Stop Reading Data")
 end
+
+
 
 on(buttons[3].clicks) do _
-    empty!(ax)
+    empty!(ax1)
+    println("Cleared Plot")
 end
 
-# Start reading data for live plot
-start_reading_data_for_live_plot(incoming_data, df_live)
-
-sleep(15)
-
-# Stop reading data for live plot
-stop_reading_data_for_live_plot()
-
-# Close the serial port
-close_serial_port(data_ch)
-
-# Display the DataFrame in a table
-vscodedisplay(df_live)
-
-# Check if the serial port is closed
-check_serial_port(data_ch)
+display(fig)
