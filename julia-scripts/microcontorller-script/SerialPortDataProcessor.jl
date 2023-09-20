@@ -210,20 +210,14 @@ ax1 = Axis(fig[1, 2])
 limits!(ax1, 0, 300, 0, 100)
 
 
-lines!(
-    ax1,
-    obs_time,
-    obs_humidity,
-    color = :red,
-    linewidth = 2,
-    linestyle = :solid,
-    label = "Humidity",
-)
+
 
 ################################################################################
-# Plot Buttons
+# Live Plot and Buttons
 ################################################################################
-fig[2, 2] = buttongrid = GridLayout(tellwidth = false, nrows = 2, height = 100)
+# Define a figure to plot the live data
+ax1 = Axis(fig[1, 2])
+fig[2, 2] = buttongrid = GridLayout(tellwidth = false)
 labels = ["Start", "Stop", "Clear"]
 
 buttons =
@@ -233,6 +227,7 @@ buttons =
 on(buttons[1].clicks) do _
     incoming_data = read_serial_data(data_ch[])
     start_reading_data_for_live_plot(incoming_data, df_live)
+    limits!(ax1, 0, 300, 0, 100)
     lines!(
         ax1,
         obs_time,
@@ -249,8 +244,6 @@ on(buttons[2].clicks) do _
     stop_reading_data_for_live_plot()
     println("Stop Reading Data")
 end
-
-
 
 on(buttons[3].clicks) do _
     empty!(ax1)
