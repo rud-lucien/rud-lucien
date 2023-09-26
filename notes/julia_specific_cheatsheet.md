@@ -54,3 +54,27 @@ df = DataFrame(A = Vector{Int}(undef, 1000), B = Vector{Float64}(undef, 1000), C
 
 # Use @allocated to check how much memory is allocated by a function (this is useful for seeing if you are copying arrays or dataframes unnecessarily)
 @allocated sum(rand(1000))
+
+# Creating a range of numbers
+range_example = range(0, stop=1, length=20)
+println("range_example: ", range_example)
+
+# Using broadcasting with a comparison operator to create a BitVector
+bit_vector = range_example .>= 0.5
+println("bit_vector: ", bit_vector)
+
+# Converting BitVector to Vector of AbstractFloat
+float_vector = convert(Vector{AbstractFloat}, bit_vector)
+println("float_vector: ", float_vector)
+
+# Using broadcasting with an anonymous function and ternary operator
+ternary_vector = (x -> x >= 0.5 ? 1 : 0).(range_example)
+println("ternary_vector: ", ternary_vector)
+
+# Using broadcasting with ifelse function
+ifelse_vector = ifelse.(range_example .>= 0.5, 1, 0)
+println("ifelse_vector: ", ifelse_vector)
+
+# Using map function with an anonymous function and ternary operator
+map_vector = map(x -> x >= 0.5 ? 1 : 0, range_example)
+println("map_vector: ", map_vector)
