@@ -78,3 +78,6 @@ println("ifelse_vector: ", ifelse_vector)
 # Using map function with an anonymous function and ternary operator
 map_vector = map(x -> x >= 0.5 ? 1 : 0, range_example)
 println("map_vector: ", map_vector)
+
+# How to find out what package a function is from i.e. The @which macro in Julia returns the method that would be called for a given set of arguments
+@which sample # this should return the source code for the sample function which is StatsBase
