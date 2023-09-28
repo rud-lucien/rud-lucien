@@ -12,6 +12,7 @@ begin
 	using CairoMakie
 	using StatsBase
 	using Colors
+	using Combinatorics
 end
 
 # ╔═╡ e5a94832-88be-4022-87ff-5a2e31766d83
@@ -646,6 +647,73 @@ means counting up the ways that each card could produce the observed data (a bla
 on the table).
 """
 
+# ╔═╡ e9b6bd39-9841-44e1-b8e3-a91bd7b17bfd
+md"""
+created some code to define the potential combinations
+"""
+
+# ╔═╡ d8714c4a-77be-405b-a9c1-b3e93ea56419
+let
+	# Define colors and number of combinations
+	colors = ["B", "W"]
+
+	# You can change the number of combinations by changing the value of n
+	n = 4
+	
+	# Generate all combinations of n colors
+	combinations = vec(join.(Iterators.product([colors for _ in 1:n]...)))
+	
+	# Function to sort characters in a string
+	sorted_strings(s) = join(sort(collect(s)))
+	
+	# Sort each combination
+	sorted_combinations = map(sorted_strings, combinations) 
+	
+	# Remove duplicates
+	unique_combinations = unique(sorted_combinations)
+
+	cards = sort(unique_combinations, rev=true)
+	
+end
+
+# ╔═╡ e65e1a4e-d742-419e-b888-620b1bd9680e
+let
+	# Define colors and number of combinations
+	colors = ["B", "W"]
+
+	# You can change the number of combinations by changing the value of n
+	n = 4
+	
+	# Generate all combinations of n colors
+	combinations = vec(join.(Iterators.product([colors for _ in 1:n]...)))
+	
+	# Function to sort characters in a string
+	sorted_strings(s) = join(sort(collect(s)))
+	
+	# Sort each combination
+	sorted_combinations = map(sorted_strings, combinations) 
+	
+	# Remove duplicates
+	unique_combinations = unique(sorted_combinations)
+
+	cards = unique_combinations
+	
+	# Define the drawn side colors
+	draw_card = 'B'
+
+
+	# Count occurrence of drawn color in each card
+	ways = [count(c -> c .== draw_card, card) for card in cards]
+end
+
+# ╔═╡ 6260a971-0d67-4760-9f2e-1eccc664728e
+let
+	a = "WWWW"
+	b = 'W'
+
+	occursin(b, a)
+end
+
 # ╔═╡ efdf3b24-4b0b-42e3-b679-7d1e7310ba54
 let
 	cards = ["BB", "BW", "WW"]
@@ -656,13 +724,24 @@ end
 	
 
 # ╔═╡ 8b20a41b-9ac4-4219-91b7-e7448e3c4852
-2 ÷ 4
+let
+	# Define the cards
+	cards = ["BB", "BW", "WW"]
+
+	
+	draw_card = 'B'
+	
+	# Count the number of times draw_card appears in each card
+	ways = [count(c -> c == draw_card, card) for card in cards]
+	
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Tidier = "f0413319-3358-4bb0-8e7c-0c83523a93bd"
@@ -671,6 +750,7 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 [compat]
 CairoMakie = "~0.10.10"
 Colors = "~0.12.10"
+Combinatorics = "~1.0.2"
 Distributions = "~0.25.100"
 StatsBase = "~0.34.2"
 Tidier = "~1.0.1"
@@ -683,7 +763,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "01e099e49f94f44dbc2065ca71081eba4a659b71"
+project_hash = "2329b6673a6b49899d034214a9108242d4938715"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "5d2e21d7b0d8c22f67483ef95ebdc39c0e6b6003"
@@ -3115,6 +3195,10 @@ version = "3.5.0+0"
 # ╟─58f9d4ef-df9e-4fdb-b940-01bf862ae0e7
 # ╠═697615e5-a921-4ddc-893a-6e8a23857b17
 # ╟─ea2de7f4-5dc5-43ec-ba07-9bb15c595e83
+# ╟─e9b6bd39-9841-44e1-b8e3-a91bd7b17bfd
+# ╠═d8714c4a-77be-405b-a9c1-b3e93ea56419
+# ╠═e65e1a4e-d742-419e-b888-620b1bd9680e
+# ╠═6260a971-0d67-4760-9f2e-1eccc664728e
 # ╠═efdf3b24-4b0b-42e3-b679-7d1e7310ba54
 # ╠═8b20a41b-9ac4-4219-91b7-e7448e3c4852
 # ╟─00000000-0000-0000-0000-000000000001

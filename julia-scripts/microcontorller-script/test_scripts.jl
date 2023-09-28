@@ -103,3 +103,24 @@ on(fig.scene.events.mouseposition) do pos
 end
 scatter!(ax, markersize = ms, color = color)
 fig
+
+# Define colors and number of combinations
+colors = ["B", "W"]
+
+# You can change the number of combinations by changing the value of n
+n = 4
+
+# Generate all combinations of n colors
+combinations = vec(join.(Iterators.product([colors for _ in 1:n]...)))
+
+# Function to sort characters in a string
+sorted_strings(s) = join(sort(collect(s)))
+
+# Sort each combination
+sorted_combinations = map(sorted_strings, combinations) 
+
+# Remove duplicates
+unique_combinations = unique(sorted_combinations)
+
+character = 'B'
+
