@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.28
+# v0.19.29
 
 using Markdown
 using InteractiveUtils
@@ -599,6 +599,64 @@ md"""
 2M3. Suppose there are two globes, one for Earth and one for Mars. The Earth globe is 70% covered in water. The Mars globe is 100% land. Further suppose that one of these globes–you don’t know which–was tossed in the air and produces a “land” observation. Assume that each globe was equally likely to be tossed. Show that the posterior probability that the globe was the Earth, conditional on seeing “land” (Pr(Earth|land)
 ), is 0.23.
 """
+
+# ╔═╡ 58f9d4ef-df9e-4fdb-b940-01bf862ae0e7
+md"""
+variables:
+- Earth, Mars, land
+
+what we know:
+- Earth globe 70% water $~~~~~~~~~~~~~~~~~~~$
+$\Pr(land|Earth) = 1 - 0.7$
+- Mars globe 100% land 
+$\Pr(land|Mars) = 1$
+- probability of globes likely to be tossed Earth = Mars = 0.5 
+$\Pr(Earth) = Pr|Mars) = 0.5$
+
+What we want to determine:
+- posterior probability probability that the globe was the Earth, conditional on seeing “land”
+
+$\Pr(Earth|land)=\frac{Pr(land|Earth)Pr(Earth)}{Pr(land)}$
+
+We need to calculate Pr(land):
+
+$\Pr(land)=Pr(land|Earth)Pr(Earth)+Pr(land|Mars)Pr(Mars)$
+
+"""
+
+# ╔═╡ 697615e5-a921-4ddc-893a-6e8a23857b17
+let
+	Pr_land_Earth = 1 - 0.7
+	Pr_land_Mars = 1
+	Pr_Earth, Pr_Mars = 0.5, 0.5
+
+	Pr_land = (Pr_land_Earth * Pr_Earth) + (Pr_land_Mars * Pr_Earth)
+	Pr_Eath_land = (Pr_land_Earth * Pr_Earth) / Pr_land
+end
+
+# ╔═╡ ea2de7f4-5dc5-43ec-ba07-9bb15c595e83
+md"""
+2M4. Suppose you have a deck with only three cards. Each card has two sides, and each side is either
+black or white. One card has two black sides. The second card has one black and one white side. The
+third card has two white sides. Now suppose all three cards are placed in a bag and shuffled. Someone
+reaches into the bag and pulls out a card and places it flat on a table. A black side is shown facing up,
+but you don’t know the color of the side facing down. Show that the probability that the other side is
+also black is 2/3. Use the counting method (Section 2 of the chapter) to approach this problem. This
+means counting up the ways that each card could produce the observed data (a black side facing up
+on the table).
+"""
+
+# ╔═╡ efdf3b24-4b0b-42e3-b679-7d1e7310ba54
+let
+	cards = ["BB", "BW", "WW"]
+	ways = [2, 1, 0]
+	p = ways .// sum(ways)
+	sum(p[cards .== "BB"])
+end
+	
+
+# ╔═╡ 8b20a41b-9ac4-4219-91b7-e7448e3c4852
+2 ÷ 4
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -3054,5 +3112,10 @@ version = "3.5.0+0"
 # ╠═6ba6fcfc-4733-47fb-9fff-83169b114a04
 # ╠═e1ffc014-43fc-49e6-978b-a37c7d8dbb10
 # ╠═ac17e8cf-8c0b-4433-ad71-c368ded2c194
+# ╟─58f9d4ef-df9e-4fdb-b940-01bf862ae0e7
+# ╠═697615e5-a921-4ddc-893a-6e8a23857b17
+# ╟─ea2de7f4-5dc5-43ec-ba07-9bb15c595e83
+# ╠═efdf3b24-4b0b-42e3-b679-7d1e7310ba54
+# ╠═8b20a41b-9ac4-4219-91b7-e7448e3c4852
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
