@@ -22,14 +22,14 @@ function calculate_parameters(starting_volume, concentration_factor, max_stir_ce
     df_volume_per_step = total_diafiltration_volume / total_number_of_df_steps
 
     return (
-        concentration_volume = concentration_volume, 
-        total_diafiltration_volume = total_diafiltration_volume, 
-        total_number_of_df_steps = total_number_of_df_steps, 
-        df_volume_per_step = df_volume_per_step
+        concentration_volume = concentration_volume,
+        total_diafiltration_volume = total_diafiltration_volume,
+        total_number_of_df_steps = total_number_of_df_steps,
+        df_volume_per_step = df_volume_per_step,
     )
 end
 
-starting_volume = 50 
+starting_volume = 50
 concentration_factor = 5
 max_stir_cell_volume = 50
 

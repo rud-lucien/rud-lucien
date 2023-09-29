@@ -6,13 +6,12 @@ using InteractiveUtils
 
 # ╔═╡ 650875c0-5c01-11ee-1ffd-056a6b964a8c
 begin
-	using Distributions
-	using Turing
-	using Tidier
-	using CairoMakie
-	using StatsBase
-	using Colors
-	using Combinatorics
+    using Distributions
+    using Turing
+    using Tidier
+    using CairoMakie
+    using StatsBase
+    using Colors
 end
 
 # ╔═╡ e5a94832-88be-4022-87ff-5a2e31766d83
@@ -23,8 +22,8 @@ Julia code
 
 # ╔═╡ 7f40dd21-64a3-4c87-9bb7-8ed675fdd7e3
 let
-	way = [0, 3, 8, 9, 0]
-	way / sum(way)
+    way = [0, 3, 8, 9, 0]
+    way / sum(way)
 end
 
 # ╔═╡ 4c692c64-f9c4-4fb9-b9e6-8315bc17219f
@@ -35,8 +34,8 @@ Julia code
 
 # ╔═╡ 65073446-9df1-4fd7-8af4-d1b4099bc03e
 let
-	b = Binomial(9, 0.5)
-	pdf(b, 6)
+    b = Binomial(9, 0.5)
+    pdf(b, 6)
 end
 
 # ╔═╡ a140edfa-81aa-498d-b9fb-991f2b5ea05b
@@ -46,35 +45,37 @@ Julia code 2.3 & 2.4 code combined
 
 # ╔═╡ c062fd11-138b-45dc-b888-075fde024d13
 let
-	size = 20
-	
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 20
 
-	#define prior
-	prior = ones(size)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = [pdf(Binomial(9, p), 6) for p in p_grid]
+    #define prior
+    prior = ones(size)
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = [pdf(Binomial(9, p), 6) for p in p_grid]
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "$size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
 
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color=random_color)
-	scatter!(ax, p_grid, posterior, color=random_color)
-	f
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "$size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ 8d513ed6-de11-4bc4-982e-897ec227c695
@@ -84,83 +85,87 @@ Julia code 2.4
 
 # ╔═╡ b2f35e2a-b19f-4997-8ce8-48d346d9ffcb
 let
-	size = 20
-	
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 20
 
-	#define prior
-	prior = pdf.(Beta(3, 1), p_grid)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = [pdf(Binomial(9, p), 6) for p in p_grid]
+    #define prior
+    prior = pdf.(Beta(3, 1), p_grid)
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = [pdf(Binomial(9, p), 6) for p in p_grid]
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "Posterior distribution of probability of water ($size points)",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
-	
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color=random_color)
-	scatter!(ax, p_grid, posterior, color=random_color)
-	f
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
+
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "Posterior distribution of probability of water ($size points)",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ c2aa6e94-9e95-4821-b3b2-caea23e124bf
 let
-	size = 20
-	
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 20
 
-	#define prior
-	prior_1 = ones(size)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = pdf.(Binomial.(9, p_grid), 6) 
+    #define prior
+    prior_1 = ones(size)
 
-	#compute product of likelihod and prior
-	unstd_posterior_1 = likelihood .* prior_1
+    # compute likelihood at each value in grid
+    likelihood = pdf.(Binomial.(9, p_grid), 6)
 
-	#standardize the posterior so it sums to 1
-	posterior_1 = unstd_posterior_1 / sum(unstd_posterior_1)
+    #compute product of likelihod and prior
+    unstd_posterior_1 = likelihood .* prior_1
 
-	#define prior
-	prior_2 = pdf.(Beta(3, 1), p_grid)
+    #standardize the posterior so it sums to 1
+    posterior_1 = unstd_posterior_1 / sum(unstd_posterior_1)
+
+    #define prior
+    prior_2 = pdf.(Beta(3, 1), p_grid)
 
 
-	#compute product of likelihod and prior
-	unstd_posterior_2 = likelihood .* prior_2
+    #compute product of likelihod and prior
+    unstd_posterior_2 = likelihood .* prior_2
 
-	#standardize the posterior so it sums to 1
-	posterior_2 = unstd_posterior_2 / sum(unstd_posterior_2)
+    #standardize the posterior so it sums to 1
+    posterior_2 = unstd_posterior_2 / sum(unstd_posterior_2)
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "$size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "$size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
 
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	random_color_2 = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior_1, color=random_color, label="prior_1")
-	scatter!(ax, p_grid, posterior_1, color=random_color)
-	lines!(ax, p_grid, posterior_2, color=random_color_2, label="prior_2")
-	scatter!(ax, p_grid, posterior_2, color=random_color_2)
-	axislegend()
-	current_figure()
-	f
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+    random_color_2 = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior_1, color = random_color, label = "prior_1")
+    scatter!(ax, p_grid, posterior_1, color = random_color)
+    lines!(ax, p_grid, posterior_2, color = random_color_2, label = "prior_2")
+    scatter!(ax, p_grid, posterior_2, color = random_color_2)
+    axislegend()
+    current_figure()
+    f
 end
 
 # ╔═╡ f5bd667c-ddd7-4a09-9f99-29f2bdb6373f
@@ -170,35 +175,37 @@ Julia code 2.5 code part 1
 
 # ╔═╡ 604841b3-c454-4417-b9d5-81a39c1570c7
 let
-	size = 20
+    size = 20
 
-	# define grid
-	p_grid = range(0, 1, size) 
-	
-	#define prior
-	prior =  ifelse.(p_grid .>= 0.5, 1, 0)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = [pdf(Binomial(9, p), 6) for p in p_grid]
+    #define prior
+    prior = ifelse.(p_grid .>= 0.5, 1, 0)
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = [pdf(Binomial(9, p), 6) for p in p_grid]
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "$size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
 
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color=random_color)
-	scatter!(ax, p_grid, posterior, color=random_color)
-	f
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "$size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ 5fb75f00-8795-4d81-af92-5cfb7f090afa
@@ -208,35 +215,37 @@ Julia code 2.5 code part 2
 
 # ╔═╡ f85eb41d-d82e-449a-a6e0-2f0de440010f
 let
-	size = 20
+    size = 20
 
-	# define grid
-	p_grid = range(0, 1, size) 
-	
-	#define prior
-	prior =  exp.(-5*abs.(p_grid .- 0.5))
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = [pdf(Binomial(9, p), 6) for p in p_grid]
+    #define prior
+    prior = exp.(-5 * abs.(p_grid .- 0.5))
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = [pdf(Binomial(9, p), 6) for p in p_grid]
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "$size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
-	
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color=random_color)
-	scatter!(ax, p_grid, posterior, color=random_color)
-	f
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
+
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "$size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ bfc161bd-adce-47b7-988f-d570e309c932
@@ -248,13 +257,13 @@ quadratic approximation to the globe tossing data
 
 # ╔═╡ d0e54752-32aa-4e45-bb73-cc1ac273fb33
 let
-	@model function water_land(W, L)
-		p ~ Uniform(0, 1)
-		W ~ Binomial(W + L, p)
-	end
+    @model function water_land(W, L)
+        p ~ Uniform(0, 1)
+        W ~ Binomial(W + L, p)
+    end
 
-	chain = sample(water_land(6, 3), NUTS(0.65), 1000)
-	display(chain)
+    chain = sample(water_land(6, 3), NUTS(0.65), 1000)
+    display(chain)
 end
 
 
@@ -267,27 +276,39 @@ analytical calculation to the globe tossing data
 
 # ╔═╡ 818c854c-5553-4e09-9247-8d4d4e3972a2
 let
-	size = 101
-	W = 6
-	L = 3
-	x = range(0, 1, size)
+    size = 101
+    W = 6
+    L = 3
+    x = range(0, 1, size)
 
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	random_color_2 = RGB(rand(), rand(), rand())
-	
-	b = Beta(W+1, L+1)
-	f = Figure()
-	ax = Axis(f[1, 1],
-	xlabel = "probability of water",
-    ylabel = "posterior probability")
-	lines!(ax, x, pdf.(b, x), color=random_color, linestyle=:solid, label=L"\mathcal{Beta}")
-	
-	# quadratic approximation
-	b2 = Normal(0.6165, 0.1333)
-	lines!(ax, x, pdf.(b2, x), color=random_color_2, linestyle=:dash, label=L"\mathcal{N}(0.62, 0.12)")
-	axislegend()
-	f
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+    random_color_2 = RGB(rand(), rand(), rand())
+
+    b = Beta(W + 1, L + 1)
+    f = Figure()
+    ax = Axis(f[1, 1], xlabel = "probability of water", ylabel = "posterior probability")
+    lines!(
+        ax,
+        x,
+        pdf.(b, x),
+        color = random_color,
+        linestyle = :solid,
+        label = L"\mathcal{Beta}",
+    )
+
+    # quadratic approximation
+    b2 = Normal(0.6165, 0.1333)
+    lines!(
+        ax,
+        x,
+        pdf.(b2, x),
+        color = random_color_2,
+        linestyle = :dash,
+        label = L"\mathcal{N}(0.62, 0.12)",
+    )
+    axislegend()
+    f
 end
 
 # ╔═╡ 57d78469-a48c-4e40-b036-21e7e200379d
@@ -299,38 +320,51 @@ MCMC chain for the globe tossing model
 
 # ╔═╡ 5c3ae4f7-12dc-42c6-b74a-b65a8b0f787e
 let
-	n_samples = 1000
-	p = Vector{Float64}(undef, n_samples)
-	p[1] = 0.5
-	W, L = 6, 3
-	x = range(0, 1; length=1000)
-	
-	for i in 2:n_samples
-		p_new = rand(Normal(p[i-1], 0.1))
-		if p_new < 0
-			p_new = abs(p_new)
-		elseif p_new > 1
-			p_new = 2 - p_new
-		end
+    n_samples = 1000
+    p = Vector{Float64}(undef, n_samples)
+    p[1] = 0.5
+    W, L = 6, 3
+    x = range(0, 1; length = 1000)
 
-		q0 = pdf(Binomial(W+L, p[i-1]), W)
-		q1 = pdf(Binomial(W+L, p_new), W)
-		u = rand(Uniform())
-		p[i] = ifelse(u < q1 / q0, p_new, p[i-1])
-	end
+    for i = 2:n_samples
+        p_new = rand(Normal(p[i-1], 0.1))
+        if p_new < 0
+            p_new = abs(p_new)
+        elseif p_new > 1
+            p_new = 2 - p_new
+        end
 
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	random_color_2 = RGB(rand(), rand(), rand())
-	
-	f = Figure()
-	ax = Axis(f[1, 1])
-	density!(p, color = (:white, 0.1), strokecolor = random_color, strokewidth = 1, label = "MCMC")
-	b = Beta(W+1, L+1)
-	lines!(ax, x, pdf.(b, x), color=random_color_2, linestyle=:dash, label=L"\mathcal{Beta}")
-	axislegend()
-	f
-	
+        q0 = pdf(Binomial(W + L, p[i-1]), W)
+        q1 = pdf(Binomial(W + L, p_new), W)
+        u = rand(Uniform())
+        p[i] = ifelse(u < q1 / q0, p_new, p[i-1])
+    end
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+    random_color_2 = RGB(rand(), rand(), rand())
+
+    f = Figure()
+    ax = Axis(f[1, 1])
+    density!(
+        p,
+        color = (:white, 0.1),
+        strokecolor = random_color,
+        strokewidth = 1,
+        label = "MCMC",
+    )
+    b = Beta(W + 1, L + 1)
+    lines!(
+        ax,
+        x,
+        pdf.(b, x),
+        color = random_color_2,
+        linestyle = :dash,
+        label = L"\mathcal{Beta}",
+    )
+    axislegend()
+    f
+
 end
 
 # ╔═╡ ed63d60a-6d89-4e8f-a24b-6eed0f367708
@@ -417,35 +451,37 @@ s and the number of tosses (in this case 3 and 3 ):
 
 # ╔═╡ f688c74a-b3fc-4429-8e60-f4d46d6cd0c9
 let
-	size = 20
-	
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 20
 
-	#define prior
-	prior = ones(size)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = pdf.(Binomial.(3, p_grid), 3)
+    #define prior
+    prior = ones(size)
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = pdf.(Binomial.(3, p_grid), 3)
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "grid approximation for (W,W,W) observations $size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
 
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color=random_color)
-	scatter!(ax, p_grid, posterior, color=random_color)
-	f
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "grid approximation for (W,W,W) observations $size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ 72bcc17c-a7f9-4972-b64e-416510c80662
@@ -455,35 +491,37 @@ We recreate this but update the arguments to 3 W's and 4 tosses.
 
 # ╔═╡ b39f24ef-a60f-4361-91ce-d4d8e76ba030
 let
-	size = 20
-	
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 20
 
-	#define prior
-	prior = ones(size)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = pdf.(Binomial.(4, p_grid), 3)
+    #define prior
+    prior = ones(size)
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = pdf.(Binomial.(4, p_grid), 3)
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "grid approximation for (W,W,W,L) observations $size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
-	
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color=random_color)
-	scatter!(ax, p_grid, posterior, color=random_color)
-	f
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
+
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "grid approximation for (W,W,W,L) observations $size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ d5bce89e-9dea-4202-b28b-e2d527b98ab6
@@ -493,35 +531,37 @@ Again, this time with 5 W's and 7 tosses:
 
 # ╔═╡ 2adcec1c-9986-4012-9346-43979889ad71
 let
-	size = 20
-	
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 20
 
-	#define prior
-	prior = ones(size)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = pdf.(Binomial.(7, p_grid), 5)
+    #define prior
+    prior = ones(size)
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = pdf.(Binomial.(7, p_grid), 5)
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "grid approximation for (L,W,W,L,W,W,W) observations $size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
-	
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color=random_color)
-	scatter!(ax, p_grid, posterior, color=random_color)
-	f
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
+
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "grid approximation for (L,W,W,L,W,W,W) observations $size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ d1953795-8d12-42d1-a760-192e7d07076a
@@ -531,68 +571,72 @@ md"""
 
 # ╔═╡ 6ba6fcfc-4733-47fb-9fff-83169b114a04
 let
-	size = 20
+    size = 20
 
-	# define grid
-	p_grid = range(0, 1, size) 
-	
-	#define prior
-	prior =  ifelse.(p_grid .< 0.5, 0, 1)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = pdf.(Binomial.(3, p_grid), 3)
+    #define prior
+    prior = ifelse.(p_grid .< 0.5, 0, 1)
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = pdf.(Binomial.(3, p_grid), 3)
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "grid approximation for (W,W,W) observations $size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
-	
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color=random_color)
-	scatter!(ax, p_grid, posterior, color=random_color)
-	f
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
+
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "grid approximation for (W,W,W) observations $size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ e1ffc014-43fc-49e6-978b-a37c7d8dbb10
 let
-	size = 20
-	
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 20
 
-	#define prior
-	prior = ifelse.(p_grid .< 0.5, 0, 1)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# compute likelihood at each value in grid
-	likelihood = pdf.(Binomial.(4, p_grid), 3)
+    #define prior
+    prior = ifelse.(p_grid .< 0.5, 0, 1)
 
-	#compute product of likelihod and prior
-	unstd_posterior = likelihood .* prior
+    # compute likelihood at each value in grid
+    likelihood = pdf.(Binomial.(4, p_grid), 3)
 
-	#standardize the posterior so it sums to 1
-	posterior = unstd_posterior / sum(unstd_posterior)
+    #compute product of likelihod and prior
+    unstd_posterior = likelihood .* prior
 
-	f = Figure()
-	ax = Axis(f[1, 1],
-    title = "grid approximation for (W,W,W,L) observations $size points",
-    xlabel = "probability of water",
-    ylabel = "posterior probability")
+    #standardize the posterior so it sums to 1
+    posterior = unstd_posterior / sum(unstd_posterior)
 
-	# Generate random color
-	random_color = RGB(rand(), rand(), rand())
-	
-	lines!(ax, p_grid, posterior, color = random_color)
-	scatter!(ax, p_grid, posterior, color = random_color)
-	f
+    f = Figure()
+    ax = Axis(
+        f[1, 1],
+        title = "grid approximation for (W,W,W,L) observations $size points",
+        xlabel = "probability of water",
+        ylabel = "posterior probability",
+    )
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    scatter!(ax, p_grid, posterior, color = random_color)
+    f
 end
 
 # ╔═╡ ac17e8cf-8c0b-4433-ad71-c368ded2c194
@@ -627,12 +671,12 @@ $\Pr(land)=Pr(land|Earth)Pr(Earth)+Pr(land|Mars)Pr(Mars)$
 
 # ╔═╡ 697615e5-a921-4ddc-893a-6e8a23857b17
 let
-	Pr_land_Earth = 1 - 0.7
-	Pr_land_Mars = 1
-	Pr_Earth, Pr_Mars = 0.5, 0.5
+    Pr_land_Earth = 1 - 0.7
+    Pr_land_Mars = 1
+    Pr_Earth, Pr_Mars = 0.5, 0.5
 
-	Pr_land = (Pr_land_Earth * Pr_Earth) + (Pr_land_Mars * Pr_Earth)
-	Pr_Eath_land = (Pr_land_Earth * Pr_Earth) / Pr_land
+    Pr_land = (Pr_land_Earth * Pr_Earth) + (Pr_land_Mars * Pr_Earth)
+    Pr_Eath_land = (Pr_land_Earth * Pr_Earth) / Pr_land
 end
 
 # ╔═╡ ea2de7f4-5dc5-43ec-ba07-9bb15c595e83
@@ -652,88 +696,72 @@ md"""
 created some code to define the potential combinations
 """
 
+# ╔═╡ 6f7854ac-0c1e-441b-8f95-73455af8ba91
+begin
+    # Function to generate all unique combinations of n colors
+    function generate_unique_combinations(colors, n)
+        # Generate all combinations of n colors
+        combinations = vec(join.(Iterators.product([colors for _ = 1:n]...)))
+
+        # Define a helper function to sort characters in a string
+        sorted_strings(s) = join(sort(collect(s)))
+
+        # Sort each combination
+        sorted_combinations = map(sorted_strings, combinations)
+
+        # Remove duplicates and sort in reverse order
+        unique_combinations = sort(unique(sorted_combinations), rev = true)
+
+        return unique_combinations
+    end
+
+    # Function to count the number of times a character appears in each combination
+    function count_character(character, combinations)
+        # Preallocate an array to hold the counts
+        ways_to_produce = zeros(Int64, length(combinations))
+
+        # Count the occurrences of the character in each combination
+        for i in eachindex(combinations)
+            ways_to_produce[i] =
+                sum(ifelse.([char == character for char in combinations[i]], 1, 0))
+        end
+
+        return ways_to_produce
+    end
+
+    # Function to count occurrences of each character in the combinations
+    function get_counted_characters(characters, unique_combinations)
+        # Count the number of times each character appears in each combination
+        counts = [count_character(char, unique_combinations) for char in characters]
+
+        # Convert the array of arrays to a matrix
+        counts_matrix = hcat(counts...)
+
+        return counts_matrix
+    end
+end
+
 # ╔═╡ d8714c4a-77be-405b-a9c1-b3e93ea56419
 let
-	# Define colors and number of combinations
-	colors = ["B", "W"]
+    # Define colors and number of combinations
+    colors = ["B", "W"]
 
-	# You can change the number of combinations by changing the value of n
-	n = 4
-	
-	# Generate all combinations of n colors
-	combinations = vec(join.(Iterators.product([colors for _ in 1:n]...)))
-	
-	# Function to sort characters in a string
-	sorted_strings(s) = join(sort(collect(s)))
-	
-	# Sort each combination
-	sorted_combinations = map(sorted_strings, combinations) 
-	
-	# Remove duplicates
-	unique_combinations = unique(sorted_combinations)
+    n = 2  # Number of combinations
 
-	cards = sort(unique_combinations, rev=true)
-	
-end
+    # Characters to count
+    characters = ['B']
 
-# ╔═╡ e65e1a4e-d742-419e-b888-620b1bd9680e
-let
-	# Define colors and number of combinations
-	colors = ["B", "W"]
+    # Generate all unique combinations of n colors
+    unique_combinations = generate_unique_combinations(colors, n)
 
-	# You can change the number of combinations by changing the value of n
-	n = 4
-	
-	# Generate all combinations of n colors
-	combinations = vec(join.(Iterators.product([colors for _ in 1:n]...)))
-	
-	# Function to sort characters in a string
-	sorted_strings(s) = join(sort(collect(s)))
-	
-	# Sort each combination
-	sorted_combinations = map(sorted_strings, combinations) 
-	
-	# Remove duplicates
-	unique_combinations = unique(sorted_combinations)
+    # Get counted characters matrix
+    counts = get_counted_characters(characters, unique_combinations)
 
-	cards = unique_combinations
-	
-	# Define the drawn side colors
-	draw_card = 'B'
+    # Calculate the product of the counts along the columns and convert the result to a vector
+    ways = vec(prod(counts, dims = 2))
 
-
-	# Count occurrence of drawn color in each card
-	ways = [count(c -> c .== draw_card, card) for card in cards]
-end
-
-# ╔═╡ 6260a971-0d67-4760-9f2e-1eccc664728e
-let
-	a = "WWWW"
-	b = 'W'
-
-	occursin(b, a)
-end
-
-# ╔═╡ efdf3b24-4b0b-42e3-b679-7d1e7310ba54
-let
-	cards = ["BB", "BW", "WW"]
-	ways = [2, 1, 0]
-	p = ways .// sum(ways)
-	sum(p[cards .== "BB"])
-end
-	
-
-# ╔═╡ 8b20a41b-9ac4-4219-91b7-e7448e3c4852
-let
-	# Define the cards
-	cards = ["BB", "BW", "WW"]
-
-	
-	draw_card = 'B'
-	
-	# Count the number of times draw_card appears in each card
-	ways = [count(c -> c == draw_card, card) for card in cards]
-	
+    p = ways .// sum(ways)
+    sum(p[unique_combinations.=="BB"])
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -741,7 +769,6 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
-Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Tidier = "f0413319-3358-4bb0-8e7c-0c83523a93bd"
@@ -750,7 +777,6 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 [compat]
 CairoMakie = "~0.10.10"
 Colors = "~0.12.10"
-Combinatorics = "~1.0.2"
 Distributions = "~0.25.100"
 StatsBase = "~0.34.2"
 Tidier = "~1.0.1"
@@ -763,7 +789,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "2329b6673a6b49899d034214a9108242d4938715"
+project_hash = "01e099e49f94f44dbc2065ca71081eba4a659b71"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "5d2e21d7b0d8c22f67483ef95ebdc39c0e6b6003"
@@ -3196,10 +3222,7 @@ version = "3.5.0+0"
 # ╠═697615e5-a921-4ddc-893a-6e8a23857b17
 # ╟─ea2de7f4-5dc5-43ec-ba07-9bb15c595e83
 # ╟─e9b6bd39-9841-44e1-b8e3-a91bd7b17bfd
+# ╠═6f7854ac-0c1e-441b-8f95-73455af8ba91
 # ╠═d8714c4a-77be-405b-a9c1-b3e93ea56419
-# ╠═e65e1a4e-d742-419e-b888-620b1bd9680e
-# ╠═6260a971-0d67-4760-9f2e-1eccc664728e
-# ╠═efdf3b24-4b0b-42e3-b679-7d1e7310ba54
-# ╠═8b20a41b-9ac4-4219-91b7-e7448e3c4852
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
