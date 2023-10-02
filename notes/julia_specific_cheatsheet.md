@@ -81,3 +81,40 @@ println("map_vector: ", map_vector)
 
 # How to find out what package a function is from i.e. The @which macro in Julia returns the method that would be called for a given set of arguments
 @which sample # this should return the source code for the sample function which is StatsBase
+
+# How to find out what functions a package exports
+using ExamplePackage
+names(ExamplePackage)
+
+# How to find methods that accept a specific type as an argument
+# For instance, if you have a DataFrame and you want to see what functions you can call on it 
+# (i.e., what functions accept a DataFrame as an argument), you can use methodswith(DataFrame) 
+# to get a list of such functions. This can be a quick way to explore the functionality available for a type.
+using DataFrames
+methodswith(DataFrame)
+
+
+# Generator Expressions in Julia
+# Generator expressions are a high-performance, memory-efficient way to create and transform sequences.
+# They are similar to array comprehensions, but don't allocate an intermediate array, making them more memory-efficient.
+# Use them when working with large datasets or when performing simple transformations on a sequence.
+
+# Example: Creating an array with the squares of numbers 1 to 5
+squares = collect(x^2 for x in 1:5)
+
+# Example: Summing the squares of numbers 1 to 5 without creating an intermediate array
+sum_of_squares = sum(x^2 for x in 1:5)
+
+
+# Using generator expressions to create 1D array
+j = collect(2x for x = 1:5)
+println("1D array: ", j)
+
+# Using generator expressions to create 2D array
+u = collect(x + 2y for x in 1:5, y in 0:1)
+println("2D array: ", u)
+
+# Using generator expressions to create 3D array
+p = collect(x + 2y + 3z for x in 1:4, y in 0:1, z in 1:3)
+println("3D array: ", p)
+

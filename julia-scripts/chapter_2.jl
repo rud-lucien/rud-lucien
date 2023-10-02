@@ -699,9 +699,9 @@ created some code to define the potential combinations
 # ╔═╡ 6f7854ac-0c1e-441b-8f95-73455af8ba91
 begin
     # Function to generate all unique combinations of n colors
-    function generate_unique_combinations(colors, n)
+    function generate_unique_combinations(cards, n)
         # Generate all combinations of n colors
-        combinations = vec(join.(Iterators.product([colors for _ = 1:n]...)))
+        combinations = vec(join.(Iterators.product([cards for _ = 1:n]...)))
 
         # Define a helper function to sort characters in a string
         sorted_strings(s) = join(sort(collect(s)))
@@ -715,54 +715,112 @@ begin
         return unique_combinations
     end
 
-    # Function to count the number of times a character appears in each combination
-    function count_character(character, combinations)
-        # Preallocate an array to hold the counts
-        ways_to_produce = zeros(Int64, length(combinations))
+    # Function to count occurrences of each character in unique combinations, 
+    # reshape the counts into a matrix, multiply the counts row-wise, 
+    # and return the results as a vector.
+    function count_and_multiply(characters, unique_combinations)
+        # Count occurrences
+        counts = [
+            count(characters[i], unique_combinations[j]) for i in eachindex(characters)
+            for j in eachindex(unique_combinations)
+        ]
 
-        # Count the occurrences of the character in each combination
-        for i in eachindex(combinations)
-            ways_to_produce[i] =
-                sum(ifelse.([char == character for char in combinations[i]], 1, 0))
-        end
+        # Reshape the counts to a matrix
+        counts_matrix = reshape(counts, (length(unique_combinations), length(characters)))
 
-        return ways_to_produce
-    end
-
-    # Function to count occurrences of each character in the combinations
-    function get_counted_characters(characters, unique_combinations)
-        # Count the number of times each character appears in each combination
-        counts = [count_character(char, unique_combinations) for char in characters]
-
-        # Convert the array of arrays to a matrix
-        counts_matrix = hcat(counts...)
-
-        return counts_matrix
+        # Multiply row-wise and return as vector
+        return vec(mapslices(prod, counts_matrix, dims = 2))
     end
 end
 
 # ╔═╡ d8714c4a-77be-405b-a9c1-b3e93ea56419
 let
-    # Define colors and number of combinations
-    colors = ["B", "W"]
+    # Define cards and number of combinations
+    cards = ["B", "W"]
 
     n = 2  # Number of combinations
 
     # Characters to count
     characters = ['B']
 
-    # Generate all unique combinations of n colors
-    unique_combinations = generate_unique_combinations(colors, n)
+    # Generate all unique combinations of n cards
+    unique_combinations = generate_unique_combinations(cards, n)
 
-    # Get counted characters matrix
-    counts = get_counted_characters(characters, unique_combinations)
+    # Calculate the counts of each character in unique combinations, reshape these counts into a matrix,
+    # multiply the counts row-wise, and return the results as a vector
+    ways = count_and_multiply(characters, unique_combinations)
 
-    # Calculate the product of the counts along the columns and convert the result to a vector
-    ways = vec(prod(counts, dims = 2))
-
-    p = ways .// sum(ways)
-    sum(p[unique_combinations.=="BB"])
+    prob_bb = ways .// sum(ways)
+    sum(prob_bb[unique_combinations.=="BB"])
 end
+
+# ╔═╡ 1b945af8-386f-4c1d-9237-b944b324d82a
+md"""
+2M5. Now suppose there are four cards: B/B, B/W, W/W, and another B/B. Again suppose a card is drawn from the bag and a black side appears face up. Again calculate the probability that the other side is black.
+"""
+
+# ╔═╡ 7a07c6dd-38ef-4b23-b83b-9f4795e4d586
+let
+    # Define cardss and number of combinations
+    cards = ["B", "W"]
+
+    n = 2  # Number of combinations
+
+    # Characters to count
+    characters = ['B']
+
+    # Generate all unique combinations of n cards
+    unique_combinations = generate_unique_combinations(cards, n)
+    push!(unique_combinations, "BB")
+
+    # Calculate the counts of each character in unique combinations, reshape these counts into a matrix,
+    # multiply the counts row-wise, and return the results as a vector
+    ways = count_and_multiply(characters, unique_combinations)
+
+    prob_bb = ways .// sum(ways)
+    sum(prob_bb[unique_combinations.=="BB"])
+
+end
+
+# ╔═╡ 1a707f04-0d99-476e-9c75-1396dc14d4f6
+md"""
+2M6. Imagine that black ink is heavy, and so cards with black sides are heavier than cards with white sides. As a result, it’s less likely that a card with black sides is pulled from the bag. So again assume there are three cards: B/B, B/W, and W/W. After experimenting a number of times, you conclude that for every way to pull the B/B card from the bag, there are 2 ways to pull the B/W card and 3 ways to pull the W/W card. Again suppose that a card is pulled and a black side appears face up. Show that the probability the other side is black is now 0.5. Use the counting method, as before.
+"""
+
+# ╔═╡ e974e6a3-596f-41e9-b06b-cfba39629273
+let
+    # Define cards and number of combinations
+    cards = ["B", "W"]
+
+    n = 2  # Number of combinations
+
+    # Characters to count
+    characters = ['B']
+
+    # Generate all unique combinations of n cards
+    unique_combinations = generate_unique_combinations(cards, n)
+
+
+
+    # Calculate the counts of each character in unique combinations, reshape these counts into a matrix,
+    # multiply the counts row-wise, and return the results as a vector
+    ways = count_and_multiply(characters, unique_combinations)
+
+    prior = [3, 2, 1]
+
+    likelihood = ways .* prior
+
+    prob_bb = likelihood .// sum(likelihood)
+    sum(prob_bb[unique_combinations.=="BB"])
+end
+
+# ╔═╡ e5ae54f9-270e-497d-8dc4-781c19622735
+md"""
+2M7. Assume again the original card problem, with a single card showing a black side face up. Before looking at the other side, we draw another card from the bag and lay it face up on the table. The face that is shown on the new card is white. Show that the probability that the first card, the one showing a black side, has black on its other side is now 0.75. Use the counting method, if you can. Hint: Treat this like the sequence of globe tosses, counting all the ways to see each observation, for each possible first card.
+"""
+
+# ╔═╡ 2d86fcd1-8259-43ba-a771-c4488ea7d3a9
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -3224,5 +3282,11 @@ version = "3.5.0+0"
 # ╟─e9b6bd39-9841-44e1-b8e3-a91bd7b17bfd
 # ╠═6f7854ac-0c1e-441b-8f95-73455af8ba91
 # ╠═d8714c4a-77be-405b-a9c1-b3e93ea56419
+# ╟─1b945af8-386f-4c1d-9237-b944b324d82a
+# ╠═7a07c6dd-38ef-4b23-b83b-9f4795e4d586
+# ╟─1a707f04-0d99-476e-9c75-1396dc14d4f6
+# ╠═e974e6a3-596f-41e9-b06b-cfba39629273
+# ╟─e5ae54f9-270e-497d-8dc4-781c19622735
+# ╠═2d86fcd1-8259-43ba-a771-c4488ea7d3a9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

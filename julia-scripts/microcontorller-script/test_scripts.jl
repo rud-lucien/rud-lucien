@@ -146,6 +146,23 @@ function get_counted_characters(characters, unique_combinations)
     return counts_matrix
 end
 
+# Function to count occurrences of each character in unique combinations, 
+# reshape the counts into a matrix, multiply the counts row-wise, 
+# and return the results as a vector.
+function count_and_multiply(characters, unique_combinations)
+    # Count occurrences
+    counts = [
+        count(characters[i], unique_combinations[j]) for i in eachindex(characters) for
+        j in eachindex(unique_combinations)
+    ]
+
+    # Reshape the counts to a matrix
+    counts_matrix = reshape(counts, (length(unique_combinations), length(characters)))
+
+    # Multiply row-wise and return as vector
+    return vec(mapslices(prod, counts_matrix, dims = 2))
+end
+
 # Define colors and number of combinations
 colors = ["B", "W"]
 
@@ -161,7 +178,11 @@ unique_combinations = generate_unique_combinations(colors, n)
 counts = get_counted_characters(characters, unique_combinations)
 
 # Calculate the product of the counts along the columns and convert the result to a vector
-ways = vec(prod(counts, dims = 2))
+#ways = vec(prod(counts, dims = 2))
+
+# Calculate the counts of each character in unique combinations, reshape these counts into a matrix,
+# multiply the counts row-wise, and return the results as a vector
+ways = count_and_multiply(characters, unique_combinations)
 
 
 
@@ -208,4 +229,16 @@ counts = [count_character(char, unique_combinations) for char in characters]
 
 # Convert the array of arrays to a matrix and transpose it
 counts_matrix = hcat(counts...)
+=#
+
+
+#=
+prot
+[count(i, j) for i in characters for j in unique_combinations]
+
+x = (count(characters[i], unique_combinations[j]) for i in eachindex(characters) for j in eachindex(unique_combinations))
+x = collect(x)
+x = reshape(x, (length(unique_combinations), length(characters)))
+
+result = vec(mapslices(prod, x, dims=2))
 =#
