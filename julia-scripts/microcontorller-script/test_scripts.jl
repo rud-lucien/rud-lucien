@@ -242,3 +242,52 @@ x = reshape(x, (length(unique_combinations), length(characters)))
 
 result = vec(mapslices(prod, x, dims=2))
 =#
+# Function to generate all unique combinations of n colors
+function generate_unique_combinations(colors, n)
+    # Generate all combinations of n colors
+    combinations = vec(join.(Iterators.product([colors for _ = 1:n]...)))
+
+    # Define a helper function to sort characters in a string
+    sorted_strings(s) = join(sort(collect(s)))
+
+    # Sort each combination
+    sorted_combinations = map(sorted_strings, combinations)
+
+    # Remove duplicates and sort in reverse order
+    unique_combinations = sort(unique(sorted_combinations), rev = true)
+
+    return unique_combinations
+end
+
+# Function to count occurrences of each character in unique combinations, 
+# reshape the counts into a matrix, multiply the counts row-wise, 
+# and return the results as a vector.
+function count_and_multiply(characters, unique_combinations)
+    # Count occurrences
+    counts = [
+        count(characters[i], unique_combinations[j]) for i in eachindex(characters) for
+        j in eachindex(unique_combinations)
+    ]
+
+    # Reshape the counts to a matrix
+    counts_matrix = reshape(counts, (length(unique_combinations), length(characters)))
+
+    # Multiply row-wise and return as vector
+    return vec(mapslices(prod, counts_matrix, dims = 2))
+end
+
+# Define colors and number of combinations
+colors = ["B", "W"]
+
+n = 2  # Number of combinations
+
+# Characters to count
+characters = ['B']
+
+# Generate all unique combinations of n colors
+unique_combinations = generate_unique_combinations(colors, n)
+
+# Calculate the counts of each character in unique combinations, reshape these counts into a matrix,
+# multiply the counts row-wise, and return the results as a vector
+ways = count_and_multiply(characters, unique_combinations)
+
