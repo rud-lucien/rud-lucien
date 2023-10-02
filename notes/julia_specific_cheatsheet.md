@@ -1,5 +1,31 @@
 # Julia Specific Cheatsheet
 
+## Julia performance tips
+###  More dots: Fuse vectorized operations, vectrizing is faster than loops
+```julia  
+f(x) = 3x .^ 2 + 4x + 7x .^ 3;
+fdot(x) = @. 3x^2 + 4x + 7x^3; # equivalent to 3 .* x.^2 .+ 4 .* x .+ 7 .* x.^3 but faster
+
+x = rand(10^6);
+
+@time f(x); #slower
+@time fdot(x); #faster
+
+@time @. f(x); #just as fast
+@time f.(x); #just as fast
+```
+
+### Consider using views for slices 
+n array "slice" expression like array[1:5, :] creates a copy of that data
+An alternative is to create a "view" of the array, which is an array object (a SubArray) that actually references the data of the original array in-place, without making a copy.
+```julia
+fcopy(x) = sum(x[2:end-1]);
+@views fview(x) = sum(x[2:end-1]);
+
+@time fcopy(x); # slower
+@time fview(x); # faster
+```
+
 ## Methods for Timing Julia Code
 
 ```julia
@@ -14,6 +40,7 @@ using BenchmarkTools
 @benchmark sum(rand(1000))
 @btime sum(rand(1000))
 ```
+
 ## Methods for Identifying Type Stability in julia
 ```julia
 @code_warntype sum(rand(1000))
@@ -244,3 +271,87 @@ The mapslices() function applies a function to slices of an array along a specif
 result4 = mapslices(prod, matrix, dims=2)
 println("Method 4 result: ", result4)
 ```
+
+## Countmap in Julia
+The countmap() function returns a dictionary mapping each unique value in an array to the number of times it appears in the array.
+
+```julia
+using StatsBase
+flips = rand(["Heads", "Tails"], 100)
+counts = countmap(flips)
+println("counts: ", counts)
+```
+returns
+```julia
+counts: Dict{String,Int64} with 2 entries:
+  "Tails" => 51
+  "Heads" => 49
+```
+
+## Piping options in Julia
+The pipe operator |> is used to pipe the result of an expression into the first argument of a function call.
+This can be useful for chaining together multiple function calls.
+
+```julia
+(sqrt ∘ +)(2, 3) # equivalent to sqrt(+(2, 3))
+
+2 |> +(3) |> sqrt # equivalent to sqrt(+(2, 3))
+
+1:10 |> sum |> sqrt # equivalent to sqrt(sum(1:10))
+```
+## Piping with broadcasting
+
+```julia
+["a", "list", "of", "strings"] .|> [uppercase, reverse, titlecase, length]
+```
+returns
+```julia
+4-element Vector{Any}:
+ "A"
+ "tsil"
+ "Of"
+ 7
+```
+When combining pipes with anonymous functions, parentheses must be used if subsequent
+pipes are not to parsed as part of the anonymous function's body. Compare:
+```julia
+1:3 .|> (x -> x^2) |> sum |> sqrt
+```
+returns
+```julia
+3.7416573867739413
+```
+
+```julia
+1:3 .|> x -> x^2 |> sum |> sqrt
+```
+returns
+```julia
+3-element Vector{Float64}:
+    1.0
+    2.0
+    3.0
+```
+
+# How to create a basic plot using CairoMakie or GLMakie in Julia
+```julia
+using CairoMakie
+f = Figure()
+ax = Axis(f[1, 1],
+    xlabel = "x",
+    ylabel = "y",
+    title = "Plot Title")
+
+x = 1:10
+y = rand(10)
+
+lines!(ax, x, y, color = :red)
+scatter!(ax, x, y, color = :blue)
+```
+
+
+
+
+
+
+
