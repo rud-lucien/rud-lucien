@@ -4,6 +4,16 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
+
 # ╔═╡ 650875c0-5c01-11ee-1ffd-056a6b964a8c
 begin
     using Distributions
@@ -12,6 +22,7 @@ begin
     using CairoMakie
     using StatsBase
     using Colors
+	using PlutoUI
 end
 
 # ╔═╡ e5a94832-88be-4022-87ff-5a2e31766d83
@@ -367,13 +378,87 @@ let
 
 end
 
+# ╔═╡ 9958434d-e754-47cf-a433-30dc64b2ca7c
+md"""
+# Grid approximation example
+"""
+
+# ╔═╡ f1b7321c-f49f-481f-b2c0-c2ffae93a880
+@bind slider_1 PlutoUI.Slider(collect(range(2, 100)), show_value = true)
+
+# ╔═╡ 46649b90-d1af-4f2a-b8ad-46061dd18205
+let
+	size = slider_1
+	
+	# define a grid (list the list of possible explanation to consider)
+	p_grid = range(0, 1, size)
+	f = Figure()
+    ax1 = Axis(f[1, 1], xlabel = "Index", ylabel = "p_grid")
+	lines!(ax1, collect(1:length(p_grid)), p_grid)
+	scatter!(ax1, collect(1:length(p_grid)), p_grid, color=:tomato, markersize = 7)
+
+	# define prior probability (probability of each value of p)
+	# uniform prior distribution (equal chances of water and land)
+	prior_probability = ones(size)
+    ax2 = Axis(f[2, 1], xlabel = "Index", ylabel = "prior_probability")
+	lines!(ax2, collect(1:length(prior_probability)), prior_probability)
+	scatter!(ax2, collect(1:length(prior_probability)), prior_probability, color=:tomato, markersize = 7)
+
+	# define the probability of the data (probability of W and L samples)
+	probability_data =  pdf.(Binomial.(9, p_grid), 6)
+	ax3 = Axis(f[1, 2], xlabel = "Index", ylabel = "probability_data")
+	lines!(ax3, collect(1:length(probability_data)), probability_data)
+	scatter!(ax3, collect(1:length(probability_data)), probability_data, color=:tomato, markersize = 7)
+	
+	# get the posterior probability then normailze
+	posteriror_probability = probability_data .* prior_probability
+	posteriror_probability = posteriror_probability ./ sum(posteriror_probability)
+	ax4 = Axis(f[2, 2], xlabel = "Index", ylabel = "posterior")
+	lines!(ax4, collect(1:length(posteriror_probability)), posteriror_probability)
+	scatter!(ax4, collect(1:length(posteriror_probability)), posteriror_probability, color=:tomato, markersize = 7)
+	f
+end
+
+# ╔═╡ 2ac70a17-d5d9-464d-9331-a01e246fd23e
+@bind slider_2 PlutoUI.Slider(collect(range(2, 100)), show_value = true)
+
+# ╔═╡ ca39bbb2-7e32-48d2-8969-d70f9d7a4f86
+let
+	size = slider_2
+	
+	# define a grid (list the list of possible explanation to consider)
+	p_grid = range(0, 1, size)
+	f = Figure()
+    ax1 = Axis(f[1, 1], xlabel = "Index", ylabel = "p_grid")
+	lines!(ax1, collect(1:length(p_grid)), p_grid)
+	scatter!(ax1, collect(1:length(p_grid)), p_grid, color=:tomato, markersize = 7)
+
+	# define prior probability (probability of each value of p)
+	# wetter worlds are more plausible
+	prior_probability = pdf.(Beta(3, 1), p_grid)
+    ax2 = Axis(f[2, 1], xlabel = "Index", ylabel = "prior_probability")
+	lines!(ax2, collect(1:length(prior_probability)), prior_probability)
+	scatter!(ax2, collect(1:length(prior_probability)), prior_probability, color=:tomato, markersize = 7)
+
+	# define the probability of the data (probability of W and L samples)
+	probability_data =  pdf.(Binomial.(9, p_grid), 6)
+	ax3 = Axis(f[1, 2], xlabel = "Index", ylabel = "probability_data")
+	lines!(ax3, collect(1:length(probability_data)), probability_data)
+	scatter!(ax3, collect(1:length(probability_data)), probability_data, color=:tomato, markersize = 7)
+	
+	# get the posterior probability then normailze
+	posteriror_probability = probability_data .* prior_probability
+	posteriror_probability = posteriror_probability ./ sum(posteriror_probability)
+	ax4 = Axis(f[2, 2], xlabel = "Index", ylabel = "posterior")
+	lines!(ax4, collect(1:length(posteriror_probability)), posteriror_probability)
+	scatter!(ax4, collect(1:length(posteriror_probability)), posteriror_probability, color=:tomato, markersize = 7)
+	f
+end
+
 # ╔═╡ ed63d60a-6d89-4e8f-a24b-6eed0f367708
 md"""
 # 2.6. Practice Problems
 """
-
-# ╔═╡ 08d5a8a8-6525-4a55-9da8-12bd8f148ef6
-
 
 # ╔═╡ ecbf5afe-f204-40af-b4d0-832242a82d47
 md"""
@@ -820,7 +905,22 @@ md"""
 """
 
 # ╔═╡ 2d86fcd1-8259-43ba-a771-c4488ea7d3a9
+let
+    # Define cards and number of combinations
+    cards = ["BB", "BW", "WW"]
 
+    ways = [6, 2, 0]
+    prob_bb = ways .// sum(ways)
+    sum(prob_bb[cards.=="BB"])
+end
+
+# ╔═╡ b8ab1108-cba7-4813-a542-a07582eb9e87
+md"""
+2H1. Suppose there are two species of panda bear. Both are equally common in the wild and live in the same places. They look exactly alike and eat the same food, and there is yet no genetic assay capable of telling them apart. They differ however in their family sizes. Species A gives birth to twins 10% of the time, otherwise birthing a single infant. Species B births twins 20% of the time, otherwise birthing singleton infants. Assume these numbers are known with certainty, from many years of field
+research. 
+
+Now suppose you are managing a captive panda breeding program. You have a new female panda of unknown species, and she has just given birth to twins. What is the  probability that her next birth will also be twins?
+"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -828,6 +928,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Tidier = "f0413319-3358-4bb0-8e7c-0c83523a93bd"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
@@ -836,6 +937,7 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 CairoMakie = "~0.10.10"
 Colors = "~0.12.10"
 Distributions = "~0.25.100"
+PlutoUI = "~0.7.52"
 StatsBase = "~0.34.2"
 Tidier = "~1.0.1"
 Turing = "~0.29.1"
@@ -847,7 +949,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "01e099e49f94f44dbc2065ca71081eba4a659b71"
+project_hash = "9d396ba304f9cf27dcd6942b929079407e59b323"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "5d2e21d7b0d8c22f67483ef95ebdc39c0e6b6003"
@@ -886,6 +988,12 @@ deps = ["AbstractMCMC", "DensityInterface", "Random", "Setfield", "SparseArrays"
 git-tree-sha1 = "caa9b62583577b0d6b222f11f54aa29fabbdb5ca"
 uuid = "7a57a42e-76ec-4ea3-a279-07e840d6d9cf"
 version = "0.6.2"
+
+[[deps.AbstractPlutoDingetjes]]
+deps = ["Pkg"]
+git-tree-sha1 = "91bd53c39b9cbfb5ef4b015e8b582d344532bd0a"
+uuid = "6e696c72-6542-2067-7265-42206c756150"
+version = "1.2.0"
 
 [[deps.AbstractTrees]]
 git-tree-sha1 = "faa260e4cb5aba097a73fab382dd4b5819d8ec8c"
@@ -1693,6 +1801,18 @@ git-tree-sha1 = "f218fe3736ddf977e0e772bc9a586b2383da2685"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.23"
 
+[[deps.Hyperscript]]
+deps = ["Test"]
+git-tree-sha1 = "8d511d5b81240fc8e6802386302675bdf47737b9"
+uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
+version = "0.0.4"
+
+[[deps.HypertextLiteral]]
+deps = ["Tricks"]
+git-tree-sha1 = "c47c5fa4c5308f27ccaac35504858d8914e102f9"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.4"
+
 [[deps.IOCapture]]
 deps = ["Logging", "Random"]
 git-tree-sha1 = "d75853a0bdbfb1ac815478bacd89cd27b550ace6"
@@ -2100,6 +2220,11 @@ git-tree-sha1 = "3e6db72c2ab9cadfa3278ff388473a01fc0cfb9d"
 uuid = "be115224-59cd-429b-ad48-344e309966f0"
 version = "0.3.5"
 
+[[deps.MIMEs]]
+git-tree-sha1 = "65f28ad4b594aebe22157d6fac869786a255b7eb"
+uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
+version = "0.1.4"
+
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
 git-tree-sha1 = "eb006abbd7041c28e0d16260e50a24f8f9104913"
@@ -2412,6 +2537,12 @@ deps = ["ColorSchemes", "Colors", "Dates", "PrecompileTools", "Printf", "Random"
 git-tree-sha1 = "f92e1315dadf8c46561fb9396e525f7200cdc227"
 uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
 version = "1.3.5"
+
+[[deps.PlutoUI]]
+deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
+git-tree-sha1 = "e47cd150dbe0443c3a3651bc5b9cbd5576ab75b7"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.52"
 
 [[deps.PolygonOps]]
 git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
@@ -3257,8 +3388,12 @@ version = "3.5.0+0"
 # ╠═818c854c-5553-4e09-9247-8d4d4e3972a2
 # ╟─57d78469-a48c-4e40-b036-21e7e200379d
 # ╠═5c3ae4f7-12dc-42c6-b74a-b65a8b0f787e
-# ╟─ed63d60a-6d89-4e8f-a24b-6eed0f367708
-# ╠═08d5a8a8-6525-4a55-9da8-12bd8f148ef6
+# ╟─9958434d-e754-47cf-a433-30dc64b2ca7c
+# ╠═f1b7321c-f49f-481f-b2c0-c2ffae93a880
+# ╠═46649b90-d1af-4f2a-b8ad-46061dd18205
+# ╠═2ac70a17-d5d9-464d-9331-a01e246fd23e
+# ╠═ca39bbb2-7e32-48d2-8969-d70f9d7a4f86
+# ╠═ed63d60a-6d89-4e8f-a24b-6eed0f367708
 # ╟─ecbf5afe-f204-40af-b4d0-832242a82d47
 # ╟─1330aa0e-d6ad-402d-bb2a-328cf46f90b0
 # ╟─e873e1ec-210e-4cfb-aee0-6619f63f802a
@@ -3288,5 +3423,6 @@ version = "3.5.0+0"
 # ╠═e974e6a3-596f-41e9-b06b-cfba39629273
 # ╟─e5ae54f9-270e-497d-8dc4-781c19622735
 # ╠═2d86fcd1-8259-43ba-a771-c4488ea7d3a9
+# ╠═b8ab1108-cba7-4813-a542-a07582eb9e87
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
