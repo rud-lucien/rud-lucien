@@ -349,7 +349,36 @@ lines!(ax, x, y, color = :red)
 scatter!(ax, x, y, color = :blue)
 ```
 
+# How to add jitter(random noise to numbers) for a scatter plot in Makie
+## Create a jitter function
+```julia
+# define the jitter function as is done in R programing language
+# this funtion is simply adding noise to numbers
+function jitter(x)
+    z = findmax(collect(skipmissing(x)))[1] - findmin(collect(skipmissing(x)))[1]
+    a = z/50
+    if a == 0
+        x = x .+ rand(length(x))
+        return x
+    else
+        x = x .+ rand(Uniform(-a, a), length(x))
+        return x
+    end
+end
+```
+## Use the jitter function with a vector of data in Makie
+```julia
+# define a vector of data
+sample = rand(1000)
 
+# using the jitter function in a scatter plot with the vector of data
+f = Figure()
+ax = Axis(f[1, 1]; xlabel="x", ylabel="y")
+scatter!(jitter(sample); alpha=0.2, markersize=10)
+ax = Axis(f[1, 2]; xlabel="x", ylabel="y")
+density!(jitter(sample); color=(:lightblue, 0.3), strokecolor=:skyblue, strokewidth = 3, strokearound = false)
+f
+```
 
 
 
