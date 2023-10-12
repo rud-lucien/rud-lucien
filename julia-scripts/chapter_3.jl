@@ -277,8 +277,72 @@ code 3.19
 # ╔═╡ ce0fe42c-2e59-4afa-94d2-79b4bc117594
 p_grid2[argmin(loss)], median(samples2)
 
-# ╔═╡ faeaac99-e2a1-484a-a4c5-4ddc4d16c1c6
+# ╔═╡ 7c917b41-290f-4913-83dd-ddc3c7703f64
+md"""
+code 3.20
+"""
 
+# ╔═╡ f59ea9f7-182a-4bab-918c-a339515c0b6c
+pdf.(Binomial.(2, 0.7), 0:2)
+
+# ╔═╡ 597c35a6-4be9-48b0-949b-f96e233da32e
+md"""
+code 3.21
+"""
+
+# ╔═╡ b36f7121-733a-48f7-bfb6-70a0bfc8c846
+rand(Binomial(2, 0.7))
+
+# ╔═╡ ae9324c0-ea3e-4d77-9e81-9b60fb49f675
+md"""
+code 3.22
+"""
+
+# ╔═╡ fe7e662a-b83f-45d6-80cc-690cedc85a17
+rand(Binomial(2, 0.7), 10)
+
+# ╔═╡ dfe46561-f95e-47e4-99c6-facfc9c19092
+md"""
+code 3.23
+"""
+
+# ╔═╡ 2fcdd072-d836-42f2-a455-03e412aac028
+let
+	dummy_w = rand(Binomial(2, 0.7), 100_000)
+	proportions(dummy_w)  # or counts(dummy_w)/100000
+end
+
+# ╔═╡ 02278217-cec8-4a4b-8477-d072ebccca14
+md"""
+code 3.24
+"""
+
+# ╔═╡ 10e668e3-ac76-4f9d-b923-7b8f94851dee
+let
+	dummy_w = rand(Binomial(9, 0.7), 100_000)
+	f = Figure()
+	ax = Axis(f[1, 1]; xlabel="dummy water count", ylabel="Frequency")
+    hist!(dummy_w; bins=30)
+	f
+end
+
+# ╔═╡ 9e66d2d2-b0e9-4f2b-b106-8a9e8bb33349
+md"""
+code 3.25
+"""
+
+# ╔═╡ eef578ff-0330-4e4a-afcb-53a70d15a65b
+let
+	w = rand(Binomial(9, 0.6), 10_000)
+end
+
+# ╔═╡ b66f9b2f-f81c-4269-9162-593ed88a2251
+md"""
+code 3.26
+"""
+
+# ╔═╡ 0678ff0f-804d-4334-a967-0c5e966fde7f
+w = @. rand(Binomial(9, samples2))
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2319,6 +2383,19 @@ version = "3.5.0+0"
 # ╠═0498478c-e8bc-46af-bbcd-cd7bac5f122e
 # ╟─48706b5a-851b-4a36-b391-52f51c7870c4
 # ╠═ce0fe42c-2e59-4afa-94d2-79b4bc117594
-# ╠═faeaac99-e2a1-484a-a4c5-4ddc4d16c1c6
+# ╟─7c917b41-290f-4913-83dd-ddc3c7703f64
+# ╠═f59ea9f7-182a-4bab-918c-a339515c0b6c
+# ╟─597c35a6-4be9-48b0-949b-f96e233da32e
+# ╠═b36f7121-733a-48f7-bfb6-70a0bfc8c846
+# ╟─ae9324c0-ea3e-4d77-9e81-9b60fb49f675
+# ╠═fe7e662a-b83f-45d6-80cc-690cedc85a17
+# ╟─dfe46561-f95e-47e4-99c6-facfc9c19092
+# ╠═2fcdd072-d836-42f2-a455-03e412aac028
+# ╟─02278217-cec8-4a4b-8477-d072ebccca14
+# ╠═10e668e3-ac76-4f9d-b923-7b8f94851dee
+# ╟─9e66d2d2-b0e9-4f2b-b106-8a9e8bb33349
+# ╠═eef578ff-0330-4e4a-afcb-53a70d15a65b
+# ╟─b66f9b2f-f81c-4269-9162-593ed88a2251
+# ╠═0678ff0f-804d-4334-a967-0c5e966fde7f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
