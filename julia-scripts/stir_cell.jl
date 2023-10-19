@@ -26,7 +26,7 @@ function calculate_parameters(starting_volume, concentration_factor, max_stir_ce
         permiate_volume = permiate_volume,
         total_diafiltration_volume = total_diafiltration_volume,
         total_number_of_df_steps = total_number_of_df_steps,
-        df_volume_per_step = df_volume_per_step
+        df_volume_per_step = df_volume_per_step,
     )
 end
 
