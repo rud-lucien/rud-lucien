@@ -7,7 +7,14 @@ using InteractiveUtils
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
     quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local iv = try
+            Base.loaded_modules[Base.PkgId(
+                Base.UUID("6e696c72-6542-2067-7265-42206c756150"),
+                "AbstractPlutoDingetjes",
+            )].Bonds.initial_value
+        catch
+            b -> missing
+        end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
         el
@@ -22,7 +29,7 @@ begin
     using CairoMakie
     using StatsBase
     using Colors
-	using PlutoUI
+    using PlutoUI
 end
 
 # ╔═╡ e5a94832-88be-4022-87ff-5a2e31766d83
@@ -388,35 +395,53 @@ md"""
 
 # ╔═╡ 46649b90-d1af-4f2a-b8ad-46061dd18205
 let
-	size = slider_1
-	
-	# define a grid (list the list of possible explanation to consider)
-	p_grid = range(0, 1, size)
-	f = Figure()
+    size = slider_1
+
+    # define a grid (list the list of possible explanation to consider)
+    p_grid = range(0, 1, size)
+    f = Figure()
     ax1 = Axis(f[1, 1], xlabel = "Index", ylabel = "p_grid")
-	lines!(ax1, collect(1:length(p_grid)), p_grid)
-	scatter!(ax1, collect(1:length(p_grid)), p_grid, color=:tomato, markersize = 7)
+    lines!(ax1, collect(1:length(p_grid)), p_grid)
+    scatter!(ax1, collect(1:length(p_grid)), p_grid, color = :tomato, markersize = 7)
 
-	# define prior probability (probability of each value of p)
-	# uniform prior distribution (equal chances of water and land)
-	prior_probability = ones(size)
+    # define prior probability (probability of each value of p)
+    # uniform prior distribution (equal chances of water and land)
+    prior_probability = ones(size)
     ax2 = Axis(f[2, 1], xlabel = "Index", ylabel = "prior_probability")
-	lines!(ax2, collect(1:length(prior_probability)), prior_probability)
-	scatter!(ax2, collect(1:length(prior_probability)), prior_probability, color=:tomato, markersize = 7)
+    lines!(ax2, collect(1:length(prior_probability)), prior_probability)
+    scatter!(
+        ax2,
+        collect(1:length(prior_probability)),
+        prior_probability,
+        color = :tomato,
+        markersize = 7,
+    )
 
-	# define the probability of the data (probability of W and L samples)
-	probability_data =  pdf.(Binomial.(9, p_grid), 6)
-	ax3 = Axis(f[1, 2], xlabel = "Index", ylabel = "probability_data")
-	lines!(ax3, collect(1:length(probability_data)), probability_data)
-	scatter!(ax3, collect(1:length(probability_data)), probability_data, color=:tomato, markersize = 7)
-	
-	# get the posterior probability then normailze
-	posteriror_probability = probability_data .* prior_probability
-	posteriror_probability = posteriror_probability ./ sum(posteriror_probability)
-	ax4 = Axis(f[2, 2], xlabel = "Index", ylabel = "posterior")
-	lines!(ax4, collect(1:length(posteriror_probability)), posteriror_probability)
-	scatter!(ax4, collect(1:length(posteriror_probability)), posteriror_probability, color=:tomato, markersize = 7)
-	f
+    # define the probability of the data (probability of W and L samples)
+    probability_data = pdf.(Binomial.(9, p_grid), 6)
+    ax3 = Axis(f[1, 2], xlabel = "Index", ylabel = "probability_data")
+    lines!(ax3, collect(1:length(probability_data)), probability_data)
+    scatter!(
+        ax3,
+        collect(1:length(probability_data)),
+        probability_data,
+        color = :tomato,
+        markersize = 7,
+    )
+
+    # get the posterior probability then normailze
+    posteriror_probability = probability_data .* prior_probability
+    posteriror_probability = posteriror_probability ./ sum(posteriror_probability)
+    ax4 = Axis(f[2, 2], xlabel = "Index", ylabel = "posterior")
+    lines!(ax4, collect(1:length(posteriror_probability)), posteriror_probability)
+    scatter!(
+        ax4,
+        collect(1:length(posteriror_probability)),
+        posteriror_probability,
+        color = :tomato,
+        markersize = 7,
+    )
+    f
 end
 
 # ╔═╡ 2ac70a17-d5d9-464d-9331-a01e246fd23e
@@ -424,35 +449,53 @@ end
 
 # ╔═╡ ca39bbb2-7e32-48d2-8969-d70f9d7a4f86
 let
-	size = slider_2
-	
-	# define a grid (list the list of possible explanation to consider)
-	p_grid = range(0, 1, size)
-	f = Figure()
+    size = slider_2
+
+    # define a grid (list the list of possible explanation to consider)
+    p_grid = range(0, 1, size)
+    f = Figure()
     ax1 = Axis(f[1, 1], xlabel = "Index", ylabel = "p_grid")
-	lines!(ax1, collect(1:length(p_grid)), p_grid)
-	scatter!(ax1, collect(1:length(p_grid)), p_grid, color=:tomato, markersize = 7)
+    lines!(ax1, collect(1:length(p_grid)), p_grid)
+    scatter!(ax1, collect(1:length(p_grid)), p_grid, color = :tomato, markersize = 7)
 
-	# define prior probability (probability of each value of p)
-	# wetter worlds are more plausible
-	prior_probability = pdf.(Beta(3, 1), p_grid)
+    # define prior probability (probability of each value of p)
+    # wetter worlds are more plausible
+    prior_probability = pdf.(Beta(3, 1), p_grid)
     ax2 = Axis(f[2, 1], xlabel = "Index", ylabel = "prior_probability")
-	lines!(ax2, collect(1:length(prior_probability)), prior_probability)
-	scatter!(ax2, collect(1:length(prior_probability)), prior_probability, color=:tomato, markersize = 7)
+    lines!(ax2, collect(1:length(prior_probability)), prior_probability)
+    scatter!(
+        ax2,
+        collect(1:length(prior_probability)),
+        prior_probability,
+        color = :tomato,
+        markersize = 7,
+    )
 
-	# define the probability of the data (probability of W and L samples)
-	probability_data =  pdf.(Binomial.(9, p_grid), 6)
-	ax3 = Axis(f[1, 2], xlabel = "Index", ylabel = "probability_data")
-	lines!(ax3, collect(1:length(probability_data)), probability_data)
-	scatter!(ax3, collect(1:length(probability_data)), probability_data, color=:tomato, markersize = 7)
-	
-	# get the posterior probability then normailze
-	posteriror_probability = probability_data .* prior_probability
-	posteriror_probability = posteriror_probability ./ sum(posteriror_probability)
-	ax4 = Axis(f[2, 2], xlabel = "Index", ylabel = "posterior")
-	lines!(ax4, collect(1:length(posteriror_probability)), posteriror_probability)
-	scatter!(ax4, collect(1:length(posteriror_probability)), posteriror_probability, color=:tomato, markersize = 7)
-	f
+    # define the probability of the data (probability of W and L samples)
+    probability_data = pdf.(Binomial.(9, p_grid), 6)
+    ax3 = Axis(f[1, 2], xlabel = "Index", ylabel = "probability_data")
+    lines!(ax3, collect(1:length(probability_data)), probability_data)
+    scatter!(
+        ax3,
+        collect(1:length(probability_data)),
+        probability_data,
+        color = :tomato,
+        markersize = 7,
+    )
+
+    # get the posterior probability then normailze
+    posteriror_probability = probability_data .* prior_probability
+    posteriror_probability = posteriror_probability ./ sum(posteriror_probability)
+    ax4 = Axis(f[2, 2], xlabel = "Index", ylabel = "posterior")
+    lines!(ax4, collect(1:length(posteriror_probability)), posteriror_probability)
+    scatter!(
+        ax4,
+        collect(1:length(posteriror_probability)),
+        posteriror_probability,
+        color = :tomato,
+        markersize = 7,
+    )
+    f
 end
 
 # ╔═╡ ed63d60a-6d89-4e8f-a24b-6eed0f367708
