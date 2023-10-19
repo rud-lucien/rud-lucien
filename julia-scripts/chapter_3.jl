@@ -7,7 +7,14 @@ using InteractiveUtils
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
     quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local iv = try
+            Base.loaded_modules[Base.PkgId(
+                Base.UUID("6e696c72-6542-2067-7265-42206c756150"),
+                "AbstractPlutoDingetjes",
+            )].Bonds.initial_value
+        catch
+            b -> missing
+        end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
         el
@@ -18,12 +25,12 @@ end
 begin
     using StatsBase
     using Colors
-	using PlutoUI
-	using Distributions
-	using CairoMakie
-	using StatisticalRethinking
-	using KernelDensity
-	using Random
+    using PlutoUI
+    using Distributions
+    using CairoMakie
+    using StatisticalRethinking
+    using KernelDensity
+    using Random
 end
 
 # ╔═╡ b1a2a660-6644-11ee-2f12-2d062a616500
@@ -38,11 +45,11 @@ code 3.1
 
 # ╔═╡ 8e68fbfe-f2eb-43da-bc7f-ed0ad0cca50d
 let
-	Pr_Positive_Vampire = 0.95
-	Pr_Positive_Mortal = 0.01
-	Pr_Vampire = 0.001
-	Pr_Positive = Pr_Positive_Vampire * Pr_Vampire + Pr_Positive_Mortal * (1 - Pr_Vampire)
-	Pr_Vampire_Positive = Pr_Positive_Vampire * Pr_Vampire / Pr_Positive
+    Pr_Positive_Vampire = 0.95
+    Pr_Positive_Mortal = 0.01
+    Pr_Vampire = 0.001
+    Pr_Positive = Pr_Positive_Vampire * Pr_Vampire + Pr_Positive_Mortal * (1 - Pr_Vampire)
+    Pr_Vampire_Positive = Pr_Positive_Vampire * Pr_Vampire / Pr_Positive
 end
 
 # ╔═╡ a727d158-533c-4d36-9755-96b7d197b2a9
@@ -55,22 +62,22 @@ code 3.2
 
 # ╔═╡ b5a2fe3f-0339-42e8-a82a-cc0497fe1993
 begin
-	size = slider_1
+    size = slider_1
 
-	# define grid
-	p_grid = range(0, 1, size)
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
-	prior = ones(size)
+    # define prior
+    prior = ones(size)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     prob_data = pdf.(Binomial.(9, p_grid), 6)
-	
-	#compute product of prob_data and prior
-	posterior = prob_data .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = prob_data .* prior
+
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
 end
 
 # ╔═╡ 8396f44a-ac96-44f1-b817-a0c7fb6359f7
@@ -79,14 +86,14 @@ code 3.3
 """
 
 # ╔═╡ ea9ba18e-45b8-4255-b00b-a2a455b7490a
-samples = sample(p_grid, Weights(posterior), 10_000; replace=true)
+samples = sample(p_grid, Weights(posterior), 10_000; replace = true)
 
 # ╔═╡ dd01cf89-1ddb-46eb-9a50-6411e78bd0d3
 # define the jitter function as is done in R programing language
 # this funtion is simply adding noise to data so the points don't overlap when plotted
 function jitter(x)
     z = findmax(collect(skipmissing(x)))[1] - findmin(collect(skipmissing(x)))[1]
-    a = z/50
+    a = z / 50
     if a == 0
         x = x .+ rand(length(x))
         return x
@@ -103,12 +110,18 @@ code 3.4 and 3.5
 
 # ╔═╡ b2553cd7-cf73-4538-b04c-6f65652f65ce
 let
-	f = Figure()
-	ax = Axis(f[1, 1]; xlabel="Sample number", ylabel="Proportion water (p)")
-	scatter!(jitter(samples); alpha=0.2, markersize=10)
-	ax = Axis(f[1, 2]; xlabel="Proportion water (p)", ylabel="Density")
-	density!(jitter(samples); color=(:lightblue, 0.3), strokecolor=:skyblue, strokewidth = 3, strokearound = false)
-	f
+    f = Figure()
+    ax = Axis(f[1, 1]; xlabel = "Sample number", ylabel = "Proportion water (p)")
+    scatter!(jitter(samples); alpha = 0.2, markersize = 10)
+    ax = Axis(f[1, 2]; xlabel = "Proportion water (p)", ylabel = "Density")
+    density!(
+        jitter(samples);
+        color = (:lightblue, 0.3),
+        strokecolor = :skyblue,
+        strokewidth = 3,
+        strokearound = false,
+    )
+    f
 
 end
 
@@ -119,7 +132,7 @@ code 3.6
 
 # ╔═╡ 11f4797c-5f92-47cc-b9a7-9d3e6bcfffdb
 # add up posterior probability where p < 0.5
-sum(posterior[p_grid .< 0.5])
+sum(posterior[p_grid.<0.5])
 
 # ╔═╡ 9d6c011d-4247-4542-b92a-275d310855c3
 md"""
@@ -132,30 +145,30 @@ sum(samples .< 0.5) / length(samples)
 
 # ╔═╡ 2a0cfd4b-a89e-4789-af54-acb3c9f439ae
 let
-	f = Figure()
-	x = 0:0.01:1
-	d = Normal(mean(samples), std(samples))
-	
-	ax = Axis(f[1, 1]; xlabel="Proportion water (p)", ylabel="Density")
-	lines!(x, pdf.(d, x))
-	x1 = range(0, 0.5; length=100)
-	band!(x1, fill(0, length(x1)), pdf.(d, x1); color = (:darkblue, 0.5), label = "Label")
+    f = Figure()
+    x = 0:0.01:1
+    d = Normal(mean(samples), std(samples))
 
-	ax = Axis(f[1, 2]; xlabel="Sample number", ylabel="Proportion water (p)")
-	lines!(x, pdf.(d, x))
-	x1 = range(0.5, 0.75; length=100)
-	band!(x1, fill(0, length(x1)), pdf.(d, x1); color = (:darkblue, 0.5), label = "Label")
-	
-	ax = Axis(f[2, 1]; xlabel="Sample number", ylabel="Proportion water (p)")
-	lines!(x, pdf.(d, x))
-	x1 = range(0, 0.75; length=100)
-	band!(x1, fill(0, length(x1)), pdf.(d, x1); color = (:darkblue, 0.5), label = "Label")
-	
-	ax = Axis(f[2, 2]; xlabel="Sample number", ylabel="Proportion water (p)")
-	lines!(x, pdf.(d, x))
-	x1 = range(0.45, 0.81; length=100)
-	band!(x1, fill(0, length(x1)), pdf.(d, x1); color = (:darkblue, 0.5), label = "Label")
-	f
+    ax = Axis(f[1, 1]; xlabel = "Proportion water (p)", ylabel = "Density")
+    lines!(x, pdf.(d, x))
+    x1 = range(0, 0.5; length = 100)
+    band!(x1, fill(0, length(x1)), pdf.(d, x1); color = (:darkblue, 0.5), label = "Label")
+
+    ax = Axis(f[1, 2]; xlabel = "Sample number", ylabel = "Proportion water (p)")
+    lines!(x, pdf.(d, x))
+    x1 = range(0.5, 0.75; length = 100)
+    band!(x1, fill(0, length(x1)), pdf.(d, x1); color = (:darkblue, 0.5), label = "Label")
+
+    ax = Axis(f[2, 1]; xlabel = "Sample number", ylabel = "Proportion water (p)")
+    lines!(x, pdf.(d, x))
+    x1 = range(0, 0.75; length = 100)
+    band!(x1, fill(0, length(x1)), pdf.(d, x1); color = (:darkblue, 0.5), label = "Label")
+
+    ax = Axis(f[2, 2]; xlabel = "Sample number", ylabel = "Proportion water (p)")
+    lines!(x, pdf.(d, x))
+    x1 = range(0.45, 0.81; length = 100)
+    band!(x1, fill(0, length(x1)), pdf.(d, x1); color = (:darkblue, 0.5), label = "Label")
+    f
 end
 
 # ╔═╡ 40a41c9a-0a56-4c33-bd1c-0ec4644cbba1
@@ -190,24 +203,24 @@ code 3.11
 
 # ╔═╡ 46e31cca-ad35-4b12-b52f-0d0639cd4b36
 let
-	size = 1000
+    size = 1000
 
-	# define grid
-	global p_grid2 = range(0, 1, size)
+    # define grid
+    global p_grid2 = range(0, 1, size)
 
-	# define prior
-	prior = ones(size)
+    # define prior
+    prior = ones(size)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     prob_data = pdf.(Binomial.(3, p_grid2), 3)
-	
-	#compute product of prob_data and prior
-	global posterior2 = prob_data .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior2 = posterior2 / sum(posterior2)
+    #compute product of prob_data and prior
+    global posterior2 = prob_data .* prior
 
-	global samples2 = sample(p_grid2, Weights(posterior2), 10_000; replace=true)
+    #standardize the posterior so it sums to 1
+    posterior2 = posterior2 / sum(posterior2)
+
+    global samples2 = sample(p_grid2, Weights(posterior2), 10_000; replace = true)
 
 end
 
@@ -225,7 +238,7 @@ code 3.13
 """
 
 # ╔═╡ b9dd4fde-d817-49af-9df3-11ed654e10ac
-HPDI = hpdi(samples2, alpha=0.5)
+HPDI = hpdi(samples2, alpha = 0.5)
 
 # ╔═╡ 3df216ca-3051-4540-96bb-64492867b26a
 md"""
@@ -242,8 +255,8 @@ code 3.15
 
 # ╔═╡ 4278d117-1327-4ec4-9591-ebdb2b0784fd
 let
-	k = kde(samples2, bandwidth=0.01)
-	k.x[argmax(k.density)]
+    k = kde(samples2, bandwidth = 0.01)
+    k.x[argmax(k.density)]
 end
 
 # ╔═╡ be8760c4-002a-498a-a277-c3f056022694
@@ -260,7 +273,7 @@ code 3.17
 """
 
 # ╔═╡ 956a1e74-b919-4f89-adac-9085c06fc33b
-sum(posterior2 .* abs.( 0.5 .- p_grid)), sum(@. posterior2 * abs( 0.5 - p_grid))
+sum(posterior2 .* abs.(0.5 .- p_grid)), sum(@. posterior2 * abs(0.5 - p_grid))
 
 # ╔═╡ 059cd603-f14d-4746-b4e6-68a674ea0df4
 md"""
@@ -309,8 +322,8 @@ code 3.23
 
 # ╔═╡ 2fcdd072-d836-42f2-a455-03e412aac028
 let
-	dummy_w = rand(Binomial(2, 0.7), 100_000)
-	proportions(dummy_w)  # or counts(dummy_w)/100000
+    dummy_w = rand(Binomial(2, 0.7), 100_000)
+    proportions(dummy_w)  # or counts(dummy_w)/100000
 end
 
 # ╔═╡ 02278217-cec8-4a4b-8477-d072ebccca14
@@ -320,11 +333,11 @@ code 3.24
 
 # ╔═╡ 10e668e3-ac76-4f9d-b923-7b8f94851dee
 let
-	dummy_w = rand(Binomial(9, 0.7), 100_000)
-	f = Figure()
-	ax = Axis(f[1, 1]; xlabel="dummy water count", ylabel="Frequency")
-    hist!(dummy_w; bins=30)
-	f
+    dummy_w = rand(Binomial(9, 0.7), 100_000)
+    f = Figure()
+    ax = Axis(f[1, 1]; xlabel = "dummy water count", ylabel = "Frequency")
+    hist!(dummy_w; bins = 30)
+    f
 end
 
 # ╔═╡ 9e66d2d2-b0e9-4f2b-b106-8a9e8bb33349
@@ -334,7 +347,7 @@ code 3.25
 
 # ╔═╡ eef578ff-0330-4e4a-afcb-53a70d15a65b
 let
-	w = rand(Binomial(9, 0.6), 10_000)
+    w = rand(Binomial(9, 0.6), 10_000)
 end
 
 # ╔═╡ b66f9b2f-f81c-4269-9162-593ed88a2251
@@ -357,24 +370,24 @@ code 3.27
 
 # ╔═╡ f06e9cab-4f28-419a-a9e8-6ab79e3b744a
 begin
-	# define the grid
-	p_grid_1 = range(0, 1, 1000)
-	
-	# define the prior
-	prior_1 = ones(1000)
+    # define the grid
+    p_grid_1 = range(0, 1, 1000)
 
-	# compute the probability of the data at each value of the grid
-	likelihood = @. pdf(Binomial(9, p_grid_1), 6)
+    # define the prior
+    prior_1 = ones(1000)
 
-	# compute the product of likelihood and prior
-	posterior_1 = likelihood .* prior_1
+    # compute the probability of the data at each value of the grid
+    likelihood = @. pdf(Binomial(9, p_grid_1), 6)
 
-	# standardize the posterior so it sums to 1
-	posterior_1 = posterior_1 / sum(posterior_1)
+    # compute the product of likelihood and prior
+    posterior_1 = likelihood .* prior_1
 
-	Random.seed!(100)
+    # standardize the posterior so it sums to 1
+    posterior_1 = posterior_1 / sum(posterior_1)
 
-	samples_1 = sample(p_grid_1, Weights(posterior_1), 10_000; replace=true)
+    Random.seed!(100)
+
+    samples_1 = sample(p_grid_1, Weights(posterior_1), 10_000; replace = true)
 end
 
 # ╔═╡ 0709734f-8045-4774-b627-df6924cf2e1d
@@ -383,7 +396,7 @@ md"""
 """
 
 # ╔═╡ 9c35d537-f799-4acc-a363-bb04173f79af
-sum(samples_1 .< 0.2) / length(samples_1), sum(posterior_1[p_grid_1 .< 0.2])
+sum(samples_1 .< 0.2) / length(samples_1), sum(posterior_1[p_grid_1.<0.2])
 
 # ╔═╡ 838c17ed-3d1c-4478-b188-6ddd4f2c8868
 md"""
@@ -391,7 +404,7 @@ md"""
 """
 
 # ╔═╡ 459435a3-da56-4a4b-bde1-9d0a26b3e5a0
-sum(samples_1 .> 0.8) / length(samples_1), sum(posterior_1[p_grid_1 .> 0.8])
+sum(samples_1 .> 0.8) / length(samples_1), sum(posterior_1[p_grid_1.>0.8])
 
 # ╔═╡ 242bbb4e-3728-49cd-94b5-cd5de457b04e
 md"""
@@ -400,9 +413,10 @@ md"""
 
 # ╔═╡ 2e207ffd-edd4-4905-a31d-78bb695ab5e0
 let
-	indices = (p_grid_1 .> 0.2) .& (p_grid_1 .< 0.8)
+    indices = (p_grid_1 .> 0.2) .& (p_grid_1 .< 0.8)
 
-	sum((samples_1 .> 0.2) .& (samples_1 .< 0.8)) / length(samples_1), sum(posterior_1[indices])
+    sum((samples_1 .> 0.2) .& (samples_1 .< 0.8)) / length(samples_1),
+    sum(posterior_1[indices])
 end
 
 # ╔═╡ 6a4db54d-8bcf-47ee-96b4-ea008de7ee10
@@ -435,14 +449,14 @@ md"""
 """
 
 # ╔═╡ 7dc3427e-e31b-4257-a11f-55efed015e53
-hpdi(samples_1, alpha=0.34)
+hpdi(samples_1, alpha = 0.34)
 
 # ╔═╡ 31f52a92-d658-41e9-9112-f856264ab29f
 # Check
 let
-	index_1 = hpdi(samples_1, alpha=0.34)[1]
-	index_2 = hpdi(samples_1, alpha=0.34)[2]
-	sum((index_1 .< samples_1 .< index_2)) / length(samples_1)
+    index_1 = hpdi(samples_1, alpha = 0.34)[1]
+    index_2 = hpdi(samples_1, alpha = 0.34)[2]
+    sum((index_1 .< samples_1 .< index_2)) / length(samples_1)
 end
 
 # ╔═╡ a295ecd2-3556-4806-9c9a-0776504b6418
@@ -452,25 +466,25 @@ md"""
 
 # ╔═╡ 0d56904c-c12c-4968-8564-6d4bff492e08
 let
-	# Assuming posterior_1 is your posterior probabilities and p_grid_1 is the corresponding p values
-	sorted_indices = sortperm(p_grid_1)
-	sorted_posterior = posterior_1[sorted_indices]
-	sorted_p = p_grid_1[sorted_indices]
-	
-	cumulative_posterior = cumsum(sorted_posterior)
-	
-	# Normalize the cumulative sum to make it a proper CDF
-	cumulative_posterior ./= maximum(cumulative_posterior)
-	
-	# Find the indices
-	lower_index = findfirst(cumulative_posterior .>= 0.17)
-	upper_index = findfirst(cumulative_posterior .>= 0.83)
-	
-	# Get the corresponding p values
-	lower_p = sorted_p[lower_index]
-	upper_p = sorted_p[upper_index]
-	
-	(lower_p, upper_p)
+    # Assuming posterior_1 is your posterior probabilities and p_grid_1 is the corresponding p values
+    sorted_indices = sortperm(p_grid_1)
+    sorted_posterior = posterior_1[sorted_indices]
+    sorted_p = p_grid_1[sorted_indices]
+
+    cumulative_posterior = cumsum(sorted_posterior)
+
+    # Normalize the cumulative sum to make it a proper CDF
+    cumulative_posterior ./= maximum(cumulative_posterior)
+
+    # Find the indices
+    lower_index = findfirst(cumulative_posterior .>= 0.17)
+    upper_index = findfirst(cumulative_posterior .>= 0.83)
+
+    # Get the corresponding p values
+    lower_p = sorted_p[lower_index]
+    upper_p = sorted_p[upper_index]
+
+    (lower_p, upper_p)
 end
 
 # ╔═╡ cd9b2d47-4f12-49b0-b1e2-388af388638d
@@ -480,28 +494,24 @@ md"""
 
 # ╔═╡ 4a8304e7-e4e6-4f01-a76d-077700fc46ec
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
-	prior = ones(size)
+    # define prior
+    prior = ones(size)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(15, p_grid), 8)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
 
-	f = Figure()
-    ax = Axis(
-        f[1, 1],
-        xlabel = "p_grid",
-        ylabel = "posterior probability",
-    )
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
+
+    f = Figure()
+    ax = Axis(f[1, 1], xlabel = "p_grid", ylabel = "posterior probability")
 
     # Generate random color
     random_color = RGB(rand(), rand(), rand())
@@ -518,25 +528,25 @@ md"""
 
 # ╔═╡ fd671a3e-9222-4d56-952f-e034b41fe201
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
-	prior = ones(size)
+    # define prior
+    prior = ones(size)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(15, p_grid), 8)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
 
-	samples = sample(p_grid, Weights(posterior), 10_000; replace=true)
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
 
-	hpdi(samples, alpha=0.10)
+    samples = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    hpdi(samples, alpha = 0.10)
 end
 
 # ╔═╡ 6f348bd5-ab5b-445b-b9f9-22947046db91
@@ -546,37 +556,37 @@ md"""
 
 # ╔═╡ 3ccd2e6c-1f77-4193-a1d5-05c289e11f4d
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
-	prior = ones(size)
+    # define prior
+    prior = ones(size)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(15, p_grid), 8)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
 
-	samples = sample(p_grid, Weights(posterior), 10_000; replace=true)
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
 
-	w = @. rand(Binomial(15, samples))
-	proportions(w)  # or counts(w)/length(w)
-	proportions(w)[8] # or sum(w .== 8)/length(w)
-	
-	# Generate random color
+    samples = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    w = @. rand(Binomial(15, samples))
+    proportions(w)  # or counts(w)/length(w)
+    proportions(w)[8] # or sum(w .== 8)/length(w)
+
+    # Generate random color
     random_color = RGB(rand(), rand(), rand())
-	
-	f = Figure()
-	ax = Axis(f[1, 1]; xlabel="counts of water", ylabel="probability")
-    hist!(w; bins=30, normalization = :probability, color=random_color)
-	println("Probability of 8 waters is $(round(proportions(w)[8], digits=4))")
-	f
-	
+
+    f = Figure()
+    ax = Axis(f[1, 1]; xlabel = "counts of water", ylabel = "probability")
+    hist!(w; bins = 30, normalization = :probability, color = random_color)
+    println("Probability of 8 waters is $(round(proportions(w)[8], digits=4))")
+    f
+
 end
 
 # ╔═╡ 1f95be8e-2092-4327-b8d7-afe723f3f558
@@ -586,37 +596,37 @@ md"""
 
 # ╔═╡ b9e699ad-446d-4b77-bcab-628e0ed286ca
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
-	prior = ones(size)
+    # define prior
+    prior = ones(size)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(9, p_grid), 6)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
 
-	samples = sample(p_grid, Weights(posterior), 10_000; replace=true)
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
 
-	w = @. rand(Binomial(9, samples))
-	proportions(w)  # or counts(w)/length(w)
-	proportions(w)[6] # or sum(w .== 8)/length(w)
-	
-	# Generate random color
+    samples = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    w = @. rand(Binomial(9, samples))
+    proportions(w)  # or counts(w)/length(w)
+    proportions(w)[6] # or sum(w .== 8)/length(w)
+
+    # Generate random color
     random_color = RGB(rand(), rand(), rand())
-	
-	f = Figure()
-	ax = Axis(f[1, 1]; xlabel="counts of water", ylabel="probability")
-    hist!(w; bins=30, normalization = :probability, color=random_color)
-	println("Probability of 6 waters is $(round(proportions(w)[6], digits=4))")
-	f
-	
+
+    f = Figure()
+    ax = Axis(f[1, 1]; xlabel = "counts of water", ylabel = "probability")
+    hist!(w; bins = 30, normalization = :probability, color = random_color)
+    println("Probability of 6 waters is $(round(proportions(w)[6], digits=4))")
+    f
+
 end
 
 # ╔═╡ 2daa1227-200a-4bab-8e45-116a59f87ce4
@@ -626,28 +636,24 @@ md"""
 
 # ╔═╡ 2b5423c4-1870-443f-adce-4a29e7eb9795
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
+    # define prior
     prior = ifelse.(p_grid .>= 0.5, 1, 0)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(15, p_grid), 8)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
 
-	f = Figure()
-    ax = Axis(
-        f[1, 1],
-        xlabel = "p_grid",
-        ylabel = "posterior probability",
-    )
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
+
+    f = Figure()
+    ax = Axis(f[1, 1], xlabel = "p_grid", ylabel = "posterior probability")
 
     # Generate random color
     random_color = RGB(rand(), rand(), rand())
@@ -659,123 +665,123 @@ end
 
 # ╔═╡ e0b07136-0fbd-48d8-9865-aede4b7e1d78
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
+    # define prior
     prior = ifelse.(p_grid .>= 0.5, 1, 0)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(15, p_grid), 8)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
 
-	samples = sample(p_grid, Weights(posterior), 10_000; replace=true)
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
 
-	hpdi(samples, alpha=0.10)
+    samples = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    hpdi(samples, alpha = 0.10)
 end
 
 # ╔═╡ 2197e493-5b52-44c2-b207-aad2518f9230
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
+    # define prior
     prior = ifelse.(p_grid .>= 0.5, 1, 0)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(15, p_grid), 8)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
 
-	samples = sample(p_grid, Weights(posterior), 10_000; replace=true)
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
 
-	w = @. rand(Binomial(15, samples))
-	proportions(w)  # or counts(w)/length(w)
-	proportions(w)[8] # or sum(w .== 8)/length(w)
-	
-	# Generate random color
+    samples = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    w = @. rand(Binomial(15, samples))
+    proportions(w)  # or counts(w)/length(w)
+    proportions(w)[8] # or sum(w .== 8)/length(w)
+
+    # Generate random color
     random_color = RGB(rand(), rand(), rand())
-	
-	f = Figure()
-	ax = Axis(f[1, 1]; xlabel="counts of water", ylabel="probability")
-    hist!(w; bins=30, normalization = :probability, color=random_color)
-	println("Probability of 8 waters is $(round(proportions(w)[8], digits=4))")
-	f
-	
+
+    f = Figure()
+    ax = Axis(f[1, 1]; xlabel = "counts of water", ylabel = "probability")
+    hist!(w; bins = 30, normalization = :probability, color = random_color)
+    println("Probability of 8 waters is $(round(proportions(w)[8], digits=4))")
+    f
+
 end
 
 # ╔═╡ 07c6c448-4b02-4090-9206-d3c4850ecc38
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
+    # define prior
     prior = ifelse.(p_grid .>= 0.5, 1, 0)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(9, p_grid), 6)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
 
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
 
-	samples = sample(p_grid, Weights(posterior), 10_000; replace=true)
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
 
-	w = @. rand(Binomial(9, samples))
-	proportions(w)  # or counts(w)/length(w)
-	proportions(w)[6] # or sum(w .== 8)/length(w)
-	
-	# Generate random color
+    samples = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    w = @. rand(Binomial(9, samples))
+    proportions(w)  # or counts(w)/length(w)
+    proportions(w)[6] # or sum(w .== 8)/length(w)
+
+    # Generate random color
     random_color = RGB(rand(), rand(), rand())
-	
-	f = Figure()
-	ax = Axis(f[1, 1]; xlabel="counts of water", ylabel="probability")
-    hist!(w; bins=30, normalization = :probability, color=random_color)
-	println("Probability of 6 waters is $(round(proportions(w)[6], digits=4))")
-	f
-	
+
+    f = Figure()
+    ax = Axis(f[1, 1]; xlabel = "counts of water", ylabel = "probability")
+    hist!(w; bins = 30, normalization = :probability, color = random_color)
+    println("Probability of 6 waters is $(round(proportions(w)[6], digits=4))")
+    f
+
 end
 
 # ╔═╡ 82808b10-19f7-4900-8fe3-5e16345de4e7
 let
-	size = 1000
-	# define grid
-	p_grid = range(0, 1, size)
+    size = 1000
+    # define grid
+    p_grid = range(0, 1, size)
 
-	# define prior
-	prior = ones(size)
-	prior_2 = ifelse.(p_grid .>= 0.5, 1, 0)
+    # define prior
+    prior = ones(size)
+    prior_2 = ifelse.(p_grid .>= 0.5, 1, 0)
 
-	# compute probability of data at each value in grid
+    # compute probability of data at each value in grid
     likelihood = pdf.(Binomial.(15, p_grid), 8)
-	
-	#compute product of prob_data and prior
-	posterior = likelihood .* prior
-	posterior_2 = likelihood .* prior_2
-	
-	#standardize the posterior so it sums to 1
-	posterior = posterior / sum(posterior)
-	posterior_2 = posterior_2 / sum(posterior_2)
-	
-	sample_1 = sample(p_grid, Weights(posterior), 10_000; replace=true)
-	sample_2 = sample(p_grid, Weights(posterior_2), 10_000; replace=true)
 
-	mean(sample_1), mean(sample_2)
-	
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
+    posterior_2 = likelihood .* prior_2
+
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
+    posterior_2 = posterior_2 / sum(posterior_2)
+
+    sample_1 = sample(p_grid, Weights(posterior), 10_000; replace = true)
+    sample_2 = sample(p_grid, Weights(posterior_2), 10_000; replace = true)
+
+    mean(sample_1), mean(sample_2)
+
 end
 
 # ╔═╡ ce567663-7d7e-4a92-87e6-d3b2a97d5e39
@@ -785,22 +791,464 @@ md"""
 
 # ╔═╡ 863a6d24-9640-42e4-a9cd-ae40f3c91ac6
 let
-	size = 1000
-	p_grid = range(0, 1; length=size)
-	prior = ones(size)
-	
-	for tosses in 1:10^5
-		waters = rand(Binomial(tosses, 0.7))  # Simulate the number of successful tosses
-	    likelihood = pdf.(Binomial.(tosses, p_grid), waters)
-	    posterior = likelihood .* prior
-	    posterior /= sum(posterior)
-	    samples = sample(p_grid, Weights(posterior), 10_000; replace=true)
-	    h = hpdi(samples, alpha=0.005)  # Calculate the 99% HPDI
-	    if h[2] - h[1] < 0.05
-	        println("Need to do $tosses tosses")
-	        break
-	    end
-	end
+    size = 1000
+    p_grid = range(0, 1; length = size)
+    prior = ones(size)
+
+    for tosses = 1:10^5
+        waters = rand(Binomial(tosses, 0.7))  # Simulate the number of successful tosses
+        likelihood = pdf.(Binomial.(tosses, p_grid), waters)
+        posterior = likelihood .* prior
+        posterior /= sum(posterior)
+        samples = sample(p_grid, Weights(posterior), 10_000; replace = true)
+        h = hpdi(samples, alpha = 0.005)  # Calculate the 99% HPDI
+        if h[2] - h[1] < 0.05
+            println("Need to do $tosses tosses")
+            break
+        end
+    end
+end
+
+# ╔═╡ ab098d20-af70-4cb6-9497-32eb5ad972cd
+md"""
+code 3.28
+"""
+
+# ╔═╡ 7d01bccd-c209-4407-a987-2c8ca4058ea3
+birth1 = [
+    1,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1,
+    1,
+]
+
+# ╔═╡ d16a4de6-2e96-40f5-b769-473c4f0d92c6
+birth2 = [
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+]
+
+# ╔═╡ c435e9bd-fdfa-4f99-a082-670cce387a9e
+md"""
+code 3.30
+"""
+
+# ╔═╡ 38206e59-07f9-45d3-beb9-aca653925397
+sum(birth1) + sum(birth2)
+
+# ╔═╡ 3abafd5c-9c5f-4044-9e25-fadc1639f5be
+md"""
+##### 3H1
+"""
+
+# ╔═╡ db1bc18b-11d5-4e76-8d17-c2515e33b4af
+let
+    size = 1000
+
+    count_boys = sum(birth1) + sum(birth2)
+    count_total = length(birth1) + length(birth2)
+
+    # define grid
+    p_grid = range(0, 1, size)
+
+    # define prior
+    prior = ones(size)
+
+    # compute probability of data at each value in grid
+    likelihood = pdf.(Binomial.(count_total, p_grid), count_boys)
+
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
+
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
+
+    p_grid[findmax(posterior)[2]]
+
+    f = Figure()
+    ax = Axis(f[1, 1], xlabel = "Proportion Boys (p)", ylabel = "Posterior Density")
+
+    # Generate random color
+    random_color = RGB(rand(), rand(), rand())
+
+    lines!(ax, p_grid, posterior, color = random_color)
+    vlines!(ax, p_grid[findmax(posterior)[2]]; ymin = 0.0, ymax = 1, color = :red)
+    f
+
+end
+
+# ╔═╡ e9fe6f18-e801-4134-bd61-55b75fcf0587
+md"""
+##### 3H2
+"""
+
+# ╔═╡ 4e59422c-7c02-441a-8e1f-d3ef2e4c1b14
+let
+    size = 1000
+
+    count_boys = sum(birth1) + sum(birth2)
+    count_total = length(birth1) + length(birth2)
+
+    # define grid
+    p_grid = range(0, 1, size)
+
+    # define prior
+    prior = ones(size)
+
+    # compute probability of data at each value in grid
+    likelihood = pdf.(Binomial.(count_total, p_grid), count_boys)
+
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
+
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
+
+    sample = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    HPDI_50 = hpdi(sample, alpha = 0.50)
+    HPDI_89 = hpdi(sample, alpha = 0.11)
+    HPDI_97 = hpdi(sample, alpha = 0.03)
+
+    HPDI_50, HPDI_89, HPDI_97
+end
+
+# ╔═╡ cb3225f7-465a-4d27-a06e-c9ef2436094d
+md"""
+##### 3H3
+"""
+
+# ╔═╡ 689fcccc-91a5-429b-b08b-d871e34e4b91
+let
+    size = 1000
+
+    count_boys = sum(birth1) + sum(birth2)
+    count_total = length(birth1) + length(birth2)
+
+    # define grid
+    p_grid = range(0, 1, size)
+
+    # define prior
+    prior = ones(size)
+
+    # compute probability of data at each value in grid
+    likelihood = pdf.(Binomial.(count_total, p_grid), count_boys)
+
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
+
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
+
+    sample = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    w = @. rand(Binomial(200, sample))
+
+    f = Figure()
+    Axis(f[1, 1], xlabel = "Number of boys", ylabel = "Density")
+
+    density!(
+        w,
+        color = (:skyblue, 0.3),
+        strokecolor = :lightblue,
+        strokewidth = 3,
+        strokearound = false,
+    )
+    vlines!(count_boys; ymin = 0.0, ymax = 1, color = :tomato)
+
+    f
+
+end
+
+# ╔═╡ 28c426fc-303a-431d-98ba-3e013c6a1d2a
+md"""
+##### 3H4
+"""
+
+# ╔═╡ d78eee41-232a-4b6b-a432-0c12e07b134e
+let
+    size = 1000
+
+    count_boys = sum(birth1)
+    count_total = length(birth1)
+
+    # define grid
+    p_grid = range(0, 1, size)
+
+    # define prior
+    prior = ones(size)
+
+    # compute probability of data at each value in grid
+    likelihood = pdf.(Binomial.(count_total, p_grid), count_boys)
+
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
+
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
+
+    sample = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    w = @. rand(Binomial(100, sample))
+
+    f = Figure()
+    Axis(f[1, 1], xlabel = "Number of boys", ylabel = "Density")
+
+    density!(
+        w,
+        color = (:skyblue, 0.3),
+        strokecolor = :lightblue,
+        strokewidth = 3,
+        strokearound = false,
+    )
+    vlines!(count_boys; ymin = 0.0, ymax = 1, color = :tomato)
+
+    f
+
+end
+
+# ╔═╡ 09c665b6-6548-4c57-b130-cc6dc4a7ad22
+md"""
+##### 3H5
+"""
+
+# ╔═╡ 8d30960d-2c95-4331-a523-c1936e6e50c7
+let
+    size = 1000
+
+    count_boys = sum(birth1) + sum(birth2)
+    count_total = length(birth1) + length(birth2)
+
+    girls_first = sum(birth1 .== 0)
+    girl_then_boy = sum(birth2[birth1.==0])
+
+    # define grid
+    p_grid = range(0, 1, size)
+
+    # define prior
+    prior = ones(size)
+
+    # compute probability of data at each value in grid
+    likelihood = pdf.(Binomial.(count_total, p_grid), count_boys)
+
+    #compute product of prob_data and prior
+    posterior = likelihood .* prior
+
+    #standardize the posterior so it sums to 1
+    posterior = posterior / sum(posterior)
+
+    sample = sample(p_grid, Weights(posterior), 10_000; replace = true)
+
+    w = @. rand(Binomial(girls_first, sample))
+
+    f = Figure()
+    Axis(f[1, 1], xlabel = "Number of boys", ylabel = "Density")
+
+    density!(
+        w,
+        color = (:skyblue, 0.3),
+        strokecolor = :lightblue,
+        strokewidth = 3,
+        strokearound = false,
+    )
+    vlines!(girl_then_boy; ymin = 0.0, ymax = 1, color = :tomato)
+
+    f
+
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -2893,5 +3341,20 @@ version = "3.5.0+0"
 # ╠═82808b10-19f7-4900-8fe3-5e16345de4e7
 # ╟─ce567663-7d7e-4a92-87e6-d3b2a97d5e39
 # ╠═863a6d24-9640-42e4-a9cd-ae40f3c91ac6
+# ╟─ab098d20-af70-4cb6-9497-32eb5ad972cd
+# ╟─7d01bccd-c209-4407-a987-2c8ca4058ea3
+# ╟─d16a4de6-2e96-40f5-b769-473c4f0d92c6
+# ╟─c435e9bd-fdfa-4f99-a082-670cce387a9e
+# ╠═38206e59-07f9-45d3-beb9-aca653925397
+# ╟─3abafd5c-9c5f-4044-9e25-fadc1639f5be
+# ╠═db1bc18b-11d5-4e76-8d17-c2515e33b4af
+# ╟─e9fe6f18-e801-4134-bd61-55b75fcf0587
+# ╠═4e59422c-7c02-441a-8e1f-d3ef2e4c1b14
+# ╠═cb3225f7-465a-4d27-a06e-c9ef2436094d
+# ╠═689fcccc-91a5-429b-b08b-d871e34e4b91
+# ╟─28c426fc-303a-431d-98ba-3e013c6a1d2a
+# ╠═d78eee41-232a-4b6b-a432-0c12e07b134e
+# ╟─09c665b6-6548-4c57-b130-cc6dc4a7ad22
+# ╠═8d30960d-2c95-4331-a523-c1936e6e50c7
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
