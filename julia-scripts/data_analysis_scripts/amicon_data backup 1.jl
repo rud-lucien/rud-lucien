@@ -17,12 +17,11 @@ end
 # ╔═╡ a5b196c0-7285-11ee-04f5-97c3abd83d97
 begin
 	using PlutoUI
-	using Tidier
+	using DataFrames
 	using CairoMakie
 	using CSV
 	using Dates
 	using Unitful
-	using Colors
 end
 
 # ╔═╡ 23622e8d-db79-4a42-bc2d-3c46d981e1bf
@@ -41,8 +40,6 @@ end
 raw_data()
 
 # ╔═╡ 33abbefc-861d-46ad-a363-5c6680a40967
-# ╠═╡ disabled = true
-#=╠═╡
 function clean_data()
 	df = raw_data()
 	# Convert DATE and TIME columns to String type and combine them
@@ -82,71 +79,18 @@ function clean_data()
 
 	df
 end
-  ╠═╡ =#
 
-# ╔═╡ 10cb61ac-66d9-4801-98b9-53295e6b6e5b
-df = @chain raw_data() begin
-	# Convert DATE and TIME columns to String type and combine them
-	@mutate(DateTime = ymd_hms(DATE * string(TIME)))
-	# Calculate the elapsed time in seconds since the first timestamp
-	@mutate(ElapsedTime = Dates.value(DateTime .- DateTime[1]) / 1000)
-	# remove :DATE and :TIME column in place
-	@select(!(DATE:TIME))
-	# move :DateTime and :ElapsedTime to the front
-	@select(DateTime, ElapsedTime, Not(:DateTime, :ElapsedTime))
-	# drop the :DATA_No column
-	@select(!(DATA_No))
-	# rename the columns
-	@rename(
-	    P1_Psi = DM00015, 
-	    P2_Psi = DM00017, 
-	    P3_Psi = DM00019,
-	    permeate_volume_current = DM00021, 
-	    Source_air_flow_LPM = W0030, 
-	    Source_Temp_C = W003B, 
-	    Source_Pressure_Psi = W0038, 
-	    Source_RH = W003C, 
-	    P1_raw = NU_EP1_1_Current_Pressure_1_, 
-	    P2_raw = NU_EP1_1_Current_Pressure_2_, 
-	    P3_raw = NU_EP1_1_Current_Flow_3_, 
-	    permeate_flow_rate = NU_EP1_1_Current_Value_5_)
-	# fix the units for colunms
-	@mutate(P1_Psi = Float32(P1_Psi),
-			P2_Psi = Float32(P2_Psi),
-	        P3_Psi = Float32(P3_Psi),
-	        P1_raw = P1_raw * 0.0001,
-	        P2_raw = P2_raw * 0.0001,
-	        P3_raw = P3_raw * 0.0001,
-	        Source_air_flow_LPM = Source_air_flow_LPM * 0.1,
-	        Source_Temp_C = Source_Temp_C * 0.1,
-	        Source_Pressure_Psi = Source_Pressure_Psi * 0.1,
-	        permeate_volume_current = permeate_volume_current * 0.1)
-end
+# ╔═╡ 95ec7371-fc96-4055-aeb2-4ddc27c149ac
+uconvert(u"ft", 36u"inch")
 
-# ╔═╡ ed9c0c89-0625-4c5f-9544-cd6d3fdfe019
-clean_df = begin
-	# Assign units to the columns using DataFrames.jl and Unitful.jl
-	df[!, :P1_Psi] = df[!, :P1_Psi] .* u"psi" 
-	df[!, :P2_Psi] = df[!, :P2_Psi] .* u"psi" 
-	df[!, :P3_Psi] = df[!, :P3_Psi] .* u"psi"
-	df[!, :P1_raw] = df[!, :P1_raw] .* u"MPa" 
-	df[!, :P2_raw] = df[!, :P2_raw] .* u"MPa"
-	df[!, :P3_raw] = df[!, :P3_raw] .* u"MPa"
-	df[!, :ElapsedTime] = df[!, :ElapsedTime] .* u"s"
-	df[!, :permeate_volume_current] = df[!, :permeate_volume_current] .* u"mL"
-	df[!, :permeate_flow_rate] = df[!, :permeate_flow_rate] .* u"mL/minute"
-	df[!, :Source_air_flow_LPM] = df[!, :Source_air_flow_LPM] .* u"L/minute"
-	df[!, :Source_Pressure_Psi] = df[!, :Source_Pressure_Psi] .* u"psi"
-	df[!, :Source_Temp_C] = df[!, :Source_Temp_C] .* u"C"
+# ╔═╡ 03062a99-4c74-4ca0-953a-78c966c7ec08
+df = clean_data()
 
-	df
-end
+# ╔═╡ 808d9c27-9b05-4d52-baed-d6cafd7da55b
+@bind yaxis Select(names(df, Not(:DateTime, :ElapsedTime)))
 
 # ╔═╡ 1d7198e0-3550-464d-8ab5-44cf84874299
-# ╠═╡ disabled = true
-#=╠═╡
-fig=lines(ustrip.(clean_df.ElapsedTime), ustrip.(clean_df[!,"$clean_df_yaxis"]))
-  ╠═╡ =#
+fig=lines(ustrip.(df.ElapsedTime), ustrip.(df[!,"$yaxis"]))
 
 # ╔═╡ 52478c42-7745-447b-a87b-d52dee44679c
 csv_files = filter(x -> occursin(".csv", x), readdir(raw"C:\Users\rlucien\OneDrive - Moderna\Documents\KEYENCE\log0"))
@@ -154,135 +98,30 @@ csv_files = filter(x -> occursin(".csv", x), readdir(raw"C:\Users\rlucien\OneDri
 # ╔═╡ b719722d-9a35-4076-bdda-0178c930392a
 @bind selected_files MultiSelect(csv_files)
 
-# ╔═╡ 4a824d17-af54-48e1-95a4-034c122f0e02
-selected_files
-
-# ╔═╡ f0b64be5-09cb-4d32-ba2b-b344156fa13c
-function read_files2()
-    dir_path = raw"C:\Users\rlucien\OneDrive - Moderna\Documents\KEYENCE\log0\\"  # Replace with your actual directory path
-
-    # Create an empty DataFrame to hold all the data
-    all_data = DataFrame()
-
-    for file in selected_files
-        # Read the CSV file into a DataFrame
-        df = CSV.read(dir_path * file, DataFrame, normalizenames=true, header=2)
-
-        # Add a new column to the DataFrame to track the source file
-        df[!, :source_file] = fill(file, nrow(df))
-
-        # Convert DATE and TIME columns to String type and combine them
-        df[!, :DateTime] = ymd_hms.(string.(df.DATE) .* " " .* string.(df.TIME))
-
-        # Calculate the elapsed time in seconds since the first timestamp
-        df[!, :ElapsedTime] = Dates.value.(df.DateTime .- df.DateTime[1]) / 1000
-
-        # Vertically concatenate the new DataFrame with the existing data
-        all_data = vcat(all_data, df)
-    end
-
-    return all_data
+# ╔═╡ 0d2fb16a-67ab-4c6f-b55e-1f334d097b24
+function read_files()
+    dataframes = reduce(vcat, (CSV.read(file, DataFrame, normalizenames=true, header=2) for file in selected_files))
+    return dataframes
 end
 
-# ╔═╡ 4cd84c95-96e7-4aa5-afca-70249566fec1
-read_files2()
-
-# ╔═╡ ca6c2700-7283-4500-b86a-b590e9369f88
- dfs_2 = @chain read_files2() begin
-    # remove :DATE and :TIME column in place
-    @select(!(DATE:TIME))
-    # move :DateTime and :ElapsedTime to the front
-    @select(DateTime, ElapsedTime, Not(:DateTime, :ElapsedTime))
-    # drop the :DATA_No column
-    @select(!(DATA_No))
-    # rename the columns
-    @rename(
-        P1_Psi = DM00015, 
-        P2_Psi = DM00017, 
-        P3_Psi = DM00019,
-        permeate_volume_current = DM00021, 
-        Source_air_flow_LPM = W0030, 
-        Source_Temp_C = W003B, 
-        Source_Pressure_Psi = W0038, 
-        Source_RH = W003C, 
-        P1_raw = NU_EP1_1_Current_Pressure_1_, 
-        P2_raw = NU_EP1_1_Current_Pressure_2_, 
-        P3_raw = NU_EP1_1_Current_Flow_3_, 
-        permeate_flow_rate = NU_EP1_1_Current_Value_5_)
-    # fix the units for colunms
-    @mutate(P1_Psi = Float32(P1_Psi),
-            P2_Psi = Float32(P2_Psi),
-            P3_Psi = Float32(P3_Psi),
-            P1_raw = P1_raw * 0.0001,
-            P2_raw = P2_raw * 0.0001,
-            P3_raw = P3_raw * 0.0001,
-            Source_air_flow_LPM = Source_air_flow_LPM * 0.1,
-            Source_Temp_C = Source_Temp_C * 0.1,
-            Source_Pressure_Psi = Source_Pressure_Psi * 0.1,
-            permeate_volume_current = permeate_volume_current * 0.1)
-end 
-
-# ╔═╡ 4329da44-f7d0-433f-b9cd-1be76a43cb7c
-clean_dfs = begin
-	# Assign units to the columns using DataFrames.jl and Unitful.jl
-	dfs_2[!, :P1_Psi] = dfs_2[!, :P1_Psi] .* u"psi" 
-	dfs_2[!, :P2_Psi] = dfs_2[!, :P2_Psi] .* u"psi" 
-	dfs_2[!, :P3_Psi] = dfs_2[!, :P3_Psi] .* u"psi"
-	dfs_2[!, :P1_raw] = dfs_2[!, :P1_raw] .* u"MPa" 
-	dfs_2[!, :P2_raw] = dfs_2[!, :P2_raw] .* u"MPa"
-	dfs_2[!, :P3_raw] = dfs_2[!, :P3_raw] .* u"MPa"
-	dfs_2[!, :ElapsedTime] = dfs_2[!, :ElapsedTime] .* u"s"
-	dfs_2[!, :permeate_volume_current] = dfs_2[!, :permeate_volume_current] .* u"mL"
-	dfs_2[!, :permeate_flow_rate] = dfs_2[!, :permeate_flow_rate] .* u"mL/minute"
-	dfs_2[!, :Source_air_flow_LPM] = dfs_2[!, :Source_air_flow_LPM] .* u"L/minute"
-	dfs_2[!, :Source_Pressure_Psi] = dfs_2[!, :Source_Pressure_Psi] .* u"psi"
-	dfs_2[!, :Source_Temp_C] = dfs_2[!, :Source_Temp_C] .* u"C"
-	dfs_2
-	
-end
-
-# ╔═╡ 1b1d6665-0853-483b-8361-f5305cd3aacd
-@bind clean_dfs_xaxis Select(names(clean_dfs))
-
-# ╔═╡ 193fd98c-5479-468d-8bf5-d22ad3ac278f
-@bind clean_dfs_yaxis Select(names(clean_dfs, Not(:DateTime, :ElapsedTime)))
-
-# ╔═╡ 3cf120f9-99b3-4ac1-8334-0e608a31e99b
-begin
-	
-# Assuming `df` is the DataFrame returned by the `read_files2` function
-groups = @group_by(clean_dfs, source_file)
-	
-fig = Figure()
-ax = Axis(fig[1, 1], xlabel="Elapsed Time", ylabel="P1_Psi")
-
-colors = RGB(rand(), rand(), rand())
-
-
-for (i, g) in enumerate(groups)
-    lines!(ax, ustrip.(g.ElapsedTime), ustrip.(g.P1_Psi), color=colors[i])
-end
-
-fig
-end
+# ╔═╡ 2188f919-d54f-4043-8a52-a58b85a43855
+read_files()
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-Tidier = "f0413319-3358-4bb0-8e7c-0c83523a93bd"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 CSV = "~0.10.11"
 CairoMakie = "~0.10.11"
-Colors = "~0.12.10"
+DataFrames = "~1.6.1"
 PlutoUI = "~0.7.52"
-Tidier = "~1.0.1"
 Unitful = "~1.17.0"
 """
 
@@ -292,12 +131,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "7cab8b6545c1daa57b7fb6515015c88174817434"
-
-[[deps.ANSIColoredPrinters]]
-git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
-uuid = "a4c015fc-c6ff-483c-b24f-f7ea428134e9"
-version = "0.0.1"
+project_hash = "90c51c933b757fdcca5deef90983237670452a66"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -335,12 +169,6 @@ weakdeps = ["StaticArrays"]
 
     [deps.Adapt.extensions]
     AdaptStaticArraysExt = "StaticArrays"
-
-[[deps.AlgebraOfGraphics]]
-deps = ["Colors", "Dates", "Dictionaries", "FileIO", "GLM", "GeoInterface", "GeometryBasics", "GridLayoutBase", "KernelDensity", "Loess", "Makie", "PlotUtils", "PooledArrays", "PrecompileTools", "RelocatableFolders", "StatsBase", "StructArrays", "Tables"]
-git-tree-sha1 = "c58b2c0f1161b8a2e79dcb1a0ec4b639c2406f15"
-uuid = "cbdf2221-f076-402e-a563-3d30da359d67"
-version = "0.6.16"
 
 [[deps.Animations]]
 deps = ["Colors"]
@@ -398,11 +226,6 @@ version = "0.4.7"
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 
-[[deps.BitFlags]]
-git-tree-sha1 = "43b1a4a8f797c1cddadf60499a8a077d4af2cd2d"
-uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
-version = "0.1.7"
-
 [[deps.Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "19a35467a82e236ff51bc17a3a44b69ef35185a2"
@@ -459,24 +282,6 @@ git-tree-sha1 = "f641eb0a4f00c343bbc32346e1217b86f3ce9dad"
 uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
 version = "0.5.1"
 
-[[deps.CategoricalArrays]]
-deps = ["DataAPI", "Future", "Missings", "Printf", "Requires", "Statistics", "Unicode"]
-git-tree-sha1 = "1568b28f91293458345dabba6a5ea3f183250a61"
-uuid = "324d7699-5711-5eae-9e2f-1d82baa6b597"
-version = "0.10.8"
-weakdeps = ["JSON", "RecipesBase", "SentinelArrays", "StructTypes"]
-
-    [deps.CategoricalArrays.extensions]
-    CategoricalArraysJSONExt = "JSON"
-    CategoricalArraysRecipesBaseExt = "RecipesBase"
-    CategoricalArraysSentinelArraysExt = "SentinelArrays"
-    CategoricalArraysStructTypesExt = "StructTypes"
-
-[[deps.Chain]]
-git-tree-sha1 = "8c4920235f6c561e401dfe569beb8b924adad003"
-uuid = "8be319e6-bccf-4806-a6f7-6fae938471bc"
-version = "0.5.0"
-
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
 git-tree-sha1 = "e0af648f0692ec1691b5d094b8724ba1346281cf"
@@ -486,12 +291,6 @@ weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
-
-[[deps.Cleaner]]
-deps = ["Tables"]
-git-tree-sha1 = "f0ebda9a8284c10ec10df406f669edca4c69892f"
-uuid = "caabdcdb-0ab6-47cf-9f62-08858e44f38f"
-version = "0.5.0"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -555,12 +354,6 @@ deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 version = "1.0.5+0"
 
-[[deps.ConcurrentUtilities]]
-deps = ["Serialization", "Sockets"]
-git-tree-sha1 = "5372dbbf8f0bdb8c700db5367132925c0771ef7e"
-uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
-version = "2.2.1"
-
 [[deps.ConstructionBase]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "c53fc348ca4d40d7b371e71fd52251839080cbc9"
@@ -586,12 +379,6 @@ version = "4.1.1"
 git-tree-sha1 = "8da84edb865b0b5b0100c0666a9bc9a0b71c553c"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 version = "1.15.0"
-
-[[deps.DataDeps]]
-deps = ["HTTP", "Libdl", "Reexport", "SHA", "p7zip_jll"]
-git-tree-sha1 = "6e8d74545d34528c30ccd3fa0f3c00f8ed49584c"
-uuid = "124859b0-ceae-595e-8997-d05f6a7a8dfe"
-version = "0.7.11"
 
 [[deps.DataFrames]]
 deps = ["Compat", "DataAPI", "DataStructures", "Future", "InlineStrings", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrecompileTools", "PrettyTables", "Printf", "REPL", "Random", "Reexport", "SentinelArrays", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
@@ -620,18 +407,6 @@ git-tree-sha1 = "bea7984f7e09aeb28a3b071c420a0186cb4fabad"
 uuid = "927a84f5-c5f4-47a5-9785-b46e178433df"
 version = "0.8.8"
 
-[[deps.DelimitedFiles]]
-deps = ["Mmap"]
-git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
-uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
-version = "1.9.1"
-
-[[deps.Dictionaries]]
-deps = ["Indexing", "Random", "Serialization"]
-git-tree-sha1 = "e82c3c97b5b4ec111f3c1b55228cebc7510525a2"
-uuid = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
-version = "0.3.25"
-
 [[deps.DiffResults]]
 deps = ["StaticArraysCore"]
 git-tree-sha1 = "782dd5f4561f5d267313f23853baaaa4c52ea621"
@@ -643,17 +418,6 @@ deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialF
 git-tree-sha1 = "23163d55f885173722d1e4cf0f6110cdbaf7e272"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
 version = "1.15.1"
-
-[[deps.Distances]]
-deps = ["LinearAlgebra", "Statistics", "StatsAPI"]
-git-tree-sha1 = "5225c965635d8c21168e32a12954675e7bea1151"
-uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
-version = "0.10.10"
-weakdeps = ["ChainRulesCore", "SparseArrays"]
-
-    [deps.Distances.extensions]
-    DistancesChainRulesCoreExt = "ChainRulesCore"
-    DistancesSparseArraysExt = "SparseArrays"
 
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -678,12 +442,6 @@ deps = ["LibGit2"]
 git-tree-sha1 = "2fb1e02f2b635d0845df5d7c167fec4dd739b00d"
 uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 version = "0.9.3"
-
-[[deps.Documenter]]
-deps = ["ANSIColoredPrinters", "Base64", "Dates", "DocStringExtensions", "IOCapture", "InteractiveUtils", "JSON", "LibGit2", "Logging", "Markdown", "REPL", "Test", "Unicode"]
-git-tree-sha1 = "39fd748a73dce4c05a9655475e437170d8fb1b67"
-uuid = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-version = "0.27.25"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
@@ -717,12 +475,6 @@ deps = ["IntervalArithmetic", "Random", "StaticArraysCore"]
 git-tree-sha1 = "499b1ca78f6180c8f8bdf1cabde2d39120229e5c"
 uuid = "429591f6-91af-11e9-00e2-59fbe8cec110"
 version = "2.2.6"
-
-[[deps.ExceptionUnwrapping]]
-deps = ["Test"]
-git-tree-sha1 = "e90caa41f5a86296e014e148ee061bd6c3edec96"
-uuid = "460bff9d-24e4-43bc-9d9f-a8973cb893f4"
-version = "0.1.9"
 
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -857,12 +609,6 @@ version = "1.0.10+0"
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
-[[deps.GLM]]
-deps = ["Distributions", "LinearAlgebra", "Printf", "Reexport", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "StatsModels"]
-git-tree-sha1 = "273bd1cd30768a2fddfa3fd63bbc746ed7249e5f"
-uuid = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
-version = "1.9.0"
-
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
 git-tree-sha1 = "2d6ca471a6c7b536127afccfa7564b5b39227fe0"
@@ -915,12 +661,6 @@ version = "0.9.2"
 git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
 uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
 version = "1.0.2"
-
-[[deps.HTTP]]
-deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
-git-tree-sha1 = "5eab648309e2e060198b45820af1a37182de3cce"
-uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "1.10.0"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
@@ -987,11 +727,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "3d09a9f60edf77f8a4d99f9e015e8fbf9989605d"
 uuid = "905a6f67-0a94-5f89-b386-d35d92009cd1"
 version = "3.1.7+0"
-
-[[deps.Indexing]]
-git-tree-sha1 = "ce1566720fd6b19ff3411404d4b977acd4814f9f"
-uuid = "313cdc1a-70c2-5d6a-ae34-0150d3930a38"
-version = "1.1.1"
 
 [[deps.IndirectArrays]]
 git-tree-sha1 = "012e604e1c7458645cb8b436f8fba789a51b257f"
@@ -1083,12 +818,6 @@ deps = ["Dates", "Mmap", "Parsers", "Unicode"]
 git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.4"
-
-[[deps.JSON3]]
-deps = ["Dates", "Mmap", "Parsers", "PrecompileTools", "StructTypes", "UUIDs"]
-git-tree-sha1 = "95220473901735a0f4df9d1ca5b171b568b2daa3"
-uuid = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
-version = "1.13.2"
 
 [[deps.JpegTurbo]]
 deps = ["CEnum", "FileIO", "ImageCore", "JpegTurbo_jll", "TOML"]
@@ -1220,12 +949,6 @@ git-tree-sha1 = "558a338f1eeabe933f9c2d4052aa7c2c707c3d52"
 uuid = "9b3f67b0-2d00-526e-9884-9e4938f8fb88"
 version = "0.1.12"
 
-[[deps.Loess]]
-deps = ["Distances", "LinearAlgebra", "Statistics", "StatsAPI"]
-git-tree-sha1 = "a113a8be4c6d0c64e217b472fb6e61c760eb4022"
-uuid = "4345ca2d-374a-55d4-8d30-97f9976e7612"
-version = "0.6.3"
-
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
 git-tree-sha1 = "7d6dd4e9212aebaeed356de34ccf262a3cd415aa"
@@ -1244,12 +967,6 @@ version = "0.3.26"
 
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
-
-[[deps.LoggingExtras]]
-deps = ["Dates", "Logging"]
-git-tree-sha1 = "c1dd6d7978c12545b4179fb6153b9250c96b0075"
-uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
-version = "1.0.3"
 
 [[deps.MIMEs]]
 git-tree-sha1 = "65f28ad4b594aebe22157d6fac869786a255b7eb"
@@ -1289,12 +1006,6 @@ version = "0.4.2"
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
-[[deps.MarketData]]
-deps = ["CSV", "Dates", "HTTP", "JSON3", "Random", "Reexport", "TimeSeries"]
-git-tree-sha1 = "715536b6af6292883128e22857c83291e30fea25"
-uuid = "945b72a4-3b13-509d-9b46-1525bb5c06de"
-version = "0.13.12"
-
 [[deps.Match]]
 git-tree-sha1 = "1d9bc5c1a6e7ee24effb93f175c9342f9154d97f"
 uuid = "7eb4fadd-790c-5f42-8a69-bfa0b872bfbf"
@@ -1305,12 +1016,6 @@ deps = ["AbstractTrees", "Automa", "DataStructures", "FreeTypeAbstraction", "Geo
 git-tree-sha1 = "8f52dbaa1351ce4cb847d95568cb29e62a307d93"
 uuid = "0a4f8689-d25c-4efe-a92b-7142dfc1aa53"
 version = "0.5.6"
-
-[[deps.MbedTLS]]
-deps = ["Dates", "MbedTLS_jll", "MozillaCACerts_jll", "Random", "Sockets"]
-git-tree-sha1 = "03a9b9718f5682ecb107ac9f7308991db4ce395b"
-uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
-version = "1.1.7"
 
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -1407,12 +1112,6 @@ deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 version = "0.8.1+0"
 
-[[deps.OpenSSL]]
-deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
-git-tree-sha1 = "51901a49222b09e3743c65b8847687ae5fc78eb2"
-uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
-version = "1.4.1"
-
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "ceeda72c9fd6bbebc4f4f598560789145a8b6c4c"
@@ -1470,12 +1169,6 @@ deps = ["OffsetArrays"]
 git-tree-sha1 = "0fac6313486baae819364c52b4f483450a9d793f"
 uuid = "5432bcbf-9aad-5242-b902-cca2824c8663"
 version = "0.5.12"
-
-[[deps.PalmerPenguins]]
-deps = ["CSV", "DataDeps"]
-git-tree-sha1 = "e7c581b0e29f7d35f47927d65d4965b413c10d90"
-uuid = "8b842266-38fa-440a-9b57-31493939ab85"
-version = "0.1.4"
 
 [[deps.Pango_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
@@ -1720,11 +1413,6 @@ version = "0.4.0"
 deps = ["Distributed", "Mmap", "Random", "Serialization"]
 uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
-[[deps.ShiftedArrays]]
-git-tree-sha1 = "503688b59397b3307443af35cd953a13e8005c16"
-uuid = "1277b4bf-5013-50f5-be3d-901d8477a67a"
-version = "2.0.0"
-
 [[deps.Showoff]]
 deps = ["Dates", "Grisu"]
 git-tree-sha1 = "91eddf657aca81df9ae6ceb20b959ae5653ad1de"
@@ -1736,11 +1424,6 @@ deps = ["Random", "Statistics", "Test"]
 git-tree-sha1 = "d263a08ec505853a5ff1c1ebde2070419e3f28e9"
 uuid = "73760f76-fbc4-59ce-8f25-708e95d2df96"
 version = "0.4.0"
-
-[[deps.SimpleBufferStream]]
-git-tree-sha1 = "874e8867b33a00e784c8a7e4b60afe9e037b74e1"
-uuid = "777ac1f9-54b0-4bf8-805c-2214025038e7"
-version = "1.1.0"
 
 [[deps.SimpleGraphs]]
 deps = ["AbstractLattices", "Combinatorics", "DataStructures", "IterTools", "LightXML", "LinearAlgebra", "LinearAlgebraX", "Optim", "Primes", "Random", "RingLists", "SimplePartitions", "SimplePolynomials", "SimpleRandom", "SparseArrays", "Statistics"]
@@ -1859,12 +1542,6 @@ version = "1.3.0"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
     InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
 
-[[deps.StatsModels]]
-deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Printf", "REPL", "ShiftedArrays", "SparseArrays", "StatsAPI", "StatsBase", "StatsFuns", "Tables"]
-git-tree-sha1 = "5cf6c4583533ee38639f73b880f35fc85f2941e0"
-uuid = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
-version = "0.7.3"
-
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
 git-tree-sha1 = "a04cabe79c5f01f4d723cc6704070ada0b9d46d5"
@@ -1876,12 +1553,6 @@ deps = ["Adapt", "ConstructionBase", "DataAPI", "GPUArraysCore", "StaticArraysCo
 git-tree-sha1 = "0a3db38e4cce3c54fe7a71f831cd7b6194a54213"
 uuid = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 version = "0.6.16"
-
-[[deps.StructTypes]]
-deps = ["Dates", "UUIDs"]
-git-tree-sha1 = "ca4bccb03acf9faaf4137a9abc1881ed1841aa70"
-uuid = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
-version = "1.10.0"
 
 [[deps.SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
@@ -1924,52 +1595,11 @@ version = "0.1.1"
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[[deps.Tidier]]
-deps = ["Reexport", "TidierCats", "TidierData", "TidierDates", "TidierPlots", "TidierStrings"]
-git-tree-sha1 = "c7a6c4db043a4d27a4150a3ea07b03d3a9a158ca"
-uuid = "f0413319-3358-4bb0-8e7c-0c83523a93bd"
-version = "1.0.1"
-
-[[deps.TidierCats]]
-deps = ["CategoricalArrays", "DataFrames", "Reexport", "Statistics"]
-git-tree-sha1 = "c4660f2c0ffd733ec243ea0a5447bd3bfae40c6d"
-uuid = "79ddc9fe-4dbf-4a56-a832-df41fb326d23"
-version = "0.1.1"
-
-[[deps.TidierData]]
-deps = ["Chain", "Cleaner", "DataFrames", "MacroTools", "Reexport", "ShiftedArrays", "Statistics"]
-git-tree-sha1 = "a4a83e2f5083ee6b18e0f01c99b4483b4f7978a2"
-uuid = "fe2206b3-d496-4ee9-a338-6a095c4ece80"
-version = "0.10.0"
-
-[[deps.TidierDates]]
-deps = ["Dates", "Documenter", "Reexport"]
-git-tree-sha1 = "ba1e0e3e7c99cdccb7c8d9d568e413283323716f"
-uuid = "20186a3f-b5d3-468e-823e-77aae96fe2d8"
-version = "0.1.0"
-
-[[deps.TidierPlots]]
-deps = ["AlgebraOfGraphics", "CairoMakie", "DataFrames", "Makie", "MarketData", "PalmerPenguins", "Reexport"]
-git-tree-sha1 = "1e2f273690efe000786b142bbe83b431fceb29f1"
-uuid = "337ecbd1-5042-4e2a-ae6f-ca776f97570a"
-version = "0.1.0"
-
-[[deps.TidierStrings]]
-git-tree-sha1 = "1e704fbaf9f4d651ed9c59b4b6a6c325c0f09558"
-uuid = "248e6834-d0f8-40ef-8fbb-8e711d883e9c"
-version = "0.1.0"
-
 [[deps.TiffImages]]
 deps = ["ColorTypes", "DataStructures", "DocStringExtensions", "FileIO", "FixedPointNumbers", "IndirectArrays", "Inflate", "Mmap", "OffsetArrays", "PkgVersion", "ProgressMeter", "UUIDs"]
 git-tree-sha1 = "34cc045dd0aaa59b8bbe86c644679bc57f1d5bd0"
 uuid = "731e570b-9d59-4bfa-96dc-6df516fadf69"
 version = "0.6.8"
-
-[[deps.TimeSeries]]
-deps = ["Dates", "DelimitedFiles", "DocStringExtensions", "RecipesBase", "Reexport", "Statistics", "Tables"]
-git-tree-sha1 = "8b9288d84da88ea44693ca8cf9c236da1778f274"
-uuid = "9e3dc215-6440-5c97-bce1-76c03772f85e"
-version = "0.23.2"
 
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]
@@ -2187,22 +1817,14 @@ version = "3.5.0+0"
 # ╠═b483a28d-7035-4c13-8cad-fe19445c4f68
 # ╠═bf0dfff0-d068-4eb8-be61-74958d303f73
 # ╠═33abbefc-861d-46ad-a363-5c6680a40967
-# ╠═10cb61ac-66d9-4801-98b9-53295e6b6e5b
-# ╠═ed9c0c89-0625-4c5f-9544-cd6d3fdfe019
+# ╠═95ec7371-fc96-4055-aeb2-4ddc27c149ac
+# ╠═03062a99-4c74-4ca0-953a-78c966c7ec08
+# ╠═808d9c27-9b05-4d52-baed-d6cafd7da55b
 # ╠═1d7198e0-3550-464d-8ab5-44cf84874299
+# ╠═70172959-baea-471f-beab-ba068614dec9
 # ╠═52478c42-7745-447b-a87b-d52dee44679c
 # ╠═b719722d-9a35-4076-bdda-0178c930392a
-# ╠═4a824d17-af54-48e1-95a4-034c122f0e02
 # ╠═0d2fb16a-67ab-4c6f-b55e-1f334d097b24
-# ╠═f0b64be5-09cb-4d32-ba2b-b344156fa13c
-# ╠═4cd84c95-96e7-4aa5-afca-70249566fec1
 # ╠═2188f919-d54f-4043-8a52-a58b85a43855
-# ╠═28c868d7-270d-4397-95c6-99b6b0d83722
-# ╠═a05a4231-888b-4169-b02c-7082b20a9fba
-# ╠═ca6c2700-7283-4500-b86a-b590e9369f88
-# ╠═4329da44-f7d0-433f-b9cd-1be76a43cb7c
-# ╠═1b1d6665-0853-483b-8361-f5305cd3aacd
-# ╠═193fd98c-5479-468d-8bf5-d22ad3ac278f
-# ╠═3cf120f9-99b3-4ac1-8334-0e608a31e99b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
