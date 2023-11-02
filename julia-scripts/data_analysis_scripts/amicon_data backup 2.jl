@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.32
+# v0.19.30
 
 using Markdown
 using InteractiveUtils
@@ -17,7 +17,6 @@ end
 # ╔═╡ a5b196c0-7285-11ee-04f5-97c3abd83d97
 begin
 	using PlutoUI
-	using DataFrames
 	using Tidier
 	using CairoMakie
 	using CSV
@@ -42,6 +41,8 @@ end
 raw_data()
 
 # ╔═╡ 33abbefc-861d-46ad-a363-5c6680a40967
+# ╠═╡ disabled = true
+#=╠═╡
 function clean_data()
 	df = raw_data()
 	# Convert DATE and TIME columns to String type and combine them
@@ -81,16 +82,14 @@ function clean_data()
 
 	df
 end
-
-# ╔═╡ 4b76acac-a460-4679-ac2c-54b8364a886f
-clean_data()
+  ╠═╡ =#
 
 # ╔═╡ 10cb61ac-66d9-4801-98b9-53295e6b6e5b
 df = @chain raw_data() begin
 	# Convert DATE and TIME columns to String type and combine them
 	@mutate(DateTime = ymd_hms(DATE * string(TIME)))
 	# Calculate the elapsed time in seconds since the first timestamp
-	@mutate(ElapsedTime = Dates.value(DateTime .- DateTime[1])/ 1000)
+	@mutate(ElapsedTime = Dates.value(DateTime .- DateTime[1]) / 1000)
 	# remove :DATE and :TIME column in place
 	@select(!(DATE:TIME))
 	# move :DateTime and :ElapsedTime to the front
@@ -143,24 +142,10 @@ clean_df = begin
 	df
 end
 
-# ╔═╡ f949ae82-e34a-4e69-aac0-1993b9986363
-#=╠═╡
-@bind clean_df_xaxis Select(names(clean_df, Not(:DateTime)))
-  ╠═╡ =#
-
-# ╔═╡ ca2dee93-0830-4c9d-a617-22b69ebbea73
-#=╠═╡
-@bind clean_df_yaxis Select(names(clean_df, Not(:DateTime, :ElapsedTime)))
-  ╠═╡ =#
-
 # ╔═╡ 1d7198e0-3550-464d-8ab5-44cf84874299
+# ╠═╡ disabled = true
 #=╠═╡
-begin
-	fig = Figure()
-	ax1 = Axis(fig[1, 1], xlabel="$clean_df_xaxis", ylabel="$clean_df_yaxis")
-	lines!(ax1, ustrip.(clean_df[:, clean_df_xaxis]), ustrip.(clean_df[:, clean_df_yaxis]))
-	fig
-end
+fig=lines(ustrip.(clean_df.ElapsedTime), ustrip.(clean_df[!,"$clean_df_yaxis"]))
   ╠═╡ =#
 
 # ╔═╡ 52478c42-7745-447b-a87b-d52dee44679c
@@ -174,7 +159,7 @@ selected_files
 
 # ╔═╡ f0b64be5-09cb-4d32-ba2b-b344156fa13c
 function read_files2()
-    dir_path = raw"C:\Users\rlucien\OneDrive - Moderna\Documents\KEYENCE\log0\\"  # 
+    dir_path = raw"C:\Users\rlucien\OneDrive - Moderna\Documents\KEYENCE\log0\\"  # Replace with your actual directory path
 
     # Create an empty DataFrame to hold all the data
     all_data = DataFrame()
@@ -257,13 +242,10 @@ clean_dfs = begin
 end
 
 # ╔═╡ 1b1d6665-0853-483b-8361-f5305cd3aacd
-@bind clean_dfs_xaxis Select(names(clean_dfs, Not(:DateTime)))
+@bind clean_dfs_xaxis Select(names(clean_dfs))
 
 # ╔═╡ 193fd98c-5479-468d-8bf5-d22ad3ac278f
 @bind clean_dfs_yaxis Select(names(clean_dfs, Not(:DateTime, :ElapsedTime)))
-
-# ╔═╡ 66b91c53-0c90-42fc-8653-a3a246b8d305
-typeof(clean_dfs_yaxis)
 
 # ╔═╡ 3cf120f9-99b3-4ac1-8334-0e608a31e99b
 begin
@@ -271,20 +253,18 @@ begin
 # Assuming `df` is the DataFrame returned by the `read_files2` function
 groups = @group_by(clean_dfs, source_file)
 	
-fig2 = Figure()
-ax2 = Axis(fig2[1, 1], xlabel="$clean_dfs_xaxis", ylabel="$clean_dfs_yaxis")
+fig = Figure()
+ax = Axis(fig[1, 1], xlabel="Elapsed Time", ylabel="P1_Psi")
+
+colors = RGB(rand(), rand(), rand())
 
 
 for (i, g) in enumerate(groups)
-	colors = RGB(rand(), rand(), rand())
-    lines!(ax2, ustrip.(g[:, clean_dfs_xaxis]), ustrip.(g[:, clean_dfs_yaxis]), color=colors)
+    lines!(ax, ustrip.(g.ElapsedTime), ustrip.(g.P1_Psi), color=colors[i])
 end
 
-fig2
+fig
 end
-
-# ╔═╡ 9504785b-5d4d-47ee-8938-3a66d28f658f
-uconvert(u"minute",4000u"s" ) |> float
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -292,7 +272,6 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Tidier = "f0413319-3358-4bb0-8e7c-0c83523a93bd"
@@ -302,7 +281,6 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 CSV = "~0.10.11"
 CairoMakie = "~0.10.11"
 Colors = "~0.12.10"
-DataFrames = "~1.6.1"
 PlutoUI = "~0.7.52"
 Tidier = "~1.0.1"
 Unitful = "~1.17.0"
@@ -314,7 +292,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "cc105ad8156d8395626ed7fd83f4fe2f1b8ba6eb"
+project_hash = "7cab8b6545c1daa57b7fb6515015c88174817434"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -2209,23 +2187,22 @@ version = "3.5.0+0"
 # ╠═b483a28d-7035-4c13-8cad-fe19445c4f68
 # ╠═bf0dfff0-d068-4eb8-be61-74958d303f73
 # ╠═33abbefc-861d-46ad-a363-5c6680a40967
-# ╠═4b76acac-a460-4679-ac2c-54b8364a886f
 # ╠═10cb61ac-66d9-4801-98b9-53295e6b6e5b
 # ╠═ed9c0c89-0625-4c5f-9544-cd6d3fdfe019
-# ╠═f949ae82-e34a-4e69-aac0-1993b9986363
-# ╠═ca2dee93-0830-4c9d-a617-22b69ebbea73
 # ╠═1d7198e0-3550-464d-8ab5-44cf84874299
 # ╠═52478c42-7745-447b-a87b-d52dee44679c
 # ╠═b719722d-9a35-4076-bdda-0178c930392a
 # ╠═4a824d17-af54-48e1-95a4-034c122f0e02
+# ╠═0d2fb16a-67ab-4c6f-b55e-1f334d097b24
 # ╠═f0b64be5-09cb-4d32-ba2b-b344156fa13c
 # ╠═4cd84c95-96e7-4aa5-afca-70249566fec1
+# ╠═2188f919-d54f-4043-8a52-a58b85a43855
+# ╠═28c868d7-270d-4397-95c6-99b6b0d83722
+# ╠═a05a4231-888b-4169-b02c-7082b20a9fba
 # ╠═ca6c2700-7283-4500-b86a-b590e9369f88
 # ╠═4329da44-f7d0-433f-b9cd-1be76a43cb7c
 # ╠═1b1d6665-0853-483b-8361-f5305cd3aacd
 # ╠═193fd98c-5479-468d-8bf5-d22ad3ac278f
-# ╠═66b91c53-0c90-42fc-8653-a3a246b8d305
 # ╠═3cf120f9-99b3-4ac1-8334-0e608a31e99b
-# ╠═9504785b-5d4d-47ee-8938-3a66d28f658f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
