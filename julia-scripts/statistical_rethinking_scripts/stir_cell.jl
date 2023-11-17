@@ -31,7 +31,7 @@ function calculate_parameters(starting_volume, concentration_factor, max_stir_ce
 end
 
 starting_volume = 50
-concentration_factor = 4
+concentration_factor = 5
 max_stir_cell_volume = 50
 
 results = calculate_parameters(starting_volume, concentration_factor, max_stir_cell_volume)
