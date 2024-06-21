@@ -1,5 +1,33 @@
 # Julia Specific Cheatsheet
 
+## How to Create a New Environment in Julia
+
+1. **Navigate to the Folder Where You Want the Environment to Be Saved**
+
+   In the Julia REPL, use:
+   `cd(raw"C:\Users\YourUsername\Documents")`
+   This command changes the current working directory to the desired folder.
+
+2. **Activate a New Environment**
+
+   - To create and activate a new environment in the current directory, enter the Package REPL by typing `]` in the Julia REPL, then use:
+     `activate ./my_new_environment`
+   - To create and activate a new environment in the default directory with a specific name, in the Package REPL, type:
+     `activate --shared MyEnvironment`
+
+3. **Add Packages**
+
+   Still in the Package REPL, you can add packages to your environment using:
+   `add PackageName`
+   Replace `PackageName` with the name of the package you wish to add.
+
+4. **Activate an Existing Environment**
+
+   To activate an existing environment, navigate to the folder containing the environment, then in the Package REPL, type:
+   `activate .`
+   This activates the environment located in the current directory.
+
+
 ## Julia performance tips
 ###  More dots: Fuse vectorized operations, vectrizing is faster than loops
 ```julia  

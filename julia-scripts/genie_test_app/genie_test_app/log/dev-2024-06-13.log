@@ -1,0 +1,13 @@
+┌ Info: 2024-06-13 12:58:26 Watching ["c:\\Users\\rlucien\\OneDrive - Moderna\\Desktop\\rud-lucien\\julia-scripts\\genie_test_app\\genie_test_app"]
+└ @ GenieAutoReload C:\Users\rlucien\.julia\packages\GenieAutoReload\ESvsh\src\GenieAutoReload.jl:19
+┌ Info: 2024-06-13 12:58:27 Autoreloading
+└ @ GenieAutoReload C:\Users\rlucien\.julia\packages\GenieAutoReload\ESvsh\src\GenieAutoReload.jl:22
+┌ Info: 2024-06-13 12:58:30 Watching ["c:\\Users\\rlucien\\OneDrive - Moderna\\Desktop\\rud-lucien\\julia-scripts\\genie_test_app\\genie_test_app"]
+└ @ GenieAutoReload C:\Users\rlucien\.julia\packages\GenieAutoReload\ESvsh\src\GenieAutoReload.jl:19
+┌ Info: 2024-06-13 12:58:30 Autoreloading
+└ @ GenieAutoReload C:\Users\rlucien\.julia\packages\GenieAutoReload\ESvsh\src\GenieAutoReload.jl:22
+┌ Info: 2024-06-13 12:58:31 
+│ Web Server starting at http://127.0.0.1:9101?CHANNEL__=XOMJAAWPSXQUOMDFKZZWQEECTCXOXKJG 
+└ @ Genie.Server C:\Users\rlucien\.julia\packages\Genie\uliWf\src\Server.jl:182
+┌ Info: 2024-06-13 12:58:31 Listening on: 127.0.0.1:9101, thread id: 1
+└ @ HTTP.Servers C:\Users\rlucien\.julia\packages\HTTP\sJD5V\src\Servers.jl:382
