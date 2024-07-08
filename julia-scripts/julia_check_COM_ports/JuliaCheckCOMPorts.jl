@@ -13,30 +13,56 @@ function get_available_ports()
     return ports
 end
 
+# function send_and_receive_message(port_name::String, message::String)
+#     port = LibSerialPort.open(port_name, 9600; mode=LibSerialPort.SP_MODE_READ_WRITE)
+#     try
+#         write(port, message)
+#         sleep(1) # Adjust the sleep duration as necessary
+#         response = read(port, String)
+#         if !isempty(response)
+#             received_message = strip(response)
+#             if received_message == message
+#                 println("Device found on port $port_name with matching message: $received_message")
+#                 return true
+#             else
+#                 println("Device on port $port_name responded with a different message: $received_message")
+#             end
+#         else
+#             println("No response received from port $port_name.")
+#         end
+#     catch e
+#         println("Error on port $port_name: $e")
+#     finally
+#         close(port)
+#     end
+#     return false
+# end
+
 function send_and_receive_message(port_name::String, message::String)
-    port = LibSerialPort.open(port_name, 9600; mode=LibSerialPort.SP_MODE_READ_WRITE)
-    try
-        write(port, message)
-        sleep(1) # Adjust the sleep duration as necessary
-        response = read(port, String)
-        if !isempty(response)
-            received_message = strip(response)
-            if received_message == message
-                println("Device found on port $port_name with matching message: $received_message")
-                return true
+    success = false
+    LibSerialPort.open(port_name, 9600; mode=LibSerialPort.SP_MODE_READ_WRITE) do port
+        try
+            write(port, message)
+            sleep(0.25) # Adjust the sleep duration as necessary
+            response = read(port, String)
+            if !isempty(response)
+                received_message = strip(response)
+                if received_message == message
+                    println("Device found on port $port_name with matching message: $received_message")
+                    success = true
+                else
+                    println("Device on port $port_name responded with a different message: $received_message")
+                end
             else
-                println("Device on port $port_name responded with a different message: $received_message")
+                println("No response received from port $port_name.")
             end
-        else
-            println("No response received from port $port_name.")
+        catch e
+            println("Error on port $port_name: $e")
         end
-    catch e
-        println("Error on port $port_name: $e")
-    finally
-        close(port)
     end
-    return false
+    return success
 end
+
 
 # function find_connected_device()
 #     # Define the message to be sent
