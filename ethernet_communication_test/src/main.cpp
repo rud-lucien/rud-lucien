@@ -9,7 +9,7 @@
 byte mac[] = { 0x50, 0xD7, 0x53, 0x00, 0xD3, 0x59};
 
 IPAddress ip(169, 254, 168, 10); // IP address of your Controllino Maxi
-IPAddress server(169, 254, 168, 100); // IP address of your Modbus server (NU-EP1)
+IPAddress server(169, 254, 0, 10); // IP address of your Modbus server (NU-EP1)
 
 EthernetClient ethClient;
 ModbusTCPClient modbusTCPClient(ethClient);
