@@ -76,53 +76,57 @@ void loop()
     {
       Serial.println("Reconnection attempt failed.");
       delay(1000); // Wait before retrying
-      return; // Exit the loop function to avoid further processing until reconnected
+      return;      // Exit the loop function to avoid further processing until reconnected
     }
   }
 
-  // Address and quantity of the register to read
-  int registerAddress = 0x0002; // Base address for Port 1 process data
-  int registerQuantity = 6;     // Quantity of registers to read (7 x 16-bit values = 14 bytes)
+   // Address and quantity of the register to read
+  int registerAddress = 0x0002; // Base address for instantaneous flow rate in Process Data Structure 0
+  int registerQuantity = 2;     // Quantity of registers to read (2 x 16-bit values = 32 bits)
 
-  // Read holding registers
-  if (modbusTCPClient.requestFrom(HOLDING_REGISTERS, registerAddress, registerQuantity))
+  // Read input registers
+  if (modbusTCPClient.requestFrom(INPUT_REGISTERS, registerAddress, registerQuantity))
   {
-    if (modbusTCPClient.available() >= registerQuantity)  // 
+    if (modbusTCPClient.available() >= registerQuantity) // Ensure there are at least 2 values (32 bits)
     {
-      // Print the raw data for each register
-      Serial.println("Raw Process Data:");
-      for (int i = 0; i < registerQuantity; i++)
-      {
-        long rawData = modbusTCPClient.read();
+      long highWord = modbusTCPClient.read();
+      long lowWord = modbusTCPClient.read();
+      
+      if (highWord != -1 && lowWord != -1) {
+        // Combine the two registers into a 32-bit value
+        uint32_t combined = (static_cast<uint32_t>(highWord) << 16) | static_cast<uint16_t>(lowWord);
         
-        if(i == 0)
-        {
-        long flowrate = rawData >> 14;
-        float flowrate_ml = float(flowrate)*0.1;
-        Serial.print("flowrate ml: ");
-        Serial.println(flowrate_ml);
-        }
+        // Extract data from the combined value
+        uint32_t rawInstantaneousFlow = combined & 0x3FFFF; // First 18 bits
+        float instantaneousFlow = rawInstantaneousFlow * 0.1; // Apply scaling factor to convert to mL/min
 
-        if (i == 1)
-        {
-          long shot_amount = rawData >> 14;
-          float shot_amount_ml = float(shot_amount) * 0.001;
-          Serial.print("Shot amount mL: ");
-          Serial.println(shot_amount_ml);
-        }
+        uint8_t error = (combined >> 18) & 0x7; // Next 3 bits
+        uint8_t stabilityLevel = (combined >> 21) & 0x7; // Next 3 bits
+        uint8_t alert = (combined >> 24) & 0x1; // Next 1 bit
+        uint8_t output2 = (combined >> 25) & 0x1; // Next 1 bit
+        uint8_t output1 = (combined >> 26) & 0x1; // Next 1 bit
 
-        if(i == 2)
-        {
-        long integrated_flow = rawData >> 14;
-        float integrated_flow_ml = float(integrated_flow)*.01;
-        Serial.print("Integrated flow: ");
-        Serial.println(integrated_flow_ml);
-        }
+        // Print the extracted data
+        Serial.print("Instantaneous Flow Rate: ");
+        Serial.print(instantaneousFlow);
+        Serial.println(" mL/min");
 
-        Serial.print("Process Data Structure: ");
-        Serial.print(i);
-        Serial.print(": ");
-        Serial.println(rawData, HEX); // Print the data in hexadecimal format
+        Serial.print("Error: ");
+        Serial.println(error);
+
+        Serial.print("Stability Level: ");
+        Serial.println(stabilityLevel);
+
+        Serial.print("Alert: ");
+        Serial.println(alert);
+
+        Serial.print("Output 2: ");
+        Serial.println(output2);
+
+        Serial.print("Output 1: ");
+        Serial.println(output1);
+      } else {
+        Serial.println("Failed to read register.");
       }
     }
   }
