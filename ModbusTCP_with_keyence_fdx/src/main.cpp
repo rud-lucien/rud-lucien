@@ -15,6 +15,16 @@ IPAddress server(169, 254, 0, 10);          // IP address of your Modbus server 
 
 bool wasConnected = false;
 
+// Function to reset IntegratedFlow
+void resetIntegratedFlow()
+{
+  Serial.println("Resetting Integrated Flow...");
+  digitalWrite(CONTROLLINO_D1, HIGH); // Write the specified state to the pin
+  delay(250);  // Ensure the signal is recognized (increase the delay if needed)
+  digitalWrite(CONTROLLINO_D1, LOW);
+  Serial.println("Integrated Flow Reset Completed");
+}
+
 void setup()
 {
   Serial.begin(115200); // Initialize serial communication at 115200 baud rate
@@ -80,6 +90,17 @@ void loop()
     }
   }
 
+ // Check for reset command
+  if (Serial.available() > 0)
+  {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    if (command.equals("rst"))
+    {
+      resetIntegratedFlow();
+    }
+  }
+
    // Address and quantity of the register to read
   int registerAddress = 0x0002; // Base address for instantaneous flow rate in Process Data Structure 0
   int registerQuantity = 2;     // Quantity of registers to read (2 x 16-bit values = 32 bits)
@@ -111,6 +132,7 @@ void loop()
         Serial.println("\n");
         Serial.print("Output1_value: ");
         Serial.print(output1);
+        Serial.println("\n");
 
       } else {
         Serial.println("Failed to read register.");
