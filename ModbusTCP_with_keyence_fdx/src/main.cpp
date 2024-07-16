@@ -97,34 +97,21 @@ void loop()
         uint32_t combined = (static_cast<uint32_t>(highWord) << 16) | static_cast<uint16_t>(lowWord);
         
         // Extract data from the combined value
-        uint32_t rawInstantaneousFlow = combined & 0x3FFFF; // First 18 bits
-        float instantaneousFlow = rawInstantaneousFlow * 0.1; // Apply scaling factor to convert to mL/min
-
-        uint8_t error = (combined >> 18) & 0x7; // Next 3 bits
-        uint8_t stabilityLevel = (combined >> 21) & 0x7; // Next 3 bits
-        uint8_t alert = (combined >> 24) & 0x1; // Next 1 bit
-        uint8_t output2 = (combined >> 25) & 0x1; // Next 1 bit
-        uint8_t output1 = (combined >> 26) & 0x1; // Next 1 bit
+        uint32_t integratedFlow = combined >> 14; // First 18 bits
+        
+        // uint8_t error = (combined >> 18) & 0x7; // Next 3 bits
+        // uint8_t stabilityLevel = (combined >> 21) & 0x7; // Next 3 bits
+        // uint8_t alert = (combined >> 24) & 0x1; // Next 1 bit
+        // uint8_t output2 = (combined >> 25) & 0x1; // Next 1 bit
+        uint8_t output1 = combined & 0x1; // Next 1 bit
 
         // Print the extracted data
-        Serial.print("Instantaneous Flow Rate: ");
-        Serial.print(instantaneousFlow);
-        Serial.println(" mL/min");
+        Serial.print("IntegratedFlow_mL: ");
+        Serial.print(integratedFlow);
+        Serial.println("\n");
+        Serial.print("Output1_value: ");
+        Serial.print(output1);
 
-        Serial.print("Error: ");
-        Serial.println(error);
-
-        Serial.print("Stability Level: ");
-        Serial.println(stabilityLevel);
-
-        Serial.print("Alert: ");
-        Serial.println(alert);
-
-        Serial.print("Output 2: ");
-        Serial.println(output2);
-
-        Serial.print("Output 1: ");
-        Serial.println(output1);
       } else {
         Serial.println("Failed to read register.");
       }
