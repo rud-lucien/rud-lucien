@@ -39,6 +39,7 @@ void checkModbusConnection()
     }
 
     Serial.println("Attempting to reconnect to the server...");
+    ethClient.setConnectionTimeout(100); // Set the timeout duration for client.connect() and client.stop()
     if (modbusTCPClient.begin(server, 502))
     {
       Serial.println("Successfully reconnected to the server!");
@@ -47,7 +48,7 @@ void checkModbusConnection()
     else
     {
       Serial.println("Reconnection attempt failed.");
-      delay(1000); // Wait before retrying
+      delay(100); // Wait before retrying
     }
   }
 }
