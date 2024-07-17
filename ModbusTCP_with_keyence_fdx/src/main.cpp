@@ -15,21 +15,26 @@ IPAddress server(169, 254, 0, 10);          // IP address of your Modbus server 
 
 bool wasConnected = false;
 
+#define RST_CHNL_1 CONTROLLINO_D1 // Aliase for integrated flow reset channel
+
 // Function to reset IntegratedFlow
-void resetIntegratedFlow()
+void resetIntegratedFlow(int reset_channel)
 {
   Serial.println("Resetting Integrated Flow...");
-  digitalWrite(CONTROLLINO_D1, HIGH); // Write the specified state to the pin
-  delay(250);  // Ensure the signal is recognized (increase the delay if needed)
-  digitalWrite(CONTROLLINO_D1, LOW);
+  digitalWrite(reset_channel, HIGH); // Write the specified state to the pin
+  delay(100);                        // Ensure the signal is recognized (increase the delay if needed)
+  digitalWrite(reset_channel, LOW);
   Serial.println("Integrated Flow Reset Completed");
 }
 
 void setup()
 {
+  pinMode(RST_CHNL_1, OUTPUT);
+
   Serial.begin(115200); // Initialize serial communication at 115200 baud rate
   while (!Serial)       // Wait for serial port to connect
     ;
+
   // Start the Ethernet connection
   Serial.println("Starting Ethernet connection...");
   Ethernet.begin(mac, ip); // Initialize Ethernet with the MAC address and IP address
@@ -90,18 +95,18 @@ void loop()
     }
   }
 
- // Check for reset command
+  // Check for reset command
   if (Serial.available() > 0)
   {
     String command = Serial.readStringUntil('\n');
     command.trim();
     if (command.equals("rst"))
     {
-      resetIntegratedFlow();
+      resetIntegratedFlow(RST_CHNL_1);
     }
   }
 
-   // Address and quantity of the register to read
+  // Address and quantity of the register to read
   int registerAddress = 0x0002; // Base address for instantaneous flow rate in Process Data Structure 0
   int registerQuantity = 2;     // Quantity of registers to read (2 x 16-bit values = 32 bits)
 
@@ -112,29 +117,31 @@ void loop()
     {
       long highWord = modbusTCPClient.read();
       long lowWord = modbusTCPClient.read();
-      
-      if (highWord != -1 && lowWord != -1) {
+
+      if (highWord != -1 && lowWord != -1)
+      {
         // Combine the two registers into a 32-bit value
         uint32_t combined = (static_cast<uint32_t>(highWord) << 16) | static_cast<uint16_t>(lowWord);
-        
+
         // Extract data from the combined value
         uint32_t integratedFlow = combined >> 14; // First 18 bits
-        
+
         // uint8_t error = (combined >> 18) & 0x7; // Next 3 bits
         // uint8_t stabilityLevel = (combined >> 21) & 0x7; // Next 3 bits
         // uint8_t alert = (combined >> 24) & 0x1; // Next 1 bit
         // uint8_t output2 = (combined >> 25) & 0x1; // Next 1 bit
-        uint8_t output1 = combined & 0x1; // Next 1 bit
+        // uint8_t output1 = combined & 0x1; // Next 1 bit
 
         // Print the extracted data
         Serial.print("IntegratedFlow_mL: ");
         Serial.print(integratedFlow);
         Serial.println("\n");
-        Serial.print("Output1_value: ");
-        Serial.print(output1);
-        Serial.println("\n");
-
-      } else {
+        // Serial.print("Output1_value: ");
+        // Serial.print(output1);
+        // Serial.println("\n");
+      }
+      else
+      {
         Serial.println("Failed to read register.");
       }
     }
