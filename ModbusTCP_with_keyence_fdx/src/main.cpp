@@ -7,7 +7,6 @@
 
 // Ethernet settings for Controllino Maxi Automation
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-
 IPAddress ip(169, 254, 0, 11); // IP address of your Controllino Maxi Automation
 EthernetClient ethClient;
 ModbusTCPClient modbusTCPClient(ethClient); // Modbus TCP client using the Ethernet client
@@ -16,6 +15,9 @@ IPAddress server(169, 254, 0, 10);          // IP address of your Modbus server 
 bool wasConnected = false;
 
 #define RST_CHNL_1 CONTROLLINO_D1 // Aliase for integrated flow reset channel for FD-XA1 Sensor on port 1 of NQ-EP4L
+
+unsigned long prevTime_connectionStatus = 0; // Initialize to 0 for immediate first check
+long interval_connectionStatus = 250;        // Check connection status every 250 ms
 
 // Function to reset IntegratedFlow
 void resetIntegratedFlow(int reset_channel)
@@ -48,7 +50,6 @@ void checkModbusConnection()
     else
     {
       Serial.println("Reconnection attempt failed.");
-      delay(100); // Wait before retrying
     }
   }
 }
@@ -91,14 +92,13 @@ bool readModbusRegisters(int registerAddress, int registerQuantity)
   return false;
 }
 
-
 void setup()
 {
   pinMode(RST_CHNL_1, OUTPUT);
 
   Serial.begin(115200); // Initialize serial communication at 115200 baud rate
-  while (!Serial);      // Wait for serial port to connect
-    
+  while (!Serial)
+    ; // Wait for serial port to connect
 
   // Start the Ethernet connection
   Serial.println("Starting Ethernet connection...");
@@ -127,10 +127,16 @@ void setup()
 
 void loop()
 {
-  // Check Modbus connection
-  checkModbusConnection();
+  unsigned long currentTime = millis();
 
-  // Check for reset command
+  // Check Modbus connection periodically
+  if (currentTime - prevTime_connectionStatus >= interval_connectionStatus)
+  {
+    prevTime_connectionStatus = currentTime; // Update the previous time
+    checkModbusConnection();
+  }
+
+  // Check for reset command from serial input
   if (Serial.available() > 0)
   {
     String command = Serial.readStringUntil('\n');
@@ -141,11 +147,8 @@ void loop()
     }
   }
 
-  // Address and quantity of the register to read
+  // Read Modbus registers and extract data
   int registerAddress = 0x0002; // Base address for senor connected to Port 1 of NQ-EP4L
   int registerQuantity = 2;     // Quantity of registers to read (2 x 16-bit values = 32 bits)
   readModbusRegisters(registerAddress, registerQuantity);
-
-  // Wait before reading again
-  delay(250);
 }
