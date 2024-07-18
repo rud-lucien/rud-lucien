@@ -53,6 +53,45 @@ void checkModbusConnection()
   }
 }
 
+// Function to read Modbus registers and extract data
+bool readModbusRegisters(int registerAddress, int registerQuantity)
+{
+  if (modbusTCPClient.requestFrom(INPUT_REGISTERS, registerAddress, registerQuantity))
+  {
+    if (modbusTCPClient.available() >= registerQuantity) // Ensure there are enough values
+    {
+      long highWord = modbusTCPClient.read();
+      long lowWord = modbusTCPClient.read();
+
+      if (highWord != -1 && lowWord != -1)
+      {
+        // Combine the two registers into a 32-bit value
+        uint32_t combined = (static_cast<uint32_t>(highWord) << 16) | static_cast<uint16_t>(lowWord);
+
+        // Extract data from the combined value
+        uint32_t integratedFlow = combined >> 14; // First 18 bits
+
+        // Print the extracted data
+        Serial.print("IntegratedFlow_mL: ");
+        Serial.println(integratedFlow);
+
+        return true;
+      }
+      else
+      {
+        Serial.println("Failed to read register.");
+        return false;
+      }
+    }
+  }
+  else
+  {
+    Serial.println("Failed to read from Modbus server!");
+  }
+  return false;
+}
+
+
 void setup()
 {
   pinMode(RST_CHNL_1, OUTPUT);
@@ -105,37 +144,7 @@ void loop()
   // Address and quantity of the register to read
   int registerAddress = 0x0002; // Base address for senor connected to Port 1 of NQ-EP4L
   int registerQuantity = 2;     // Quantity of registers to read (2 x 16-bit values = 32 bits)
-
-  // Read input registers
-  if (modbusTCPClient.requestFrom(INPUT_REGISTERS, registerAddress, registerQuantity))
-  {
-    if (modbusTCPClient.available() >= registerQuantity) // Ensure there are at least 2 values (32 bits)
-    {
-      long highWord = modbusTCPClient.read();
-      long lowWord = modbusTCPClient.read();
-
-      if (highWord != -1 && lowWord != -1)
-      {
-        // Combine the two registers into a 32-bit value
-        uint32_t combined = (static_cast<uint32_t>(highWord) << 16) | static_cast<uint16_t>(lowWord);
-
-        // Extract data from the combined value
-        uint32_t integratedFlow = combined >> 14; // First 18 bits
-
-        // Print the extracted data
-        Serial.print("IntegratedFlow_mL: ");
-        Serial.println(integratedFlow);
-      }
-      else
-      {
-        Serial.println("Failed to read register.");
-      }
-    }
-  }
-  else
-  {
-    Serial.println("Failed to read from Modbus server!");
-  }
+  readModbusRegisters(registerAddress, registerQuantity);
 
   // Wait before reading again
   delay(250);
