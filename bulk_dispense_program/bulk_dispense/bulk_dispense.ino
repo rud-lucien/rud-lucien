@@ -16,18 +16,18 @@
 #define REAGENT_VALVE_4_PIN CONTROLLINO_R3
 
 // Create objects for each reagent valve using the SolenoidValve class
-SolenoidValve reagentValve1(REAGENT_VALVE_1_PIN); // Reagent Valve 1 (Pressure)
-SolenoidValve reagentValve2(REAGENT_VALVE_2_PIN); // Reagent Valve 2 (Pressure)
-SolenoidValve reagentValve3(REAGENT_VALVE_3_PIN); // Reagent Valve 3 (Pressure)
-SolenoidValve reagentValve4(REAGENT_VALVE_4_PIN); // Reagent Valve 4 (Pressure)
+SolenoidValve reagentValve1(REAGENT_VALVE_1_PIN);  // Reagent Valve 1 (Pressure)
+SolenoidValve reagentValve2(REAGENT_VALVE_2_PIN);  // Reagent Valve 2 (Pressure)
+SolenoidValve reagentValve3(REAGENT_VALVE_3_PIN);  // Reagent Valve 3 (Pressure)
+SolenoidValve reagentValve4(REAGENT_VALVE_4_PIN);  // Reagent Valve 4 (Pressure)
 
 // Define constants for the waste bottle valve control pins
 #define WASTE_VALVE_1_PIN CONTROLLINO_R4
 #define WASTE_VALVE_2_PIN CONTROLLINO_R5
 
 // Create objects for each waste bottle valve
-SolenoidValve wasteValve1(WASTE_VALVE_1_PIN); // Waste Valve 1 (Vacuum)
-SolenoidValve wasteValve2(WASTE_VALVE_2_PIN); // Waste Valve 2 (Vacuum)
+SolenoidValve wasteValve1(WASTE_VALVE_1_PIN);  // Waste Valve 1 (Vacuum)
+SolenoidValve wasteValve2(WASTE_VALVE_2_PIN);  // Waste Valve 2 (Vacuum)
 
 // Define constants for the generic media separated valve control pins
 #define MEDIA_VALVE_1_PIN CONTROLLINO_DO0
@@ -36,10 +36,10 @@ SolenoidValve wasteValve2(WASTE_VALVE_2_PIN); // Waste Valve 2 (Vacuum)
 #define MEDIA_VALVE_4_PIN CONTROLLINO_DO3
 
 // Create objects for each media valve using the SolenoidValve class
-SolenoidValve mediaValve1(MEDIA_VALVE_1_PIN); // Media Valve 1
-SolenoidValve mediaValve2(MEDIA_VALVE_2_PIN); // Media Valve 2
-SolenoidValve mediaValve3(MEDIA_VALVE_3_PIN); // Media Valve 3
-SolenoidValve mediaValve4(MEDIA_VALVE_4_PIN); // Media Valve 4
+SolenoidValve mediaValve1(MEDIA_VALVE_1_PIN);  // Media Valve 1
+SolenoidValve mediaValve2(MEDIA_VALVE_2_PIN);  // Media Valve 2
+SolenoidValve mediaValve3(MEDIA_VALVE_3_PIN);  // Media Valve 3
+SolenoidValve mediaValve4(MEDIA_VALVE_4_PIN);  // Media Valve 4
 
 // Define constants for the bubble sensor pins (AI0-AI3)
 #define REAGENT_1_BUBBLE_SENSOR_PIN CONTROLLINO_AI0
@@ -48,10 +48,10 @@ SolenoidValve mediaValve4(MEDIA_VALVE_4_PIN); // Media Valve 4
 #define REAGENT_4_BUBBLE_SENSOR_PIN CONTROLLINO_AI3
 
 // Create objects for each bubble sensor associated with reagent bottles
-BubbleSensor reagent1BubbleSensor(REAGENT_1_BUBBLE_SENSOR_PIN); // Sensor for Reagent Bottle 1
-BubbleSensor reagent2BubbleSensor(REAGENT_2_BUBBLE_SENSOR_PIN); // Sensor for Reagent Bottle 2
-BubbleSensor reagent3BubbleSensor(REAGENT_3_BUBBLE_SENSOR_PIN); // Sensor for Reagent Bottle 3
-BubbleSensor reagent4BubbleSensor(REAGENT_4_BUBBLE_SENSOR_PIN); // Sensor for Reagent Bottle 4
+BubbleSensor reagent1BubbleSensor(REAGENT_1_BUBBLE_SENSOR_PIN);  // Sensor for Reagent Bottle 1
+BubbleSensor reagent2BubbleSensor(REAGENT_2_BUBBLE_SENSOR_PIN);  // Sensor for Reagent Bottle 2
+BubbleSensor reagent3BubbleSensor(REAGENT_3_BUBBLE_SENSOR_PIN);  // Sensor for Reagent Bottle 3
+BubbleSensor reagent4BubbleSensor(REAGENT_4_BUBBLE_SENSOR_PIN);  // Sensor for Reagent Bottle 4
 
 // Define constants for the overflow sensor pins
 #define OVERFLOW_SENSOR_TROUGH_1_PIN CONTROLLINO_DI0
@@ -60,22 +60,22 @@ BubbleSensor reagent4BubbleSensor(REAGENT_4_BUBBLE_SENSOR_PIN); // Sensor for Re
 #define OVERFLOW_SENSOR_TROUGH_4_PIN CONTROLLINO_DI3
 
 // Create objects for each overflow sensor associated with the troughs
-OverflowSensor overflowSensorTrough1(OVERFLOW_SENSOR_TROUGH_1_PIN); // Overflow Sensor for Trough 1
-OverflowSensor overflowSensorTrough2(OVERFLOW_SENSOR_TROUGH_2_PIN); // Overflow Sensor for Trough 2
-OverflowSensor overflowSensorTrough3(OVERFLOW_SENSOR_TROUGH_3_PIN); // Overflow Sensor for Trough 3
-OverflowSensor overflowSensorTrough4(OVERFLOW_SENSOR_TROUGH_4_PIN); // Overflow Sensor for Trough 4
+OverflowSensor overflowSensorTrough1(OVERFLOW_SENSOR_TROUGH_1_PIN);  // Overflow Sensor for Trough 1
+OverflowSensor overflowSensorTrough2(OVERFLOW_SENSOR_TROUGH_2_PIN);  // Overflow Sensor for Trough 2
+OverflowSensor overflowSensorTrough3(OVERFLOW_SENSOR_TROUGH_3_PIN);  // Overflow Sensor for Trough 3
+OverflowSensor overflowSensorTrough4(OVERFLOW_SENSOR_TROUGH_4_PIN);  // Overflow Sensor for Trough 4
 
 // Define constants for the control and feedback pins
-#define PRESSURE_VALVE_CONTROL_PIN CONTROLLINO_AO0   // Analog Output pin for controlling the valve
-#define PRESSURE_VALVE_FEEDBACK_PIN CONTROLLINO_AI13 // Analog Input pin for reading feedback
+#define PRESSURE_VALVE_CONTROL_PIN CONTROLLINO_AO0    // Analog Output pin for controlling the valve
+#define PRESSURE_VALVE_FEEDBACK_PIN CONTROLLINO_AI13  // Analog Input pin for reading feedback
 
 // Create an object for the pressure valve
 ProportionalValve pressureValve(PRESSURE_VALVE_CONTROL_PIN, PRESSURE_VALVE_FEEDBACK_PIN);
 
 // Define constants for the pressure sensor pin and pressure range
 #define PRESSURE_SENSOR_PIN CONTROLLINO_AI12
-#define MIN_PRESSURE 0.0  // Minimum pressure in psi
-#define MAX_PRESSURE 50.0 // Maximum pressure in psi
+#define MIN_PRESSURE 0.0   // Minimum pressure in psi
+#define MAX_PRESSURE 50.0  // Maximum pressure in psi
 
 // Create an object for the pressure sensor
 PressureSensor pressureSensor(PRESSURE_SENSOR_PIN, MIN_PRESSURE, MAX_PRESSURE);
@@ -86,13 +86,13 @@ PressureSensor pressureSensor(PRESSURE_SENSOR_PIN, MIN_PRESSURE, MAX_PRESSURE);
 #define FLOW_SENSOR_REAGENT_3_RESET_PIN CONTROLLINO_DO6
 #define FLOW_SENSOR_REAGENT_4_RESET_PIN CONTROLLINO_DO7
 
-#define FLOW_SENSOR_REAGENT_1_MODBUS_REGISTER 0x0002  // Modbus register for Reagent 1 flow sensor
-#define FLOW_SENSOR_REAGENT_2_MODBUS_REGISTER 0x00012 // Modbus register for Reagent 2 flow sensor
-#define FLOW_SENSOR_REAGENT_3_MODBUS_REGISTER 0x00022 // Modbus register for Reagent 3 flow sensor
-#define FLOW_SENSOR_REAGENT_4_MODBUS_REGISTER 0x00032 // Modbus register for Reagent 4 flow sensor
+#define FLOW_SENSOR_REAGENT_1_MODBUS_REGISTER 0x0002   // Modbus register for Reagent 1 flow sensor
+#define FLOW_SENSOR_REAGENT_2_MODBUS_REGISTER 0x00012  // Modbus register for Reagent 2 flow sensor
+#define FLOW_SENSOR_REAGENT_3_MODBUS_REGISTER 0x00022  // Modbus register for Reagent 3 flow sensor
+#define FLOW_SENSOR_REAGENT_4_MODBUS_REGISTER 0x00032  // Modbus register for Reagent 4 flow sensor
 
 // Ethernet settings
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress ip(169, 254, 0, 11);
 IPAddress server(169, 254, 0, 10);
 
@@ -108,6 +108,25 @@ FDXSensor flowSensorReagent4(modbus, FLOW_SENSOR_REAGENT_4_MODBUS_REGISTER, FLOW
 // Create the Commander object
 Commander commander;
 
+// Create global variables for command arguments
+char valveArg[10];
+int valveNumber;
+int state;
+bool isDispensing[4] = {false, false, false, false};
+int dispensingValveNumber[4] = {-1, -1, -1, -1};
+float targetVolume[4] = {-1, -1, -1, -1}; // Track the target volume for each valve (1-4)
+
+
+// Global tracking for each valve
+struct ValveState {
+  bool isDispensing;
+  float targetVolume;
+  float lastFlowValue;
+  unsigned long lastFlowCheckTime;
+  unsigned long lastFlowChangeTime;
+};
+ValveState valveStates[4]; // Track state for valves 1-4
+
 // Create prototypes for the command functions
 void cmd_set_reagent_valve(char *args, Stream *response);
 void cmd_set_media_valve(char *args, Stream *response);
@@ -120,51 +139,51 @@ void cmd_stop_dispense(char *args, Stream *response);
 void handleOverflowCondition(int triggeredValveNumber);
 void closeValves(int valveNumber, Stream *response);
 void openValves(int valveNumber, Stream *response);
-void handleTimeoutCondition(int triggeredValveNumber);
+void handleTimeoutCondition(int valveNumber);
 void logSystemState();
 
 // Command API tree with updated patterns
 Commander::API_t API_tree[] = {
-    apiElement("setRV", "Set reagent valve: setRV <1-4> <0/1>", cmd_set_reagent_valve),
-    apiElement("setMV", "Set media valve: setMV <1-4> <0/1>", cmd_set_media_valve),
-    apiElement("setWV", "Set waste valve: setWV <1-2> <0/1>", cmd_set_waste_valve),
-    apiElement("setPV", "Set pressure valve: setPV <percentage>", cmd_set_pressure_valve),
-    apiElement("resetFS", "Reset flow sensor: resetFS <1-4>", cmd_reset_flow_sensor),
-    apiElement("setLF", "Set log frequency: setLF <milliseconds>", cmd_set_log_frequency),
-    apiElement("dispenseR", "Dispense reagent: dispenseR <1-4> [volume]", cmd_dispense_reagent),
-    apiElement("stopD", "Stop dispensing reagent: stopDispenseR <1-4>", cmd_stop_dispense)};
+  apiElement("setRV", "Set reagent valve: setRV <1-4> <0/1>", cmd_set_reagent_valve),
+  apiElement("setMV", "Set media valve: setMV <1-4> <0/1>", cmd_set_media_valve),
+  apiElement("setWV", "Set waste valve: setWV <1-2> <0/1>", cmd_set_waste_valve),
+  apiElement("setPV", "Set pressure valve: setPV <percentage>", cmd_set_pressure_valve),
+  apiElement("resetFS", "Reset flow sensor: resetFS <1-4>", cmd_reset_flow_sensor),
+  apiElement("setLF", "Set log frequency: setLF <milliseconds>", cmd_set_log_frequency),
+  apiElement("dispenseR", "Dispense reagent: dispenseR <1-4> [volume]", cmd_dispense_reagent),
+  apiElement("stopD", "Stop dispensing reagent: stopD <1-4 or all>", cmd_stop_dispense)
+};
+
+// Flow sensor reset variables
+bool resetInProgress[4] = {false, false, false, false}; // Track reset progress for each valve
+unsigned long resetStartTime[4] = {0, 0, 0, 0};             // Track reset start time for each valve
+const unsigned long resetDuration = 200;                       // Duration for flow sensor reset in milliseconds
+
 
 // Define constants for the logging interval
 unsigned long previousLogTime = 0; // Store the time of the last log
 unsigned long logInterval = 500;   // Default log frequency (1000 ms = 1 second)
 
-// Flow sensor reset variables
-bool resetInProgress = false;            // Flag to indicate if a reset is in progress
-unsigned long resetStartTime = 0;        // Timestamp when the reset started
-const unsigned long resetDuration = 200; // Duration for flow sensor reset in milliseconds
+// Global variables for timeout management (Keep these to manage the timeout logic)
+const unsigned long flowTimeoutPeriod = 10000;            // Timeout period in milliseconds (e.g., 10 seconds)
 
-// Shared command parsing variables
-char valveArg[10]; // Used to store valve number or "all"
-int valveNumber;   // Used for storing the valve number
-int state;         // Used for storing the valve open/close state (0 or 1)
-
-bool isDispensing = false;      // Track whether a dispense operation is in progress
-int dispensingValveNumber = -1; // Global variable to track the valve currently dispensing, initialized to -1 (none)
-
-// Global variables for timeout management
-unsigned long lastFlowCheckTime = 0;           // Tracks when we last checked the flow sensor
-unsigned long lastFlowChangeTime = 0;          // Tracks the last time the flow value changed
-float lastFlowValue = -1.0;                    // Stores the last known flow value
-const unsigned long flowTimeoutPeriod = 10000; // Timeout period in milliseconds (e.g., 10 seconds)
-
-// Global variables for volume dispensing
+// Global variables for volume dispensing (Keep these to handle volume-based dispensing for each valve)
 const float MIN_VOLUME = 1.0;   // Minimum volume in mL (adjust as needed)
 const float MAX_VOLUME = 200.0; // Maximum volume in mL (adjust as needed)
-float targetVolume = -1;        // The volume requested by the user
+const float VOLUME_TOLERANCE = 0.5;  // Allowable difference in mL
 
 void setup()
 {
   Serial.begin(115200); // Start serial communication
+
+  // Initialize valve states
+  for (int i = 0; i < 4; i++) {
+    valveStates[i].isDispensing = false;
+    valveStates[i].targetVolume = -1;
+    valveStates[i].lastFlowValue = -1;
+    valveStates[i].lastFlowCheckTime = 0;
+    valveStates[i].lastFlowChangeTime = 0;
+  }
 
   // Initialize each valve
   reagentValve1.setup();
@@ -197,68 +216,27 @@ void setup()
 
 void loop()
 {
+  unsigned long currentTime = millis();
 
-  static unsigned long previousOverflowCheckTime = 0;
-
-  // Monitor the flow sensor reset progress in the loop
-  if (resetInProgress)
+  // Monitor the flow sensor reset progress in the loop for each valve
+  for (int i = 0; i < 4; i++)
   {
-    // Check if the reset duration has passed
-    if (millis() - resetStartTime >= resetDuration)
+    if (resetInProgress[i] && millis() - resetStartTime[i] >= resetDuration)
     {
-      resetInProgress = false; // Reset is complete, clear the flag
-      Serial.println("Flow sensor reset completed. Proceeding with dispensing.");
-
-      // *** NEW LOGIC: Proceed with the next dispensing steps ***
-
-      // Check if dispensing is requested and proceed with valve opening
-      if (isDispensing)
-      {
-        SolenoidValve *reagentValve = nullptr;
-        SolenoidValve *mediaValve = nullptr;
-
-        if (dispensingValveNumber == 1)
-        {
-          reagentValve = &reagentValve1;
-          mediaValve = &mediaValve1;
-        }
-        else if (dispensingValveNumber == 2)
-        {
-          reagentValve = &reagentValve2;
-          mediaValve = &mediaValve2;
-        }
-        else if (dispensingValveNumber == 3)
-        {
-          reagentValve = &reagentValve3;
-          mediaValve = &mediaValve3;
-        }
-        else if (dispensingValveNumber == 4)
-        {
-          reagentValve = &reagentValve4;
-          mediaValve = &mediaValve4;
-        }
-
-        if (reagentValve != nullptr)
-        {
-          reagentValve->openValve();
-          Serial.print("Reagent valve ");
-          Serial.print(dispensingValveNumber);
-          Serial.println(" opened.");
-        }
-
-        if (mediaValve != nullptr)
-        {
-          mediaValve->openValve();
-          Serial.print("Media valve ");
-          Serial.print(dispensingValveNumber);
-          Serial.println(" opened.");
-        }
-      }
+      resetInProgress[i] = false; // Reset is complete
+      Serial.print("Flow sensor reset completed for valve ");
+      Serial.println(i + 1);
+      // Call the actual flow sensor reset function for the specific valve
+      if (i == 0)
+        flowSensorReagent1.handleReset();
+      else if (i == 1)
+        flowSensorReagent2.handleReset();
+      else if (i == 2)
+        flowSensorReagent3.handleReset();
+      else if (i == 3)
+        flowSensorReagent4.handleReset();
     }
   }
-
-  // Get the current time
-  unsigned long currentTime = millis();
 
   static char commandBuffer[16]; // Buffer to store incoming command
   static uint8_t commandIndex = 0;
@@ -283,113 +261,92 @@ void loop()
     }
   }
 
-  // Monitor the overflow sensors every 100ms
+  // Monitor the overflow sensors every 50ms
+  static unsigned long previousOverflowCheckTime = 0;
   if (currentTime - previousOverflowCheckTime >= 50)
   {
     previousOverflowCheckTime = currentTime;
 
-    // Monitor all overflow sensors continuously
     if (overflowSensorTrough1.loop() == 1)
-    {
-      // Serial.println("Overflow detected on sensor 1.");
-      handleOverflowCondition(1); // Handle overflow by closing valves directly
-    }
+      handleOverflowCondition(1);
     if (overflowSensorTrough2.loop() == 1)
-    {
-      // Serial.println("Overflow detected on sensor 2.");
       handleOverflowCondition(2);
-    }
     if (overflowSensorTrough3.loop() == 1)
-    {
-      // Serial.println("Overflow detected on sensor 3.");
       handleOverflowCondition(3);
-    }
     if (overflowSensorTrough4.loop() == 1)
-    {
-      // Serial.println("Overflow detected on sensor 4.");
       handleOverflowCondition(4);
-    }
   }
 
-  // Check flow sensor activity and volume accumulation if dispensing is in progress
-  if (isDispensing && currentTime - lastFlowCheckTime >= 50)
-  { // Check flow every 50 milliseconds
-    lastFlowCheckTime = currentTime;
-
-    // Read the current flow value from the active flow sensor
-    float currentFlowValue = -1.0;
-    if (dispensingValveNumber == 1)
-      currentFlowValue = flowSensorReagent1.getScaledFlowValue();
-    else if (dispensingValveNumber == 2)
-      currentFlowValue = flowSensorReagent2.getScaledFlowValue();
-    else if (dispensingValveNumber == 3)
-      currentFlowValue = flowSensorReagent3.getScaledFlowValue();
-    else if (dispensingValveNumber == 4)
-      currentFlowValue = flowSensorReagent4.getScaledFlowValue();
-
-    // Check for invalid flow reading
-    if (currentFlowValue < 0)
+  // Monitor flow for each valve independently
+  for (int i = 0; i < 4; i++)
+  {
+    if (valveStates[i].isDispensing && currentTime - valveStates[i].lastFlowCheckTime >= 50)
     {
-      Serial.println("Invalid flow reading. Stopping dispense.");
-      handleTimeoutCondition(dispensingValveNumber); // Stop dispensing due to invalid flow
-      return;                                        // Exit the loop since dispensing has stopped
-    }
+      valveStates[i].lastFlowCheckTime = currentTime;
 
-    if (currentFlowValue >= 0)
-    {
-      // Directly compare the current flow sensor value with the target volume
-      if (targetVolume > 0)
-      { // Only compare if a positive target volume was provided
-        // Stop when the target volume is reached
-        if (currentFlowValue >= targetVolume)
-        {
-          Serial.print("Target volume reached: ");
-          Serial.print(currentFlowValue);
-          Serial.println(" mL.");
-          handleTimeoutCondition(dispensingValveNumber); // Stop dispensing
-          return;                                        // Exit the loop since dispensing has stopped
-        }
+      // Get the flow value for the current valve
+      float currentFlowValue = -1.0;
+      if (i == 0)
+        currentFlowValue = flowSensorReagent1.getScaledFlowValue();
+      else if (i == 1)
+        currentFlowValue = flowSensorReagent2.getScaledFlowValue();
+      else if (i == 2)
+        currentFlowValue = flowSensorReagent3.getScaledFlowValue();
+      else if (i == 3)
+        currentFlowValue = flowSensorReagent4.getScaledFlowValue();
+
+      // Handle invalid flow readings
+      if (currentFlowValue < 0)
+      {
+        Serial.print("Invalid flow reading for valve ");
+        Serial.println(i + 1);
+        handleTimeoutCondition(i + 1);
+        continue;
       }
 
-      // Handle timeout if the flow value hasn't changed for the flowTimeoutPeriod
-      if (currentFlowValue == lastFlowValue)
+      // Check if the target volume is reached, using tolerance
+      if (valveStates[i].targetVolume > 0 && currentFlowValue >= valveStates[i].targetVolume)
       {
-        if (currentTime - lastFlowChangeTime >= flowTimeoutPeriod)
+        Serial.print("Target volume reached for valve ");
+        Serial.println(i + 1);
+        handleTimeoutCondition(i + 1); // Close valves and stop dispensing
+        continue;
+      }
+
+      // Handle flow timeout
+      if (currentFlowValue == valveStates[i].lastFlowValue)
+      {
+        if (currentTime - valveStates[i].lastFlowChangeTime >= flowTimeoutPeriod)
         {
-          Serial.print("Timeout occurred: No flow detected for valve ");
-          Serial.println(dispensingValveNumber);
-          handleTimeoutCondition(dispensingValveNumber); // Stop dispensing due to timeout
-          return;                                        // Exit the loop since dispensing has stopped
+          Serial.print("Timeout occurred for valve ");
+          Serial.println(i + 1);
+          handleTimeoutCondition(i + 1);
         }
       }
       else
       {
-        // Update lastFlowValue for the next loop
-        lastFlowValue = currentFlowValue;
-        // Flow has changed, reset the flow change timer
-        lastFlowChangeTime = currentTime;
+        valveStates[i].lastFlowValue = currentFlowValue;
+        valveStates[i].lastFlowChangeTime = currentTime;
       }
     }
   }
+  // Check Modbus connection status every 500ms (move to an interval-based check)
+  static unsigned long previousModbusCheckTime = 0;
+  if (currentTime - previousModbusCheckTime >= 500)
+  {
+    modbus.checkConnection();
+    previousModbusCheckTime = currentTime;
+  }
 
-  // Handle reset process for each flow sensor
-  flowSensorReagent1.handleReset();
-  flowSensorReagent2.handleReset();
-  flowSensorReagent3.handleReset();
-  flowSensorReagent4.handleReset();
-
-  modbus.checkConnection();
-
-  // Check if enough time has passed since the last log
+  // Log system state every logInterval milliseconds
   if (currentTime - previousLogTime >= logInterval)
   {
-    logSystemState();              // Call the log function
-    previousLogTime = currentTime; // Update the last log time
+    logSystemState();
+    previousLogTime = currentTime;
   }
 }
 
-void logSystemState()
-{
+void logSystemState() {
   Serial.print("LOG,");
 
   // Reagent Valve States: RV1-RV4 (0 for Closed, 1 for Open)
@@ -485,227 +442,177 @@ void logSystemState()
     Serial.print("N/A");
   }
 
+  // *** New Logs for Target Volume and Dispensing State ***
+  // Dispensing State for Valves 1-4
+  Serial.print(",DS,");
+  Serial.print(valveStates[0].isDispensing ? "1" : "0");
+  Serial.print(valveStates[1].isDispensing ? "1" : "0");
+  Serial.print(valveStates[2].isDispensing ? "1" : "0");
+  Serial.print(valveStates[3].isDispensing ? "1" : "0");
+
+  // Target Volume for Valves 1-4
+  Serial.print(",TV,");
+  Serial.print(valveStates[0].targetVolume, 1);
+  Serial.print(",");
+  Serial.print(valveStates[1].targetVolume, 1);
+  Serial.print(",");
+  Serial.print(valveStates[2].targetVolume, 1);
+  Serial.print(",");
+  Serial.print(valveStates[3].targetVolume, 1);
+
   Serial.println();
 }
 
 // Command to set reagent valves (setRV <valve number> <0/1> or setRV all <0/1>)
-void cmd_set_reagent_valve(char *args, Stream *response)
-{
+void cmd_set_reagent_valve(char *args, Stream *response) {
   // Parse the command input (valve number or "all" and state)
-  if (sscanf(args, "%s %d", valveArg, &state) == 2)
-  {
-    if (strcmp(valveArg, "all") == 0)
-    {
+  if (sscanf(args, "%s %d", valveArg, &state) == 2) {
+    if (strcmp(valveArg, "all") == 0) {
       // Handle the "all" case for reagent valves
-      if (state == 0 || state == 1)
-      {
-        if (state == 1)
-        {
+      if (state == 0 || state == 1) {
+        if (state == 1) {
           reagentValve1.openValve();
           reagentValve2.openValve();
           reagentValve3.openValve();
           reagentValve4.openValve();
           response->println("All reagent valves opened.");
-        }
-        else
-        {
+        } else {
           reagentValve1.closeValve();
           reagentValve2.closeValve();
           reagentValve3.closeValve();
           reagentValve4.closeValve();
           response->println("All reagent valves closed.");
         }
-      }
-      else
-      {
+      } else {
         response->println("Invalid state. Use 0 or 1.");
       }
-    }
-    else
-    {
+    } else {
       // Handle specific valve number
       valveNumber = atoi(valveArg);
-      if (valveNumber >= 1 && valveNumber <= 4 && (state == 0 || state == 1))
-      {
+      if (valveNumber >= 1 && valveNumber <= 4 && (state == 0 || state == 1)) {
         SolenoidValve *valve = nullptr;
-        if (valveNumber == 1)
-          valve = &reagentValve1;
-        else if (valveNumber == 2)
-          valve = &reagentValve2;
-        else if (valveNumber == 3)
-          valve = &reagentValve3;
-        else if (valveNumber == 4)
-          valve = &reagentValve4;
+        if (valveNumber == 1) valve = &reagentValve1;
+        else if (valveNumber == 2) valve = &reagentValve2;
+        else if (valveNumber == 3) valve = &reagentValve3;
+        else if (valveNumber == 4) valve = &reagentValve4;
 
-        if (valve != nullptr)
-        {
-          if (state == 1)
-          {
+        if (valve != nullptr) {
+          if (state == 1) {
             valve->openValve();
+            valveStates[valveNumber - 1].isDispensing = true;  // Track dispensing per valve
             response->println("Reagent valve opened.");
-          }
-          else
-          {
+          } else {
             valve->closeValve();
+            valveStates[valveNumber - 1].isDispensing = false; // Track dispensing per valve
             response->println("Reagent valve closed.");
           }
         }
-      }
-      else
-      {
+      } else {
         response->println("Invalid reagent valve command. Use 1-4 or 'all'.");
       }
     }
-  }
-  else
-  {
+  } else {
     response->println("Invalid reagent valve command.");
   }
 }
 
+
 // Command to set media valves (setMV <valve number> <0/1> or setMV all <0/1>)
-void cmd_set_media_valve(char *args, Stream *response)
-{
-  // Reuse global variables for command parsing
-  if (sscanf(args, "%s %d", valveArg, &state) == 2)
-  {
-    if (strcmp(valveArg, "all") == 0)
-    {
-      if (state == 0 || state == 1)
-      {
-        if (state == 1)
-        {
+void cmd_set_media_valve(char *args, Stream *response) {
+  if (sscanf(args, "%s %d", valveArg, &state) == 2) {
+    if (strcmp(valveArg, "all") == 0) {
+      // Handle the "all" case for media valves
+      if (state == 0 || state == 1) {
+        if (state == 1) {
           mediaValve1.openValve();
           mediaValve2.openValve();
           mediaValve3.openValve();
           mediaValve4.openValve();
           response->println("All media valves opened.");
-        }
-        else
-        {
+        } else {
           mediaValve1.closeValve();
           mediaValve2.closeValve();
           mediaValve3.closeValve();
           mediaValve4.closeValve();
           response->println("All media valves closed.");
         }
-      }
-      else
-      {
+      } else {
         response->println("Invalid state. Use 0 or 1.");
       }
-    }
-    else
-    {
+    } else {
+      // Handle specific valve number
       valveNumber = atoi(valveArg);
-      if (valveNumber >= 1 && valveNumber <= 4 && (state == 0 || state == 1))
-      {
+      if (valveNumber >= 1 && valveNumber <= 4 && (state == 0 || state == 1)) {
         SolenoidValve *valve = nullptr;
-        if (valveNumber == 1)
-          valve = &mediaValve1;
-        else if (valveNumber == 2)
-          valve = &mediaValve2;
-        else if (valveNumber == 3)
-          valve = &mediaValve3;
-        else if (valveNumber == 4)
-          valve = &mediaValve4;
+        if (valveNumber == 1) valve = &mediaValve1;
+        else if (valveNumber == 2) valve = &mediaValve2;
+        else if (valveNumber == 3) valve = &mediaValve3;
+        else if (valveNumber == 4) valve = &mediaValve4;
 
-        if (valve != nullptr)
-        {
-          if (state == 1)
-          {
+        if (valve != nullptr) {
+          if (state == 1) {
             valve->openValve();
             response->println("Media valve opened.");
-          }
-          else
-          {
+          } else {
             valve->closeValve();
             response->println("Media valve closed.");
           }
         }
-      }
-      else
-      {
+      } else {
         response->println("Invalid media valve command. Use 1-4 or 'all'.");
       }
     }
-  }
-  else
-  {
+  } else {
     response->println("Invalid media valve command.");
   }
 }
 
 // Command to set waste valves (setWV <valve number> <0/1> or setWV all <0/1>)
-void cmd_set_waste_valve(char *args, Stream *response)
-{
-  // Parse the command input (valve number or "all" and state)
-  if (sscanf(args, "%s %d", valveArg, &state) == 2)
-  {
-    if (strcmp(valveArg, "all") == 0)
-    {
+void cmd_set_waste_valve(char *args, Stream *response) {
+  if (sscanf(args, "%s %d", valveArg, &state) == 2) {
+    if (strcmp(valveArg, "all") == 0) {
       // Handle the "all" case for waste valves
-      if (state == 0 || state == 1)
-      {
-        if (state == 1)
-        {
+      if (state == 0 || state == 1) {
+        if (state == 1) {
           wasteValve1.openValve();
           wasteValve2.openValve();
           response->println("All waste valves opened.");
-        }
-        else
-        {
+        } else {
           wasteValve1.closeValve();
           wasteValve2.closeValve();
           response->println("All waste valves closed.");
         }
-      }
-      else
-      {
+      } else {
         response->println("Invalid state. Use 0 or 1.");
       }
-    }
-    else
-    {
+    } else {
       // Handle specific valve number
       valveNumber = atoi(valveArg); // Convert valveArg to integer
-      if (valveNumber >= 1 && valveNumber <= 2 && (state == 0 || state == 1))
-      {
+      if (valveNumber >= 1 && valveNumber <= 2 && (state == 0 || state == 1)) {
         SolenoidValve *valve = nullptr;
-        if (valveNumber == 1)
-          valve = &wasteValve1;
-        else if (valveNumber == 2)
-          valve = &wasteValve2;
+        if (valveNumber == 1) valve = &wasteValve1;
+        else if (valveNumber == 2) valve = &wasteValve2;
 
-        if (valve != nullptr)
-        {
-          if (state == 1)
-          {
+        if (valve != nullptr) {
+          if (state == 1) {
             valve->openValve();
             response->println("Waste valve opened.");
-          }
-          else
-          {
+          } else {
             valve->closeValve();
             response->println("Waste valve closed.");
           }
         }
-      }
-      else
-      {
+      } else {
         response->println("Invalid waste valve command. Use 1-2 or 'all'.");
       }
     }
-  }
-  else
-  {
+  } else {
     response->println("Invalid waste valve command.");
   }
 }
 
 // Command to set pressure valve (setPV <percentage>)
-void cmd_set_pressure_valve(char *args, Stream *response)
-{
+void cmd_set_pressure_valve(char *args, Stream *response) {
   String command = String(args); // Convert args to String object for easier parsing
   String valueStr = command;     // The entire command is the value for PV (since we're passing it directly)
 
@@ -714,15 +621,12 @@ void cmd_set_pressure_valve(char *args, Stream *response)
   int percentage = int(value);      // Convert the float to an integer percentage
 
   // Validate the percentage range (0-100)
-  if (percentage >= 0 && percentage <= 100)
-  {
+  if (percentage >= 0 && percentage <= 100) {
     pressureValve.setPosition(percentage); // Set the valve to the percentage position
     response->print("Pressure valve set to ");
     response->print(percentage);
     response->println("%.");
-  }
-  else
-  {
+  } else {
     response->println("Invalid value for pressure valve. Use a percentage between 0 and 100.");
   }
 }
@@ -797,15 +701,13 @@ void cmd_set_log_frequency(char *args, Stream *response)
 }
 
 // Command to dispense reagent (dispenseR <valve number> [volume])
-void cmd_dispense_reagent(char *args, Stream *response)
-{
-
+void cmd_dispense_reagent(char *args, Stream *response) {
   // Convert the char* args to a String for easier parsing
   String inputString = String(args);
-
+  
   // Trim leading and trailing spaces from the input string
   inputString.trim();
-
+  
   // Variables to store the parsed values
   int valveNumber = -1;       // Default to -1, meaning no specific valve requested
   float requestedVolume = -1; // Default to -1, meaning no specific volume requested
@@ -814,257 +716,133 @@ void cmd_dispense_reagent(char *args, Stream *response)
   int spaceIndex = inputString.indexOf(' ');
 
   // If there's a space, extract and parse the valve number and volume
-  if (spaceIndex != -1)
-  {
-    // Extract the integer part (valve number) before the space
+  if (spaceIndex != -1) {
     String intPart = inputString.substring(0, spaceIndex);
-
-    // Extract the float part (volume) after the space
     String floatPart = inputString.substring(spaceIndex + 1);
-
+    
     // Convert the string parts to int and float
-    valveNumber = intPart.toInt();         // Convert the valve number to an int
-    requestedVolume = floatPart.toFloat(); // Convert the volume to a float
-  }
-  else
-  {
-    // If no space, assume only the valve number was provided (continuous dispense)
-    valveNumber = inputString.toInt(); // Convert the entire input as an int for valve number
+    valveNumber = intPart.toInt();
+    requestedVolume = floatPart.toFloat();
+  } else {
+    valveNumber = inputString.toInt();
   }
 
-  // Debug: Print parsed values for debugging
   response->print("Valve number: ");
   response->println(valveNumber);
   response->print("Requested volume: ");
   response->println(requestedVolume);
 
-  // Step 1: Reset the flow sensor first (before any parsing or dispensing logic)
-  response->println("Starting flow sensor reset...");
-
-  if (valveNumber == 1)
-  {
-    flowSensorReagent1.startResetFlow();
-  }
-  else if (valveNumber == 2)
-  {
-    flowSensorReagent2.startResetFlow();
-  }
-  else if (valveNumber == 3)
-  {
-    flowSensorReagent3.startResetFlow();
-  }
-  else if (valveNumber == 4)
-  {
-    flowSensorReagent4.startResetFlow();
-  }
-
-  response->print("Flow sensor reset for reagent ");
-  response->println(valveNumber);
-
-  // Step 2: Check if the valve number is valid (should be between 1 and 4)
-  if (valveNumber >= 1 && valveNumber <= 4)
-  {
-    // Step 3: Handle the optional volume argument
-    if (requestedVolume > 0)
-    {
-      // Volume was provided, validate the target volume
-      if (requestedVolume < MIN_VOLUME)
-      {
+  if (valveNumber >= 1 && valveNumber <= 4) {
+    // Validate and set volume
+    if (requestedVolume > 0) {
+      if (requestedVolume < MIN_VOLUME) {
         response->print("Requested volume too low. Minimum volume is ");
         response->print(MIN_VOLUME);
         response->println(" mL.");
-        return; // Stop further execution if volume is too low
-      }
-      else if (requestedVolume > MAX_VOLUME)
-      {
+        return;
+      } else if (requestedVolume > MAX_VOLUME) {
         response->print("Requested volume too high. Maximum volume is ");
         response->print(MAX_VOLUME);
         response->println(" mL.");
-        return; // Stop further execution if volume is too high
+        return;
       }
-      // Set target volume
-      targetVolume = requestedVolume; // Set the requested target volume
-      response->print("Target volume set: ");
-      response->println(targetVolume);
-    }
-    else
-    {
-      // If no valid volume was specified, this is a continuous dispense
-      targetVolume = -1; // No target volume (dispense indefinitely)
+      // Correctly set the target volume for the valve
+      valveStates[valveNumber - 1].targetVolume = requestedVolume;  // **Make sure this is being set correctly**
+      response->print("Target volume set for valve ");
+      response->print(valveNumber);
+      response->print(": ");
+      response->print(valveStates[valveNumber - 1].targetVolume);
+      response->println(" mL");
+    } else {
+      valveStates[valveNumber - 1].targetVolume = -1;  // Continuous dispense if no specific volume is set
       response->println("Continuous dispensing (no target volume specified).");
     }
 
-    // Step 4: Check the overflow sensor for the specific valve
-    OverflowSensor *overflowSensor = nullptr;
-    if (valveNumber == 1)
-      overflowSensor = &overflowSensorTrough1;
-    else if (valveNumber == 2)
-      overflowSensor = &overflowSensorTrough2;
-    else if (valveNumber == 3)
-      overflowSensor = &overflowSensorTrough3;
-    else if (valveNumber == 4)
-      overflowSensor = &overflowSensorTrough4;
-
-    if (overflowSensor != nullptr && overflowSensor->isOverflowing())
-    {
-      response->print("Cannot dispense: Overflow detected for valve ");
-      response->println(valveNumber);
-      return; // Stop the function if overflow is detected
-    }
-
-    // Step 5: Check if the pressure valve needs to be set to 100%
+    // *** Pressure Valve Check ***
     float currentPressure = pressureSensor.readPressure();
-    float pressureThreshold = 20.0; // Example pressure threshold in psi (adjust as needed)
-
-    if (currentPressure < pressureThreshold)
-    {
+    if (currentPressure < 20.0) { // Adjust threshold as needed
       pressureValve.setPosition(100); // Set pressure valve to 100%
       response->println("Pressure valve set to 100%.");
-    }
-    else
-    {
+    } else {
       response->println("System already pressurized.");
     }
 
-    // Step 6: Open reagent and media valves for the specified valve
-    openValves(valveNumber, response); // Use the helper function to open valves
+    // Reset flow sensor for the specific valve
+    resetInProgress[valveNumber - 1] = true; // Track reset progress
+    resetStartTime[valveNumber - 1] = millis(); // Record reset start time
 
-    // Step 7: Handle dispensing state and volume tracking
-    isDispensing = true;                 // Set the dispensing state to true
-    dispensingValveNumber = valveNumber; // Track the currently dispensing valve
-  }
-  else
-  {
-    // If the valve number is invalid, notify the user
+     // Reset the flow sensor for the specific valve
+    if (valveNumber == 1) flowSensorReagent1.startResetFlow();
+    else if (valveNumber == 2) flowSensorReagent2.startResetFlow();
+    else if (valveNumber == 3) flowSensorReagent3.startResetFlow();
+    else if (valveNumber == 4) flowSensorReagent4.startResetFlow();
+
+    response->print("Flow sensor reset initiated for reagent ");
+    response->println(valveNumber);
+
+    // Open the reagent and media valves for the specific valve
+    openValves(valveNumber, response);
+
+    // Track the dispensing state for the valve
+    valveStates[valveNumber - 1].isDispensing = true;
+  } else {
     response->println("Invalid valve number. Use 1-4.");
   }
 }
 
+
 // Command to stop dispensing (stopD <valve number> or stopD all)
 void cmd_stop_dispense(char *args, Stream *response)
 {
-  // Check if the argument is "all" to stop all valves
   if (strcmp(args, "all") == 0)
   {
-    // Stop all reagent and media valves (emergency stop)
-    closeValves(1, response);
-    closeValves(2, response);
-    closeValves(3, response);
-    closeValves(4, response);
-
-    // Reset the flow sensors after stopping all
-    flowSensorReagent1.startResetFlow();
-    flowSensorReagent2.startResetFlow();
-    flowSensorReagent3.startResetFlow();
-    flowSensorReagent4.startResetFlow();
-    response->println("All flow sensors reset after emergency stop.");
-
-    // Reset the dispensing state and active valve tracker
-    isDispensing = false;
-    dispensingValveNumber = -1;
+    // Stop all reagent and media valves
+    for (int i = 1; i <= 4; i++)
+    {
+      closeValves(i, response);
+      flowSensorReagent1.startResetFlow();
+    }
+    response->println("All valves and flow sensors reset.");
+    for (int i = 0; i < 4; i++)
+    {
+      isDispensing[i] = false;
+      dispensingValveNumber[i] = -1;
+    }
   }
   else
   {
-    // Parse the valve number
     int valveNumber;
-    if (sscanf(args, "%d", &valveNumber) == 1)
+    if (sscanf(args, "%d", &valveNumber) == 1 && valveNumber >= 1 && valveNumber <= 4)
     {
-      if (valveNumber >= 1 && valveNumber <= 4)
-      {
-        closeValves(valveNumber, response);
+      closeValves(valveNumber, response);
+      if (valveNumber == 1) flowSensorReagent1.startResetFlow();
+      else if (valveNumber == 2) flowSensorReagent2.startResetFlow();
+      else if (valveNumber == 3) flowSensorReagent3.startResetFlow();
+      else if (valveNumber == 4) flowSensorReagent4.startResetFlow();
 
-        // Reset the flow sensor for the specific reagent
-        if (valveNumber == 1)
-        {
-          flowSensorReagent1.startResetFlow();
-          response->println("Flow sensor 1 reset after stop.");
-        }
-        else if (valveNumber == 2)
-        {
-          flowSensorReagent2.startResetFlow();
-          response->println("Flow sensor 2 reset after stop.");
-        }
-        else if (valveNumber == 3)
-        {
-          flowSensorReagent3.startResetFlow();
-          response->println("Flow sensor 3 reset after stop.");
-        }
-        else if (valveNumber == 4)
-        {
-          flowSensorReagent4.startResetFlow();
-          response->println("Flow sensor 4 reset after stop.");
-        }
-
-        // Reset the dispensing state and active valve tracker
-        isDispensing = false;
-        dispensingValveNumber = -1;
-      }
-      else
-      {
-        response->println("Invalid valve number. Use 1-4.");
-      }
+      isDispensing[valveNumber - 1] = false;
+      dispensingValveNumber[valveNumber - 1] = -1;
     }
     else
     {
-      response->println("Invalid stop command.");
+      response->println("Invalid valve number. Use 1-4 or 'all'.");
     }
   }
 }
+
 
 void handleOverflowCondition(int triggeredValveNumber)
 {
-  // Check if the system is actively dispensing and if the overflow occurred on the currently dispensing valve
-  if (isDispensing && triggeredValveNumber == dispensingValveNumber)
+  if (isDispensing[triggeredValveNumber - 1])
   {
-    // Stop dispensing for the specific valve
-    SolenoidValve *reagentValve = nullptr;
-    SolenoidValve *mediaValve = nullptr;
-
-    // Determine which valves to close based on the valve number
-    if (triggeredValveNumber == 1)
-    {
-      reagentValve = &reagentValve1;
-      mediaValve = &mediaValve1;
-    }
-    else if (triggeredValveNumber == 2)
-    {
-      reagentValve = &reagentValve2;
-      mediaValve = &mediaValve2;
-    }
-    else if (triggeredValveNumber == 3)
-    {
-      reagentValve = &reagentValve3;
-      mediaValve = &mediaValve3;
-    }
-    else if (triggeredValveNumber == 4)
-    {
-      reagentValve = &reagentValve4;
-      mediaValve = &mediaValve4;
-    }
-
-    // Close the reagent and media valves directly
-    if (reagentValve != nullptr)
-    {
-      reagentValve->closeValve();
-      Serial.print("Reagent valve ");
-      Serial.print(triggeredValveNumber);
-      Serial.println(" closed.");
-    }
-    if (mediaValve != nullptr)
-    {
-      mediaValve->closeValve();
-      Serial.print("Media valve ");
-      Serial.print(triggeredValveNumber);
-      Serial.println(" closed.");
-    }
-
-    // Reset the dispensing state and active valve tracker
-    isDispensing = false;
-    dispensingValveNumber = -1; // Reset the dispensing valve tracker
-
-    // Additional action: You can add any additional actions or alerts here (e.g., log the overflow event)
+    closeValves(triggeredValveNumber, &Serial);
+    isDispensing[triggeredValveNumber - 1] = false;
+    dispensingValveNumber[triggeredValveNumber - 1] = -1;
+    Serial.print("Overflow detected: Valves closed for valve ");
+    Serial.println(triggeredValveNumber);
   }
 }
+
 
 // Helper function to close both reagent and media valves for a given valve number
 void closeValves(int valveNumber, Stream *response)
@@ -1154,35 +932,18 @@ void openValves(int valveNumber, Stream *response)
   }
 }
 
-void handleTimeoutCondition(int triggeredValveNumber)
-{
-  Serial.print("Timeout occurred: Closing valves for valve ");
-  Serial.println(triggeredValveNumber);
-  closeValves(triggeredValveNumber, &Serial); // Use the helper function to close valves
+void handleTimeoutCondition(int valveNumber) {
+  closeValves(valveNumber, &Serial);
+  Serial.print("Timeout occurred: Valves closed for valve ");
+  Serial.println(valveNumber);
 
-  // Reset the flow sensor for the specific reagent after the dispense is completed
-  if (triggeredValveNumber == 1)
-  {
-    flowSensorReagent1.startResetFlow();
-    Serial.println("Flow sensor 1 reset after dispensing.");
-  }
-  else if (triggeredValveNumber == 2)
-  {
-    flowSensorReagent2.startResetFlow();
-    Serial.println("Flow sensor 2 reset after dispensing.");
-  }
-  else if (triggeredValveNumber == 3)
-  {
-    flowSensorReagent3.startResetFlow();
-    Serial.println("Flow sensor 3 reset after dispensing.");
-  }
-  else if (triggeredValveNumber == 4)
-  {
-    flowSensorReagent4.startResetFlow();
-    Serial.println("Flow sensor 4 reset after dispensing.");
-  }
+  // Reset the flow sensor for the specific valve after the dispense is completed
+  if (valveNumber == 1) flowSensorReagent1.startResetFlow();
+  else if (valveNumber == 2) flowSensorReagent2.startResetFlow();
+  else if (valveNumber == 3) flowSensorReagent3.startResetFlow();
+  else if (valveNumber == 4) flowSensorReagent4.startResetFlow();
 
-  // Reset the dispensing state and active valve tracker
-  isDispensing = false;
-  dispensingValveNumber = -1; // Reset the dispensing valve tracker
+  // Reset the valve state
+  valveStates[valveNumber - 1].isDispensing = false;
+  valveStates[valveNumber - 1].targetVolume = -1;
 }
