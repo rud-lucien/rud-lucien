@@ -170,7 +170,7 @@ const unsigned long flowTimeoutPeriod = 10000;            // Timeout period in m
 // Global variables for volume dispensing (Keep these to handle volume-based dispensing for each valve)
 const float MIN_VOLUME = 1.0;   // Minimum volume in mL (adjust as needed)
 const float MAX_VOLUME = 200.0; // Maximum volume in mL (adjust as needed)
-const float VOLUME_TOLERANCE = 0.5;  // Allowable difference in mL
+
 
 void setup()
 {
@@ -268,13 +268,25 @@ void loop()
     previousOverflowCheckTime = currentTime;
 
     if (overflowSensorTrough1.loop() == 1)
+    {
+      Serial.println("Overflow sensor 1 triggered");
       handleOverflowCondition(1);
+    }
     if (overflowSensorTrough2.loop() == 1)
+    {
+      Serial.println("Overflow sensor 2 triggered");
       handleOverflowCondition(2);
+    }
     if (overflowSensorTrough3.loop() == 1)
+    {
+      Serial.println("Overflow sensor 3 triggered");
       handleOverflowCondition(3);
+    }
     if (overflowSensorTrough4.loop() == 1)
+    {
+      Serial.println("Overflow sensor 4 triggered");
       handleOverflowCondition(4);
+    }
   }
 
   // Monitor flow for each valve independently
@@ -733,6 +745,19 @@ void cmd_dispense_reagent(char *args, Stream *response) {
   response->println(requestedVolume);
 
   if (valveNumber >= 1 && valveNumber <= 4) {
+    // Check the overflow sensor for the specific valve
+    OverflowSensor *overflowSensor = nullptr;
+    if (valveNumber == 1) overflowSensor = &overflowSensorTrough1;
+    else if (valveNumber == 2) overflowSensor = &overflowSensorTrough2;
+    else if (valveNumber == 3) overflowSensor = &overflowSensorTrough3;
+    else if (valveNumber == 4) overflowSensor = &overflowSensorTrough4;
+
+    if (overflowSensor != nullptr && overflowSensor->isOverflowing()) {
+      response->print("Cannot dispense: Overflow detected for valve ");
+      response->println(valveNumber);
+      return;  // Stop the function if overflow is detected
+    }
+    
     // Validate and set volume
     if (requestedVolume > 0) {
       if (requestedVolume < MIN_VOLUME) {
@@ -785,6 +810,7 @@ void cmd_dispense_reagent(char *args, Stream *response) {
 
     // Track the dispensing state for the valve
     valveStates[valveNumber - 1].isDispensing = true;
+    isDispensing[valveNumber - 1] = true; // Set isDispensing flag for the valve
   } else {
     response->println("Invalid valve number. Use 1-4.");
   }
@@ -830,16 +856,23 @@ void cmd_stop_dispense(char *args, Stream *response)
   }
 }
 
-
-void handleOverflowCondition(int triggeredValveNumber)
-{
-  if (isDispensing[triggeredValveNumber - 1])
-  {
+void handleOverflowCondition(int triggeredValveNumber) {
+  if (isDispensing[triggeredValveNumber - 1]) {
     closeValves(triggeredValveNumber, &Serial);
-    isDispensing[triggeredValveNumber - 1] = false;
+    isDispensing[triggeredValveNumber - 1] = false;  // Stop the valve from dispensing
     dispensingValveNumber[triggeredValveNumber - 1] = -1;
     Serial.print("Overflow detected: Valves closed for valve ");
     Serial.println(triggeredValveNumber);
+
+    // Reset the flow sensor for the specific valve to avoid timeout
+    if (triggeredValveNumber == 1) flowSensorReagent1.startResetFlow();
+    else if (triggeredValveNumber == 2) flowSensorReagent2.startResetFlow();
+    else if (triggeredValveNumber == 3) flowSensorReagent3.startResetFlow();
+    else if (triggeredValveNumber == 4) flowSensorReagent4.startResetFlow();
+
+    // Reset the timeout mechanism for this valve (if necessary)
+    valveStates[triggeredValveNumber - 1].lastFlowCheckTime = 0;  // Reset the flow check timer
+    valveStates[triggeredValveNumber - 1].lastFlowChangeTime = 0;  // Reset the last flow change time
   }
 }
 
@@ -932,18 +965,18 @@ void openValves(int valveNumber, Stream *response)
   }
 }
 
-void handleTimeoutCondition(int valveNumber) {
-  closeValves(valveNumber, &Serial);
+void handleTimeoutCondition(int triggeredValveNumber) {
+  closeValves(triggeredValveNumber, &Serial);
   Serial.print("Timeout occurred: Valves closed for valve ");
-  Serial.println(valveNumber);
+  Serial.println(triggeredValveNumber);
 
   // Reset the flow sensor for the specific valve after the dispense is completed
-  if (valveNumber == 1) flowSensorReagent1.startResetFlow();
-  else if (valveNumber == 2) flowSensorReagent2.startResetFlow();
-  else if (valveNumber == 3) flowSensorReagent3.startResetFlow();
-  else if (valveNumber == 4) flowSensorReagent4.startResetFlow();
+  if (triggeredValveNumber == 1) flowSensorReagent1.startResetFlow();
+  else if (triggeredValveNumber == 2) flowSensorReagent2.startResetFlow();
+  else if (triggeredValveNumber == 3) flowSensorReagent3.startResetFlow();
+  else if (triggeredValveNumber == 4) flowSensorReagent4.startResetFlow();
 
   // Reset the valve state
-  valveStates[valveNumber - 1].isDispensing = false;
-  valveStates[valveNumber - 1].targetVolume = -1;
+  valveStates[triggeredValveNumber - 1].isDispensing = false;
+  valveStates[triggeredValveNumber - 1].targetVolume = -1;
 }
