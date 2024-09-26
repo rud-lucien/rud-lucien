@@ -69,16 +69,20 @@ IPAddress server(169, 254, 0, 10);
 // ======================[Global Command Variables]===============================
 // Variables for handling command arguments and valve states
 char valveArg[10];                              // Stores command arguments
-int valveNumber;                                // Tracks which valve number is being used
-int state;                                      // Tracks the state of the valve (open/closed)
+int valveNumber = 0;                                // Tracks which valve number is being used
+int state = 0;                                      // Tracks the state of the valve (open/closed)
 bool isDispensing[4] = {false, false, false, false};  // Tracks whether each valve is dispensing
 int dispensingValveNumber[4] = {-1, -1, -1, -1};      // Tracks the current dispensing valve number (-1 if none)
 float targetVolume[4] = {-1, -1, -1, -1};            // Stores target volume for each valve
+
+bool fillMode[4] = {false, false, false, false};      // Tracks if each trough is in fill mode
+unsigned long fillCheckTime[4] = {0, 0, 0, 0};       // Time to track periodic checks
 
 // ======================[Valve State Tracking]====================================
 // Structure for tracking state of each valve (flow, volume, dispensing)
 struct ValveState {
   bool isDispensing;                    // Whether the valve is currently dispensing
+  bool manualControl;                   // Whether the valve is under manual control
   float targetVolume;                   // Target volume for the valve
   float lastFlowValue;                  // Last flow sensor reading for the valve
   unsigned long lastFlowCheckTime;      // Last time flow was checked
@@ -96,7 +100,7 @@ const unsigned long resetDuration = 200;                 // Duration of flow sen
 // ======================[Logging and Timeout Management]==========================
 // Variables for managing system logging and timeout behavior
 unsigned long previousLogTime = 0;                       // Time of the last log
-unsigned long logInterval = 500;                         // Default log interval (milliseconds)
+unsigned long logInterval = 250;                         // Default log interval (milliseconds)
 const unsigned long flowTimeoutPeriod = 10000;           // Flow timeout period (milliseconds)
 
 // ======================[Volume Dispensing Configuration]=========================
@@ -155,6 +159,8 @@ void cmd_reset_flow_sensor(char *args, Stream *response);
 void cmd_set_log_frequency(char *args, Stream *response);
 void cmd_dispense_reagent(char *args, Stream *response);
 void cmd_stop_dispense(char *args, Stream *response);
+void cmd_fill_reagent(char *args, Stream *response);    
+void cmd_stop_fill_reagent(char *args, Stream *response); 
 
 // ======================[Overflow and Timeout Handling]===========================
 // Functions to handle overflow and timeout conditions
@@ -174,6 +180,7 @@ void handleFlowSensorReset(unsigned long currentTime);
 void handleSerialCommands();
 void monitorOverflowSensors(unsigned long currentTime);
 void monitorFlowSensors(unsigned long currentTime);
+void monitorFillSensors(unsigned long currentTime);
 float getFlowSensorValue(int valveIndex);
 void checkModbusConnection(unsigned long currentTime);
 void logSystemState(unsigned long currentTime);
@@ -196,7 +203,9 @@ Commander::API_t API_tree[] = {
   apiElement("resetFS", "Reset flow sensor: resetFS <1-4>", cmd_reset_flow_sensor),
   apiElement("setLF", "Set log frequency: setLF <milliseconds>", cmd_set_log_frequency),
   apiElement("dispenseR", "Dispense reagent: dispenseR <1-4> [volume]", cmd_dispense_reagent),
-  apiElement("stopD", "Stop dispensing reagent: stopD <1-4 or all>", cmd_stop_dispense)
+  apiElement("stopD", "Stop dispensing reagent: stopD <1-4 or all>", cmd_stop_dispense),
+  apiElement("fillR", "Fill reagent trough: fillR <1-4>", cmd_fill_reagent),
+  apiElement("stopF", "Stop filling reagent trough: stopF <1-4 or all>", cmd_stop_fill_reagent)
 };
 
 // ======================[Setup and Loop]==========================================
@@ -212,6 +221,7 @@ void setup()
         valveStates[i].lastFlowValue = -1;
         valveStates[i].lastFlowCheckTime = 0;
         valveStates[i].lastFlowChangeTime = 0;
+        fillMode[i] = false;
     }
 
     // Initialize each valve and sensor
@@ -235,6 +245,7 @@ void loop()
     handleSerialCommands();              // Handle serial input
     monitorOverflowSensors(currentTime); // Check for overflow sensors
     monitorFlowSensors(currentTime);     // Check flow sensor values
+    monitorFillSensors(currentTime);     // Monitor filling process
     checkModbusConnection(currentTime);  // Check Modbus connection
     logSystemState(currentTime); // Log the system state
 }
@@ -291,12 +302,21 @@ void log() {
     );
 
     // Target Volume for Valves 1-4
-    printf(",TV,%.1f,%.1f,%.1f,%.1f\n",
+    printf(",TV,%.1f,%.1f,%.1f,%.1f",
         valveStates[0].targetVolume,
         valveStates[1].targetVolume,
         valveStates[2].targetVolume,
         valveStates[3].targetVolume
     );
+
+    // Filling Mode for Troughs 1-4 (0 = off, 1 = on)
+    printf(",FM,%d%d%d%d\n",
+        fillMode[0] ? 1 : 0,
+        fillMode[1] ? 1 : 0,
+        fillMode[2] ? 1 : 0,
+        fillMode[3] ? 1 : 0
+    );
+
 }
 
 // Helper function to print flow sensor values
@@ -347,21 +367,22 @@ void initializeSensors()
 // Function to handle flow sensor reset
 void handleFlowSensorReset(unsigned long currentTime)
 {
+    // Array of flow sensors
+    FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
+
     for (int i = 0; i < 4; i++)
     {
         if (resetInProgress[i] && millis() - resetStartTime[i] >= resetDuration)
         {
-            resetInProgress[i] = false; // Reset is complete
-            Serial.print("Flow sensor reset completed for valve ");
-            Serial.println(i + 1);
+            resetInProgress[i] = false;  // Reset is complete
+            printf("Flow sensor reset completed for valve %d\n", i + 1);
 
-            if (i == 0) flowSensorReagent1.handleReset();
-            else if (i == 1) flowSensorReagent2.handleReset();
-            else if (i == 2) flowSensorReagent3.handleReset();
-            else if (i == 3) flowSensorReagent4.handleReset();
+            // Reset the corresponding flow sensor using the array
+            flowSensors[i]->handleReset();
         }
     }
 }
+
 
 // Function to handle serial input for commands
 void handleSerialCommands()
@@ -393,55 +414,60 @@ void handleSerialCommands()
 void monitorOverflowSensors(unsigned long currentTime)
 {
     static unsigned long previousOverflowCheckTime = 0;
-    if (currentTime - previousOverflowCheckTime >= 50)
-    {
+
+    // Array of overflow sensors
+    OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
+
+    if (currentTime - previousOverflowCheckTime >= 25) {
         previousOverflowCheckTime = currentTime;
 
-        if (overflowSensorTrough1.loop() == 1) handleOverflowCondition(1);
-        if (overflowSensorTrough2.loop() == 1) handleOverflowCondition(2);
-        if (overflowSensorTrough3.loop() == 1) handleOverflowCondition(3);
-        if (overflowSensorTrough4.loop() == 1) handleOverflowCondition(4);
+        // Loop through the overflow sensors and check if any have triggered overflow
+        for (int i = 0; i < 4; i++) {
+            if (overflowSensors[i]->loop() == 1) {
+                handleOverflowCondition(i + 1);  // Pass the correct valve number (1-based index)
+            }
+        }
     }
 }
 
+
 // Function to monitor flow sensors for each valve
-void monitorFlowSensors(unsigned long currentTime)
-{
-    for (int i = 0; i < 4; i++)
-    {
-        if (valveStates[i].isDispensing && currentTime - valveStates[i].lastFlowCheckTime >= 50)
-        {
+void monitorFlowSensors(unsigned long currentTime) {
+    for (int i = 0; i < 4; i++) {
+        if (valveStates[i].isDispensing && currentTime - valveStates[i].lastFlowCheckTime >= 25) {
             valveStates[i].lastFlowCheckTime = currentTime;
+
+            // Skip timeout check if the valve is manually controlled
+            if (valveStates[i].manualControl) {
+                continue;
+            }
+
+            // Skip flow check for a brief period after reset to allow valid readings
+            if (resetInProgress[i] && currentTime - resetStartTime[i] < resetDuration + 50) {
+                // Give the sensor some additional time after reset (e.g., 50ms buffer)
+                continue;
+            }
 
             float currentFlowValue = getFlowSensorValue(i);
 
-            if (currentFlowValue < 0)
-            {
-                Serial.print("Invalid flow reading for valve ");
-                Serial.println(i + 1);
+            if (currentFlowValue < 0) {
+                printf("Invalid flow reading for valve %d\n", i + 1);
                 handleTimeoutCondition(i + 1);
                 continue;
             }
 
-            if (valveStates[i].targetVolume > 0 && currentFlowValue >= valveStates[i].targetVolume)
-            {
-                Serial.print("Target volume reached for valve ");
-                Serial.println(i + 1);
+            if (valveStates[i].targetVolume > 0 && currentFlowValue >= valveStates[i].targetVolume) {
+                printf("Target volume reached for valve %d\n", i + 1);
                 handleTimeoutCondition(i + 1);  // Close valves and stop dispensing
                 continue;
             }
 
-            if (currentFlowValue == valveStates[i].lastFlowValue)
-            {
-                if (currentTime - valveStates[i].lastFlowChangeTime >= flowTimeoutPeriod)
-                {
-                    Serial.print("Timeout occurred for valve ");
-                    Serial.println(i + 1);
+            if (currentFlowValue == valveStates[i].lastFlowValue) {
+                if (currentTime - valveStates[i].lastFlowChangeTime >= flowTimeoutPeriod) {
+                    printf("Timeout occurred for valve %d\n", i + 1);
                     handleTimeoutCondition(i + 1);
                 }
-            }
-            else
-            {
+            } else {
                 valveStates[i].lastFlowValue = currentFlowValue;
                 valveStates[i].lastFlowChangeTime = currentTime;
             }
@@ -449,15 +475,21 @@ void monitorFlowSensors(unsigned long currentTime)
     }
 }
 
+
 // Function to get the flow sensor value for a specific valve
 float getFlowSensorValue(int valveIndex)
 {
-    if (valveIndex == 0) return flowSensorReagent1.getScaledFlowValue();
-    if (valveIndex == 1) return flowSensorReagent2.getScaledFlowValue();
-    if (valveIndex == 2) return flowSensorReagent3.getScaledFlowValue();
-    if (valveIndex == 3) return flowSensorReagent4.getScaledFlowValue();
-    return -1.0;  // Invalid index
+    // Array of flow sensors
+    FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
+
+    // Validate the valve index and return the flow sensor value
+    if (valveIndex >= 0 && valveIndex < 4) {
+        return flowSensors[valveIndex]->getScaledFlowValue();
+    } else {
+        return -1.0;  // Invalid index
+    }
 }
+
 
 // Function to check Modbus connection status
 void checkModbusConnection(unsigned long currentTime)
@@ -486,43 +518,46 @@ void logSystemState(unsigned long currentTime)
 // Command to set reagent valves (setRV <valve number> <0/1> or setRV all <0/1>)
 void cmd_set_reagent_valve(char *args, Stream *response) {
     if (sscanf(args, "%s %d", valveArg, &state) == 2) {
+        SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+        SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
+
         if (strcmp(valveArg, "all") == 0) {
-            if (state == 0 || state == 1) {
-                if (state == 1) {
-                    reagentValve1.openValve();
-                    reagentValve2.openValve();
-                    reagentValve3.openValve();
-                    reagentValve4.openValve();
-                    response->println("All reagent valves opened.");
-                } else {
-                    reagentValve1.closeValve();
-                    reagentValve2.closeValve();
-                    reagentValve3.closeValve();
-                    reagentValve4.closeValve();
-                    response->println("All reagent valves closed.");
+            for (int i = 0; i < 4; i++) {
+                fillMode[i] = false;  // Disable fill mode
+                reagentValves[i]->closeValve();
+                mediaValves[i]->closeValve();
+                valveStates[i].manualControl = (state == 1);  // Set manualControl flag
+            }
+
+            if (state == 1) {
+                for (int i = 0; i < 4; i++) {
+                    reagentValves[i]->openValve();
                 }
+                response->println("All reagent valves opened.");
             } else {
-                response->println("Invalid state. Use 0 or 1.");
+                for (int i = 0; i < 4; i++) {
+                    reagentValves[i]->closeValve();
+                }
+                response->println("All reagent valves closed.");
             }
         } else {
             valveNumber = atoi(valveArg);
             if (valveNumber >= 1 && valveNumber <= 4 && (state == 0 || state == 1)) {
-                SolenoidValve *valve = nullptr;
-                if (valveNumber == 1) valve = &reagentValve1;
-                else if (valveNumber == 2) valve = &reagentValve2;
-                else if (valveNumber == 3) valve = &reagentValve3;
-                else if (valveNumber == 4) valve = &reagentValve4;
+                fillMode[valveNumber - 1] = false;
+                reagentValves[valveNumber - 1]->closeValve();
+                mediaValves[valveNumber - 1]->closeValve();
 
-                if (valve != nullptr) {
-                    if (state == 1) {
-                        valve->openValve();
-                        valveStates[valveNumber - 1].isDispensing = true;  // Track dispensing
-                        response->println("Reagent valve opened.");
-                    } else {
-                        valve->closeValve();
-                        valveStates[valveNumber - 1].isDispensing = false; // Stop dispensing
-                        response->println("Reagent valve closed.");
-                    }
+                SolenoidValve *valve = reagentValves[valveNumber - 1];
+                if (state == 1) {
+                    valve->openValve();
+                    valveStates[valveNumber - 1].isDispensing = true;
+                    valveStates[valveNumber - 1].manualControl = true;  // Set manualControl flag
+                    response->println("Reagent valve opened.");
+                } else {
+                    valve->closeValve();
+                    valveStates[valveNumber - 1].isDispensing = false;
+                    valveStates[valveNumber - 1].manualControl = false;  // Reset manualControl flag
+                    response->println("Reagent valve closed.");
                 }
             } else {
                 response->println("Invalid reagent valve command. Use 1-4 or 'all'.");
@@ -533,42 +568,55 @@ void cmd_set_reagent_valve(char *args, Stream *response) {
     }
 }
 
+
+
 // Command to set media valves (setMV <valve number> <0/1> or setMV all <0/1>)
 void cmd_set_media_valve(char *args, Stream *response) {
     if (sscanf(args, "%s %d", valveArg, &state) == 2) {
+        SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
+        SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+
         if (strcmp(valveArg, "all") == 0) {
-            if (state == 0 || state == 1) {
-                if (state == 1) {
-                    mediaValve1.openValve();
-                    mediaValve2.openValve();
-                    mediaValve3.openValve();
-                    mediaValve4.openValve();
-                    response->println("All media valves opened.");
-                } else {
-                    mediaValve1.closeValve();
-                    mediaValve2.closeValve();
-                    mediaValve3.closeValve();
-                    mediaValve4.closeValve();
-                    response->println("All media valves closed.");
+            // Disable fill mode for all troughs and close valves
+            for (int i = 0; i < 4; i++) {
+                fillMode[i] = false;  // Disable fill mode for all troughs
+                reagentValves[i]->closeValve();  // Close reagent valves
+                mediaValves[i]->closeValve();    // Close media valves
+                valveStates[i].manualControl = (state == 1);  // Set manualControl flag for all valves
+            }
+
+            // Open or close all media valves based on the state
+            if (state == 1) {
+                for (int i = 0; i < 4; i++) {
+                    mediaValves[i]->openValve();
                 }
+                response->println("All media valves opened.");
             } else {
-                response->println("Invalid state. Use 0 or 1.");
+                for (int i = 0; i < 4; i++) {
+                    mediaValves[i]->closeValve();
+                }
+                response->println("All media valves closed.");
             }
         } else {
             valveNumber = atoi(valveArg);
             if (valveNumber >= 1 && valveNumber <= 4 && (state == 0 || state == 1)) {
-                SolenoidValve *valve = nullptr;
-                if (valveNumber == 1) valve = &mediaValve1;
-                else if (valveNumber == 2) valve = &mediaValve2;
-                else if (valveNumber == 3) valve = &mediaValve3;
-                else if (valveNumber == 4) valve = &mediaValve4;
+                // Disable fill mode for the specific trough
+                fillMode[valveNumber - 1] = false;
 
+                // Close reagent and media valves for the specific trough
+                reagentValves[valveNumber - 1]->closeValve();
+                mediaValves[valveNumber - 1]->closeValve();
+
+                // Open or close the specific media valve
+                SolenoidValve *valve = mediaValves[valveNumber - 1];
                 if (valve != nullptr) {
                     if (state == 1) {
                         valve->openValve();
+                        valveStates[valveNumber - 1].manualControl = true;  // Set manualControl flag
                         response->println("Media valve opened.");
                     } else {
                         valve->closeValve();
+                        valveStates[valveNumber - 1].manualControl = false; // Reset manualControl flag
                         response->println("Media valve closed.");
                     }
                 }
@@ -580,6 +628,8 @@ void cmd_set_media_valve(char *args, Stream *response) {
         response->println("Invalid media valve command.");
     }
 }
+
+
 
 // Command to set waste valves (setWV <valve number> <0/1> or setWV all <0/1>)
 void cmd_set_waste_valve(char *args, Stream *response) {
@@ -645,37 +695,29 @@ void cmd_set_pressure_valve(char *args, Stream *response) {
 
 // Command to reset flow sensor (resetFS <sensor number> or resetFS all)
 void cmd_reset_flow_sensor(char *args, Stream *response) {
+    // Array of flow sensors
+    FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
+
     if (strcmp(args, "all") == 0) {
-        // Reset all flow sensors
-        flowSensorReagent1.startResetFlow();
-        flowSensorReagent2.startResetFlow();
-        flowSensorReagent3.startResetFlow();
-        flowSensorReagent4.startResetFlow();
+        // Reset all flow sensors using a loop
+        for (int i = 0; i < 4; i++) {
+            flowSensors[i]->startResetFlow();
+        }
         response->println("All flow sensors reset initiated.");
     } else {
         int sensorNumber;
-        if (sscanf(args, "%d", &sensorNumber) == 1) {
-            // Reset the specific flow sensor based on sensorNumber
-            if (sensorNumber == 1) {
-                flowSensorReagent1.startResetFlow();
-                response->println("Flow sensor 1 reset initiated.");
-            } else if (sensorNumber == 2) {
-                flowSensorReagent2.startResetFlow();
-                response->println("Flow sensor 2 reset initiated.");
-            } else if (sensorNumber == 3) {
-                flowSensorReagent3.startResetFlow();
-                response->println("Flow sensor 3 reset initiated.");
-            } else if (sensorNumber == 4) {
-                flowSensorReagent4.startResetFlow();
-                response->println("Flow sensor 4 reset initiated.");
-            } else {
-                response->println("Invalid flow sensor number. Use 1-4 or 'all'.");
-            }
+        if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= 4) {
+            // Reset the specific flow sensor
+            flowSensors[sensorNumber - 1]->startResetFlow();
+            response->print("Flow sensor ");
+            response->print(sensorNumber);
+            response->println(" reset initiated.");
         } else {
-            response->println("Invalid flow sensor command.");
+            response->println("Invalid flow sensor number. Use 1-4 or 'all'.");
         }
     }
 }
+
 
 // Command to set the logging frequency (setLF <milliseconds>)
 void cmd_set_log_frequency(char *args, Stream *response) {
@@ -690,10 +732,48 @@ void cmd_set_log_frequency(char *args, Stream *response) {
     }
 }
 
+// ======================[Helper function for checking system pressure]===============
+bool checkAndSetPressure(Stream *response, float thresholdPressure, unsigned long timeout) {
+    unsigned long pressureCheckStartTime = millis();
+    float currentPressure = pressureSensor.readPressure();
+
+    // Check if the system is already pressurized
+    if (currentPressure >= thresholdPressure) {
+        response->println("System already pressurized.");
+        return true;
+    }
+
+    // Set the pressure valve to 100%
+    pressureValve.setPosition(100);
+    response->println("Pressure valve set to 100%.");
+
+    // Wait for pressure to stabilize within the timeout
+    while (millis() - pressureCheckStartTime < timeout) {
+        currentPressure = pressureSensor.readPressure();
+        if (currentPressure >= thresholdPressure) {
+            return true;  // Pressure is sufficient
+        }
+        delay(100);  // Add delay to prevent tight looping
+    }
+
+    // If pressure is not reached, log and return false
+    response->print("Error: Pressure threshold not reached. Current pressure: ");
+    response->print(currentPressure);
+    response->println(" psi. Operation aborted.");
+    return false;
+}
+
+
 // ======================[Command Functions for Dispensing Control]===============
 
 // Command to dispense reagent (dispenseR <valve number> [volume])
 void cmd_dispense_reagent(char *args, Stream *response) {
+    // Check and set the pressure using the helper function
+        if (!checkAndSetPressure(response, 20.0, 500)) {
+            return;  // If pressure check fails, abort the dispense operation
+        }
+
+    // Enable dispensing only after pressure check succeeds
     String inputString = String(args);
     inputString.trim();
     int valveNumber = -1;
@@ -717,11 +797,20 @@ void cmd_dispense_reagent(char *args, Stream *response) {
     response->println(requestedVolume);
 
     if (valveNumber >= 1 && valveNumber <= 4) {
-        OverflowSensor *overflowSensor = nullptr;
-        if (valveNumber == 1) overflowSensor = &overflowSensorTrough1;
-        else if (valveNumber == 2) overflowSensor = &overflowSensorTrough2;
-        else if (valveNumber == 3) overflowSensor = &overflowSensorTrough3;
-        else if (valveNumber == 4) overflowSensor = &overflowSensorTrough4;
+        
+        // Disable fill mode for the specific trough
+        fillMode[valveNumber - 1] = false;
+
+        // Close reagent and media valves using a loop
+        SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+        SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
+        
+        reagentValves[valveNumber - 1]->closeValve();
+        mediaValves[valveNumber - 1]->closeValve();
+
+        // Select the correct overflow sensor
+        OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
+        OverflowSensor *overflowSensor = overflowSensors[valveNumber - 1];
 
         if (overflowSensor != nullptr && overflowSensor->isOverflowing()) {
             response->print("Cannot dispense: Overflow detected for valve ");
@@ -753,23 +842,12 @@ void cmd_dispense_reagent(char *args, Stream *response) {
             response->println("Continuous dispensing (no target volume specified).");
         }
 
-        // Check and set the pressure valve
-        float currentPressure = pressureSensor.readPressure();
-        if (currentPressure < 20.0) {
-            pressureValve.setPosition(100);  // Set pressure valve to 100%
-            response->println("Pressure valve set to 100%.");
-        } else {
-            response->println("System already pressurized.");
-        }
-
-        // Reset flow sensor for the specific valve
+        // Reset flow sensor for the specific valve using a loop
+        FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
+        
         resetInProgress[valveNumber - 1] = true;
         resetStartTime[valveNumber - 1] = millis();
-
-        if (valveNumber == 1) flowSensorReagent1.startResetFlow();
-        else if (valveNumber == 2) flowSensorReagent2.startResetFlow();
-        else if (valveNumber == 3) flowSensorReagent3.startResetFlow();
-        else if (valveNumber == 4) flowSensorReagent4.startResetFlow();
+        flowSensors[valveNumber - 1]->startResetFlow();
 
         response->print("Flow sensor reset initiated for reagent ");
         response->println(valveNumber);
@@ -785,14 +863,24 @@ void cmd_dispense_reagent(char *args, Stream *response) {
     }
 }
 
+
+
 // Command to stop dispensing (stopD <valve number> or stopD all)
 void cmd_stop_dispense(char *args, Stream *response) {
+    FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
+
     if (strcmp(args, "all") == 0) {
-        // Stop all reagent and media valves
-        for (int i = 1; i <= 4; i++) {
-            closeValves(i, response);
-            flowSensorReagent1.startResetFlow();
+        // Stop all reagent and media valves and disable fill mode
+        for (int i = 0; i < 4; i++) {
+            fillMode[i] = false;  // Disable fill mode for all troughs
+            closeValves(i + 1, response);  // Close the reagent and media valves
         }
+
+        // Reset all flow sensors using a loop
+        for (int i = 0; i < 4; i++) {
+            flowSensors[i]->startResetFlow();
+        }
+
         response->println("All valves and flow sensors reset.");
         for (int i = 0; i < 4; i++) {
             isDispensing[i] = false;
@@ -801,11 +889,11 @@ void cmd_stop_dispense(char *args, Stream *response) {
     } else {
         int valveNumber;
         if (sscanf(args, "%d", &valveNumber) == 1 && valveNumber >= 1 && valveNumber <= 4) {
-            closeValves(valveNumber, response);
-            if (valveNumber == 1) flowSensorReagent1.startResetFlow();
-            else if (valveNumber == 2) flowSensorReagent2.startResetFlow();
-            else if (valveNumber == 3) flowSensorReagent3.startResetFlow();
-            else if (valveNumber == 4) flowSensorReagent4.startResetFlow();
+            fillMode[valveNumber - 1] = false;  // Disable fill mode for the specific trough
+            closeValves(valveNumber, response);  // Close reagent and media valves
+
+            // Reset the flow sensor for the specific valve
+            flowSensors[valveNumber - 1]->startResetFlow();
 
             isDispensing[valveNumber - 1] = false;
             dispensingValveNumber[valveNumber - 1] = -1;
@@ -815,129 +903,212 @@ void cmd_stop_dispense(char *args, Stream *response) {
     }
 }
 
+
+
 // Helper function to handle overflow conditions
 void handleOverflowCondition(int triggeredValveNumber) {
-  if (isDispensing[triggeredValveNumber - 1]) {
-    closeValves(triggeredValveNumber, &Serial);
-    isDispensing[triggeredValveNumber - 1] = false;  // Stop the valve from dispensing
-    dispensingValveNumber[triggeredValveNumber - 1] = -1;
-    Serial.print("Overflow detected: Valves closed for valve ");
-    Serial.println(triggeredValveNumber);
+    if (isDispensing[triggeredValveNumber - 1]) {
+        closeValves(triggeredValveNumber, &Serial);
+        isDispensing[triggeredValveNumber - 1] = false;  // Stop the valve from dispensing
+        dispensingValveNumber[triggeredValveNumber - 1] = -1;
+        Serial.print("Overflow detected: Valves closed for valve ");
+        Serial.println(triggeredValveNumber);
 
-    // Reset the flow sensor for the specific valve to avoid timeout
-    if (triggeredValveNumber == 1) flowSensorReagent1.startResetFlow();
-    else if (triggeredValveNumber == 2) flowSensorReagent2.startResetFlow();
-    else if (triggeredValveNumber == 3) flowSensorReagent3.startResetFlow();
-    else if (triggeredValveNumber == 4) flowSensorReagent4.startResetFlow();
+        // Reset the flow sensor for the specific valve using an array
+        FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
+        flowSensors[triggeredValveNumber - 1]->startResetFlow();
 
-    // Reset the timeout mechanism for this valve (if necessary)
-    valveStates[triggeredValveNumber - 1].lastFlowCheckTime = 0;  // Reset the flow check timer
-    valveStates[triggeredValveNumber - 1].lastFlowChangeTime = 0;  // Reset the last flow change time
-  }
+        // Reset the timeout mechanism for this valve
+        valveStates[triggeredValveNumber - 1].lastFlowCheckTime = 0;  // Reset the flow check timer
+        valveStates[triggeredValveNumber - 1].lastFlowChangeTime = 0;  // Reset the last flow change time
+    }
 }
+
 
 
 // Helper function to close both reagent and media valves for a given valve number
 void closeValves(int valveNumber, Stream *response)
 {
-  SolenoidValve *reagentValve = nullptr;
-  SolenoidValve *mediaValve = nullptr;
+    // Arrays for reagent and media valves
+    SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+    SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
 
-  if (valveNumber == 1)
-  {
-    reagentValve = &reagentValve1;
-    mediaValve = &mediaValve1;
-  }
-  else if (valveNumber == 2)
-  {
-    reagentValve = &reagentValve2;
-    mediaValve = &mediaValve2;
-  }
-  else if (valveNumber == 3)
-  {
-    reagentValve = &reagentValve3;
-    mediaValve = &mediaValve3;
-  }
-  else if (valveNumber == 4)
-  {
-    reagentValve = &reagentValve4;
-    mediaValve = &mediaValve4;
-  }
+    if (valveNumber >= 1 && valveNumber <= 4) {
+        // Close the reagent valve
+        reagentValves[valveNumber - 1]->closeValve();
+        response->print("Reagent valve ");
+        response->print(valveNumber);
+        response->println(" closed.");
 
-  if (reagentValve != nullptr)
-  {
-    reagentValve->closeValve();
-    response->print("Reagent valve ");
-    response->print(valveNumber);
-    response->println(" closed.");
-  }
-
-  if (mediaValve != nullptr)
-  {
-    mediaValve->closeValve();
-    response->print("Media valve ");
-    response->print(valveNumber);
-    response->println(" closed.");
-  }
+        // Close the media valve
+        mediaValves[valveNumber - 1]->closeValve();
+        response->print("Media valve ");
+        response->print(valveNumber);
+        response->println(" closed.");
+    } else {
+        response->println("Invalid valve number.");
+    }
 }
+
 
 // Helper function to open both reagent and media valves for a given valve number
 void openValves(int valveNumber, Stream *response)
 {
-  SolenoidValve *reagentValve = nullptr;
-  SolenoidValve *mediaValve = nullptr;
+    // Arrays for reagent and media valves
+    SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+    SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
 
-  if (valveNumber == 1)
-  {
-    reagentValve = &reagentValve1;
-    mediaValve = &mediaValve1;
-  }
-  else if (valveNumber == 2)
-  {
-    reagentValve = &reagentValve2;
-    mediaValve = &mediaValve2;
-  }
-  else if (valveNumber == 3)
-  {
-    reagentValve = &reagentValve3;
-    mediaValve = &mediaValve3;
-  }
-  else if (valveNumber == 4)
-  {
-    reagentValve = &reagentValve4;
-    mediaValve = &mediaValve4;
-  }
+    if (valveNumber >= 1 && valveNumber <= 4) {
+        // Open the reagent valve
+        reagentValves[valveNumber - 1]->openValve();
+        response->print("Reagent valve ");
+        response->print(valveNumber);
+        response->println(" opened.");
 
-  if (reagentValve != nullptr)
-  {
-    reagentValve->openValve();
-    response->print("Reagent valve ");
-    response->print(valveNumber);
-    response->println(" opened.");
-  }
-
-  if (mediaValve != nullptr)
-  {
-    mediaValve->openValve();
-    response->print("Media valve ");
-    response->print(valveNumber);
-    response->println(" opened.");
-  }
+        // Open the media valve
+        mediaValves[valveNumber - 1]->openValve();
+        response->print("Media valve ");
+        response->print(valveNumber);
+        response->println(" opened.");
+    } else {
+        response->println("Invalid valve number.");
+    }
 }
+
 
 // Helper function to handle timeout conditions
 void handleTimeoutCondition(int triggeredValveNumber) {
-  closeValves(triggeredValveNumber, &Serial);
-  Serial.print("Timeout occurred: Valves closed for valve ");
-  Serial.println(triggeredValveNumber);
+    closeValves(triggeredValveNumber, &Serial);
+    Serial.print("Timeout occurred: Valves closed for valve ");
+    Serial.println(triggeredValveNumber);
 
-  // Reset the flow sensor for the specific valve after the dispense is completed
-  if (triggeredValveNumber == 1) flowSensorReagent1.startResetFlow();
-  else if (triggeredValveNumber == 2) flowSensorReagent2.startResetFlow();
-  else if (triggeredValveNumber == 3) flowSensorReagent3.startResetFlow();
-  else if (triggeredValveNumber == 4) flowSensorReagent4.startResetFlow();
+    // Reset the flow sensor for the specific valve using an array
+    FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
+    flowSensors[triggeredValveNumber - 1]->startResetFlow();
 
-  // Reset the valve state
-  valveStates[triggeredValveNumber - 1].isDispensing = false;
-  valveStates[triggeredValveNumber - 1].targetVolume = -1;
+    // Reset the valve state
+    valveStates[triggeredValveNumber - 1].isDispensing = false;
+    valveStates[triggeredValveNumber - 1].targetVolume = -1;
+}
+
+
+void monitorFillSensors(unsigned long currentTime) {
+    // Arrays for overflow sensors, reagent valves, media valves
+    OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
+    SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+    SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
+
+    const unsigned long SENSOR_CHECK_INTERVAL = 3000;  // 3 second check interval for overflow
+
+    for (int i = 0; i < 4; i++) {
+        // Only check if the fill mode is active for this trough
+        if (fillMode[i] && currentTime - fillCheckTime[i] >= SENSOR_CHECK_INTERVAL) {
+            fillCheckTime[i] = currentTime;  // Reset the check time
+
+            // Access the correct overflow sensor, reagent valve, and media valve
+            OverflowSensor *overflowSensor = overflowSensors[i];
+            SolenoidValve *reagentValve = reagentValves[i];
+            SolenoidValve *mediaValve = mediaValves[i];
+
+            bool isOverflowing = overflowSensor->isOverflowing();
+            printf("Trough %d: Overflow sensor status: %d\n", i + 1, isOverflowing);
+
+            // If overflow is detected, close the valves and stop filling
+            if (isOverflowing) {
+                if (reagentValve->isValveOpen()) {
+                    reagentValve->closeValve();
+                    mediaValve->closeValve();
+                    printf("Overflow detected for trough %d, closing valves.\n", i + 1);
+                }
+            } 
+            // If overflow is NOT detected and the valves are closed, reopen them
+            else if (!reagentValve->isValveOpen()) {
+                reagentValve->openValve();
+                mediaValve->openValve();
+                printf("Trough %d not overflowing, opening valves to fill.\n", i + 1);
+            } 
+            else {
+                printf("Trough %d is already filling.\n", i + 1);
+            }
+        }
+    }
+}
+
+
+
+void cmd_fill_reagent(char *args, Stream *response) {
+    // Check and set the pressure using the helper function
+    if (!checkAndSetPressure(response, 20.0, 500)) {
+        return;  // If pressure check fails, abort the fill operation
+    }
+
+    String inputString = String(args);
+    inputString.trim();
+
+    // Arrays for reagent and media valves and flow sensors
+    SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+    SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
+
+    // Handle "fillR all" case
+    if (inputString.equalsIgnoreCase("all")) {
+        for (int i = 0; i < 4; i++) {
+            // Close and then open the valves to start a fresh fill
+            reagentValves[i]->closeValve();
+            mediaValves[i]->closeValve();
+
+            reagentValves[i]->openValve();
+            mediaValves[i]->openValve();
+
+            fillMode[i] = true;  // Enable fill mode for this valve
+            response->print("Filling started for valve ");
+            response->println(i + 1);
+        }
+        response->println("Filling started for all valves.");
+    } else {
+        int valveNumber = inputString.toInt();
+
+        if (valveNumber >= 1 && valveNumber <= 4) {
+            reagentValves[valveNumber - 1]->closeValve();
+            mediaValves[valveNumber - 1]->closeValve();
+
+            reagentValves[valveNumber - 1]->openValve();
+            mediaValves[valveNumber - 1]->openValve();
+
+            fillMode[valveNumber - 1] = true;  // Enable fill mode for this valve
+            response->print("Filling started for valve ");
+            response->println(valveNumber);
+        } else {
+            response->println("Invalid valve number. Use 1-4 or 'all'.");
+        }
+    }
+}
+
+
+
+
+
+// Command to stop filling the reagent (stopFillR <valve number> or stopFillR all)
+void cmd_stop_fill_reagent(char *args, Stream *response) {
+    if (sscanf(args, "%s", valveArg) == 1) {
+        if (strcmp(valveArg, "all") == 0) {
+            // Disable fill mode for all troughs
+            for (int i = 0; i < 4; i++) {
+                fillMode[i] = false;
+                closeValves(i + 1, response);  // Close all valves
+            }
+            response->println("Fill mode disabled for all troughs.");
+        } else {
+            valveNumber = atoi(valveArg);
+            if (valveNumber >= 1 && valveNumber <= 4) {
+                fillMode[valveNumber - 1] = false;
+                closeValves(valveNumber, response);  // Close the specific valve
+                response->print("Fill mode disabled for trough ");
+                response->println(valveNumber);
+            } else {
+                response->println("Invalid trough number. Use 1-4 or 'all'.");
+            }
+        }
+    } else {
+        response->println("Invalid stop fill command.");
+    }
 }
