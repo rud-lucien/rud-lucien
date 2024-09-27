@@ -1263,7 +1263,7 @@ void cmd_fill_reagent(char *args, Stream *response)
   }
 }
 
-// Command to stop filling the reagent (stopFillR <valve number> or stopFillR all)
+// Command to stop filling the reagent (stopF <valve number> or stopF all)
 void cmd_stop_fill_reagent(char *args, Stream *response)
 {
   if (sscanf(args, "%s", valveArg) == 1)
