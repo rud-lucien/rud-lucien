@@ -255,9 +255,9 @@ void loop()
 void log()
 {
   // Print initial log prefix
-  printf("LOG,RV,%d%d%d%d,MV,%d%d%d%d,WV,%d%d,BS,%d%d%d%d,OV,%d%d%d%d",
+  printf("LOG,MB,%d,RV,%d%d%d%d,MV,%d%d%d%d,WV,%d%d,BS,%d%d%d%d,OV,%d%d%d%d",
          // modbusConnected (1 if connected, 0 if not)
-         modbus.isConnected() ? "1" : "0",
+         modbus.isConnected() ? 1 : 0,
 
          // Reagent Valve States: RV1-RV4 (0 for Closed, 1 for Open)
          reagentValve1.isValveOpen() ? 1 : 0,
