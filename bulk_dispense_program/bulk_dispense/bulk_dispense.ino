@@ -97,18 +97,13 @@ ValveState valveStates[4]; // Array to track state for each of the 4 valves
 // Variables for tracking flow sensor reset progress for each valve
 bool resetInProgress[4] = {false, false, false, false}; // Is the reset in progress for each valve?
 unsigned long resetStartTime[4] = {0, 0, 0, 0};         // Start time of the reset for each valve
-const unsigned long resetDuration = 5;                  // Duration of flow sensor reset (milliseconds)
+
 
 // ======================[Logging and Timeout Management]==========================
 // Variables for managing system logging and timeout behavior
 unsigned long previousLogTime = 0;             // Time of the last log
 unsigned long logInterval = 250;               // Default log interval (milliseconds)
 const unsigned long flowTimeoutPeriod = 10000; // Flow timeout period (milliseconds)
-
-// ======================[Volume Dispensing Configuration]=========================
-// Variables related to volume-based dispensing
-const float MIN_VOLUME = 1.0;   // Minimum allowed volume (mL)
-const float MAX_VOLUME = 200.0; // Maximum allowed volume (mL)
 
 // ======================[Valve and Sensor Objects]===============================
 
@@ -369,6 +364,7 @@ void initializeSensors()
 // Function to handle flow sensor reset
 void handleFlowSensorReset(unsigned long currentTime)
 {
+  const unsigned long resetDuration = 5;    // Duration of flow sensor reset (milliseconds)
   // Array of flow sensors
   FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
 
@@ -444,6 +440,8 @@ void monitorOverflowSensors(unsigned long currentTime)
 // Function to monitor flow sensors for each valve
 void monitorFlowSensors(unsigned long currentTime)
 {
+  const unsigned long resetDuration = 5;
+
   for (int i = 0; i < 4; i++)
   {
     if (valveStates[i].isDispensing && currentTime - valveStates[i].lastFlowCheckTime >= 25)
@@ -870,13 +868,20 @@ bool checkAndSetPressure(Stream *response, float thresholdPressure, unsigned lon
 void cmd_dispense_reagent(char *args, Stream *response)
 {
   // Check if Modbus is connected
-     if (!modbus.isConnected()) {
-        response->println("Modbus not connected. Cannot process dispense command.");
-        return;
-    }
-  
+  if (!modbus.isConnected())
+  {
+    response->println("Modbus not connected. Cannot process dispense command.");
+    return;
+  }
+
+  const float PRESSURE_THRESHOLD_PSI = 20.0;
+  const unsigned long PRESSURE_TIMEOUT_MS = 500;
+
+  const float MIN_VOLUME = 1.0;   
+  const float MAX_VOLUME = 200.0; 
+
   // Check and set the pressure using the helper function
-  if (!checkAndSetPressure(response, 20.0, 500))
+  if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
   {
     return; // If pressure check fails, abort the dispense operation
   }
@@ -1126,13 +1131,19 @@ void handleTimeoutCondition(int triggeredValveNumber)
 // monitorFillSensors function to monitor overflow sensors and fill the troughs
 void monitorFillSensors(unsigned long currentTime)
 {
+  const float MAX_FILL_VOLUME_ML = 150.0;           // Maximum fill volume in mL
+  const unsigned long MAX_FILL_TIME_MS = 60000;    // Maximum fill time in milliseconds (1.5 minutes)
+
   // Arrays for overflow sensors, reagent valves, media valves, flow sensors
   OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
   SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
   SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
   FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
 
-  // First, track the valve states outside the interval-controlled loop
+  static unsigned long fillStartTime[4] = {0, 0, 0, 0};   // Track fill start time for each valve
+  static float previousFlowValue[4] = {0, 0, 0, 0};       // Track the last known flow value for each valve
+
+  // 1. Track valve states to know when dispensing starts and stops (outside interval loop)
   for (int i = 0; i < 4; i++)
   {
     bool isReagentValveOpen = reagentValves[i]->isValveOpen();
@@ -1143,8 +1154,13 @@ void monitorFillSensors(unsigned long currentTime)
     {
       if (!valveStates[i].isDispensing)
       {
-        valveStates[i].isDispensing = true; // Start dispensing
-        printf("Valve %d opened, starting dispensing.\n", i + 1);
+        valveStates[i].isDispensing = true;  // Start dispensing
+        if (fillStartTime[i] == 0)           // Only set start time if it's not already set
+        {
+          fillStartTime[i] = currentTime;    // Set the start time when filling starts
+          previousFlowValue[i] = 0;          // Reset flow tracking
+          printf("Valve %d opened, starting dispensing.\n", i + 1);
+        }
       }
     }
     // If both valves are closed, dispensing has stopped
@@ -1152,36 +1168,81 @@ void monitorFillSensors(unsigned long currentTime)
     {
       if (valveStates[i].isDispensing)
       {
-        valveStates[i].isDispensing = false; // Stop dispensing
+        valveStates[i].isDispensing = false;      // Stop dispensing
         printf("Valve %d closed, stopping dispensing.\n", i + 1);
 
         // Reset the flow sensor when dispensing stops
-        resetInProgress[i] = true;              // Mark reset as in progress
-        resetStartTime[i] = millis();           // Capture reset start time
-        flowSensors[i]->startResetFlow();       // Reset flow sensor
+        resetInProgress[i] = true;                // Mark reset as in progress
+        resetStartTime[i] = millis();             // Capture reset start time
+        flowSensors[i]->startResetFlow();         // Reset flow sensor
         printf("Flow sensor reset initiated for valve %d.\n", i + 1);
-        delay(100); // Add a small delay between each valve
+        delay(100);                               // Add a small delay between each valve
+
+        // Reset tracking for the next fill
+        fillStartTime[i] = 0;  // Reset fill start time for the next cycle
+        previousFlowValue[i] = 0;  // Reset flow tracking
       }
     }
   }
 
-  const unsigned long SENSOR_CHECK_INTERVAL = 500; // Check interval for overflow
-
+  // 2. Implement the timeout and volume checks outside the interval control loop
   for (int i = 0; i < 4; i++)
   {
-    // Only check if the fill mode is active for this trough
+    if (fillMode[i] && valveStates[i].isDispensing)  // Check only if fill mode is active and valve is dispensing
+    {
+      // Access the correct flow sensor
+      FDXSensor *flowSensor = flowSensors[i];
+      float currentFlowValue = flowSensor->getScaledFlowValue();
+
+      // Calculate the new volume added since the last check
+      float addedVolume = currentFlowValue - previousFlowValue[i];
+      if (addedVolume < 0) addedVolume = 0;  // Ensure no negative flow values
+      previousFlowValue[i] = currentFlowValue;  // Update the previous flow value
+
+      // Check if fill timeout has occurred based on volume or time
+      bool volumeExceeded = currentFlowValue >= MAX_FILL_VOLUME_ML;
+      bool timeExceeded = currentTime - fillStartTime[i] >= MAX_FILL_TIME_MS;
+
+      if (volumeExceeded || timeExceeded)
+      {
+        // Disable fill mode for this valve
+        fillMode[i] = false;
+        reagentValves[i]->closeValve();
+        mediaValves[i]->closeValve();
+
+        if (volumeExceeded)
+        {
+          printf("Fill timeout for trough %d: maximum volume (%.2f mL) reached.\n", i + 1, currentFlowValue);
+        }
+        else if (timeExceeded)
+        {
+          printf("Fill timeout for trough %d: maximum time (%.2f seconds) reached.\n", i + 1, MAX_FILL_TIME_MS / 1000.0);
+        }
+
+        // Reset tracking for the next fill
+        fillStartTime[i] = 0;      // Reset start time when fill completes
+        previousFlowValue[i] = 0;  // Reset flow tracking
+        continue; // Skip further checks for this valve
+      }
+    }
+  }
+
+  // 3. Interval-based check for overflow and managing valve states for the next fill cycle
+  const unsigned long SENSOR_CHECK_INTERVAL = 500; // Check interval for overflow
+  for (int i = 0; i < 4; i++)
+  {
     if (fillMode[i] && currentTime - fillCheckTime[i] >= SENSOR_CHECK_INTERVAL)
     {
-      fillCheckTime[i] = currentTime; // Reset the check time
+      fillCheckTime[i] = currentTime;             // Reset the check time
 
-      // Access the correct overflow sensor, reagent valve, media valve, and flow sensor
+      // Access the correct overflow sensor, reagent valve, and media valve
       OverflowSensor *overflowSensor = overflowSensors[i];
       SolenoidValve *reagentValve = reagentValves[i];
       SolenoidValve *mediaValve = mediaValves[i];
 
       bool isOverflowing = overflowSensor->isOverflowing();
 
-      // If overflow is detected, close the valves and reset the flow sensor
+      // If overflow is detected, close the valves
       if (isOverflowing)
       {
         if (reagentValve->isValveOpen() && mediaValve->isValveOpen())
@@ -1203,6 +1264,12 @@ void monitorFillSensors(unsigned long currentTime)
 }
 
 
+
+
+
+
+
+
 // Command to fill the reagent (fillR <valve number> or fillR all)
 void cmd_fill_reagent(char *args, Stream *response)
 {
@@ -1212,10 +1279,13 @@ void cmd_fill_reagent(char *args, Stream *response)
         return;
     }
   
+  const float PRESSURE_THRESHOLD_PSI = 20.0;
+  const unsigned long PRESSURE_TIMEOUT_MS = 500;
+
   // Check and set the pressure using the helper function
-  if (!checkAndSetPressure(response, 20.0, 500))
+  if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
   {
-    return; // If pressure check fails, abort the fill operation
+    return; // If pressure check fails, abort the dispense operation
   }
 
   String inputString = String(args);
