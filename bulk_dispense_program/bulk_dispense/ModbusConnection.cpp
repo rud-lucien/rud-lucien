@@ -4,14 +4,6 @@ ModbusConnection::ModbusConnection(byte macAddr[], IPAddress ipAddr, IPAddress s
     : mac{macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]},
       ip(ipAddr), server(serverAddr), modbusTCPClient(ethClient) {}
 
-void ModbusConnection::setupEthernet() {
-    Ethernet.begin(mac, ip);
-    Serial.print("IP Address: ");
-    Serial.println(Ethernet.localIP());
-
-    checkConnection();  // Call checkConnection to establish Modbus connection at startup
-}
-
 void ModbusConnection::checkConnection() {
     if (!modbusTCPClient.connected()) {
         if (wasConnected) {

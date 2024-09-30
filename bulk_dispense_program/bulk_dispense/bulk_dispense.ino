@@ -10,6 +10,7 @@
 #include "ModbusConnection.h"
 #include "Commander-API.hpp"
 #include "Commander-IO.hpp"
+#include "TCPServer.h"
 
 // ======================[Pin Assignments and Constants]==========================
 
@@ -64,7 +65,9 @@
 // Ethernet/Modbus Settings
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 IPAddress ip(169, 254, 0, 11);
-IPAddress server(169, 254, 0, 10);
+// Create instances of TCPServer and ModbusConnection
+TCPServer tcpServer(ip, 8080);  // Use port 8080 for the TCP server
+ModbusConnection modbus(mac, ip, IPAddress(169, 254, 0, 10));  // Modbus server IP
 
 // ======================[Global Command Variables]===============================
 // Variables for handling command arguments and valve states
@@ -140,7 +143,6 @@ ProportionalValve pressureValve(PRESSURE_VALVE_CONTROL_PIN, PRESSURE_VALVE_FEEDB
 PressureSensor pressureSensor(PRESSURE_SENSOR_PIN, MIN_PRESSURE, MAX_PRESSURE);
 
 // Flow Sensors (Modbus Connected)
-ModbusConnection modbus(mac, ip, server);
 FDXSensor flowSensorReagent1(modbus, FLOW_SENSOR_REAGENT_1_MODBUS_REGISTER, FLOW_SENSOR_REAGENT_1_RESET_PIN);
 FDXSensor flowSensorReagent2(modbus, FLOW_SENSOR_REAGENT_2_MODBUS_REGISTER, FLOW_SENSOR_REAGENT_2_RESET_PIN);
 FDXSensor flowSensorReagent3(modbus, FLOW_SENSOR_REAGENT_3_MODBUS_REGISTER, FLOW_SENSOR_REAGENT_3_RESET_PIN);
@@ -210,6 +212,26 @@ void setup()
 {
   Serial.begin(115200); // Start serial communication
 
+   // Initialize Ethernet and print the IP address (called only once)
+    Ethernet.begin(mac, ip);
+    Serial.print("IP Address: ");
+    Serial.println(Ethernet.localIP());
+
+    delay(1000);  // Allow some time for Ethernet initialization
+    
+    // Start the TCP server
+    tcpServer.begin();
+    Serial.println("TCP server initialized.");
+
+    delay(500);  // Add a small delay to ensure the TCP server is ready
+
+    // Initialize Modbus connection (without Ethernet.begin)
+    modbus.checkConnection();
+    Serial.println("Modbus connection initialized.");
+
+    delay(500);  // Add a small delay after Modbus connection check
+
+
   // Initialize valve states
   for (int i = 0; i < 4; i++)
   {
@@ -227,7 +249,6 @@ void setup()
   pressureValve.setup();
   pressureValve.setPosition(0.0);
   pressureSensor.setup();
-  modbus.setupEthernet();
 
   // Attach and initialize the Commander API
   commander.attachTree(API_tree);
@@ -238,8 +259,12 @@ void loop()
 {
   unsigned long currentTime = millis();
 
+
+
   handleFlowSensorReset(currentTime);  // Manage flow sensor reset
   handleSerialCommands();              // Handle serial input
+  handleTCPCommands();                 // Handle TCP client requests and commands
+  tcpServer.handleClient();            // Handle incoming TCP client requests
   monitorOverflowSensors(currentTime); // Check for overflow sensors
   monitorFlowSensors(currentTime);     // Check flow sensor values
   monitorFillSensors(currentTime);     // Monitor filling process
@@ -406,6 +431,21 @@ void handleSerialCommands()
     }
   }
 }
+
+// Handle TCP commands received from the TCP server
+void handleTCPCommands() {
+    String tcpCommand = tcpServer.handleClient();  // Get the command from the TCP server
+
+    if (tcpCommand.length() > 0) {
+        // Convert the String to a char array for compatibility with commander.execute()
+        char commandBuffer[16];
+        tcpCommand.toCharArray(commandBuffer, sizeof(commandBuffer));
+
+        // Execute the command using Commander and send the result back to the client
+        commander.execute(commandBuffer, &tcpServer.getClient());
+    }
+}
+
 
 // Function to monitor overflow sensors every 50ms
 void monitorOverflowSensors(unsigned long currentTime)

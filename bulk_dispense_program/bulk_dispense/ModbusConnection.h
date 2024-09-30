@@ -18,9 +18,6 @@ public:
     // Constructor
     ModbusConnection(byte macAddr[], IPAddress ipAddr, IPAddress serverAddr);
 
-    // Setup Ethernet connection
-    void setupEthernet();
-
     // Check and reconnect if needed
     void checkConnection();
 
