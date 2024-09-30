@@ -12,9 +12,10 @@ private:
     EthernetClient ethClient;
     ModbusTCPClient modbusTCPClient;
 
-    bool wasConnected = false;
+    bool wasConnected = false;  // Track the Modbus connection status
 
 public:
+    // Constructor
     ModbusConnection(byte macAddr[], IPAddress ipAddr, IPAddress serverAddr);
 
     // Setup Ethernet connection
@@ -23,8 +24,12 @@ public:
     // Check and reconnect if needed
     void checkConnection();
 
-    // Read modbus registers for a given address and quantity
+    // Method to check if Modbus is connected
+    bool isConnected() const;  // Return the connection status
+
+    // Read Modbus registers for a given address and quantity
     bool readRegisters(int registerAddress, int registerQuantity, uint32_t &result);
 };
 
 #endif
+

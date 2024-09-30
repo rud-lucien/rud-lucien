@@ -78,6 +78,7 @@ float targetVolume[4] = {-1, -1, -1, -1};            // Stores target volume for
 bool fillMode[4] = {false, false, false, false}; // Tracks if each trough is in fill mode
 unsigned long fillCheckTime[4] = {0, 0, 0, 0};   // Time to track periodic checks
 
+
 // ======================[Valve State Tracking]====================================
 // Structure for tracking state of each valve (flow, volume, dispensing)
 struct ValveState
@@ -255,6 +256,9 @@ void log()
 {
   // Print initial log prefix
   printf("LOG,RV,%d%d%d%d,MV,%d%d%d%d,WV,%d%d,BS,%d%d%d%d,OV,%d%d%d%d",
+         // modbusConnected (1 if connected, 0 if not)
+         modbus.isConnected() ? "1" : "0",
+
          // Reagent Valve States: RV1-RV4 (0 for Closed, 1 for Open)
          reagentValve1.isValveOpen() ? 1 : 0,
          reagentValve2.isValveOpen() ? 1 : 0,
@@ -510,14 +514,12 @@ float getFlowSensorValue(int valveIndex)
 }
 
 // Function to check Modbus connection status
-void checkModbusConnection(unsigned long currentTime)
-{
-  static unsigned long previousModbusCheckTime = 0;
-  if (currentTime - previousModbusCheckTime >= 500)
-  {
-    modbus.checkConnection();
-    previousModbusCheckTime = currentTime;
-  }
+void checkModbusConnection(unsigned long currentTime) {
+    static unsigned long previousModbusCheckTime = 0;
+    if (currentTime - previousModbusCheckTime >= 500) {
+        modbus.checkConnection();
+        previousModbusCheckTime = currentTime;
+    }
 }
 
 // Function to log system state at regular intervals
@@ -774,6 +776,12 @@ void cmd_set_pressure_valve(char *args, Stream *response)
 // Command to reset flow sensor (resetFS <sensor number> or resetFS all)
 void cmd_reset_flow_sensor(char *args, Stream *response)
 {
+  // Check if Modbus is connected
+     if (!modbus.isConnected()) {
+        response->println("Modbus not connected. Cannot process dispense command.");
+        return;
+    }
+  
   // Array of flow sensors
   FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
 
@@ -861,6 +869,12 @@ bool checkAndSetPressure(Stream *response, float thresholdPressure, unsigned lon
 // Command to dispense reagent (dispenseR <valve number> [volume])
 void cmd_dispense_reagent(char *args, Stream *response)
 {
+  // Check if Modbus is connected
+     if (!modbus.isConnected()) {
+        response->println("Modbus not connected. Cannot process dispense command.");
+        return;
+    }
+  
   // Check and set the pressure using the helper function
   if (!checkAndSetPressure(response, 20.0, 500))
   {
@@ -1192,6 +1206,12 @@ void monitorFillSensors(unsigned long currentTime)
 // Command to fill the reagent (fillR <valve number> or fillR all)
 void cmd_fill_reagent(char *args, Stream *response)
 {
+  // Check if Modbus is connected
+  if (!modbus.isConnected()) {
+        response->println("Modbus not connected. Cannot process fill command.");
+        return;
+    }
+  
   // Check and set the pressure using the helper function
   if (!checkAndSetPressure(response, 20.0, 500))
   {

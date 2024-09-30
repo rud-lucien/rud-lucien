@@ -9,7 +9,7 @@ void ModbusConnection::setupEthernet() {
     Serial.print("IP Address: ");
     Serial.println(Ethernet.localIP());
 
-    checkConnection();
+    checkConnection();  // Call checkConnection to establish Modbus connection at startup
 }
 
 void ModbusConnection::checkConnection() {
@@ -26,6 +26,11 @@ void ModbusConnection::checkConnection() {
             Serial.println("Connection to Modbus server failed.");
         }
     }
+}
+
+// New method to check the connection status
+bool ModbusConnection::isConnected() const {
+    return wasConnected;  // Return the current connection status
 }
 
 bool ModbusConnection::readRegisters(int registerAddress, int registerQuantity, uint32_t &result) {
