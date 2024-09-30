@@ -1109,10 +1109,10 @@ void handleTimeoutCondition(int triggeredValveNumber)
   valveStates[triggeredValveNumber - 1].targetVolume = -1;
 }
 
-//  monitorFillSensors function to monitor overflow sensors and fill the troughs
+// monitorFillSensors function to monitor overflow sensors and fill the troughs
 void monitorFillSensors(unsigned long currentTime)
 {
-  // Arrays for overflow sensors, reagent valves, media valves
+  // Arrays for overflow sensors, reagent valves, media valves, flow sensors
   OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
   SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
   SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
@@ -1124,7 +1124,7 @@ void monitorFillSensors(unsigned long currentTime)
     bool isReagentValveOpen = reagentValves[i]->isValveOpen();
     bool isMediaValveOpen = mediaValves[i]->isValveOpen();
 
-    // Update isDispensing based on the valve states
+    // If both valves are open, dispensing has started
     if (isReagentValveOpen && isMediaValveOpen)
     {
       if (!valveStates[i].isDispensing)
@@ -1133,17 +1133,25 @@ void monitorFillSensors(unsigned long currentTime)
         printf("Valve %d opened, starting dispensing.\n", i + 1);
       }
     }
+    // If both valves are closed, dispensing has stopped
     else if (!isReagentValveOpen && !isMediaValveOpen)
     {
       if (valveStates[i].isDispensing)
       {
         valveStates[i].isDispensing = false; // Stop dispensing
         printf("Valve %d closed, stopping dispensing.\n", i + 1);
+
+        // Reset the flow sensor when dispensing stops
+        resetInProgress[i] = true;              // Mark reset as in progress
+        resetStartTime[i] = millis();           // Capture reset start time
+        flowSensors[i]->startResetFlow();       // Reset flow sensor
+        printf("Flow sensor reset initiated for valve %d.\n", i + 1);
+        delay(100); // Add a small delay between each valve
       }
     }
   }
 
-  const unsigned long SENSOR_CHECK_INTERVAL = 500; // 3 second check interval for overflow
+  const unsigned long SENSOR_CHECK_INTERVAL = 500; // Check interval for overflow
 
   for (int i = 0; i < 4; i++)
   {
@@ -1156,10 +1164,8 @@ void monitorFillSensors(unsigned long currentTime)
       OverflowSensor *overflowSensor = overflowSensors[i];
       SolenoidValve *reagentValve = reagentValves[i];
       SolenoidValve *mediaValve = mediaValves[i];
-      FDXSensor *flowSensor = flowSensors[i];
 
       bool isOverflowing = overflowSensor->isOverflowing();
-      // printf("Trough %d: Overflow sensor status: %d\n", i + 1, isOverflowing);
 
       // If overflow is detected, close the valves and reset the flow sensor
       if (isOverflowing)
@@ -1168,23 +1174,20 @@ void monitorFillSensors(unsigned long currentTime)
         {
           reagentValve->closeValve();
           mediaValve->closeValve();
-          // printf("Overflow detected for trough %d, closing valves.\n", i + 1);
+          printf("Overflow detected for trough %d, closing valves.\n", i + 1);
         }
       }
-      // If overflow is not detected and valves are closed, reopen them and prepare for next fill cycle
+      // If overflow is not detected and valves are closed, reopen them and prepare for the next fill cycle
       else if (!reagentValve->isValveOpen())
       {
         reagentValve->openValve();
         mediaValve->openValve();
-        // printf("Trough %d not overflowing, opening valves to fill.\n", i + 1);
-      }
-      else
-      {
-        // printf("Trough %d is already filling.\n", i + 1);
+        printf("Trough %d not overflowing, opening valves to fill.\n", i + 1);
       }
     }
   }
 }
+
 
 // Command to fill the reagent (fillR <valve number> or fillR all)
 void cmd_fill_reagent(char *args, Stream *response)
