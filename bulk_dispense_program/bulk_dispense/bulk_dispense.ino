@@ -160,6 +160,8 @@ void cmd_dispense_reagent(char *args, Stream *response);
 void cmd_stop_dispense(char *args, Stream *response);
 void cmd_fill_reagent(char *args, Stream *response);
 void cmd_stop_fill_reagent(char *args, Stream *response);
+void cmd_print_help(char *args, Stream *response);
+void cmd_get_system_state(char *args, Stream *response);
 
 // ======================[Overflow and Timeout Handling]===========================
 // Functions to handle overflow and timeout conditions
@@ -195,16 +197,19 @@ Commander commander;
 // ======================[Commander API Configuration]============================
 
 Commander::API_t API_tree[] = {
-    apiElement("setRV", "Set reagent valve: setRV <1-4> <0/1>", cmd_set_reagent_valve),
-    apiElement("setMV", "Set media valve: setMV <1-4> <0/1>", cmd_set_media_valve),
-    apiElement("setWV", "Set waste valve: setWV <1-2> <0/1>", cmd_set_waste_valve),
-    apiElement("setPV", "Set pressure valve: setPV <percentage>", cmd_set_pressure_valve),
-    apiElement("resetFS", "Reset flow sensor: resetFS <1-4>", cmd_reset_flow_sensor),
-    apiElement("setLF", "Set log frequency: setLF <milliseconds>", cmd_set_log_frequency),
-    apiElement("dispenseR", "Dispense reagent: dispenseR <1-4> [volume]", cmd_dispense_reagent),
-    apiElement("stopD", "Stop dispensing reagent: stopD <1-4 or all>", cmd_stop_dispense),
-    apiElement("fillR", "Fill reagent trough: fillR <1-4>", cmd_fill_reagent),
-    apiElement("stopF", "Stop filling reagent trough: stopF <1-4 or all>", cmd_stop_fill_reagent)};
+    apiElement("setRV", "Set reagent valve: setRV <1-4> <0/1> (0 = close, 1 = open)", cmd_set_reagent_valve),
+    apiElement("setMV", "Set media valve: setMV <1-4> <0/1> (0 = close, 1 = open)", cmd_set_media_valve),
+    apiElement("setWV", "Set waste valve: setWV <1-2> <0/1> (0 = close, 1 = open)", cmd_set_waste_valve),
+    apiElement("setPV", "Set pressure valve: setPV <percentage> (sets pressure valve to the percentage value)", cmd_set_pressure_valve),
+    apiElement("resetFS", "Reset flow sensor: resetFS <1-4> (resets the flow sensor for the selected valve)", cmd_reset_flow_sensor),
+    apiElement("setLF", "Set log frequency: setLF <milliseconds> (set log interval in milliseconds)", cmd_set_log_frequency),
+    apiElement("dispenseR", "Dispense reagent: dispenseR <1-4> [volume] (volume in mL, continuous if omitted)", cmd_dispense_reagent),
+    apiElement("stopD", "Stop dispensing reagent: stopD <1-4 or all> (stops dispensing for a valve or all)", cmd_stop_dispense),
+    apiElement("fillR", "Fill reagent trough: fillR <1-4 or all> (initiates filling for a trough or all troughs)", cmd_fill_reagent),
+    apiElement("stopF", "Stop filling reagent trough: stopF <1-4 or all> (stops filling for a trough or all)", cmd_stop_fill_reagent),
+    apiElement("help", "Print available commands and usage: help", cmd_print_help),
+    apiElement("state", "Get system state: state", cmd_get_system_state)
+    };
 
 // ======================[Setup and Loop]==========================================
 
@@ -274,8 +279,44 @@ void loop()
 
 void log()
 {
+  int systemState = 1;  // Default state is Idle (1)
+  bool isDispensing = false;
+  bool inFillMode = false;
+
+  // Check Modbus connection first
+    if (!modbus.isConnected()) {
+        systemState = 4;  // Modbus Disconnected (Error State)
+    } else {
+        // Check if any valve is dispensing
+        for (int i = 0; i < 4; i++) {
+            if (valveStates[i].isDispensing) {
+                isDispensing = true;
+                break;  // No need to check further, already found a dispensing valve
+            }
+        }
+
+        // Check if any trough is in fill mode
+        for (int i = 0; i < 4; i++) {
+            if (fillMode[i]) {
+                inFillMode = true;
+                break;  // No need to check further, already found a trough in fill mode
+            }
+        }
+
+        // Determine the system state based on precedence (fill mode takes priority)
+        if (inFillMode) {
+            systemState = 3;  // Fill Mode
+        } else if (isDispensing) {
+            systemState = 2;  // Dispensing
+        }
+    }
+  
   // Print initial log prefix
-  printf("LOG,MB,%d,RV,%d%d%d%d,MV,%d%d%d%d,WV,%d%d,BS,%d%d%d%d,OV,%d%d%d%d",
+  printf("LOG,STATE,%d,MB,%d,RV,%d%d%d%d,MV,%d%d%d%d,WV,%d%d,BS,%d%d%d%d,OV,%d%d%d%d",
+         
+         // System State (1 = Idle, 2 = Dispensing, 3 = Fill Mode)
+         systemState,
+         
          // modbusConnected (1 if connected, 0 if not)
          modbus.isConnected() ? 1 : 0,
 
@@ -407,7 +448,7 @@ void handleFlowSensorReset(unsigned long currentTime, Stream *response)
 // Function to handle serial input for commands
 void handleSerialCommands()
 {
-  static char commandBuffer[16]; // Buffer to store incoming command
+  static char commandBuffer[64]; // Buffer to store incoming command
   static uint8_t commandIndex = 0;
 
   while (Serial.available())
@@ -573,7 +614,9 @@ void logSystemState(unsigned long currentTime)
 {
   if (currentTime - previousLogTime >= logInterval)
   {
-    log();
+    if (!Serial.available()) {
+      log();
+    }
     previousLogTime = currentTime;
   }
 }
@@ -1474,4 +1517,59 @@ void cmd_stop_fill_reagent(char *args, Stream *response)
   {
     response->println("Error: Invalid stop fill command. Use 'stopF <valve number>' or 'stopF all'.");
   }
+}
+
+void cmd_print_help(char *args, Stream *response)
+{
+    // Print the help information to the specified stream (Serial, TCP, etc.)
+    commander.printHelp(response);
+}
+
+void cmd_get_system_state(char *args, Stream *response)
+{
+    int systemState = 1;  // Default state is Idle (1)
+    bool isDispensing = false;
+    bool inFillMode = false;
+    bool errorState = false;
+
+    // Check Modbus connection, set error state if Modbus is disconnected
+    if (!modbus.isConnected()) {
+        errorState = true;
+    }
+
+    // Check if any valve is dispensing
+    for (int i = 0; i < 4; i++) {
+        if (valveStates[i].isDispensing) {
+            isDispensing = true;
+            break;
+        }
+    }
+
+    // Check if any trough is in fill mode
+    for (int i = 0; i < 4; i++) {
+        if (fillMode[i]) {
+            inFillMode = true;
+            break;
+        }
+    }
+
+    // Determine the system state based on precedence (Error > Fill Mode > Dispensing > Idle)
+    if (errorState) {
+        systemState = 4;  // Error State
+    } else if (inFillMode) {
+        systemState = 3;  // Fill Mode
+    } else if (isDispensing) {
+        systemState = 2;  // Dispensing
+    }
+
+    // Send the system state as a response to the client
+    if (systemState == 1) {
+        response->println("System State: Idle");
+    } else if (systemState == 2) {
+        response->println("System State: Dispensing");
+    } else if (systemState == 3) {
+        response->println("System State: Fill Mode");
+    } else if (systemState == 4) {
+        response->println("System State: Error - Modbus Disconnected");
+    }
 }
