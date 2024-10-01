@@ -163,8 +163,8 @@ void cmd_stop_fill_reagent(char *args, Stream *response);
 
 // ======================[Overflow and Timeout Handling]===========================
 // Functions to handle overflow and timeout conditions
-void handleOverflowCondition(int triggeredValveNumber);
-void handleTimeoutCondition(int triggeredValveNumber);
+void handleOverflowCondition(int triggeredValveNumber, Stream *response);
+void handleTimeoutCondition(int triggeredValveNumber, Stream *response);
 
 // ======================[System State Logging and Utility Functions]==============
 // Functions for logging system state and printing sensor values
@@ -175,11 +175,11 @@ void printFlowSensorValues(); // Helper function to print flow sensor values
 // Helper functions for flow sensor reset, serial command handling, etc.
 void initializeValves();
 void initializeSensors();
-void handleFlowSensorReset(unsigned long currentTime);
+void handleFlowSensorReset(unsigned long currentTime, Stream *response);
 void handleSerialCommands();
-void monitorOverflowSensors(unsigned long currentTime);
-void monitorFlowSensors(unsigned long currentTime);
-void monitorFillSensors(unsigned long currentTime);
+void monitorOverflowSensors(unsigned long currentTime, Stream *response);
+void monitorFlowSensors(unsigned long currentTime, Stream *response);
+void monitorFillSensors(unsigned long currentTime, Stream *response);
 float getFlowSensorValue(int valveIndex);
 void checkModbusConnection(unsigned long currentTime);
 void logSystemState(unsigned long currentTime);
@@ -261,13 +261,13 @@ void loop()
 
 
 
-  handleFlowSensorReset(currentTime);  // Manage flow sensor reset
+  handleFlowSensorReset(currentTime, &Serial);  // Manage flow sensor reset
   handleSerialCommands();              // Handle serial input
   handleTCPCommands();                 // Handle TCP client requests and commands
   tcpServer.handleClient();            // Handle incoming TCP client requests
-  monitorOverflowSensors(currentTime); // Check for overflow sensors
-  monitorFlowSensors(currentTime);     // Check flow sensor values
-  monitorFillSensors(currentTime);     // Monitor filling process
+  monitorOverflowSensors(currentTime, &Serial); // Check for overflow sensors
+  monitorFlowSensors(currentTime, &Serial);     // Check flow sensor values
+  monitorFillSensors(currentTime, &Serial);     // Monitor filling process
   checkModbusConnection(currentTime);  // Check Modbus connection
   logSystemState(currentTime);         // Log the system state
 }
@@ -387,23 +387,21 @@ void initializeSensors()
 }
 
 // Function to handle flow sensor reset
-void handleFlowSensorReset(unsigned long currentTime)
+void handleFlowSensorReset(unsigned long currentTime, Stream *response)
 {
-  const unsigned long resetDuration = 5;    // Duration of flow sensor reset (milliseconds)
-  // Array of flow sensors
-  FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
+    const unsigned long resetDuration = 5;
+    FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
 
-  for (int i = 0; i < 4; i++)
-  {
-    if (resetInProgress[i] && millis() - resetStartTime[i] >= resetDuration)
+    for (int i = 0; i < 4; i++)
     {
-      resetInProgress[i] = false; // Reset is complete
-      printf("Flow sensor reset completed for valve %d\n", i + 1);
-
-      // Reset the corresponding flow sensor using the array
-      flowSensors[i]->handleReset();
+        if (resetInProgress[i] && millis() - resetStartTime[i] >= resetDuration)
+        {
+            resetInProgress[i] = false; // Reset is complete
+            response->print("Flow sensor reset completed for valve ");
+            response->println(i + 1);
+            flowSensors[i]->handleReset();
+        }
     }
-  }
 }
 
 // Function to handle serial input for commands
@@ -438,17 +436,24 @@ void handleTCPCommands() {
 
     if (tcpCommand.length() > 0) {
         // Convert the String to a char array for compatibility with commander.execute()
-        char commandBuffer[16];
+        char commandBuffer[64];  // Increase the buffer size to accommodate longer commands
         tcpCommand.toCharArray(commandBuffer, sizeof(commandBuffer));
 
-        // Execute the command using Commander and send the result back to the client
+        // Send a message that the command was received
+        tcpServer.getClient().println("Command received: " + tcpCommand);
+
+        // Execute the command using Commander and send the response back to the TCP client
         commander.execute(commandBuffer, &tcpServer.getClient());
+
+        // Ensure that after command execution, any errors or messages are sent back
+        tcpServer.getClient().println("Command processed.");
+
     }
 }
 
 
 // Function to monitor overflow sensors every 50ms
-void monitorOverflowSensors(unsigned long currentTime)
+void monitorOverflowSensors(unsigned long currentTime, Stream *response)
 {
   static unsigned long previousOverflowCheckTime = 0;
 
@@ -471,14 +476,14 @@ void monitorOverflowSensors(unsigned long currentTime)
       // Proceed with overflow handling for troughs not in fill mode
       if (overflowSensors[i]->loop() == 1)
       {
-        handleOverflowCondition(i + 1); // Handle overflow as usual for troughs not in fill mode
+        handleOverflowCondition(i + 1, response); // Handle overflow as usual for troughs not in fill mode
       }
     }
   }
 }
 
 // Function to monitor flow sensors for each valve
-void monitorFlowSensors(unsigned long currentTime)
+void monitorFlowSensors(unsigned long currentTime, Stream *response)
 {
   const unsigned long resetDuration = 5;
 
@@ -505,15 +510,17 @@ void monitorFlowSensors(unsigned long currentTime)
 
       if (currentFlowValue < 0)
       {
-        printf("Invalid flow reading for valve %d\n", i + 1);
-        handleTimeoutCondition(i + 1);
+        response->print("Invalid flow reading for valve ");
+        response->println(i + 1);
+        handleTimeoutCondition(i + 1, response);
         continue;
       }
 
       if (valveStates[i].targetVolume > 0 && currentFlowValue >= valveStates[i].targetVolume)
       {
-        printf("Target volume reached for valve %d\n", i + 1);
-        handleTimeoutCondition(i + 1); // Close valves and stop dispensing
+        response->print("Target volume reached for valve ");
+        response->println(i + 1);
+        handleTimeoutCondition(i + 1, response); // Close valves and stop dispensing
         continue;
       }
 
@@ -521,8 +528,9 @@ void monitorFlowSensors(unsigned long currentTime)
       {
         if (currentTime - valveStates[i].lastFlowChangeTime >= flowTimeoutPeriod)
         {
-          printf("Timeout occurred for valve %d\n", i + 1);
-          handleTimeoutCondition(i + 1);
+          response->print("Timeout occurred for valve ");
+          response->println(i + 1);
+          handleTimeoutCondition(i + 1, response);
         }
       }
       else
@@ -819,12 +827,11 @@ void cmd_set_pressure_valve(char *args, Stream *response)
 // ======================[Command Functions for Flow Sensors]=====================
 
 // Command to reset flow sensor (resetFS <sensor number> or resetFS all)
-// Command to reset flow sensor (resetFS <sensor number> or resetFS all)
 void cmd_reset_flow_sensor(char *args, Stream *response)
 {
   // Check if Modbus is connected
   if (!modbus.isConnected()) {
-      response->println("Modbus not connected. Cannot process reset command.");
+      response->println("Error: Modbus not connected. Cannot process reset command.");
       return;
   }
   
@@ -862,7 +869,7 @@ void cmd_reset_flow_sensor(char *args, Stream *response)
     }
     else
     {
-      response->println("Invalid flow sensor number. Use 1-4 or 'all'.");
+      response->println("Error: Invalid flow sensor number. Use 1-4 or 'all'.");
     }
   }
 }
@@ -881,7 +888,7 @@ void cmd_set_log_frequency(char *args, Stream *response)
   }
   else
   {
-    response->println("Invalid log frequency. Please provide a valid number in milliseconds.");
+    response->println("Error: Invalid log frequency. Please provide a valid number in milliseconds.");
   }
 }
 
@@ -928,7 +935,7 @@ void cmd_dispense_reagent(char *args, Stream *response)
   // Check if Modbus is connected
   if (!modbus.isConnected())
   {
-    response->println("Modbus not connected. Cannot process dispense command.");
+    response->println("Error: Modbus not connected. Cannot process dispense command.");
     return;
   }
 
@@ -999,14 +1006,14 @@ void cmd_dispense_reagent(char *args, Stream *response)
     {
       if (requestedVolume < MIN_VOLUME)
       {
-        response->print("Requested volume too low. Minimum volume is ");
+        response->print("Error: Requested volume too low. Minimum volume is ");
         response->print(MIN_VOLUME);
         response->println(" mL.");
         return;
       }
       else if (requestedVolume > MAX_VOLUME)
       {
-        response->print("Requested volume too high. Maximum volume is ");
+        response->print("Error: Requested volume too high. Maximum volume is ");
         response->print(MAX_VOLUME);
         response->println(" mL.");
         return;
@@ -1044,7 +1051,7 @@ void cmd_dispense_reagent(char *args, Stream *response)
   }
   else
   {
-    response->println("Invalid valve number. Use 1-4.");
+    response->println("Error: Invalid valve number. Use 1-4.");
   }
 }
 
@@ -1093,21 +1100,21 @@ void cmd_stop_dispense(char *args, Stream *response)
     }
     else
     {
-      response->println("Invalid valve number. Use 1-4 or 'all'.");
+      response->println("Error: Invalid valve number. Use 1-4 or 'all'.");
     }
   }
 }
 
 // Helper function to handle overflow conditions
-void handleOverflowCondition(int triggeredValveNumber)
+void handleOverflowCondition(int triggeredValveNumber, Stream *response)
 {
   if (isDispensing[triggeredValveNumber - 1])
   {
     closeValves(triggeredValveNumber, &Serial);
     isDispensing[triggeredValveNumber - 1] = false; // Stop the valve from dispensing
     dispensingValveNumber[triggeredValveNumber - 1] = -1;
-    Serial.print("Overflow detected: Valves closed for valve ");
-    Serial.println(triggeredValveNumber);
+    response->print("Overflow detected: Valves closed for valve ");
+    response->println(triggeredValveNumber);
 
     // Reset the flow sensor for the specific valve using an array
     FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
@@ -1143,7 +1150,7 @@ void closeValves(int valveNumber, Stream *response)
   }
   else
   {
-    response->println("Invalid valve number.");
+    response->println("Error: Invalid valve number.");
   }
 }
 
@@ -1170,16 +1177,16 @@ void openValves(int valveNumber, Stream *response)
   }
   else
   {
-    response->println("Invalid valve number.");
+    response->println("Error: Invalid valve number.");
   }
 }
 
 // Helper function to handle timeout conditions
-void handleTimeoutCondition(int triggeredValveNumber)
+void handleTimeoutCondition(int triggeredValveNumber, Stream *response)
 {
   closeValves(triggeredValveNumber, &Serial);
-  Serial.print("Timeout occurred: Valves closed for valve ");
-  Serial.println(triggeredValveNumber);
+  response->print("Warning: Timeout occurred: Valves closed for valve  ");
+  response->println(triggeredValveNumber);
 
   // Reset the flow sensor for the specific valve using an array
   FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
@@ -1193,7 +1200,7 @@ void handleTimeoutCondition(int triggeredValveNumber)
 }
 
 // monitorFillSensors function to monitor overflow sensors and fill the troughs
-void monitorFillSensors(unsigned long currentTime)
+void monitorFillSensors(unsigned long currentTime, Stream *response)
 {
   const float MAX_FILL_VOLUME_ML = 150.0;           // Maximum fill volume in mL
   const unsigned long MAX_FILL_TIME_MS = 60000;    // Maximum fill time in milliseconds (1.5 minutes)
@@ -1223,7 +1230,9 @@ void monitorFillSensors(unsigned long currentTime)
         {
           fillStartTime[i] = currentTime;    // Set the start time when filling starts
           previousFlowValue[i] = 0;          // Reset flow tracking
-          printf("Valve %d opened, starting dispensing.\n", i + 1);
+          response->print("Valve ");
+          response->print(i + 1);
+          response->println(" opened, starting dispensing.");
         }
       }
     }
@@ -1233,13 +1242,16 @@ void monitorFillSensors(unsigned long currentTime)
       if (valveStates[i].isDispensing)
       {
         valveStates[i].isDispensing = false;      // Stop dispensing
-        printf("Valve %d closed, stopping dispensing.\n", i + 1);
+        response->print("Valve ");
+        response->print(i + 1);
+        response->println(" closed, stopping dispensing.");
 
         // Reset the flow sensor when dispensing stops
         resetInProgress[i] = true;                // Mark reset as in progress
         resetStartTime[i] = millis();             // Capture reset start time
         flowSensors[i]->startResetFlow();         // Reset flow sensor
-        printf("Flow sensor reset initiated for valve %d.\n", i + 1);
+        response->print("Flow sensor reset initiated for valve ");
+        response->println(i + 1);
         delay(100);                               // Add a small delay between each valve
 
         // Reset tracking for the next fill
@@ -1276,11 +1288,19 @@ void monitorFillSensors(unsigned long currentTime)
 
         if (volumeExceeded)
         {
-          printf("Fill timeout for trough %d: maximum volume (%.2f mL) reached.\n", i + 1, currentFlowValue);
+          response->print("Warning: Fill timeout for trough ");
+          response->print(i + 1); // Print the trough number
+          response->print(": maximum volume (");
+          response->print(currentFlowValue, 2); // Print the currentFlowValue with 2 decimal places
+          response->println(" mL) reached.");
         }
         else if (timeExceeded)
         {
-          printf("Fill timeout for trough %d: maximum time (%.2f seconds) reached.\n", i + 1, MAX_FILL_TIME_MS / 1000.0);
+          response->print("Warning: Fill timeout for trough ");
+          response->print(i + 1); // Print the trough number
+          response->print(": maximum time (");
+          response->print(MAX_FILL_TIME_MS / 1000.0, 2); // Print the time in seconds with 2 decimal places
+          response->println(" seconds) reached.");
         }
 
         // Reset tracking for the next fill
@@ -1313,7 +1333,9 @@ void monitorFillSensors(unsigned long currentTime)
         {
           reagentValve->closeValve();
           mediaValve->closeValve();
-          printf("Overflow detected for trough %d, closing valves.\n", i + 1);
+          response->print("Overflow detected for trough ");
+          response->print(i + 1);                 // Print the trough number
+          response->println(", closing valves."); // Print the rest of the message and a newline
         }
       }
       // If overflow is not detected and valves are closed, reopen them and prepare for the next fill cycle
@@ -1321,7 +1343,9 @@ void monitorFillSensors(unsigned long currentTime)
       {
         reagentValve->openValve();
         mediaValve->openValve();
-        printf("Trough %d not overflowing, opening valves to fill.\n", i + 1);
+        response->print("Trough ");
+        response->print(i + 1);                                         // Print the trough number
+        response->println(" not overflowing, opening valves to fill."); // Print the rest of the message and a newline
       }
     }
   }
@@ -1334,7 +1358,7 @@ void cmd_fill_reagent(char *args, Stream *response)
 {
   // Check if Modbus is connected
   if (!modbus.isConnected()) {
-        response->println("Modbus not connected. Cannot process fill command.");
+        response->println("Error: Modbus not connected. Cannot process fill command.");
         return;
     }
   
@@ -1410,7 +1434,7 @@ void cmd_fill_reagent(char *args, Stream *response)
     }
     else
     {
-      response->println("Invalid valve number. Use 1-4 or 'all'.");
+      response->println("Error: Invalid valve number. Use 1-4 or 'all'.");
     }
   }
 }
@@ -1442,12 +1466,12 @@ void cmd_stop_fill_reagent(char *args, Stream *response)
       }
       else
       {
-        response->println("Invalid trough number. Use 1-4 or 'all'.");
+        response->println("Error: Invalid trough number. Use 1-4 or 'all'.");
       }
     }
   }
   else
   {
-    response->println("Invalid stop fill command.");
+    response->println("Error: Invalid stop fill command. Use 'stopF <valve number>' or 'stopF all'.");
   }
 }
