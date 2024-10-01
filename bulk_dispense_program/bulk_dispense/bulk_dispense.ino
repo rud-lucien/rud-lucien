@@ -986,7 +986,7 @@ void cmd_dispense_reagent(char *args, Stream *response)
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
 
   const float MIN_VOLUME = 1.0;   
-  const float MAX_VOLUME = 200.0; 
+  const float MAX_VOLUME = 150.0; 
 
   // Check and set the pressure using the helper function
   if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
