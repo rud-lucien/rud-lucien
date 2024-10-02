@@ -102,7 +102,6 @@ unsigned long resetStartTime[4] = {0, 0, 0, 0};         // Start time of the res
 // Variables for managing system logging and timeout behavior
 unsigned long previousLogTime = 0;             // Time of the last log
 unsigned long logInterval = 250;               // Default log interval (milliseconds)
-const unsigned long flowTimeoutPeriod = 10000; // Flow timeout period (milliseconds)
 
 // ======================[Valve and Sensor Objects]===============================
 
@@ -540,6 +539,12 @@ void monitorOverflowSensors(unsigned long currentTime, Stream *response)
 void monitorFlowSensors(unsigned long currentTime, Stream *response)
 {
   const unsigned long resetDuration = 5;
+  const unsigned long flowTimeoutPeriod = 10000; // Flow timeout period (milliseconds)
+  const unsigned long bubbleDetectionPeriod = 11000; // Time to wait for continuous bubbles before timeout (5 seconds)
+
+  BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
+
+  static unsigned long bubbleStartTime[4] = {0, 0, 0, 0}; // Time when bubbles were first detected for each valve
 
   for (int i = 0; i < 4; i++)
   {
@@ -562,6 +567,27 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response)
 
       float currentFlowValue = getFlowSensorValue(i);
 
+      // Check if bubble sensor indicates an empty line (bubble detected)
+      if (!bubbleSensors[i]->isLiquidDetected())
+      {
+        // Start or continue counting the time bubbles are detected
+        if (bubbleStartTime[i] == 0)
+        {
+          bubbleStartTime[i] = currentTime;
+        }
+        else if (currentTime - bubbleStartTime[i] >= bubbleDetectionPeriod)
+        {
+          handleTimeoutCondition(i + 1, response); // Close valves and stop dispensing
+          bubbleStartTime[i] = 0;                  // Reset the bubble start time after timeout
+          continue;
+        }
+      }
+      else
+      {
+        // Reset the bubble detection if liquid is detected
+        bubbleStartTime[i] = 0;
+      }
+
       if (currentFlowValue < 0)
       {
         response->print("Invalid flow reading for valve ");
@@ -570,6 +596,7 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response)
         continue;
       }
 
+      // Check if the flow is improving or stable
       if (valveStates[i].targetVolume > 0 && currentFlowValue >= valveStates[i].targetVolume)
       {
         response->print("Target volume reached for valve ");
@@ -580,9 +607,9 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response)
 
       if (currentFlowValue == valveStates[i].lastFlowValue)
       {
-        if (currentTime - valveStates[i].lastFlowChangeTime >= flowTimeoutPeriod)
+        if (currentTime - valveStates[i].lastFlowChangeTime >= flowTimeoutPeriod && bubbleStartTime[i] != 0)
         {
-          response->print("Timeout occurred for valve ");
+          response->print("Timeout occurred: Reagent bottle may be empty for valve ");
           response->println(i + 1);
           handleTimeoutCondition(i + 1, response);
         }
