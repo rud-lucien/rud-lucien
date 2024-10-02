@@ -185,6 +185,7 @@ void monitorFillSensors(unsigned long currentTime, Stream *response);
 float getFlowSensorValue(int valveIndex);
 void checkModbusConnection(unsigned long currentTime);
 void logSystemState(unsigned long currentTime);
+void resetFlowSensor(int sensorIndex, FDXSensor *flowSensors[]);
 
 // ======================[Valve Control Functions]=================================
 // Helper functions to open and close reagent and media valves
@@ -317,9 +318,6 @@ void log()
          // System State (1 = Idle, 2 = Dispensing, 3 = Fill Mode)
          systemState,
          
-         // modbusConnected (1 if connected, 0 if not)
-         modbus.isConnected() ? 1 : 0,
-
          // Reagent Valve States: RV1-RV4 (0 for Closed, 1 for Open)
          reagentValve1.isValveOpen() ? 1 : 0,
          reagentValve2.isValveOpen() ? 1 : 0,
@@ -476,17 +474,14 @@ void handleTCPCommands() {
     String tcpCommand = tcpServer.handleClient();  // Get the command from the TCP server
 
     if (tcpCommand.length() > 0) {
-        // Convert the String to a char array for compatibility with commander.execute()
-        char commandBuffer[64];  // Increase the buffer size to accommodate longer commands
+       
+        char commandBuffer[64];  
         tcpCommand.toCharArray(commandBuffer, sizeof(commandBuffer));
 
-        // Send a message that the command was received
         tcpServer.getClient().println("Command received: " + tcpCommand);
 
-        // Execute the command using Commander and send the response back to the TCP client
         commander.execute(commandBuffer, &tcpServer.getClient());
 
-        // Ensure that after command execution, any errors or messages are sent back
         tcpServer.getClient().println("Command processed.");
 
     }
@@ -498,7 +493,6 @@ void monitorOverflowSensors(unsigned long currentTime, Stream *response)
 {
   static unsigned long previousOverflowCheckTime = 0;
 
-  // Array of overflow sensors
   OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
 
   if (currentTime - previousOverflowCheckTime >= 25)
@@ -620,6 +614,24 @@ void logSystemState(unsigned long currentTime)
     previousLogTime = currentTime;
   }
 }
+
+// Helper function for resetting flow sensors
+void resetFlowSensor(int sensorIndex, FDXSensor *flowSensors[]) {
+    // Disable fill mode for the specific trough
+    fillMode[sensorIndex] = false;
+
+    // Set the reset flags and start the reset process
+    resetInProgress[sensorIndex] = true;
+    resetStartTime[sensorIndex] = millis();
+    flowSensors[sensorIndex]->startResetFlow();
+
+    // Allow sensor to stabilize
+    delay(100);
+
+    // Mark the reset as complete
+    resetInProgress[sensorIndex] = false;
+}
+
 
 // ======================[Command Functions for Valve Control]====================
 
@@ -872,13 +884,12 @@ void cmd_set_pressure_valve(char *args, Stream *response)
 // Command to reset flow sensor (resetFS <sensor number> or resetFS all)
 void cmd_reset_flow_sensor(char *args, Stream *response)
 {
-  // Check if Modbus is connected
+
   if (!modbus.isConnected()) {
       response->println("Error: Modbus not connected. Cannot process reset command.");
       return;
   }
   
-  // Array of flow sensors
   FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
 
   if (strcmp(args, "all") == 0)
@@ -886,11 +897,9 @@ void cmd_reset_flow_sensor(char *args, Stream *response)
     // Reset all flow sensors using a loop
     for (int i = 0; i < 4; i++)
     {
-      resetInProgress[i] = true;   // Set the reset flag
-      resetStartTime[i] = millis();
-      flowSensors[i]->startResetFlow();
-      delay(100);                  // Allow sensor to stabilize
-      resetInProgress[i] = false;  // Reset complete
+      valveStates[i].manualControl = true; // Set manual control flag
+      resetFlowSensor(i, flowSensors);
+
     }
     response->println("All flow sensors reset initiated.");
   }
@@ -899,12 +908,8 @@ void cmd_reset_flow_sensor(char *args, Stream *response)
     int sensorNumber;
     if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= 4)
     {
-      // Reset the specific flow sensor
-      resetInProgress[sensorNumber - 1] = true;   // Set the reset flag
-      resetStartTime[sensorNumber - 1] = millis();
-      flowSensors[sensorNumber - 1]->startResetFlow();
-      delay(100);                                 // Allow sensor to stabilize
-      resetInProgress[sensorNumber - 1] = false;  // Reset complete
+      valveStates[sensorNumber - 1].manualControl = true;
+      resetFlowSensor(sensorNumber - 1, flowSensors); 
 
       response->print("Flow sensor ");
       response->print(sensorNumber);
@@ -1077,11 +1082,7 @@ void cmd_dispense_reagent(char *args, Stream *response)
     // Reset flow sensor for the specific valve using a loop
     FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
 
-    resetInProgress[valveNumber - 1] = true;
-    resetStartTime[valveNumber - 1] = millis();
-    flowSensors[valveNumber - 1]->startResetFlow();
-    delay(100);  
-
+    resetFlowSensor(valveNumber - 1, flowSensors);  
     response->print("Flow sensor reset initiated for reagent ");
     response->println(valveNumber);
 
@@ -1115,8 +1116,7 @@ void cmd_stop_dispense(char *args, Stream *response)
     // Reset all flow sensors using a loop
     for (int i = 0; i < 4; i++)
     {
-      flowSensors[i]->startResetFlow();
-      delay(100);
+      resetFlowSensor(i, flowSensors);
     }
 
     response->println("All valves and flow sensors reset.");
@@ -1135,9 +1135,8 @@ void cmd_stop_dispense(char *args, Stream *response)
       closeValves(valveNumber, response); // Close reagent and media valves
 
       // Reset the flow sensor for the specific valve
-      flowSensors[valveNumber - 1]->startResetFlow();
-      delay(100);
-
+      resetFlowSensor(valveNumber - 1, flowSensors);
+      
       isDispensing[valveNumber - 1] = false;
       dispensingValveNumber[valveNumber - 1] = -1;
     }
@@ -1161,8 +1160,7 @@ void handleOverflowCondition(int triggeredValveNumber, Stream *response)
 
     // Reset the flow sensor for the specific valve using an array
     FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
-    flowSensors[triggeredValveNumber - 1]->startResetFlow();
-    delay(100);
+    resetFlowSensor(triggeredValveNumber - 1, flowSensors);
 
     // Reset the timeout mechanism for this valve
     valveStates[triggeredValveNumber - 1].lastFlowCheckTime = 0;  // Reset the flow check timer
@@ -1233,8 +1231,7 @@ void handleTimeoutCondition(int triggeredValveNumber, Stream *response)
 
   // Reset the flow sensor for the specific valve using an array
   FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
-  flowSensors[triggeredValveNumber - 1]->startResetFlow();
-  delay(100);
+  resetFlowSensor(triggeredValveNumber - 1, flowSensors);
 
 
   // Reset the valve state
@@ -1290,12 +1287,7 @@ void monitorFillSensors(unsigned long currentTime, Stream *response)
         response->println(" closed, stopping dispensing.");
 
         // Reset the flow sensor when dispensing stops
-        resetInProgress[i] = true;                // Mark reset as in progress
-        resetStartTime[i] = millis();             // Capture reset start time
-        flowSensors[i]->startResetFlow();         // Reset flow sensor
-        response->print("Flow sensor reset initiated for valve ");
-        response->println(i + 1);
-        delay(100);                               // Add a small delay between each valve
+        resetFlowSensor(i, flowSensors);
 
         // Reset tracking for the next fill
         fillStartTime[i] = 0;  // Reset fill start time for the next cycle
@@ -1436,12 +1428,7 @@ void cmd_fill_reagent(char *args, Stream *response)
       mediaValves[i]->openValve();
 
       // Reset the flow sensor after the valves have been opened
-      resetInProgress[i] = true;
-      resetStartTime[i] = millis();
-      flowSensors[i]->startResetFlow(); // Reset flow sensor
-      // response->print("Flow sensor reset initiated for valve ");
-      response->println(i + 1);
-      delay(100); // Add a small delay between each valve
+      resetFlowSensor(i, flowSensors);
 
       fillMode[i] = true; // Enable fill mode for this valve
                           // response->print("Filling started for valve ");
@@ -1464,16 +1451,11 @@ void cmd_fill_reagent(char *args, Stream *response)
       mediaValves[valveNumber - 1]->openValve();
 
       // Reset the flow sensor after the valves have been opened
-      resetInProgress[valveNumber - 1] = true;
-      resetStartTime[valveNumber - 1] = millis();
-      flowSensors[valveNumber - 1]->startResetFlow(); // Reset flow sensor
-      // response->print("Flow sensor reset initiated for valve ");
-      // response->println(valveNumber);
-      delay(100); // Add a small delay between each valve
+       resetFlowSensor(valveNumber - 1, flowSensors);
 
       fillMode[valveNumber - 1] = true; // Enable fill mode for this valve
-                                        // response->print("Filling started for valve ");
-                                        // response->println(valveNumber);
+      // response->print("Filling started for valve ");
+      // response->println(valveNumber);
     }
     else
     {
@@ -1519,12 +1501,13 @@ void cmd_stop_fill_reagent(char *args, Stream *response)
   }
 }
 
+// Command to print help information
 void cmd_print_help(char *args, Stream *response)
 {
-    // Print the help information to the specified stream (Serial, TCP, etc.)
     commander.printHelp(response);
 }
 
+// Command to get the system state
 void cmd_get_system_state(char *args, Stream *response)
 {
     int systemState = 1;  // Default state is Idle (1)
