@@ -26,6 +26,9 @@ public:
 
     // Read Modbus registers for a given address and quantity
     bool readRegisters(int registerAddress, int registerQuantity, uint32_t &result);
+
+    // Getter to access the Modbus server IP
+    IPAddress getServerAddress() const;  // Add this line to the header
 };
 
 #endif

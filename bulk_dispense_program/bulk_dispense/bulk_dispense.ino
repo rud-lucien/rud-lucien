@@ -20,6 +20,9 @@
 #define REAGENT_VALVE_3_PIN CONTROLLINO_R2
 #define REAGENT_VALVE_4_PIN CONTROLLINO_R3
 
+// Modbus reset pin
+#define MODBUS_RESET_PIN CONTROLLINO_R6
+
 // Waste Valves
 #define WASTE_VALVE_1_PIN CONTROLLINO_R4
 #define WASTE_VALVE_2_PIN CONTROLLINO_R5
@@ -162,6 +165,8 @@ void cmd_fill_reagent(char *args, Stream *response);
 void cmd_stop_fill_reagent(char *args, Stream *response);
 void cmd_print_help(char *args, Stream *response);
 void cmd_get_system_state(char *args, Stream *response);
+void cmd_modbus_reset(char *args, Stream *response);
+void cmd_device_info(char *args, Stream *response);
 
 // ======================[Overflow and Timeout Handling]===========================
 // Functions to handle overflow and timeout conditions
@@ -209,7 +214,9 @@ Commander::API_t API_tree[] = {
     apiElement("fillR", "Fill reagent trough: fillR <1-4 or all> (initiates filling for a trough or all troughs)", cmd_fill_reagent),
     apiElement("stopF", "Stop filling reagent trough: stopF <1-4 or all> (stops filling for a trough or all)", cmd_stop_fill_reagent),
     apiElement("help", "Print available commands and usage: help", cmd_print_help),
-    apiElement("state", "Get system state: state", cmd_get_system_state)
+    apiElement("state", "Get system state: state", cmd_get_system_state),
+    apiElement("modbusReset", "Reset Modbus device: modbusReset", cmd_modbus_reset),
+    apiElement("deviceInfo", "Print device information (IP, TCP, Modbus).", cmd_device_info)
     };
 
 // ======================[Setup and Loop]==========================================
@@ -218,25 +225,36 @@ void setup()
 {
   Serial.begin(115200); // Start serial communication
 
-   // Initialize Ethernet and print the IP address (called only once)
-    Ethernet.begin(mac, ip);
-    Serial.print("IP Address: ");
-    Serial.println(Ethernet.localIP());
+  pinMode(MODBUS_RESET_PIN, OUTPUT);    // Set Modbus reset pin as output
+  digitalWrite(MODBUS_RESET_PIN, HIGH); // Apply 24V to Modbus reset pin
+  delay(5000);                          // Wait for Modbus to initialize
 
-    delay(1000);  // Allow some time for Ethernet initialization
-    
-    // Start the TCP server
-    tcpServer.begin();
-    Serial.println("TCP server initialized.");
+  // Initialize Ethernet and print the IP address (called only once)
+  Ethernet.begin(mac, ip);
+  Serial.print("Device Ethernet IP Address: ");
+  Serial.println(Ethernet.localIP());
 
-    delay(500);  // Add a small delay to ensure the TCP server is ready
+  delay(1000); // Allow some time for Ethernet initialization
 
-    // Initialize Modbus connection (without Ethernet.begin)
-    modbus.checkConnection();
-    Serial.println("Modbus connection initialized.");
+  // Start the TCP server
+  tcpServer.begin();
+  Serial.println("TCP server initialized.");
+  Serial.print("TCP/IP Address: ");
+  Serial.println(ip);  
+  Serial.print("TCP/IP Port: ");
+  Serial.println(8080);  
 
-    delay(500);  // Add a small delay after Modbus connection check
+  delay(500); // Add a small delay to ensure the TCP server is ready
 
+  // Initialize Modbus connection (without Ethernet.begin)
+  modbus.checkConnection();
+  Serial.println("Modbus connection initialized.");
+  Serial.print("Modbus Server Address: ");
+  Serial.println(modbus.getServerAddress());  
+  Serial.print("Modbus Port: ");
+  Serial.println(502);  // Default Modbus TCP port
+
+  delay(500); // Add a small delay after Modbus connection check
 
   // Initialize valve states
   for (int i = 0; i < 4; i++)
@@ -1555,4 +1573,65 @@ void cmd_get_system_state(char *args, Stream *response)
     } else if (systemState == 4) {
         response->println("System State: Error - Modbus Disconnected");
     }
+}
+
+// Command to reset the Modbus connection
+void cmd_modbus_reset(char *args, Stream *response)
+{
+  // Log the start of the reset process
+  response->println("Starting Modbus reset...");
+
+  // Turn off the relay (cut power to the NQ-EP4L)
+  digitalWrite(MODBUS_RESET_PIN, LOW);
+  response->println("Power to Modbus device turned off.");
+
+  delay(2000);
+
+  // Turn the relay back on (restore power to the NQ-EP4L)
+  digitalWrite(MODBUS_RESET_PIN, HIGH);
+  response->println("Power to Modbus device restored.");
+
+  delay(5000);
+
+  modbus.checkConnection();
+
+  // Report the Modbus connection status
+  if (modbus.isConnected())
+  {
+    response->println("Modbus connection re-established successfully.");
+  }
+  else
+  {
+    response->println("Error: Modbus connection could not be re-established.");
+  }
+}
+
+// Command to provide device IP, TCP/IP, and Modbus info (Serial only)
+void cmd_device_info(char *args, Stream *response)
+{
+  // Check if the command is coming from Serial (local access only)
+  if (response == &Serial)
+  {
+    response->println("---- Device Information (Serial Only) ----");
+
+    IPAddress deviceIP = Ethernet.localIP();
+    response->print("Device IP Address: ");
+    response->println(deviceIP);
+
+    response->print("TCP Server IP: ");
+    response->println(ip);
+    response->print("TCP Server Port: ");
+    response->println(8080);
+
+    response->print("Modbus Server Address: ");
+    response->println(modbus.getServerAddress());
+    response->print("Modbus Port: ");
+    response->println(502);
+
+    response->println("----------------------------------------");
+  }
+  else
+  {
+    response->println("Error: Device information can only be accessed via Serial.");
+  }
 }

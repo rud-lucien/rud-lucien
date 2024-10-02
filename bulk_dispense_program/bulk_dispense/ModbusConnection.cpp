@@ -39,3 +39,9 @@ bool ModbusConnection::readRegisters(int registerAddress, int registerQuantity, 
     Serial.println("Failed to read from Modbus server!");
     return false;
 }
+
+// Getter to return the Modbus server IP address
+IPAddress ModbusConnection::getServerAddress() const {
+    return server;
+}
+
