@@ -164,6 +164,7 @@ void cmd_print_help(char *args, Stream *response);
 void cmd_get_system_state(char *args, Stream *response);
 void cmd_modbus_reset(char *args, Stream *response);
 void cmd_device_info(char *args, Stream *response);
+void cmd_prime_valves(char *args, Stream *response);
 
 // ======================[Overflow and Timeout Handling]===========================
 // Functions to handle overflow and timeout conditions
@@ -213,7 +214,9 @@ Commander::API_t API_tree[] = {
     apiElement("help", "Print available commands and usage: help", cmd_print_help),
     apiElement("state", "Get system state: state", cmd_get_system_state),
     apiElement("modbusReset", "Reset Modbus device: modbusReset", cmd_modbus_reset),
-    apiElement("deviceInfo", "Print device information (IP, TCP, Modbus).", cmd_device_info)};
+    apiElement("deviceInfo", "Print device information (IP, TCP, Modbus).", cmd_device_info),
+    apiElement("prime", "Prime valves until bubble sensor detects liquid: prime <1-4> or prime all", cmd_prime_valves),
+};
 
 // ======================[Setup and Loop]==========================================
 
@@ -256,6 +259,7 @@ void setup()
   for (int i = 0; i < 4; i++)
   {
     valveStates[i].isDispensing = false;
+    valveStates[i].manualControl = false;
     valveStates[i].targetVolume = -1;
     valveStates[i].lastFlowValue = -1;
     valveStates[i].lastFlowCheckTime = 0;
@@ -542,91 +546,95 @@ void monitorOverflowSensors(unsigned long currentTime, Stream *response)
 // Function to monitor flow sensors for each valve
 void monitorFlowSensors(unsigned long currentTime, Stream *response)
 {
-  const unsigned long resetDuration = 5;
-  const unsigned long flowTimeoutPeriod = 10000; // Flow timeout period (milliseconds)
-  const unsigned long bubbleDetectionPeriod = 5000; // Time to wait for continuous bubbles before timeout (5 seconds)
+    const unsigned long resetDuration = 5;
+    const unsigned long flowTimeoutPeriod = 10000; // Flow timeout period (milliseconds)
+    const unsigned long bubbleDetectionPeriod = 5000; // Time to wait for continuous bubbles before timeout
 
-  BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
+    BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
+    static unsigned long bubbleStartTime[4] = {0, 0, 0, 0}; // Time when bubbles were first detected for each valve
 
-  static unsigned long bubbleStartTime[4] = {0, 0, 0, 0}; // Time when bubbles were first detected for each valve
-
-  for (int i = 0; i < 4; i++)
-  {
-    if (valveStates[i].isDispensing && currentTime - valveStates[i].lastFlowCheckTime >= 25)
+    for (int i = 0; i < 4; i++)
     {
-      valveStates[i].lastFlowCheckTime = currentTime;
-
-      // Skip timeout check if the valve is manually controlled
-      if (valveStates[i].manualControl)
-      {
-        continue;
-      }
-
-      // Skip flow check for a brief period after reset to allow valid readings
-      if (resetInProgress[i] && currentTime - resetStartTime[i] < resetDuration + 50)
-      {
-        // Give the sensor some additional time after reset (e.g., 50ms buffer)
-        continue;
-      }
-
-      float currentFlowValue = getFlowSensorValue(i);
-
-      // Check if bubble sensor indicates an empty line (bubble detected)
-      if (!bubbleSensors[i]->isLiquidDetected())
-      {
-        // Start or continue counting the time bubbles are detected
-        if (bubbleStartTime[i] == 0)
+        if (valveStates[i].isDispensing && currentTime - valveStates[i].lastFlowCheckTime >= 25)
         {
-          bubbleStartTime[i] = currentTime;
-        }
-        else if (currentTime - bubbleStartTime[i] >= bubbleDetectionPeriod)
-        {
-          handleTimeoutCondition(i + 1, response); // Close valves and stop dispensing
-          bubbleStartTime[i] = 0;                  // Reset the bubble start time after timeout
-          continue;
-        }
-      }
-      else
-      {
-        // Reset the bubble detection if liquid is detected
-        bubbleStartTime[i] = 0;
-      }
+            valveStates[i].lastFlowCheckTime = currentTime;
 
-      if (currentFlowValue < 0)
-      {
-        response->print("Invalid flow reading for valve ");
-        response->println(i + 1);
-        handleTimeoutCondition(i + 1, response);
-        continue;
-      }
+            // Skip timeout check if the valve is manually controlled
+            if (valveStates[i].manualControl)
+            {
+                continue;
+            }
 
-      // Check if the flow is improving or stable
-      if (valveStates[i].targetVolume > 0 && currentFlowValue >= valveStates[i].targetVolume)
-      {
-        response->print("Target volume reached for valve ");
-        response->println(i + 1);
-        handleTimeoutCondition(i + 1, response); // Close valves and stop dispensing
-        continue;
-      }
+            // Skip flow check for a brief period after reset to allow valid readings
+            if (resetInProgress[i] && currentTime - resetStartTime[i] < resetDuration + 50)
+            {
+                // Give the sensor some additional time after reset (e.g., 50ms buffer)
+                continue;
+            }
 
-      if (currentFlowValue == valveStates[i].lastFlowValue)
-      {
-        if ((currentTime - valveStates[i].lastFlowChangeTime >= flowTimeoutPeriod) || (bubbleStartTime[i] != 0 && currentTime - bubbleStartTime[i] >= bubbleDetectionPeriod))
-        {
-          fillMode[i] = false;
-          response->print("Timeout occurred: Reagent bottle may be empty for valve ");
-          response->println(i + 1);
-          handleTimeoutCondition(i + 1, response);
+            float currentFlowValue = getFlowSensorValue(i);
+
+            // Check if bubble sensor indicates an empty line (bubble detected)
+            if (!bubbleSensors[i]->isLiquidDetected())
+            {
+                // Start or continue counting the time bubbles are detected
+                if (bubbleStartTime[i] == 0)
+                {
+                    bubbleStartTime[i] = currentTime;
+                }
+                else if (currentTime - bubbleStartTime[i] >= bubbleDetectionPeriod)
+                {
+                    fillMode[i] = false;
+                    response->print("Timeout occurred: Continuous air detected for valve ");
+                    response->println(i + 1);
+                    handleTimeoutCondition(i + 1, response); // Close valves and stop dispensing
+                    bubbleStartTime[i] = 0;                  // Reset the bubble start time after timeout
+                    continue;
+                }
+            }
+            else
+            {
+                // Reset the bubble detection if liquid is detected
+                bubbleStartTime[i] = 0;
+            }
+
+            if (currentFlowValue < 0)
+            {
+                response->print("Invalid flow reading for valve ");
+                response->println(i + 1);
+                handleTimeoutCondition(i + 1, response);
+                continue;
+            }
+
+            // Check if the flow is improving or stable
+            if (valveStates[i].targetVolume > 0 && currentFlowValue >= valveStates[i].targetVolume)
+            {
+                response->print("Target volume reached for valve ");
+                response->println(i + 1);
+                handleTimeoutCondition(i + 1, response); // Close valves and stop dispensing
+                continue;
+            }
+
+            // Trigger a flow timeout if the flow hasn’t changed for flowTimeoutPeriod
+            if (currentFlowValue == valveStates[i].lastFlowValue)
+            {
+                if (currentTime - valveStates[i].lastFlowChangeTime >= flowTimeoutPeriod)
+                {
+                    fillMode[i] = false;
+                    response->print("Timeout occurred: No flow detected for valve ");
+                    response->println(i + 1);
+                    handleTimeoutCondition(i + 1, response);
+                }
+            }
+            else
+            {
+                valveStates[i].lastFlowValue = currentFlowValue;
+                valveStates[i].lastFlowChangeTime = currentTime;
+            }
         }
-      }
-      else
-      {
-        valveStates[i].lastFlowValue = currentFlowValue;
-        valveStates[i].lastFlowChangeTime = currentTime;
-      }
     }
-  }
 }
+
 
 // Function to get the flow sensor value for a specific valve
 float getFlowSensorValue(int valveIndex)
@@ -1277,9 +1285,7 @@ void openValves(int valveNumber, Stream *response)
 void handleTimeoutCondition(int triggeredValveNumber, Stream *response)
 {
   closeValves(triggeredValveNumber, &Serial);
-  response->print("Warning: Timeout occurred: Valves closed for valve  ");
-  response->println(triggeredValveNumber);
-
+  
   // Reset the flow sensor for the specific valve using an array
   FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
   flowSensors[triggeredValveNumber - 1]->startResetFlow();
@@ -1685,3 +1691,114 @@ void cmd_device_info(char *args, Stream *response)
     response->println("Error: Device information can only be accessed via Serial.");
   }
 }
+
+// Command to prime valves (prime <valve number> or prime all)
+void cmd_prime_valves(char *args, Stream *response)
+{
+    // Check if Modbus is connected
+    if (!modbus.isConnected()) {
+        response->println("Error: Modbus not connected. Cannot process prime command.");
+        return;
+    }
+
+    const float PRESSURE_THRESHOLD_PSI = 15.0;
+    const unsigned long PRESSURE_TIMEOUT_MS = 500;
+
+    // Check and set the pressure using the helper function
+    if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
+    {
+        return; // If pressure check fails, abort the prime operation
+    }
+
+    String inputString = String(args);
+    inputString.trim();
+
+    // Arrays for reagent, media valves, and bubble sensors
+    SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+    SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
+    BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
+
+    if (inputString.equalsIgnoreCase("all"))
+    {
+        // Prime all valves
+        for (int i = 0; i < 4; i++)
+        {
+            // Check if the line is already primed (bubble sensor detects liquid)
+            if (bubbleSensors[i]->isLiquidDetected())
+            {
+                response->print("Valve ");
+                response->print(i + 1);
+                response->println(" already primed.");
+                continue;  // Skip to the next valve
+            }
+
+            // Disable fill mode and enable manual control
+            fillMode[i] = false;
+            valveStates[i].manualControl = true;
+
+            reagentValves[i]->openValve();
+            mediaValves[i]->openValve();
+
+            // Wait until the bubble sensor detects liquid (line primed)
+            while (!bubbleSensors[i]->isLiquidDetected())
+            {
+                delay(100);  // Small delay for sensor reading
+            }
+
+            // Once liquid is detected, close the valves and reset manual control
+            reagentValves[i]->closeValve();
+            mediaValves[i]->closeValve();
+            valveStates[i].manualControl = false;  // Reset manual control after priming
+
+            response->print("Valve ");
+            response->print(i + 1);
+            response->println(" primed.");
+        }
+
+        response->println("All valves primed.");
+    }
+    else
+    {
+        int valveNumber = inputString.toInt();
+
+        if (valveNumber >= 1 && valveNumber <= 4)
+        {
+            // Check if the line is already primed
+            if (bubbleSensors[valveNumber - 1]->isLiquidDetected())
+            {
+                response->print("Valve ");
+                response->print(valveNumber);
+                response->println(" already primed.");
+                return;  // No need to prime this valve
+            }
+
+            // Disable fill mode and enable manual control
+            fillMode[valveNumber - 1] = false;
+            valveStates[valveNumber - 1].manualControl = true;
+
+            // Open the reagent and media valves for priming
+            reagentValves[valveNumber - 1]->openValve();
+            mediaValves[valveNumber - 1]->openValve();
+
+            // Wait until the bubble sensor detects liquid (line primed)
+            while (!bubbleSensors[valveNumber - 1]->isLiquidDetected())
+            {
+                delay(100);  // Small delay for sensor reading
+            }
+
+            // Once liquid is detected, close the valves and reset manual control
+            reagentValves[valveNumber - 1]->closeValve();
+            mediaValves[valveNumber - 1]->closeValve();
+            valveStates[valveNumber - 1].manualControl = false;  // Reset manual control after priming
+
+            response->print("Valve ");
+            response->print(valveNumber);
+            response->println(" primed.");
+        }
+        else
+        {
+            response->println("Error: Invalid valve number. Use 1-4 or 'all'.");
+        }
+    }
+}
+
