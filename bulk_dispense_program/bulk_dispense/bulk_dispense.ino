@@ -1148,6 +1148,10 @@ void cmd_dispense_reagent(char *args, Stream *response)
     // Track the dispensing state for the valve
     valveStates[valveNumber - 1].isDispensing = true;
     isDispensing[valveNumber - 1] = true; // Set isDispensing flag
+
+    // After dispensing is done, send a response back
+    response->print("Dispensing complete for valve ");
+    response->println(valveNumber);
   }
   else
   {
@@ -1703,6 +1707,7 @@ void cmd_prime_valves(char *args, Stream *response)
 
     const float PRESSURE_THRESHOLD_PSI = 15.0;
     const unsigned long PRESSURE_TIMEOUT_MS = 500;
+    const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000; // Prime for 2 additional seconds after detecting liquid
 
     // Check and set the pressure using the helper function
     if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
@@ -1745,7 +1750,14 @@ void cmd_prime_valves(char *args, Stream *response)
                 delay(100);  // Small delay for sensor reading
             }
 
-            // Once liquid is detected, close the valves and reset manual control
+            // Once liquid is detected, continue priming for the additional X seconds
+            unsigned long additionalPrimeStartTime = millis();
+            while (millis() - additionalPrimeStartTime < ADDITIONAL_PRIME_TIME_MS)
+            {
+                delay(100);  // Small delay to keep valves open for additional time
+            }
+
+            // Close the valves and reset manual control after priming
             reagentValves[i]->closeValve();
             mediaValves[i]->closeValve();
             valveStates[i].manualControl = false;  // Reset manual control after priming
@@ -1786,14 +1798,20 @@ void cmd_prime_valves(char *args, Stream *response)
                 delay(100);  // Small delay for sensor reading
             }
 
-            // Once liquid is detected, close the valves and reset manual control
+            // Once liquid is detected, continue priming for the additional X seconds
+            unsigned long additionalPrimeStartTime = millis();
+            while (millis() - additionalPrimeStartTime < ADDITIONAL_PRIME_TIME_MS)
+            {
+                delay(100);  // Small delay to keep valves open for additional time
+            }
+
+            // Close the valves and reset manual control after priming
             reagentValves[valveNumber - 1]->closeValve();
             mediaValves[valveNumber - 1]->closeValve();
             valveStates[valveNumber - 1].manualControl = false;  // Reset manual control after priming
 
-            response->print("Valve ");
-            response->print(valveNumber);
-            response->println(" primed.");
+            response->print("Priming complete for valve ");
+            response->println(valveNumber);
         }
         else
         {
@@ -1801,4 +1819,5 @@ void cmd_prime_valves(char *args, Stream *response)
         }
     }
 }
+
 
