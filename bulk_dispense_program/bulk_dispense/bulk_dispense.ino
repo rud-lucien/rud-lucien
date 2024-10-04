@@ -78,11 +78,13 @@ char valveArg[10];                                   // Stores command arguments
 int valveNumber = -1;                                 // Tracks which valve number is being used
 int state = 0;                                       // Tracks the state of the valve (open/closed)
 bool isDispensing[4] = {false, false, false, false}; // Tracks whether each valve is dispensing
+bool isPriming[4] = {false, false, false, false}; // Tracks whether each valve is priming
 int dispensingValveNumber[4] = {-1, -1, -1, -1};     // Tracks the current dispensing valve number (-1 if none)
 float targetVolume[4] = {-1, -1, -1, -1};            // Stores target volume for each valve
 
 bool fillMode[4] = {false, false, false, false}; // Tracks if each trough is in fill mode
 unsigned long fillCheckTime[4] = {0, 0, 0, 0};   // Time to track periodic checks
+
 
 // ======================[Valve State Tracking]====================================
 // Structure for tracking state of each valve (flow, volume, dispensing)
@@ -90,6 +92,7 @@ struct ValveState
 {
   bool isDispensing;                // Whether the valve is currently dispensing
   bool manualControl;               // Whether the valve is under manual control
+  bool isPriming;                   // Whether the valve is currently priming
   float targetVolume;               // Target volume for the valve
   float lastFlowValue;              // Last flow sensor reading for the valve
   unsigned long lastFlowCheckTime;  // Last time flow was checked
@@ -189,6 +192,7 @@ float getFlowSensorValue(int valveIndex);
 void checkModbusConnection(unsigned long currentTime);
 void logSystemState(unsigned long currentTime);
 void resetFlowSensor(int sensorIndex, FDXSensor *flowSensors[]);
+void monitorPrimeSensors(unsigned long currentTime, Stream *response);
 
 // ======================[Valve Control Functions]=================================
 // Helper functions to open and close reagent and media valves
@@ -260,6 +264,7 @@ void setup()
   {
     valveStates[i].isDispensing = false;
     valveStates[i].manualControl = false;
+    valveStates[i].isPriming = false;
     valveStates[i].targetVolume = -1;
     valveStates[i].lastFlowValue = -1;
     valveStates[i].lastFlowCheckTime = 0;
@@ -290,6 +295,7 @@ void loop()
   monitorOverflowSensors(currentTime, &Serial);            // Check for overflow sensors
   monitorFlowSensors(currentTime, &Serial);                // Check flow sensor values
   monitorFillSensors(currentTime, &Serial);                // Monitor filling process
+  monitorPrimeSensors(currentTime, &Serial);               // Monitor priming process
   checkModbusConnection(currentTime);                      // Check Modbus connection
   logSystemState(currentTime);                             // Log the system state
 }
@@ -1696,6 +1702,40 @@ void cmd_device_info(char *args, Stream *response)
   }
 }
 
+// New function to monitor the priming process in the main loop
+void monitorPrimeSensors(unsigned long currentTime, Stream *response)
+{
+    const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000;
+    static unsigned long additionalPrimeStartTime[4] = {0, 0, 0, 0};  // Time to track additional priming after liquid detected
+
+    BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
+    SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
+    SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
+
+    for (int i = 0; i < 4; i++) {
+        if (valveStates[i].isPriming) {
+            // If liquid is detected, start additional priming timer
+            if (bubbleSensors[i]->isLiquidDetected() && additionalPrimeStartTime[i] == 0) {
+                additionalPrimeStartTime[i] = currentTime;
+                response->print("Liquid detected for valve ");
+                response->println(i + 1);
+            }
+
+            // Stop priming once additional time has passed
+            if (additionalPrimeStartTime[i] != 0 && currentTime - additionalPrimeStartTime[i] >= ADDITIONAL_PRIME_TIME_MS) {
+                reagentValves[i]->closeValve();
+                mediaValves[i]->closeValve();
+                valveStates[i].manualControl = false;
+                valveStates[i].isPriming = false;  // Mark priming as complete
+                response->print("Priming complete for valve ");
+                response->println(i + 1);
+                additionalPrimeStartTime[i] = 0;  // Reset the timer
+            }
+        }
+    }
+}
+
+
 // Command to prime valves (prime <valve number> or prime all)
 void cmd_prime_valves(char *args, Stream *response)
 {
@@ -1707,11 +1747,9 @@ void cmd_prime_valves(char *args, Stream *response)
 
     const float PRESSURE_THRESHOLD_PSI = 15.0;
     const unsigned long PRESSURE_TIMEOUT_MS = 500;
-    const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000; // Prime for 2 additional seconds after detecting liquid
 
     // Check and set the pressure using the helper function
-    if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
-    {
+    if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS)) {
         return; // If pressure check fails, abort the prime operation
     }
 
@@ -1723,101 +1761,49 @@ void cmd_prime_valves(char *args, Stream *response)
     SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
     BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
 
-    if (inputString.equalsIgnoreCase("all"))
-    {
+    // Priming state tracking (use flags to track priming progress in the main loop)
+    if (inputString.equalsIgnoreCase("all")) {
         // Prime all valves
-        for (int i = 0; i < 4; i++)
-        {
-            // Check if the line is already primed (bubble sensor detects liquid)
-            if (bubbleSensors[i]->isLiquidDetected())
-            {
+        for (int i = 0; i < 4; i++) {
+            if (!bubbleSensors[i]->isLiquidDetected()) {
+                // Start priming for valves not already primed
+                fillMode[i] = false;
+                valveStates[i].manualControl = true;
+                reagentValves[i]->openValve();
+                mediaValves[i]->openValve();
+                valveStates[i].isPriming = true;  // Set the priming flag inside the ValveState
+                response->print("Priming started for valve ");
+                response->println(i + 1);
+            } else {
                 response->print("Valve ");
                 response->print(i + 1);
                 response->println(" already primed.");
-                continue;  // Skip to the next valve
             }
-
-            // Disable fill mode and enable manual control
-            fillMode[i] = false;
-            valveStates[i].manualControl = true;
-
-            reagentValves[i]->openValve();
-            mediaValves[i]->openValve();
-
-            // Wait until the bubble sensor detects liquid (line primed)
-            while (!bubbleSensors[i]->isLiquidDetected())
-            {
-                delay(100);  // Small delay for sensor reading
-            }
-
-            // Once liquid is detected, continue priming for the additional X seconds
-            unsigned long additionalPrimeStartTime = millis();
-            while (millis() - additionalPrimeStartTime < ADDITIONAL_PRIME_TIME_MS)
-            {
-                delay(100);  // Small delay to keep valves open for additional time
-            }
-
-            // Close the valves and reset manual control after priming
-            reagentValves[i]->closeValve();
-            mediaValves[i]->closeValve();
-            valveStates[i].manualControl = false;  // Reset manual control after priming
-
-            response->print("Valve ");
-            response->print(i + 1);
-            response->println(" primed.");
         }
-
-        response->println("All valves primed.");
-    }
-    else
-    {
+    } else {
         int valveNumber = inputString.toInt();
-
-        if (valveNumber >= 1 && valveNumber <= 4)
-        {
-            // Check if the line is already primed
-            if (bubbleSensors[valveNumber - 1]->isLiquidDetected())
-            {
+        if (valveNumber >= 1 && valveNumber <= 4) {
+            if (!bubbleSensors[valveNumber - 1]->isLiquidDetected()) {
+                // Start priming for the specific valve
+                fillMode[valveNumber - 1] = false;
+                valveStates[valveNumber - 1].manualControl = true;
+                reagentValves[valveNumber - 1]->openValve();
+                mediaValves[valveNumber - 1]->openValve();
+                valveStates[valveNumber - 1].isPriming = true;  // Set the priming flag inside the ValveState
+                response->print("Priming started for valve ");
+                response->println(valveNumber);
+            } else {
                 response->print("Valve ");
                 response->print(valveNumber);
                 response->println(" already primed.");
-                return;  // No need to prime this valve
             }
-
-            // Disable fill mode and enable manual control
-            fillMode[valveNumber - 1] = false;
-            valveStates[valveNumber - 1].manualControl = true;
-
-            // Open the reagent and media valves for priming
-            reagentValves[valveNumber - 1]->openValve();
-            mediaValves[valveNumber - 1]->openValve();
-
-            // Wait until the bubble sensor detects liquid (line primed)
-            while (!bubbleSensors[valveNumber - 1]->isLiquidDetected())
-            {
-                delay(100);  // Small delay for sensor reading
-            }
-
-            // Once liquid is detected, continue priming for the additional X seconds
-            unsigned long additionalPrimeStartTime = millis();
-            while (millis() - additionalPrimeStartTime < ADDITIONAL_PRIME_TIME_MS)
-            {
-                delay(100);  // Small delay to keep valves open for additional time
-            }
-
-            // Close the valves and reset manual control after priming
-            reagentValves[valveNumber - 1]->closeValve();
-            mediaValves[valveNumber - 1]->closeValve();
-            valveStates[valveNumber - 1].manualControl = false;  // Reset manual control after priming
-
-            response->print("Priming complete for valve ");
-            response->println(valveNumber);
-        }
-        else
-        {
+        } else {
             response->println("Error: Invalid valve number. Use 1-4 or 'all'.");
         }
     }
 }
+
+
+
 
 
