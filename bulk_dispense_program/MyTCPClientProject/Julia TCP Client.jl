@@ -26,6 +26,7 @@ function receive_response(sock)
     end
 end
 
+
 function run_tcp_client(ip, port)
     # Connect to the TCP server
     sock = connect_to_tcp_server(ip, port)

@@ -13,6 +13,9 @@ private:
 public:
     // Constructor
     TCPServer(IPAddress _ip, int _port);
+    bool hasClient;
+    bool gotCommand;
+    String command;
     
     // Start the TCP server
     void begin();
