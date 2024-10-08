@@ -319,19 +319,35 @@ void setup()
 
 void loop()
 {
-  unsigned long currentTime = millis();
+    unsigned long currentTime = millis();
 
-  handleFlowSensorReset(currentTime, &Serial);  // Manage flow sensor reset
-  handleSerialCommands();                       // Handle serial input
-  handleTCPCommands();                          // Handle TCP client requests and commands
-  tcpServer.handleClient();                     // Handle incoming TCP client requests
-  monitorOverflowSensors(currentTime, &Serial); // Check for overflow sensors
-  monitorFlowSensors(currentTime, &Serial);     // Check flow sensor values
-  monitorFillSensors(currentTime, &Serial);     // Monitor filling process
-  monitorPrimeSensors(currentTime, &Serial);    // Monitor priming process
-  checkModbusConnection(currentTime);           // Check Modbus connection
-  logSystemState(currentTime);                  // Log the system state
+    // Handle serial commands if available
+    if (Serial) {
+        handleSerialCommands();
+        handleFlowSensorReset(currentTime, &Serial);  // Pass Serial stream
+        monitorOverflowSensors(currentTime, &Serial);
+        monitorFlowSensors(currentTime, &Serial);
+        monitorFillSensors(currentTime, &Serial);
+        monitorPrimeSensors(currentTime, &Serial);
+    }
+
+    // Handle TCP commands and updates
+    handleTCPCommands();
+    tcpServer.handleClient();  // Manage incoming TCP requests
+
+    if (tcpServer.getClient() && tcpServer.getClient().connected()) {
+        handleFlowSensorReset(currentTime, &tcpServer.getClient());  // Pass TCP client stream
+        monitorOverflowSensors(currentTime, &tcpServer.getClient());
+        monitorFlowSensors(currentTime, &tcpServer.getClient());
+        monitorFillSensors(currentTime, &tcpServer.getClient());
+        monitorPrimeSensors(currentTime, &tcpServer.getClient());
+    }
+
+    // Regular system updates
+    checkModbusConnection(currentTime);
+    logSystemState(currentTime); // Optionally log to Serial and/or TCP
 }
+
 
 void log()
 {
@@ -1190,10 +1206,6 @@ void cmd_set_waste_valve(char *args, Stream *response)
 
       // Track the dispensing state for the valve
       valveControls[localValveNumber - 1].isDispensing = true;
-
-      // After dispensing is done, send a response back
-      response->print(F("Dispensing complete for valve "));
-      response->println(localValveNumber);
     }
     else
     {

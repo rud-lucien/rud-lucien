@@ -17,7 +17,7 @@ public:
     // Start the TCP server
     void begin();
 
-    EthernetClient getClient();
+    EthernetClient& getClient();
 
 
     // Handle incoming client connections and return received commands

@@ -11,9 +11,10 @@ void TCPServer::begin() {
     Serial.println(Ethernet.localIP());
 }
 
-EthernetClient TCPServer::getClient() {
-    return client;  // Return the connected client
+EthernetClient& TCPServer::getClient() {
+    return client;  // Return a reference to the connected client
 }
+
 
 // Handle incoming client connections and return received commands
 String TCPServer::handleClient() {
