@@ -199,8 +199,8 @@ void print_something(Stream *);
 
 // ======================[Overflow and Timeout Handling]===========================
 // Functions to handle overflow and timeout conditions
-void handleOverflowCondition(int triggeredValveNumber, Stream *response);
-void handleTimeoutCondition(int triggeredValveNumber, Stream *response);
+void handleOverflowCondition(int triggeredValveNumber, Stream *response, EthernetClient client);
+void handleTimeoutCondition(int triggeredValveNumber, Stream *response, EthernetClient client);
 
 // ======================[System State Logging and Utility Functions]==============
 // Functions for logging system state and printing sensor values
@@ -614,7 +614,7 @@ void monitorOverflowSensors(unsigned long currentTime, Stream *response, Etherne
       // Proceed with overflow handling for troughs not in fill mode
       if (overflowSensors[i]->loop() == 1)
       {
-        handleOverflowCondition(i + 1, response); // Handle overflow as usual for troughs not in fill mode
+        handleOverflowCondition(i + 1, response, tcpServer.getClient()); // Handle overflow as usual for troughs not in fill mode
       }
     }
   }
@@ -671,7 +671,7 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetCli
             client.print(F("Timeout occurred: Continuous air detected for valve "));
             client.println(i + 1);
           }
-          handleTimeoutCondition(i + 1, response); // Close valves and stop dispensing
+          handleTimeoutCondition(i + 1, response, tcpServer.getClient()); // Close valves and stop dispensing
           bubbleStartTime[i] = 0;                  // Reset the bubble start time after timeout
           continue;
         }
@@ -694,7 +694,7 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetCli
           client.print(F("Invalid flow reading for valve "));
           client.println(i + 1);
         }
-        handleTimeoutCondition(i + 1, response);
+        handleTimeoutCondition(i + 1, response, tcpServer.getClient());
         continue;
       }
 
@@ -711,7 +711,7 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetCli
           client.print(F("Target volume reached for valve "));
           client.println(i + 1);
         }
-        handleTimeoutCondition(i + 1, response); // Close valves and stop dispensing
+        handleTimeoutCondition(i + 1, response, tcpServer.getClient()); // Close valves and stop dispensing
         continue;
       }
 
@@ -731,7 +731,7 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetCli
             client.print(F("Timeout occurred: No flow detected for valve "));
             client.println(i + 1);
           }
-          handleTimeoutCondition(i + 1, response);
+          handleTimeoutCondition(i + 1, response, tcpServer.getClient());
         }
       }
       else
@@ -1309,7 +1309,7 @@ void cmd_stop_dispense(char *args, Stream *response)
 }
 
 // Helper function to handle overflow conditions
-void handleOverflowCondition(int triggeredValveNumber, Stream *response)
+void handleOverflowCondition(int triggeredValveNumber, Stream *response, EthernetClient client)
 {
   if (valveControls[triggeredValveNumber - 1].isDispensing) // Check if the valve is dispensing
   {
@@ -1317,9 +1317,16 @@ void handleOverflowCondition(int triggeredValveNumber, Stream *response)
     valveControls[triggeredValveNumber - 1].isDispensing = false;       // Stop the valve from dispensing
     valveControls[triggeredValveNumber - 1].dispensingValveNumber = -1; // Reset dispensing valve number
 
-    response->print(F("Overflow detected: Valves closed for valve "));
-    response->println(triggeredValveNumber);
-
+    if (Serial)
+    {
+      response->print(F("Overflow detected: Valves closed for valve "));
+      response->println(triggeredValveNumber);
+    }
+    if (client)
+    {
+      client.print(F("Overflow detected: Valves closed for valve "));
+      client.println(triggeredValveNumber);
+    }
     // Reset the flow sensor for the specific valve
     flowSensors[triggeredValveNumber - 1]->startResetFlow();
     delay(100);
@@ -1377,7 +1384,7 @@ void openValves(int valveNumber, Stream *response)
 }
 
 // Helper function to handle timeout conditions
-void handleTimeoutCondition(int triggeredValveNumber, Stream *response)
+void handleTimeoutCondition(int triggeredValveNumber, Stream *response, EthernetClient client)
 {
   closeValves(triggeredValveNumber, &Serial);
 
