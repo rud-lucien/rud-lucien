@@ -10,7 +10,7 @@
 #include "Commander-API.hpp"
 #include "Commander-IO.hpp"
 #include "TCPServer.h"
-#include "TCPStream.h"
+// #include "TCPStream.h"
 
 // ======================[Pin Assignments and Constants]==========================
 
@@ -73,7 +73,7 @@ IPAddress ip(169, 254, 0, 11);
 // Create instances of TCPServer and ModbusConnection
 TCPServer tcpServer(ip, 8080);                                // Use port 8080 for the TCP server
 ModbusConnection modbus(mac, ip, IPAddress(169, 254, 0, 10)); // Modbus server IP
-TCPStream tcpStream;
+// TCPStream tcpStream;
 // ======================[Global Command Variables]===============================
 // struct to store command variables
 struct CommandVariables
@@ -202,6 +202,9 @@ void print_something(Stream *);
 void handleOverflowCondition(int triggeredValveNumber, Stream *response, EthernetClient client);
 void handleTimeoutCondition(int triggeredValveNumber, Stream *response, EthernetClient client);
 
+// ======================[Pressure Sensor Handling]===================================
+bool checkAndSetPressure(Stream *response, EthernetClient client, float thresholdPressure, unsigned long timeout);
+
 // ======================[System State Logging and Utility Functions]==============
 // Functions for logging system state and printing sensor values
 void log();
@@ -314,7 +317,7 @@ void setup()
   commander.attachTree(API_tree);
   commander.init();
 
-  tcpStream.begin(tcpServer.getClient());
+  // tcpStream.begin(tcpServer.getClient());
 }
 
 void loop()
@@ -1107,7 +1110,7 @@ void cmd_set_log_frequency(char *args, Stream *response)
 }
 
 // ======================[Helper function for checking system pressure]===============
-bool checkAndSetPressure(Stream *response, float thresholdPressure, unsigned long timeout)
+bool checkAndSetPressure(Stream *response, EthernetClient client, float thresholdPressure, unsigned long timeout)
 {
   unsigned long pressureCheckStartTime = millis();
   float currentPressure = pressureSensor.readPressure();
@@ -1115,13 +1118,27 @@ bool checkAndSetPressure(Stream *response, float thresholdPressure, unsigned lon
   // Check if the system is already pressurized
   if (currentPressure >= thresholdPressure)
   {
-    response->println(F("System already pressurized."));
+    if (Serial)
+    {
+      response->println(F("System pressurized."));
+    }
+    if (client)
+    {
+      client.println(F("System pressurized."));
+    }
     return true;
   }
 
   // Set the pressure valve to 100%
   pressureValve.setPosition(100);
-  response->println(F("Pressure valve set to 100%."));
+  if (Serial)
+  {
+    response->println(F("Pressure valve set to 100%."));
+  }
+  if (client)
+  {
+    client.println(F("Pressure valve set to 100%."));
+  }
 
   // Wait for pressure to stabilize within the timeout
   while (millis() - pressureCheckStartTime < timeout)
@@ -1135,9 +1152,18 @@ bool checkAndSetPressure(Stream *response, float thresholdPressure, unsigned lon
   }
 
   // If pressure is not reached, log and return false
-  response->print(F("Error: Pressure threshold not reached. Current pressure: "));
-  response->print(currentPressure);
-  response->println(F(" psi. Operation aborted."));
+  if (Serial)
+  {
+    response->print(F("Error: Pressure threshold not reached. Current pressure: "));
+    response->print(currentPressure);
+    response->println(F(" psi. Operation aborted."));
+  }
+  if (client)
+  {
+    client.print(F("Error: Pressure threshold not reached. Current pressure: "));
+    client.print(currentPressure);
+    client.println(F(" psi. Operation aborted."));
+  }
   return false;
 }
 
@@ -1162,7 +1188,7 @@ void cmd_dispense_reagent(char *args, Stream *response)
   const int MAX_VOLUME = 150; // Use int instead of float
 
   // Check and set the pressure using the helper function
-  if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
+  if (!checkAndSetPressure(response, tcpServer.getClient(), PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
   {
     return; // If pressure check fails, abort the dispense operation
   }
@@ -1614,7 +1640,7 @@ void cmd_fill_reagent(char *args, Stream *response)
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
 
   // Check and set the pressure using the helper function
-  if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
+  if (!checkAndSetPressure(response, tcpServer.getClient(), PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
   {
     return; // If pressure check fails, abort the fill operation
   }
@@ -1896,7 +1922,7 @@ void cmd_prime_valves(char *args, Stream *response)
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
 
   // Check and set the pressure using the helper function
-  if (!checkAndSetPressure(response, PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
+  if (!checkAndSetPressure(response, tcpServer.getClient(), PRESSURE_THRESHOLD_PSI, PRESSURE_TIMEOUT_MS))
   {
     return; // If pressure check fails, abort the prime operation
   }
