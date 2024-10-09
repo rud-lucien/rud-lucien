@@ -224,11 +224,13 @@ void checkModbusConnection(unsigned long currentTime);
 void logSystemState(unsigned long currentTime);
 void resetFlowSensor(int sensorIndex, FDXSensor *flowSensors[]);
 void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetClient client);
+void sendMessage(const char *message, Stream *serial, EthernetClient client, bool addNewline = true);
+void sendMessage(const __FlashStringHelper *message, Stream *serial, EthernetClient client, bool addNewline = true);
 
 // ======================[Valve Control Functions]=================================
 // Helper functions to open and close reagent and media valves
-void openValves(int valveNumber, Stream *response);
-void closeValves(int valveNumber, Stream *response);
+void openValves(int valveNumber, Stream *response, EthernetClient client);
+void closeValves(int valveNumber, Stream *response, EthernetClient client);
 
 // Commander Object for Handling API
 Commander commander;
@@ -324,30 +326,16 @@ void loop()
 {
   unsigned long currentTime = millis();
 
-  // Handle serial commands if available
-  if (Serial)
-  {
-    handleSerialCommands();
-    handleFlowSensorReset(currentTime, &Serial, tcpServer.getClient()); // Pass Serial stream
-    monitorOverflowSensors(currentTime, &Serial, tcpServer.getClient());
-    monitorFlowSensors(currentTime, &Serial, tcpServer.getClient());
-    monitorFillSensors(currentTime, &Serial, tcpServer.getClient());
-    monitorPrimeSensors(currentTime, &Serial, tcpServer.getClient());
-  }
 
-  // Handle TCP commands and updates
+  handleSerialCommands();
   handleTCPCommands();
 
-  if (tcpServer.getClient() && tcpServer.getClient().connected())
-  {
-    // print_something(&tcpStream);
-    handleFlowSensorReset(currentTime, &Serial, tcpServer.getClient()); // Pass TCP client stream
-    monitorOverflowSensors(currentTime, &Serial, tcpServer.getClient());
-    monitorFlowSensors(currentTime, &Serial, tcpServer.getClient());
-    monitorFillSensors(currentTime, &Serial, tcpServer.getClient());
-    monitorPrimeSensors(currentTime, &Serial, tcpServer.getClient());
-    tcpServer.getClient().flush();
-  }
+  // print_something(&tcpStream);
+  handleFlowSensorReset(currentTime, &Serial, tcpServer.getClient()); // Pass TCP client stream
+  monitorOverflowSensors(currentTime, &Serial, tcpServer.getClient());
+  monitorFlowSensors(currentTime, &Serial, tcpServer.getClient());
+  monitorFillSensors(currentTime, &Serial, tcpServer.getClient());
+  monitorPrimeSensors(currentTime, &Serial, tcpServer.getClient());
 
   // Regular system updates
   checkModbusConnection(currentTime);
@@ -535,16 +523,8 @@ void handleFlowSensorReset(unsigned long currentTime, Stream *response, Ethernet
     if (flowSensorReset.resetInProgress[i] && millis() - flowSensorReset.resetStartTime[i] >= resetDuration)
     {
       flowSensorReset.resetInProgress[i] = false; // Reset is complete
-      if (Serial)
-      {
-        response->print(F("Flow sensor reset completed for valve "));
-        response->println(i + 1);
-      }
-      if (client)
-      {
-        client.print(F("Flow sensor reset completed for valve "));
-        client.println(i + 1);
-      }
+      sendMessage(F("Flow sensor reset completed for valve "), response, client, false);
+      sendMessage(String(i + 1).c_str(), response, client);
       flowSensors[i]->handleReset();
     }
   }
@@ -623,6 +603,57 @@ void monitorOverflowSensors(unsigned long currentTime, Stream *response, Etherne
   }
 }
 
+// Helper function to send messages to both Serial and TCP client if connected
+void sendMessage(const char *message, Stream *serial, EthernetClient client, bool addNewline = true)
+{
+    // Send message to Serial
+    if (serial && serial == &Serial)
+    {
+        if (addNewline)
+            serial->println(message);  // Add newline by default
+        else
+            serial->print(message);    // No newline if specified
+    }
+
+    // Send message to TCP client if connected
+    if (client && client.connected())
+    {
+        if (addNewline)
+            client.println(message);  // Add newline by default
+        else
+            client.print(message);    // No newline if specified
+
+        client.flush();  // Ensure message is sent immediately
+    }
+}
+
+
+// Overloaded helper function for Flash strings (F macro)
+void sendMessage(const __FlashStringHelper *message, Stream *serial, EthernetClient client, bool addNewline = true)
+{
+    // Send message to Serial
+    if (serial && serial == &Serial)
+    {
+        if (addNewline)
+            serial->println(message);  // Add newline by default
+        else
+            serial->print(message);    // No newline if specified
+    }
+
+    // Send message to TCP client if connected
+    if (client && client.connected())
+    {
+        if (addNewline)
+            client.println(message);  // Add newline by default
+        else
+            client.print(message);    // No newline if specified
+
+        client.flush();  // Ensure message is sent immediately
+    }
+}
+
+
+
 // Function to monitor flow sensors for each valve
 void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
@@ -664,16 +695,8 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetCli
         else if (currentTime - bubbleStartTime[i] >= bubbleDetectionPeriod)
         {
           valveControls[i].fillMode = false;
-          if (Serial)
-          {
-            response->print(F("Timeout occurred: Continuous air detected for valve "));
-            response->println(i + 1);
-          }
-          if (client)
-          {
-            client.print(F("Timeout occurred: Continuous air detected for valve "));
-            client.println(i + 1);
-          }
+          sendMessage(F("Timeout occurred: Continuous air detected for valve "), response, client, false);
+          sendMessage(String(i + 1).c_str(), response, client);
           handleTimeoutCondition(i + 1, response, tcpServer.getClient()); // Close valves and stop dispensing
           bubbleStartTime[i] = 0;                  // Reset the bubble start time after timeout
           continue;
@@ -687,16 +710,8 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetCli
 
       if (currentFlowValue < 0)
       {
-        if (Serial)
-        {
-          response->print(F("Invalid flow reading for valve "));
-          response->println(i + 1);
-        }
-        if (client)
-        {
-          client.print(F("Invalid flow reading for valve "));
-          client.println(i + 1);
-        }
+        sendMessage(F("Invalid flow reading for valve "), response, client, false);
+        sendMessage(String(i + 1).c_str(), response, client);
         handleTimeoutCondition(i + 1, response, tcpServer.getClient());
         continue;
       }
@@ -704,16 +719,8 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetCli
       // Check if the flow is improving or stable
       if (valveControls[i].targetVolume > 0 && currentFlowValue >= valveControls[i].targetVolume)
       {
-        if (Serial)
-        {
-          response->print(F("Target volume reached for valve "));
-          response->println(i + 1);
-        }
-        if (client)
-        {
-          client.print(F("Target volume reached for valve "));
-          client.println(i + 1);
-        }
+        sendMessage(F("Target volume reached for valve "), response, client, false);
+        sendMessage(String(i + 1).c_str(), response, client);
         handleTimeoutCondition(i + 1, response, tcpServer.getClient()); // Close valves and stop dispensing
         continue;
       }
@@ -724,16 +731,8 @@ void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetCli
         if (currentTime - valveControls[i].lastFlowChangeTime >= flowTimeoutPeriod)
         {
           valveControls[i].fillMode = false;
-          if (Serial)
-          {
-            response->print(F("Timeout occurred: No flow detected for valve "));
-            response->println(i + 1);
-          }
-          if (client)
-          {
-            client.print(F("Timeout occurred: No flow detected for valve "));
-            client.println(i + 1);
-          }
+          sendMessage(F("Timeout occurred: No flow detected for valve "), response, client, false);
+          sendMessage(String(i + 1).c_str(), response, client);
           handleTimeoutCondition(i + 1, response, tcpServer.getClient());
         }
       }
@@ -1118,27 +1117,13 @@ bool checkAndSetPressure(Stream *response, EthernetClient client, float threshol
   // Check if the system is already pressurized
   if (currentPressure >= thresholdPressure)
   {
-    if (Serial)
-    {
-      response->println(F("System pressurized."));
-    }
-    if (client)
-    {
-      client.println(F("System pressurized."));
-    }
+    sendMessage(F("System pressurized."), response, client);
     return true;
   }
 
   // Set the pressure valve to 100%
   pressureValve.setPosition(100);
-  if (Serial)
-  {
-    response->println(F("Pressure valve set to 100%."));
-  }
-  if (client)
-  {
-    client.println(F("Pressure valve set to 100%."));
-  }
+  sendMessage(F("Pressure valve set to 100%."), response, client);
 
   // Wait for pressure to stabilize within the timeout
   while (millis() - pressureCheckStartTime < timeout)
@@ -1152,18 +1137,9 @@ bool checkAndSetPressure(Stream *response, EthernetClient client, float threshol
   }
 
   // If pressure is not reached, log and return false
-  if (Serial)
-  {
-    response->print(F("Error: Pressure threshold not reached. Current pressure: "));
-    response->print(currentPressure);
-    response->println(F(" psi. Operation aborted."));
-  }
-  if (client)
-  {
-    client.print(F("Error: Pressure threshold not reached. Current pressure: "));
-    client.print(currentPressure);
-    client.println(F(" psi. Operation aborted."));
-  }
+  sendMessage(F("Error: Pressure threshold not reached. Current pressure: "), response, client, false);
+  sendMessage(String(currentPressure).c_str(), response, client, false);
+  sendMessage(F(" psi. Operation aborted."), response, client);
   return false;
 }
 
@@ -1274,7 +1250,7 @@ void cmd_dispense_reagent(char *args, Stream *response)
     response->println(localValveNumber);
 
     // Open the reagent and media valves for the specific valve
-    openValves(localValveNumber, response);
+    openValves(localValveNumber, response, tcpServer.getClient());
 
     // Track the dispensing state for the valve
     valveControls[localValveNumber - 1].isDispensing = true;
@@ -1296,7 +1272,7 @@ void cmd_stop_dispense(char *args, Stream *response)
     for (int i = 0; i < 4; i++)
     {
       valveControls[i].fillMode = false; // Disable fill mode for all troughs
-      closeValves(i + 1, response);      // Close the reagent and media valves
+      closeValves(i + 1, response, tcpServer.getClient());      // Close the reagent and media valves
     }
 
     // Reset all flow sensors using a loop
@@ -1318,7 +1294,7 @@ void cmd_stop_dispense(char *args, Stream *response)
     if (sscanf(args, "%d", &localValveNumber) == 1 && localValveNumber >= 1 && localValveNumber <= 4)
     {
       valveControls[localValveNumber - 1].fillMode = false; // Disable fill mode for the specific valve
-      closeValves(localValveNumber, response);              // Close reagent and media valves
+      closeValves(localValveNumber, response, tcpServer.getClient());              // Close reagent and media valves
 
       // Reset the flow sensor for the specific valve
       flowSensors[localValveNumber - 1]->startResetFlow();
@@ -1339,20 +1315,13 @@ void handleOverflowCondition(int triggeredValveNumber, Stream *response, Etherne
 {
   if (valveControls[triggeredValveNumber - 1].isDispensing) // Check if the valve is dispensing
   {
-    closeValves(triggeredValveNumber, &Serial);                         // Close the valve
+    closeValves(triggeredValveNumber, &Serial, tcpServer.getClient());                         // Close the valve
     valveControls[triggeredValveNumber - 1].isDispensing = false;       // Stop the valve from dispensing
     valveControls[triggeredValveNumber - 1].dispensingValveNumber = -1; // Reset dispensing valve number
 
-    if (Serial)
-    {
-      response->print(F("Overflow detected: Valves closed for valve "));
-      response->println(triggeredValveNumber);
-    }
-    if (client)
-    {
-      client.print(F("Overflow detected: Valves closed for valve "));
-      client.println(triggeredValveNumber);
-    }
+    sendMessage(F("Overflow detected: Valves closed for valve "), response, client, false);
+    sendMessage(String(triggeredValveNumber).c_str(), response, client, false);
+
     // Reset the flow sensor for the specific valve
     flowSensors[triggeredValveNumber - 1]->startResetFlow();
     delay(100);
@@ -1364,7 +1333,7 @@ void handleOverflowCondition(int triggeredValveNumber, Stream *response, Etherne
 }
 
 // Helper function to close both reagent and media valves for a given valve number
-void closeValves(int valveNumber, Stream *response)
+void closeValves(int valveNumber, Stream *response, EthernetClient client)
 {
   if (valveNumber >= 1 && valveNumber <= 4)
   {
@@ -1382,12 +1351,12 @@ void closeValves(int valveNumber, Stream *response)
   }
   else
   {
-    response->println(F("Error: Invalid valve number."));
+    sendMessage(F("Error: Invalid valve number."), response, client);
   }
 }
 
 // Helper function to open both reagent and media valves for a given valve number
-void openValves(int valveNumber, Stream *response)
+void openValves(int valveNumber, Stream *response, EthernetClient client)
 {
   if (valveNumber >= 1 && valveNumber <= 4)
   {
@@ -1405,14 +1374,14 @@ void openValves(int valveNumber, Stream *response)
   }
   else
   {
-    response->println(F("Error: Invalid valve number."));
+   sendMessage(F("Error: Invalid valve number."), response, client);
   }
 }
 
 // Helper function to handle timeout conditions
 void handleTimeoutCondition(int triggeredValveNumber, Stream *response, EthernetClient client)
 {
-  closeValves(triggeredValveNumber, &Serial);
+  closeValves(triggeredValveNumber, &Serial, tcpServer.getClient());
 
   // Reset the flow sensor for the specific valve using an array
   flowSensors[triggeredValveNumber - 1]->startResetFlow();
@@ -1449,18 +1418,10 @@ void monitorFillSensors(unsigned long currentTime, Stream *response, EthernetCli
         {
           fillStartTime[i] = currentTime; // Set the start time when filling starts
           previousFlowValue[i] = 0;       // Reset flow tracking
-          if (Serial)
-          {
-            response->print(F("Valve "));
-            response->print(i + 1);
-            response->println(F(" opened, starting dispensing."));
-          }
-          if (client)
-          {
-            client.print(F("Valve "));
-            client.print(i + 1);
-            client.println(F(" opened, starting dispensing."));
-          }
+          sendMessage(F("Valve "), response, client, false);
+          sendMessage(String(i + 1).c_str(), response, client, false);
+          sendMessage(F(" opened, starting dispensing."), response, client);
+
         }
       }
     }
@@ -1470,18 +1431,10 @@ void monitorFillSensors(unsigned long currentTime, Stream *response, EthernetCli
       if (valveControls[i].isDispensing)
       {
         valveControls[i].isDispensing = false; // Stop dispensing
-        if (Serial)
-        {
-          response->print(F("Valve "));
-          response->print(i + 1);
-          response->println(F(" closed, stopping dispensing."));
-        }
-        if (client)
-        {
-          client.print(F("Valve "));
-          client.print(i + 1);
-          client.println(F(" closed, stopping dispensing."));
-        }
+        sendMessage(F("Valve "), response, client, false);
+        sendMessage(String(i + 1).c_str(), response, client, false);
+        sendMessage(F(" closed, stopping dispensing."), response, client);
+
 
         // Reset the flow sensor when dispensing stops
         resetFlowSensor(i, flowSensors);
@@ -1521,41 +1474,20 @@ void monitorFillSensors(unsigned long currentTime, Stream *response, EthernetCli
 
         if (volumeExceeded)
         {
-          if (Serial)
-          {
-            response->print(F("Warning: Fill timeout for trough "));
-            response->print(i + 1); // Print the trough number
-            response->print(F(": maximum volume ("));
-            response->print(currentFlowValue, 2); // Print the currentFlowValue with 2 decimal places
-            response->println(F(" mL) reached."));
-          }
-          if (client)
-          {
-            client.print(F("Warning: Fill timeout for trough "));
-            client.print(i + 1); // Print the trough number
-            client.print(F(": maximum volume ("));
-            client.print(currentFlowValue, 2); // Print the currentFlowValue with 2 decimal places
-            client.println(F(" mL) reached."));
-          }
+          sendMessage(F("Warning: Fill timeout for trough "), response, client, false);
+          sendMessage(String(i + 1).c_str(), response, client, false);
+          sendMessage(F(": maximum volume ("), response, client, false);
+          sendMessage(String(currentFlowValue, 2).c_str(), response, client, false); // Send currentFlowValue with 2 decimal places
+          sendMessage(F(" mL) reached."), response, client);
+
         }
         else if (timeExceeded)
         {
-          if (Serial)
-          {
-            response->print(F("Warning: Fill timeout for trough "));
-            response->print(i + 1); // Print the trough number
-            response->print(F(": maximum time ("));
-            response->print(MAX_FILL_TIME_MS / 1000.0, 2); // Print the time in seconds with 2 decimal places
-            response->println(F(" seconds) reached."));
-          }
-          if (client)
-          {
-            client.print(F("Warning: Fill timeout for trough "));
-            client.print(i + 1); // Print the trough number
-            client.print(F(": maximum time ("));
-            client.print(MAX_FILL_TIME_MS / 1000.0, 2); // Print the time in seconds with 2 decimal places
-            client.println(F(" seconds) reached."));
-          }
+          sendMessage(F("Warning: Fill timeout for trough "), response, client, false);
+          sendMessage(String(i + 1).c_str(), response, client, false);
+          sendMessage(F(": maximum time ("), response, client, false);
+          sendMessage(String(MAX_FILL_TIME_MS / 1000.0, 2).c_str(), response, client, false); // Send time in seconds with 2 decimal places
+          sendMessage(F(" seconds) reached."), response, client);
         }
 
         // Reset tracking for the next fill
@@ -1588,18 +1520,9 @@ void monitorFillSensors(unsigned long currentTime, Stream *response, EthernetCli
         {
           reagentValve->closeValve();
           mediaValve->closeValve();
-          if (Serial)
-          {
-            response->print(F("Overflow detected for trough "));
-            response->print(i + 1);                    // Print the trough number
-            response->println(F(", closing valves.")); // Print the rest of the message and a newline
-          }
-          if (client)
-          {
-            client.print(F("Overflow detected for trough "));
-            client.print(i + 1);                    // Print the trough number
-            client.println(F(", closing valves.")); // Print the rest of the message and a newline
-          }
+          sendMessage(F("Overflow detected for trough "), response, client, false);
+          sendMessage(String(i + 1).c_str(), response, client, false);
+          sendMessage(F(", closing valves."), response, client);
         }
       }
       // If overflow is not detected and valves are closed, reopen them and prepare for the next fill cycle
@@ -1607,18 +1530,10 @@ void monitorFillSensors(unsigned long currentTime, Stream *response, EthernetCli
       {
         reagentValve->openValve();
         mediaValve->openValve();
-        if (Serial)
-        {
-          response->print(F("Trough "));
-          response->print(i + 1);                                            // Print the trough number
-          response->println(F(" not overflowing, opening valves to fill.")); // Print the rest of the message and a newline
-        }
-        if (client)
-        {
-          client.print(F("Trough "));
-          client.print(i + 1);                                            // Print the trough number
-          client.println(F(" not overflowing, opening valves to fill.")); // Print the rest of the message and a newline
-        }
+        sendMessage(F("Trough "), response, client, false);
+        sendMessage(String(i + 1).c_str(), response, client, false);
+        sendMessage(F(" not overflowing, opening valves to fill."), response, client);
+
       }
     }
   }
@@ -1700,7 +1615,7 @@ void cmd_stop_fill_reagent(char *args, Stream *response)
       for (int i = 0; i < 4; i++)
       {
         valveControls[i].fillMode = false; // Use the updated `fillMode` in the `valveControls` struct
-        closeValves(i + 1, response);      // Close all valves
+        closeValves(i + 1, response, tcpServer.getClient());      // Close all valves
       }
       response->println(F("Fill mode disabled for all troughs."));
     }
@@ -1708,7 +1623,7 @@ void cmd_stop_fill_reagent(char *args, Stream *response)
     {
       // Disable fill mode for the specific trough
       valveControls[localValveNumber - 1].fillMode = false; // Use `valveControls` instead of the global `fillMode[]`
-      closeValves(localValveNumber, response);              // Close the specific valve
+      closeValves(localValveNumber, response, tcpServer.getClient());              // Close the specific valve
       response->print(F("Fill mode disabled for trough "));
       response->println(localValveNumber);
     }
@@ -1871,16 +1786,8 @@ void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetCl
       if (bubbleSensors[i]->isLiquidDetected() && additionalPrimeStartTime[i] == 0)
       {
         additionalPrimeStartTime[i] = currentTime;
-        if (Serial)
-        {
-          response->print(F("Liquid detected for valve "));
-          response->println(i + 1);
-        }
-        if (client)
-        {
-          client.print(F("Liquid detected for valve "));
-          client.println(i + 1);
-        }
+        sendMessage(F("Liquid detected for valve "), response, client, false);
+        sendMessage(String(i + 1).c_str(), response, client);
       }
 
       // Stop priming once additional time has passed
@@ -1890,16 +1797,8 @@ void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetCl
         mediaValves[i]->closeValve();
         valveControls[i].manualControl = false;
         valveControls[i].isPriming = false;
-        if (Serial)
-        {
-          response->print(F("Priming complete for valve "));
-          response->println(i + 1);
-        }
-        if (client)
-        {
-          client.print(F("Priming complete for valve "));
-          client.println(i + 1);
-        }
+        sendMessage(F("Priming complete for valve "), response, client, false);
+        sendMessage(String(i + 1).c_str(), response, client);
         additionalPrimeStartTime[i] = 0;
       }
     }
