@@ -1015,7 +1015,12 @@ void cmd_set_waste_valve(char *args, Stream *response)
         if (localValveNumber >= 1 && localValveNumber <= 4 && (state == 0 || state == 1))
         {
           // Disable fill mode for the specific trough
+          if(valveControls[localValveNumber - 1].fillMode == true)
+          {
           valveControls[localValveNumber - 1].fillMode = false;
+          response->print(F("Fill mode disabled for trough "));
+          response->println(localValveNumber);
+          }
 
           SolenoidValve *valve = wasteValves[localValveNumber - 1];
 
@@ -1945,6 +1950,14 @@ void cmd_drain_trough(char *args, Stream *response)
   // Parse the trough number from the arguments
   if (sscanf(args, "%d", &troughNumber) == 1 && troughNumber >= 1 && troughNumber <= 4)
   {
+    // Check if fill mode is enabled for the specified trough and disable it
+    if (valveControls[troughNumber - 1].fillMode == true)  // Check if fill mode is enabled
+    {
+      valveControls[troughNumber - 1].fillMode = false;  // Disable fill mode
+      response->print(F("Fill mode disabled for trough "));
+      response->println(troughNumber);  // Print a message that fill mode was disabled
+    }
+    
     // Execute the drain logic based on the trough number
     switch (troughNumber)
     {
