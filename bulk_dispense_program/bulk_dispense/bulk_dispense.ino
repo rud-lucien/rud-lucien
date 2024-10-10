@@ -810,7 +810,12 @@ void cmd_set_reagent_valve(char *args, Stream *response)
       // Handle "setRV all <0/1>" command to open/close all reagent valves
       for (int i = 0; i < 4; i++)
       {
+        if(valveControls[i].fillMode == true)
+        {
         valveControls[i].fillMode = false;             // Disable fill mode for all troughs
+        response->print(F("Fill mode disabled for trough "));
+        response->println(i + 1);
+        }
         valveControls[i].manualControl = (state == 1); // Set manualControl flag
 
         if (state == 1)
@@ -840,7 +845,12 @@ void cmd_set_reagent_valve(char *args, Stream *response)
       if (localValveNumber >= 1 && localValveNumber <= 4 && (state == 0 || state == 1))
       {
         // Disable fill mode for the specific trough
+        if(valveControls[localValveNumber - 1].fillMode == true)
+        {
         valveControls[localValveNumber - 1].fillMode = false;
+        response->print(F("Fill mode disabled for trough "));
+        response->println(localValveNumber);
+        }
 
         SolenoidValve *valve = reagentValves[localValveNumber - 1];
 
@@ -888,7 +898,12 @@ void cmd_set_media_valve(char *args, Stream *response)
       // Handle "setMV all <0/1>" command to open/close all media valves
       for (int i = 0; i < 4; i++)
       {
+        if(valveControls[i].fillMode == true)
+        {
         valveControls[i].fillMode = false;             // Disable fill mode for all troughs
+        response->print(F("Fill mode disabled for trough "));
+        response->println(i + 1);
+        }
         valveControls[i].manualControl = (state == 1); // Set manualControl flag for all valves
 
         if (state == 1)
@@ -919,7 +934,12 @@ void cmd_set_media_valve(char *args, Stream *response)
       if (localValveNumber >= 1 && localValveNumber <= 4 && (state == 0 || state == 1))
       {
         // Disable fill mode for the specific trough
+        if(valveControls[localValveNumber - 1].fillMode == true)
+        {
         valveControls[localValveNumber - 1].fillMode = false;
+        response->print(F("Fill mode disabled for trough "));
+        response->println(localValveNumber);
+        }
 
         SolenoidValve *valve = mediaValves[localValveNumber - 1];
 
@@ -1064,7 +1084,12 @@ void cmd_reset_flow_sensor(char *args, Stream *response)
     // Reset all flow sensors using a loop
     for (int i = 0; i < 4; i++)
     {
+      if(valveControls[i].fillMode == true)
+      {
       valveControls[i].fillMode = false;
+      response->print(F("Fill mode disabled for trough "));
+      response->println(i + 1);
+      }
       valveControls[i].manualControl = true; // Set manual control flag
       resetFlowSensor(i, flowSensors);
       flowSensorReset.resetInProgress[i] = false;
@@ -1075,7 +1100,12 @@ void cmd_reset_flow_sensor(char *args, Stream *response)
   {
     if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= 4)
     {
+      if(valveControls[sensorNumber - 1].fillMode == true)
+      {
       valveControls[sensorNumber - 1].fillMode = false;
+      response->print(F("Fill mode disabled for trough "));
+      response->println(sensorNumber);
+      }
       valveControls[sensorNumber - 1].manualControl = true;
       resetFlowSensor(sensorNumber - 1, flowSensors);
       flowSensorReset.resetInProgress[sensorNumber - 1] = false;
@@ -1198,7 +1228,12 @@ void cmd_dispense_reagent(char *args, Stream *response)
   if (localValveNumber >= 1 && localValveNumber <= 4)
   {
     // Disable fill mode for the specific trough
+    if(valveControls[localValveNumber - 1].fillMode == true)
+    {
     valveControls[localValveNumber - 1].fillMode = false;
+    response->print(F("Fill mode disabled for trough "));
+    response->println(localValveNumber);
+    }
 
     // Close reagent and media valves using a loop
     reagentValves[localValveNumber - 1]->closeValve();
@@ -1271,7 +1306,11 @@ void cmd_stop_dispense(char *args, Stream *response)
     // Stop all reagent and media valves and disable fill mode
     for (int i = 0; i < 4; i++)
     {
+      if(valveControls[i].fillMode == true)
+      {
       valveControls[i].fillMode = false; // Disable fill mode for all troughs
+      response->println(F("Fill mode disabled for all troughs."));
+      }
       closeValves(i + 1, response, tcpServer.getClient());      // Close the reagent and media valves
     }
 
@@ -1293,7 +1332,12 @@ void cmd_stop_dispense(char *args, Stream *response)
   {
     if (sscanf(args, "%d", &localValveNumber) == 1 && localValveNumber >= 1 && localValveNumber <= 4)
     {
+      if(valveControls[localValveNumber - 1].fillMode == true)
+      {
       valveControls[localValveNumber - 1].fillMode = false; // Disable fill mode for the specific valve
+      response->print(F("Fill mode disabled for trough "));
+      response->println(localValveNumber);
+      }
       closeValves(localValveNumber, response, tcpServer.getClient());              // Close reagent and media valves
 
       // Reset the flow sensor for the specific valve
@@ -1468,7 +1512,12 @@ void monitorFillSensors(unsigned long currentTime, Stream *response, EthernetCli
       if (volumeExceeded || timeExceeded)
       {
         // Disable fill mode for this valve
+        if(valveControls[i].fillMode == true)
+        {
         valveControls[i].fillMode = false;
+        sendMessage(F("Fill mode disabled for trough "), response, client, false);
+        sendMessage(String(i + 1).c_str(), response, client);
+        }
         reagentValves[i]->closeValve();
         mediaValves[i]->closeValve();
 
@@ -1578,7 +1627,7 @@ void cmd_fill_reagent(char *args, Stream *response)
 
       valveControls[i].fillMode = true; // Enable fill mode for this valve
     }
-    response->println(F("Filling started for all valves."));
+    response->println(F("Fill mode enabled for all troughs."));
   }
   else if (sscanf(args, "%d", &localValveNumber) == 1 && localValveNumber >= 1 && localValveNumber <= 4)
   {
@@ -1592,8 +1641,9 @@ void cmd_fill_reagent(char *args, Stream *response)
 
     // Reset the flow sensor after the valves have been opened
     resetFlowSensor(localValveNumber - 1, flowSensors);
-
     valveControls[localValveNumber - 1].fillMode = true; // Enable fill mode for this valve
+    response->print(F("Fill mode enabled for trough "));
+    response->println(localValveNumber);
   }
   else
   {
@@ -1835,7 +1885,12 @@ void cmd_prime_valves(char *args, Stream *response)
       if (!bubbleSensors[i]->isLiquidDetected())
       {
         // Start priming for valves not already primed
+        if(valveControls[i].fillMode == true)
+        {
         valveControls[i].fillMode = false;
+        response->print(F("Fill mode disabled for trough "));
+        response->println(i + 1);
+        }
         valveControls[i].manualControl = true;
         reagentValves[i]->openValve();
         mediaValves[i]->openValve();
@@ -1856,7 +1911,12 @@ void cmd_prime_valves(char *args, Stream *response)
     if (!bubbleSensors[localValveNumber - 1]->isLiquidDetected())
     {
       // Start priming for the specific valve
+      if(valveControls[localValveNumber - 1].fillMode == true)
+      {
       valveControls[localValveNumber - 1].fillMode = false;
+      response->print(F("Fill mode disabled for trough "));
+      response->println(localValveNumber);
+      }
       valveControls[localValveNumber - 1].manualControl = true;
       reagentValves[localValveNumber - 1]->openValve();
       mediaValves[localValveNumber - 1]->openValve();
