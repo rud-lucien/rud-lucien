@@ -68,10 +68,10 @@
 
 // Ethernet/Modbus Settings
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-IPAddress ip(169, 254, 0, 11);
+IPAddress ip(192, 168, 0, 13);
 // Create instances of TCPServer and ModbusConnection
 TCPServer tcpServer(ip, 8080);                                // Use port 8080 for the TCP server
-ModbusConnection modbus(mac, ip, IPAddress(169, 254, 0, 10)); // Modbus server IP
+ModbusConnection modbus(mac, ip, IPAddress(192, 168, 0, 14)); // Modbus server IP
 // TCPStream tcpStream;
 // ======================[Global Command Variables]===============================
 // struct to store command variables
