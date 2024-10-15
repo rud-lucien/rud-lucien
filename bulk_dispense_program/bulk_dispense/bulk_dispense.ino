@@ -236,23 +236,25 @@ Commander commander;
 // ======================[Commander API Configuration]============================
 
 Commander::API_t API_tree[] = {
-    apiElement("setRV", "Set reagent valve: setRV <1-4> <0/1> (0 = close, 1 = open)", cmd_set_reagent_valve),
-    apiElement("setMV", "Set media valve: setMV <1-4> <0/1> (0 = close, 1 = open)", cmd_set_media_valve),
-    apiElement("setWV", "Set waste valve: setWV <1-2> <0/1> (0 = close, 1 = open)", cmd_set_waste_valve),
-    apiElement("setPV", "Set pressure valve: setPV <percentage> (sets pressure valve to the percentage value)", cmd_set_pressure_valve),
-    apiElement("resetFS", "Reset flow sensor: resetFS <1-4> (resets the flow sensor for the selected valve)", cmd_reset_flow_sensor),
-    apiElement("setLF", "Set log frequency: setLF <milliseconds> (set log interval in milliseconds)", cmd_set_log_frequency),
-    apiElement("dispenseR", "Dispense reagent: dispenseR <1-4> [volume] (volume in mL, continuous if omitted)", cmd_dispense_reagent),
-    apiElement("stopD", "Stop dispensing reagent: stopD <1-4 or all> (stops dispensing for a valve or all)", cmd_stop_dispense),
-    apiElement("fillR", "Fill reagent trough: fillR <1-4 or all> (initiates filling for a trough or all troughs)", cmd_fill_reagent),
-    apiElement("stopF", "Stop filling reagent trough: stopF <1-4 or all> (stops filling for a trough or all)", cmd_stop_fill_reagent),
-    apiElement("help", "Print available commands and usage: help", cmd_print_help),
-    apiElement("state", "Get system state: state", cmd_get_system_state),
-    apiElement("modbusReset", "Reset Modbus device: modbusReset", cmd_modbus_reset),
-    apiElement("deviceInfo", "Print device information (IP, TCP, Modbus).", cmd_device_info),
-    apiElement("prime", "Prime valves until bubble sensor detects liquid: prime <1-4> or prime all", cmd_prime_valves),
-    apiElement("drain", "Drain reagent trough: drain <1-4> (drains the specified trough)", cmd_drain_trough),
-    apiElement("prime", "Prime valves until bubble sensor detects liquid: prime <1-4> or prime all", cmd_prime_valves)};
+    apiElement("R", "Reagent valve: R <1-4> <0/1> (0 = close, 1 = open)", cmd_set_reagent_valve),
+    apiElement("M", "Media valve: M <1-4> <0/1> (0 = close, 1 = open)", cmd_set_media_valve),
+    apiElement("W", "Waste valve: W <1-4> <0/1> (0 = close, 1 = open)", cmd_set_waste_valve),
+    apiElement("RF", "Reset flow sensor: RF <1-4> or RF all (resets the flow sensor for the selected valve)", cmd_reset_flow_sensor),
+    apiElement("PV", "Pressure valve: PV <percentage> (set pressure valve percentage)", cmd_set_pressure_valve),
+    apiElement("LF", "Log frequency: LF <milliseconds> (set log interval in milliseconds)", cmd_set_log_frequency),
+    apiElement("D", "Dispense reagent: D <1-4> [volume] (volume in mL, continuous if omitted)", cmd_dispense_reagent),
+    apiElement("SD", "Stop dispensing: SD <1-4 or all> (stop dispensing for a valve or all)", cmd_stop_dispense),
+    apiElement("F", "Fill reagent: F <1-4 or all> (initiate filling for a trough or all)", cmd_fill_reagent),
+    apiElement("SF", "Stop filling: SF <1-4 or all> (stop filling for a trough or all)", cmd_stop_fill_reagent),
+    apiElement("SS", "System state: SS (get system state)", cmd_get_system_state),
+    apiElement("MR", "Modbus reset: MR (reset Modbus device)", cmd_modbus_reset),
+    apiElement("P", "Prime valves: P <1-4 or all> (prime valves until liquid detected)", cmd_prime_valves),
+    apiElement("DT", "Drain trough: DT <1-4 or all> (drain the specified trough)", cmd_drain_trough),
+    apiElement("DI", "Device info: DI (print device information)", cmd_device_info),
+    apiElement("SDT", "Stop draining reagent trough: SDT <1-4> or SDT all", cmd_stop_drain_trough),
+    apiElement("H", "Help: H (print help information)", cmd_print_help),
+
+};
 
 // ======================[Setup and Loop]==========================================
 
@@ -784,7 +786,7 @@ void resetFlowSensor(int sensorIndex, FDXSensor *flowSensors[])
 
 // ======================[Command Functions for Valve Control]====================
 
-// Command to set reagent valves (setRV <valve number> <0/1> or setRV all <0/1>)
+// Command to set reagent valves (R <valve number> <0/1> or R all <0/1>)
 void cmd_set_reagent_valve(char *args, Stream *response)
 {
   int localValveNumber = -1;
@@ -794,7 +796,7 @@ void cmd_set_reagent_valve(char *args, Stream *response)
   {
     if (strncmp(commandVars.valveArg, "all", 3) == 0)
     {
-      // Handle "setRV all <0/1>" command to open/close all reagent valves
+      // Handle "R all <0/1>" command to open/close all reagent valves
       for (int i = 0; i < 4; i++)
       {
         if (valveControls[i].fillMode == true)
@@ -827,7 +829,7 @@ void cmd_set_reagent_valve(char *args, Stream *response)
     }
     else
     {
-      // Handle "setRV <valve number> <0/1>" command for individual reagent valves
+      // Handle "R <valve number> <0/1>" command for individual reagent valves
       localValveNumber = atoi(commandVars.valveArg); // Parse the local valve number
       if (localValveNumber >= 1 && localValveNumber <= 4 && (state == 0 || state == 1))
       {
@@ -872,7 +874,7 @@ void cmd_set_reagent_valve(char *args, Stream *response)
   }
 }
 
-// Command to set media valves (setMV <valve number> <0/1> or setMV all <0/1>)
+// Command to set media valves (M <valve number> <0/1> or R all <0/1>)
 void cmd_set_media_valve(char *args, Stream *response)
 {
   int localValveNumber = -1;
@@ -882,7 +884,7 @@ void cmd_set_media_valve(char *args, Stream *response)
   {
     if (strncmp(commandVars.valveArg, "all", 3) == 0)
     {
-      // Handle "setMV all <0/1>" command to open/close all media valves
+      // Handle "M all <0/1>" command to open/close all reagent valves
       for (int i = 0; i < 4; i++)
       {
         if (valveControls[i].fillMode == true)
@@ -915,7 +917,7 @@ void cmd_set_media_valve(char *args, Stream *response)
     }
     else
     {
-      // Handle "setMV <valve number> <0/1>" command for individual media valves
+      // Handle "M <valve number> <0/1>" command for individual reagent valves
       localValveNumber = atoi(commandVars.valveArg); // Use local variable
 
       if (localValveNumber >= 1 && localValveNumber <= 4 && (state == 0 || state == 1))
@@ -959,7 +961,7 @@ void cmd_set_media_valve(char *args, Stream *response)
   }
 }
 
-// Command to set waste valves (setWV <valve number> <0/1> or setWV all <0/1>)
+// Command to set wate valves (W <valve number> <0/1> or R all <0/1>)
 void cmd_set_waste_valve(char *args, Stream *response)
 {
   int localValveNumber = -1;
@@ -971,7 +973,7 @@ void cmd_set_waste_valve(char *args, Stream *response)
     {
       if (state == 0 || state == 1)
       {
-        // Handle "setWV all <0/1>" command to open/close all waste valves
+        // Handle "W all <0/1>" command to open/close all reagent valves
         for (int i = 0; i < 4; i++)
         {
           if (state == 1)
@@ -996,7 +998,7 @@ void cmd_set_waste_valve(char *args, Stream *response)
       }
       else
       {
-        // Handle "setWV <valve number> <0/1>" command for individual waste valves
+        // Handle "W <valve number> <0/1>" command for individual reagent valves
         localValveNumber = atoi(commandVars.valveArg); // Use local variable
 
         if (localValveNumber >= 1 && localValveNumber <= 4 && (state == 0 || state == 1))
@@ -1039,7 +1041,7 @@ void cmd_set_waste_valve(char *args, Stream *response)
   }
 }
 
-// Command to set pressure valve (setPV <percentage>)
+// Command to set pressure valve (P <percentage>)
 void cmd_set_pressure_valve(char *args, Stream *response)
 {
   int percentage;
@@ -1061,7 +1063,7 @@ void cmd_set_pressure_valve(char *args, Stream *response)
 
 // ======================[Command Functions for Flow Sensors]=====================
 
-// Command to reset flow sensor (resetFS <sensor number> or resetFS all)
+// Command to reset flow sensor (RF <1-4> or RF all)
 void cmd_reset_flow_sensor(char *args, Stream *response)
 {
   int sensorNumber = -1;
@@ -1113,7 +1115,7 @@ void cmd_reset_flow_sensor(char *args, Stream *response)
   }
 }
 
-// Command to set the logging frequency (setLF <milliseconds>)
+// Command to set the logging frequency (LF <milliseconds>)
 void cmd_set_log_frequency(char *args, Stream *response)
 {
   int newLogInterval;
@@ -1166,7 +1168,7 @@ bool checkAndSetPressure(Stream *response, EthernetClient client, float threshol
 }
 
 // ======================[Command Functions for Dispensing Control]===============
-// Command to dispense reagent (dispenseR <valve number> [volume])
+// Command to dispense reagent (D <valve number> [volume])
 void cmd_dispense_reagent(char *args, Stream *response)
 {
   int localValveNumber = -1; // Changed to localValveNumber
@@ -1288,7 +1290,7 @@ void cmd_dispense_reagent(char *args, Stream *response)
   }
 }
 
-// Command to stop dispensing (stopD <valve number> or stopD all)
+// Command to stop dispensing (SD <valve number> or SD all)
 void cmd_stop_dispense(char *args, Stream *response)
 {
   int localValveNumber = -1; // Define the local variable at the beginning
@@ -1576,7 +1578,7 @@ void monitorFillSensors(unsigned long currentTime, Stream *response, EthernetCli
   }
 }
 
-// Command to fill the reagent (fillR <valve number> or fillR all)
+// Command to fill the reagent (F <valve number> or F all)
 void cmd_fill_reagent(char *args, Stream *response)
 {
   int localValveNumber = -1; // Local variable for valve number
@@ -1639,7 +1641,7 @@ void cmd_fill_reagent(char *args, Stream *response)
   }
 }
 
-// Command to stop filling the reagent (stopF <valve number> or stopF all)
+// Command to stop filling the reagent (SF <valve number> or SF all)
 void cmd_stop_fill_reagent(char *args, Stream *response)
 {
   int localValveNumber = -1; // Local variable for valve number
@@ -1749,7 +1751,7 @@ void cmd_get_system_state(char *args, Stream *response)
   }
 }
 
-// Command to reset the Modbus connection
+// Command to reset the Modbus connection (MR)
 void cmd_modbus_reset(char *args, Stream *response)
 {
   // Log the start of the reset process
@@ -1843,7 +1845,7 @@ void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetCl
   }
 }
 
-// Command to prime valves (prime <valve number> or prime all)
+// Command to prime valves (P <valve number> or P all)
 void cmd_prime_valves(char *args, Stream *response)
 {
   int localValveNumber = -1; // Local variable for valve number
@@ -1925,7 +1927,7 @@ void cmd_prime_valves(char *args, Stream *response)
   }
 }
 
-// Command to drain reagent trough (drain <1-4>)
+// Command to drain reagent trough (DT <1-4>)
 void cmd_drain_trough(char *args, Stream *response)
 {
   int troughNumber = -1;
@@ -1979,7 +1981,7 @@ void cmd_drain_trough(char *args, Stream *response)
   }
 }
 
-// Command to stop draining reagent trough (stopDrain <1-4> or stopDrain all)
+// Command to stop draining reagent trough (SDT <1-4> or SDT all)
 void cmd_stop_drain_trough(char *args, Stream *response)
 {
   int troughNumber = -1;
