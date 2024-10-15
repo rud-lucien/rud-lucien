@@ -253,7 +253,9 @@ Commander::API_t API_tree[] = {
     apiElement("DT", "Drain trough: DT <1-4 or all> (drain the specified trough)", cmd_drain_trough),
     apiElement("DI", "Device info: DI (print device information)", cmd_device_info),
     apiElement("SDT", "Stop draining reagent trough: SDT <1-4> or SDT all", cmd_stop_drain_trough),
-    apiElement("H", "Help: H (print help information)", cmd_print_help),
+    apiElement("H", "Print available commands and usage: H", cmd_print_help),
+    apiElement("h", "Print available commands and usage: h", cmd_print_help),
+    apiElement("help", "Print available commands and usage: help", cmd_print_help),
     apiElement("TS", "Check trough state: TS <1-4> (returns if the trough is full or not)", cmd_trough_state)
 };
 
@@ -1679,7 +1681,7 @@ void cmd_stop_fill_reagent(char *args, Stream *response)
   }
 }
 
-// Command to print help information
+// Command to print help information (H, h, help)
 void cmd_print_help(char *args, Stream *response)
 {
   commander.printHelp(response);
