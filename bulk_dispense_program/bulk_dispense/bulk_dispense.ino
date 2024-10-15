@@ -1684,13 +1684,15 @@ void cmd_print_help(char *args, Stream *response)
   commander.printHelp(response);
 }
 
-// Command to get the system state
+// Command to get the system state (SS)
 void cmd_get_system_state(char *args, Stream *response)
 {
   int systemState = 1; // Default state is Idle (1)
   bool isDispensing = false;
   bool inFillMode = false;
   bool errorState = false;
+  String dispensingValves = "";  // Track which valves are dispensing
+  String fillingTroughs = "";    // Track which troughs are in fill mode
 
   // Check Modbus connection, set error state if Modbus is disconnected
   if (!modbus.isConnected())
@@ -1698,23 +1700,23 @@ void cmd_get_system_state(char *args, Stream *response)
     errorState = true;
   }
 
-  // Check if any valve is dispensing
+  // Check which valves are dispensing
   for (int i = 0; i < 4; i++)
   {
-    if (valveControls[i].isDispensing) // Updated to use valveControls
+    if (valveControls[i].isDispensing)
     {
       isDispensing = true;
-      break;
+      dispensingValves += String(i + 1) + " ";  // Store the valve number (1-based indexing)
     }
   }
 
-  // Check if any trough is in fill mode
+  // Check which troughs are in fill mode
   for (int i = 0; i < 4; i++)
   {
-    if (valveControls[i].fillMode) // Updated to use valveControls
+    if (valveControls[i].fillMode)
     {
       inFillMode = true;
-      break;
+      fillingTroughs += String(i + 1) + " ";  // Store the trough number (1-based indexing)
     }
   }
 
@@ -1740,16 +1742,30 @@ void cmd_get_system_state(char *args, Stream *response)
   else if (systemState == 2)
   {
     response->println(F("System State: Dispensing"));
+    response->print(F("Dispensing valves: "));
+    response->println(dispensingValves);  // Print which valves are dispensing
   }
   else if (systemState == 3)
   {
     response->println(F("System State: Fill Mode"));
+    response->print(F("Troughs in fill mode: "));
+    response->println(fillingTroughs);  // Print which troughs are in fill mode
   }
   else if (systemState == 4)
   {
     response->println(F("System State: Error - Modbus Disconnected"));
   }
+
+  // Print detailed information about both dispensing valves and filling troughs if available
+  if (!dispensingValves.equals("") || !fillingTroughs.equals(""))
+  {
+    response->print(F("Valves dispensing: "));
+    response->println(dispensingValves.equals("") ? "None" : dispensingValves);
+    response->print(F("Troughs in fill mode: "));
+    response->println(fillingTroughs.equals("") ? "None" : fillingTroughs);
+  }
 }
+
 
 // Command to reset the Modbus connection (MR)
 void cmd_modbus_reset(char *args, Stream *response)
