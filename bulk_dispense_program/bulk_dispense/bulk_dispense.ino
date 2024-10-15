@@ -194,6 +194,7 @@ void cmd_device_info(char *args, Stream *response);
 void cmd_prime_valves(char *args, Stream *response);
 void cmd_drain_trough(char *args, Stream *response);
 void cmd_stop_drain_trough(char *args, Stream *response);
+void cmd_trough_state(char *args, Stream *response);
 
 // ======================[Overflow and Timeout Handling]===========================
 // Functions to handle overflow and timeout conditions
@@ -253,7 +254,7 @@ Commander::API_t API_tree[] = {
     apiElement("DI", "Device info: DI (print device information)", cmd_device_info),
     apiElement("SDT", "Stop draining reagent trough: SDT <1-4> or SDT all", cmd_stop_drain_trough),
     apiElement("H", "Help: H (print help information)", cmd_print_help),
-
+    apiElement("TS", "Check trough state: TS <1-4> (returns if the trough is full or not)", cmd_trough_state)
 };
 
 // ======================[Setup and Loop]==========================================
@@ -2052,3 +2053,36 @@ void cmd_stop_drain_trough(char *args, Stream *response)
     response->println(F("Error: Invalid trough number. Use 'stopDrain <1-4>' or 'stopDrain all'."));
   }
 }
+
+// Command to check the state of a trough (TS <1-4>)
+void cmd_trough_state(char *args, Stream *response)
+{
+  int troughNumber = -1;
+
+  // Parse the trough number from the command arguments
+  if (sscanf(args, "%d", &troughNumber) == 1 && troughNumber >= 1 && troughNumber <= 4)
+  {
+    // Check the state of the overflow sensor for the specified trough
+    OverflowSensor *overflowSensor = overflowSensors[troughNumber - 1]; // Get the correct overflow sensor
+
+    if (overflowSensor->isOverflowing())
+    {
+      // If the overflow sensor is triggered, the trough is full
+      response->print(F("Trough "));
+      response->print(troughNumber);
+      response->println(F(" full: 1"));
+    }
+    else
+    {
+      // If the overflow sensor is not triggered, the trough is not full
+      response->print(F("Trough "));
+      response->print(troughNumber);
+      response->println(F(" not full: 0"));
+    }
+  }
+  else
+  {
+    response->println(F("Error: Invalid trough number. Use TS <1-4>."));
+  }
+}
+
