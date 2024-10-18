@@ -1699,7 +1699,7 @@ void cmd_get_system_state(char *args, Stream *response)
 
   const float PRESSURE_THRESHOLD_GOOD = 15.0; // Threshold for pressure being "Good"
   float currentPressure = pressureSensor.readPressure(); // Read the pressure sensor value
-  String pressureStatus = (currentPressure >= PRESSURE_THRESHOLD_GOOD) ? "Good" : "Insufficient";  // Determine pressure status
+  String pressureStatus = (currentPressure >= PRESSURE_THRESHOLD_GOOD) ? "Pressure Level: OK" : "Pressure Level: Insufficient";  // Determine pressure status
 
   // Check Modbus connection, set error state if Modbus is disconnected
   if (!modbus.isConnected())
