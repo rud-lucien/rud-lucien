@@ -1697,6 +1697,10 @@ void cmd_get_system_state(char *args, Stream *response)
   String dispensingValves = "";  // Track which valves are dispensing
   String fillingTroughs = "";    // Track which troughs are in fill mode
 
+  const float PRESSURE_THRESHOLD_GOOD = 15.0; // Threshold for pressure being "Good"
+  float currentPressure = pressureSensor.readPressure(); // Read the pressure sensor value
+  String pressureStatus = (currentPressure >= PRESSURE_THRESHOLD_GOOD) ? "Good" : "Insufficient";  // Determine pressure status
+
   // Check Modbus connection, set error state if Modbus is disconnected
   if (!modbus.isConnected())
   {
@@ -1723,10 +1727,14 @@ void cmd_get_system_state(char *args, Stream *response)
     }
   }
 
-  // Determine the system state based on precedence (Error > Fill Mode > Dispensing > Idle)
+  // Determine the system state based on precedence (Error > Fill Mode and Dispensing > Fill Mode > Dispensing > Idle)
   if (errorState)
   {
     systemState = 4; // Error State
+  }
+  else if (inFillMode && isDispensing)
+  {
+    systemState = 5; // Fill Mode and Dispensing
   }
   else if (inFillMode)
   {
@@ -1758,16 +1766,72 @@ void cmd_get_system_state(char *args, Stream *response)
   {
     response->println(F("System State: Error - Modbus Disconnected"));
   }
-
-  // Print detailed information about both dispensing valves and filling troughs if available
-  if (!dispensingValves.equals("") || !fillingTroughs.equals(""))
+  else if (systemState == 5)
   {
-    response->print(F("Valves dispensing: "));
-    response->println(dispensingValves.equals("") ? "None" : dispensingValves);
+    response->println(F("System State: Fill Mode and Dispensing"));
     response->print(F("Troughs in fill mode: "));
-    response->println(fillingTroughs.equals("") ? "None" : fillingTroughs);
+    response->println(fillingTroughs);  // Print which troughs are in fill mode
+    response->print(F("Dispensing valves: "));
+    response->println(dispensingValves);  // Print which valves are dispensing
   }
+
+  // Add additional system information
+  response->println(F("=== Additional System Info ==="));
+
+  // Pressure Valve Feedback and Percentage
+  float feedbackVoltage = pressureValve.getFeedback();
+  float valvePercent = (feedbackVoltage / 7.0) * 100; // Assuming 7V max feedback voltage
+  response->print(F("Pressure Valve (PV%): "));
+  response->print(valvePercent, 2);
+  response->println(F("%"));
+
+  // Pressure Sensor Reading and Pressure Status
+  response->print(F("Pressure Sensor (PS1): "));
+  response->print(currentPressure, 2); // 2 decimal places for pressure
+  response->print(F(" psi - "));
+  response->println(pressureStatus);  // Display pressure status (Good/Insufficient)
+
+  // Reagent Valves State
+  response->println(F("Reagent Valves:"));
+  for (int i = 0; i < 4; i++)
+  {
+    response->print(i + 1);
+    response->print(F(": "));
+    response->print(reagentValves[i]->isValveOpen() ? F("Open  ") : F("Closed  "));
+  }
+  response->println();
+
+  // Media Valves State
+  response->println(F("Media Valves:"));
+  for (int i = 0; i < 4; i++)
+  {
+    response->print(i + 1);
+    response->print(F(": "));
+    response->print(mediaValves[i]->isValveOpen() ? F("Open  ") : F("Closed  "));
+  }
+  response->println();
+
+  // Overflow Sensors State
+  response->println(F("Trough State:"));
+  for (int i = 0; i < 4; i++)
+  {
+    response->print(i + 1);
+    response->print(F(": "));
+    response->print(overflowSensors[i]->isOverflowing() ? F("Full  ") : F("Not Full  "));
+  }
+  response->println();
+
+  // Bubble Sensors (Primed Status)
+  response->println(F("Bubble Sensors (Primed Status):"));
+  for (int i = 0; i < 4; i++)
+  {
+    response->print(i + 1);
+    response->print(F(": "));
+    response->print(bubbleSensors[i]->isLiquidDetected() ? F("Primed  ") : F("Not Primed  "));
+  }
+  response->println();
 }
+
 
 
 // Command to reset the Modbus connection (MR)
