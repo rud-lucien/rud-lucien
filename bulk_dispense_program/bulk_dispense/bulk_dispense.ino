@@ -466,7 +466,6 @@ void log()
   Serial.print(valveControls[1].fillMode ? 1 : 0);
   Serial.print(valveControls[2].fillMode ? 1 : 0);
   Serial.print(valveControls[3].fillMode ? 1 : 0);
-  Serial.println();
 
   // Trough Draining State (TDS) for Troughs 1-4
   Serial.print(F(",TDS,"));
@@ -2084,25 +2083,25 @@ void cmd_stop_drain_trough(char *args, Stream *response)
     case 1:
       wasteValves[0]->closeValve();
       wasteValves[2]->closeValve();
-      response->println(F("Draining stopped for trough 1. Waste valves 1 and 3 closed."));
+      response->println(F("Draining stopped for trough 1."));
       break;
 
     case 2:
       wasteValves[0]->closeValve();
-      wasteValves[2]->openValve();
-      response->println(F("Draining stopped for trough 2. Waste valves 1 and 3 open."));
+      wasteValves[2]->closeValve();
+      response->println(F("Draining stopped for trough 2."));
       break;
 
     case 3:
       wasteValves[1]->closeValve();
       wasteValves[3]->closeValve();
-      response->println(F("Draining stopped for trough 3. Waste valves 2 and 4 closed."));
+      response->println(F("Draining stopped for trough 3."));
       break;
 
     case 4:
       wasteValves[1]->closeValve();
-      wasteValves[3]->openValve();
-      response->println(F("Draining stopped for trough 4. Waste valves 2 and 4 open."));
+      wasteValves[3]->closeValve();
+      response->println(F("Draining stopped for trough 4."));
       break;
 
     default:
