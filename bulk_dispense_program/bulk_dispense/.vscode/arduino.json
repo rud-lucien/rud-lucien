@@ -1,0 +1,5 @@
+{
+    "board": "CONTROLLINO_Boards:avr:controllino_maxi_automation",
+    "sketch": "bulk_dispense.ino",
+    "port": "COM27"
+}

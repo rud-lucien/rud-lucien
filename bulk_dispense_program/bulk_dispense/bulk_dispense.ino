@@ -489,6 +489,8 @@ void initializeValves()
   reagentValve4.setup();
   wasteValve1.setup();
   wasteValve2.setup();
+  wasteValve3.setup();
+  wasteValve4.setup();
   mediaValve1.setup();
   mediaValve2.setup();
   mediaValve3.setup();
@@ -964,85 +966,48 @@ void cmd_set_media_valve(char *args, Stream *response)
   }
 }
 
-// Command to set wate valves (W <valve number> <0/1> or R all <0/1>)
+// Command to set waste valves (W <valve number> <0/1>)
 void cmd_set_waste_valve(char *args, Stream *response)
 {
   int localValveNumber = -1;
   int state = -1;
 
-  if (sscanf(args, "%s %d", commandVars.valveArg, &state) == 2)
+  // Parse the valve number and state from the arguments
+  if (sscanf(args, "%d %d", &localValveNumber, &state) == 2 && localValveNumber >= 1 && localValveNumber <= 4 && (state == 0 || state == 1))
   {
-    if (strncmp(commandVars.valveArg, "all", 3) == 0)
+    // Disable fill mode for the specific trough if needed
+    if (valveControls[localValveNumber - 1].fillMode == true)
     {
-      if (state == 0 || state == 1)
-      {
-        // Handle "W all <0/1>" command to open/close all reagent valves
-        for (int i = 0; i < 4; i++)
-        {
-          if (state == 1)
-          {
-            wasteValves[i]->openValve();
-          }
-          else
-          {
-            wasteValves[i]->closeValve();
-          }
-        }
+      valveControls[localValveNumber - 1].fillMode = false;
+      response->print(F("Fill mode disabled for trough "));
+      response->println(localValveNumber);
+    }
 
-        // Output response based on state
-        if (state == 1)
-        {
-          response->println(F("All waste valves opened."));
-        }
-        else
-        {
-          response->println(F("All waste valves closed."));
-        }
-      }
-      else
-      {
-        // Handle "W <valve number> <0/1>" command for individual reagent valves
-        localValveNumber = atoi(commandVars.valveArg); // Use local variable
+    // Get the specific waste valve object
+    SolenoidValve *valve = wasteValves[localValveNumber - 1];
 
-        if (localValveNumber >= 1 && localValveNumber <= 4 && (state == 0 || state == 1))
-        {
-          // Disable fill mode for the specific trough
-          if (valveControls[localValveNumber - 1].fillMode == true)
-          {
-            valveControls[localValveNumber - 1].fillMode = false;
-            response->print(F("Fill mode disabled for trough "));
-            response->println(localValveNumber);
-          }
-
-          SolenoidValve *valve = wasteValves[localValveNumber - 1];
-
-          if (state == 1)
-          {
-            valve->openValve();
-            response->print(F("Waste valve "));
-            response->print(localValveNumber); // Print the valve number
-            response->println(F(" opened."));
-          }
-          else
-          {
-            valve->closeValve();
-            response->print(F("Waste valve "));
-            response->print(localValveNumber); // Print the valve number
-            response->println(F(" closed."));
-          }
-        }
-        else
-        {
-          response->println(F("Invalid waste valve command. Use setWV <1-4> <0/1> or setWV <all> <0/1>."));
-        }
-      }
+    // Open or close the valve based on the state
+    if (state == 1)
+    {
+      valve->openValve();
+      response->print(F("Waste valve "));
+      response->print(localValveNumber); // Print the valve number
+      response->println(F(" opened."));
     }
     else
     {
-      response->println(F("Invalid waste valve command."));
+      valve->closeValve();
+      response->print(F("Waste valve "));
+      response->print(localValveNumber); // Print the valve number
+      response->println(F(" closed."));
     }
   }
+  else
+  {
+    response->println(F("Invalid waste valve command. Use W <1-4> <0/1>."));
+  }
 }
+
 
 // Command to set pressure valve (P <percentage>)
 void cmd_set_pressure_valve(char *args, Stream *response)
