@@ -92,6 +92,7 @@ struct ValveControl
   bool manualControl;               // Whether the valve is under manual control
   bool isPriming;                   // Whether the valve is currently priming
   bool fillMode;                    // Whether the valve is in fill mode
+  bool isDraining;                  // Track if the trough is draining
   float targetVolume;               // Target volume for the valve
   float lastFlowValue;              // Last flow sensor reading for the valve
   unsigned long lastFlowCheckTime;  // Last time flow was checked
@@ -250,7 +251,7 @@ Commander::API_t API_tree[] = {
     apiElement("SS", "System state: SS (get system state)", cmd_get_system_state),
     apiElement("MR", "Modbus reset: MR (reset Modbus device)", cmd_modbus_reset),
     apiElement("P", "Prime valves: P <1-4 or all> (prime valves until liquid detected)", cmd_prime_valves),
-    apiElement("DT", "Drain trough: DT <1-4 or all> (drain the specified trough)", cmd_drain_trough),
+    apiElement("DT", "Drain trough: DT <1-4> (drain the specified trough)", cmd_drain_trough),
     apiElement("DI", "Device info: DI (print device information)", cmd_device_info),
     apiElement("SDT", "Stop draining reagent trough: SDT <1-4> or SDT all", cmd_stop_drain_trough),
     apiElement("H", "Print available commands and usage: H", cmd_print_help),
@@ -302,6 +303,7 @@ void setup()
     valveControls[i].isDispensing = false;
     valveControls[i].manualControl = false;
     valveControls[i].isPriming = false;
+    valveControls[i].isDraining = false;
     valveControls[i].targetVolume = -1;
     valveControls[i].lastFlowValue = -1;
     valveControls[i].lastFlowCheckTime = 0;
@@ -347,6 +349,7 @@ void log()
   int systemState = 1; // Default state is Idle (1)
   bool isDispensing = false;
   bool inFillMode = false;
+  String drainStatus = ""; // Track drain status for each trough
 
   // Check Modbus connection first
   if (!modbus.isConnected())
@@ -386,6 +389,12 @@ void log()
     }
   }
 
+  // Determine drain status for each trough based on valve combinations
+  drainStatus += (wasteValves[0]->isValveOpen() && wasteValves[2]->isValveOpen()) ? '1' : '0'; // Trough 1
+  drainStatus += (wasteValves[0]->isValveOpen() && !wasteValves[2]->isValveOpen()) ? '1' : '0'; // Trough 2
+  drainStatus += (wasteValves[1]->isValveOpen() && wasteValves[3]->isValveOpen()) ? '1' : '0'; // Trough 3
+  drainStatus += (wasteValves[1]->isValveOpen() && !wasteValves[3]->isValveOpen()) ? '1' : '0'; // Trough 4
+
   // Print initial log prefix
   Serial.print(F("LOG,STATE,"));
   Serial.print(systemState);
@@ -404,6 +413,8 @@ void log()
   Serial.print(F(",WV,"));
   Serial.print(wasteValve1.isValveOpen() ? 1 : 0);
   Serial.print(wasteValve2.isValveOpen() ? 1 : 0);
+  Serial.print(wasteValve3.isValveOpen() ? 1 : 0);
+  Serial.print(wasteValve4.isValveOpen() ? 1 : 0);
 
   Serial.print(F(",BS,"));
   Serial.print(reagent1BubbleSensor.isLiquidDetected() ? 1 : 0);
@@ -455,6 +466,11 @@ void log()
   Serial.print(valveControls[1].fillMode ? 1 : 0);
   Serial.print(valveControls[2].fillMode ? 1 : 0);
   Serial.print(valveControls[3].fillMode ? 1 : 0);
+  Serial.println();
+
+  // Trough Draining State (TDS) for Troughs 1-4
+  Serial.print(F(",TDS,"));
+  Serial.print(drainStatus); // TD as 4-bit binary string indicating draining status for each trough
   Serial.println();
 }
 
@@ -1776,6 +1792,16 @@ void cmd_get_system_state(char *args, Stream *response)
   }
   response->println();
 
+   // Waste Valves State
+  response->println(F("Waste Valves:"));
+  for (int i = 0; i < 4; i++)
+  {
+    response->print(i + 1);
+    response->print(F(": "));
+    response->print(wasteValves[i]->isValveOpen() ? F("Open  ") : F("Closed  "));
+  }
+  response->println();
+
   // Overflow Sensors State
   response->println(F("Trough State:"));
   for (int i = 0; i < 4; i++)
@@ -1991,31 +2017,34 @@ void cmd_drain_trough(char *args, Stream *response)
       response->println(troughNumber); // Print a message that fill mode was disabled
     }
 
+    // Set isDraining to true and execute the drain logic
+    valveControls[troughNumber - 1].isDraining = true;
+    
     // Execute the drain logic based on the trough number
     switch (troughNumber)
     {
     case 1:
       wasteValves[0]->openValve();
-      wasteValves[2]->closeValve();
-      response->println(F("Draining trough 1... Waste valve 1 opened, waste valve 3 closed."));
+      wasteValves[2]->openValve();
+      response->println(F("Draining trough 1... Waste valve 1 opened, waste valve 3 opened."));
       break;
 
     case 2:
       wasteValves[0]->openValve();
-      wasteValves[2]->openValve();
-      response->println(F("Draining trough 2... Waste valve 1 opened, waste valve 3 opened."));
+      wasteValves[2]->closeValve();
+      response->println(F("Draining trough 2... Waste valve 1 opened, waste valve 3 closed."));
       break;
 
     case 3:
       wasteValves[1]->openValve();
-      wasteValves[3]->closeValve();
-      response->println(F("Draining trough 3... Waste valve 2 opened, waste valve 4 closed."));
+      wasteValves[3]->openValve();
+      response->println(F("Draining trough 3... Waste valve 2 opened, waste valve 4 opened."));
       break;
 
     case 4:
       wasteValves[1]->openValve();
-      wasteValves[3]->openValve();
-      response->println(F("Draining trough 4... Waste valve 2 opened, waste valve 4 opened."));
+      wasteValves[3]->closeValve();
+      response->println(F("Draining trough 4... Waste valve 2 opened, waste valve 4 closed."));
       break;
 
     default:
@@ -2037,16 +2066,18 @@ void cmd_stop_drain_trough(char *args, Stream *response)
   // Check if "all" was provided as the argument
   if (strncmp(args, "all", 3) == 0)
   {
-    // Stop draining all troughs (close all waste valves)
-    wasteValves[0]->closeValve();
-    wasteValves[1]->closeValve();
-    wasteValves[2]->closeValve();
-    wasteValves[3]->closeValve();
-
+    // Stop draining all troughs
+    for (int i = 0; i < 4; i++)
+    {
+      valveControls[i].isDraining = false;
+      wasteValves[i]->closeValve();
+    }
     response->println(F("Draining stopped for all troughs. Waste valves closed."));
   }
   else if (sscanf(args, "%d", &troughNumber) == 1 && troughNumber >= 1 && troughNumber <= 4)
   {
+    // Stop draining the specific trough
+    valveControls[troughNumber - 1].isDraining = false;
     // Execute the stop drain logic based on the trough number
     switch (troughNumber)
     {
@@ -2058,8 +2089,8 @@ void cmd_stop_drain_trough(char *args, Stream *response)
 
     case 2:
       wasteValves[0]->closeValve();
-      wasteValves[2]->closeValve();
-      response->println(F("Draining stopped for trough 2. Waste valves 1 and 3 closed."));
+      wasteValves[2]->openValve();
+      response->println(F("Draining stopped for trough 2. Waste valves 1 and 3 open."));
       break;
 
     case 3:
@@ -2070,8 +2101,8 @@ void cmd_stop_drain_trough(char *args, Stream *response)
 
     case 4:
       wasteValves[1]->closeValve();
-      wasteValves[3]->closeValve();
-      response->println(F("Draining stopped for trough 4. Waste valves 2 and 4 closed."));
+      wasteValves[3]->openValve();
+      response->println(F("Draining stopped for trough 4. Waste valves 2 and 4 open."));
       break;
 
     default:
