@@ -40,6 +40,10 @@
 #define REAGENT_3_BUBBLE_SENSOR_PIN CONTROLLINO_AI2
 #define REAGENT_4_BUBBLE_SENSOR_PIN CONTROLLINO_AI3
 
+// Waste Line Liquid Sensors
+#define WASTE_1_LIQUID_SENSOR_PIN CONTROLLINO_AI4
+#define WASTE_2_LIQUID_SENSOR_PIN CONTROLLINO_AI5
+
 // Overflow Sensors
 #define OVERFLOW_SENSOR_TROUGH_1_PIN CONTROLLINO_DI0
 #define OVERFLOW_SENSOR_TROUGH_2_PIN CONTROLLINO_DI1
@@ -150,6 +154,10 @@ BubbleSensor reagent2BubbleSensor(REAGENT_2_BUBBLE_SENSOR_PIN);
 BubbleSensor reagent3BubbleSensor(REAGENT_3_BUBBLE_SENSOR_PIN);
 BubbleSensor reagent4BubbleSensor(REAGENT_4_BUBBLE_SENSOR_PIN);
 
+// Waste Sensors
+BubbleSensor waste1LiquidSensor(WASTE_1_LIQUID_SENSOR_PIN);
+BubbleSensor waste2LiquidSensor(WASTE_2_LIQUID_SENSOR_PIN);
+
 // Overflow Sensors
 OverflowSensor overflowSensorTrough1(OVERFLOW_SENSOR_TROUGH_1_PIN);
 OverflowSensor overflowSensorTrough2(OVERFLOW_SENSOR_TROUGH_2_PIN);
@@ -173,6 +181,7 @@ SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &media
 SolenoidValve *wasteValves[] = {&wasteValve1, &wasteValve2, &wasteValve3, &wasteValve4}; // For waste valves
 
 BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
+BubbleSensor *wasteSensors[] = {&waste1LiquidSensor, &waste2LiquidSensor};
 OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
 FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
 
@@ -398,31 +407,31 @@ void log()
   // Print initial log prefix
   Serial.print(F("LOG,STATE,"));
   Serial.print(systemState);
-  Serial.print(F(",RV,"));
+  Serial.print(F(",RV,")); //Reagent valve prefix
   Serial.print(reagentValve1.isValveOpen() ? 1 : 0);
   Serial.print(reagentValve2.isValveOpen() ? 1 : 0);
   Serial.print(reagentValve3.isValveOpen() ? 1 : 0);
   Serial.print(reagentValve4.isValveOpen() ? 1 : 0);
 
-  Serial.print(F(",MV,"));
+  Serial.print(F(",MV,")); //Media valve prefix
   Serial.print(mediaValve1.isValveOpen() ? 1 : 0);
   Serial.print(mediaValve2.isValveOpen() ? 1 : 0);
   Serial.print(mediaValve3.isValveOpen() ? 1 : 0);
   Serial.print(mediaValve4.isValveOpen() ? 1 : 0);
 
-  Serial.print(F(",WV,"));
+  Serial.print(F(",WV,")); //Waste valve prefix
   Serial.print(wasteValve1.isValveOpen() ? 1 : 0);
   Serial.print(wasteValve2.isValveOpen() ? 1 : 0);
   Serial.print(wasteValve3.isValveOpen() ? 1 : 0);
   Serial.print(wasteValve4.isValveOpen() ? 1 : 0);
 
-  Serial.print(F(",BS,"));
+  Serial.print(F(",BS,")); //Bubble sensor prefix
   Serial.print(reagent1BubbleSensor.isLiquidDetected() ? 1 : 0);
   Serial.print(reagent2BubbleSensor.isLiquidDetected() ? 1 : 0);
   Serial.print(reagent3BubbleSensor.isLiquidDetected() ? 1 : 0);
   Serial.print(reagent4BubbleSensor.isLiquidDetected() ? 1 : 0);
 
-  Serial.print(F(",OV,"));
+  Serial.print(F(",OV,")); //Overflow sensor prefix
   Serial.print(overflowSensorTrough1.isOverflowing() ? 1 : 0);
   Serial.print(overflowSensorTrough2.isOverflowing() ? 1 : 0);
   Serial.print(overflowSensorTrough3.isOverflowing() ? 1 : 0);
@@ -470,6 +479,11 @@ void log()
   // Trough Draining State (TDS) for Troughs 1-4
   Serial.print(F(",TDS,"));
   Serial.print(drainStatus); // TD as 4-bit binary string indicating draining status for each trough
+
+  // Waste Sensor for waste line
+  Serial.print(F(",WS,"));
+  Serial.print(waste1LiquidSensor.isLiquidDetected() ? 1 : 0);
+  Serial.print(waste2LiquidSensor.isLiquidDetected() ? 1 : 0);
   Serial.println();
 }
 
@@ -523,6 +537,8 @@ void initializeSensors()
   overflowSensorTrough2.setup();
   overflowSensorTrough3.setup();
   overflowSensorTrough4.setup();
+  waste1LiquidSensor.setup();
+  waste2LiquidSensor.setup();
 }
 
 // Function to handle flow sensor reset
