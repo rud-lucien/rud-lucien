@@ -1885,35 +1885,75 @@ void cmd_device_info(char *args, Stream *response)
   }
 }
 
-// Function to monitor the priming process in the main loop with failure detection
+// Enhanced function to monitor the priming process with stricter conditions for liquid detection
 void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
   const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000;
-  const unsigned long PRIME_TIMEOUT_MS = 5000; // Max time allowed for priming in milliseconds
+  const unsigned long PRIME_TIMEOUT_MS = 5000;          // Max time allowed for priming in milliseconds
+  const unsigned long STABLE_DETECTION_PERIOD_MS = 500; // Minimum stable detection period
 
   static unsigned long primeStartTime[4] = {0, 0, 0, 0};           // Track the start time of each priming
-  static unsigned long additionalPrimeStartTime[4] = {0, 0, 0, 0}; // Time to track additional priming after liquid detected
+  static unsigned long additionalPrimeStartTime[4] = {0, 0, 0, 0}; // Time for additional priming after stable detection
+  static unsigned long stableDetectionStartTime[4] = {0, 0, 0, 0}; // Track stable liquid detection start
+  static bool primingFailed[4] = {false, false, false, false};     // Track if priming has failed for each valve
+  static bool primingSuccess[4] = {false, false, false, false};    // Track if priming was successful
 
   for (int i = 0; i < 4; i++)
   {
     if (valveControls[i].isPriming) // Priming in progress for this valve
     {
-      // If priming just started, initialize the start time
+      // Initialize prime start time on first iteration
       if (primeStartTime[i] == 0)
       {
         primeStartTime[i] = currentTime;
       }
 
-      // If liquid is detected, start additional priming timer
-      if (bubbleSensors[i]->isLiquidDetected() && additionalPrimeStartTime[i] == 0)
+      // Check for priming timeout without liquid detection
+      if (!bubbleSensors[i]->isLiquidDetected() && (currentTime - primeStartTime[i] >= PRIME_TIMEOUT_MS) && !primingFailed[i] && !primingSuccess[i])
       {
-        additionalPrimeStartTime[i] = currentTime;
-        sendMessage(F("Liquid detected for valve "), response, client, false);
+        // Priming has failed: Close valves and reset
+        reagentValves[i]->closeValve();
+        mediaValves[i]->closeValve();
+        valveControls[i].manualControl = false;
+        valveControls[i].isPriming = false;
+        primingFailed[i] = true; // Mark as failed to prevent repeated failure messages
+        sendMessage(F("Priming failed for valve "), response, client, false);
         sendMessage(String(i + 1).c_str(), response, client);
+        sendMessage(F(". No liquid detected. Check if reagent bottle is empty."), response, client);
+
+        // Reset all timing variables for next priming cycle
+        primeStartTime[i] = 0;
+        additionalPrimeStartTime[i] = 0;
+        stableDetectionStartTime[i] = 0;
       }
 
-      // Check if additional priming time has passed after liquid detection
-      if (additionalPrimeStartTime[i] != 0 && currentTime - additionalPrimeStartTime[i] >= ADDITIONAL_PRIME_TIME_MS)
+      // Handle stable liquid detection
+      else if (bubbleSensors[i]->isLiquidDetected() && stableDetectionStartTime[i] == 0 && !primingFailed[i])
+      {
+        // Start timing stable liquid detection
+        stableDetectionStartTime[i] = currentTime;
+      }
+      else if (!bubbleSensors[i]->isLiquidDetected())
+      {
+        // Reset stable detection if liquid is not detected continuously
+        stableDetectionStartTime[i] = 0;
+      }
+
+      // Check if liquid has been stably detected for required period
+      else if (stableDetectionStartTime[i] != 0 && (currentTime - stableDetectionStartTime[i] >= STABLE_DETECTION_PERIOD_MS))
+      {
+        // Begin additional priming after stable detection
+        if (additionalPrimeStartTime[i] == 0)
+        {
+          additionalPrimeStartTime[i] = currentTime;
+
+          // Reset primeStartTime since liquid detection is confirmed
+          primeStartTime[i] = 0;
+        }
+      }
+
+      // Complete priming after additional time has passed
+      else if (additionalPrimeStartTime[i] != 0 && (currentTime - additionalPrimeStartTime[i] >= ADDITIONAL_PRIME_TIME_MS))
       {
         // Priming complete: close valves and reset
         reagentValves[i]->closeValve();
@@ -1923,26 +1963,20 @@ void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetCl
         sendMessage(F("Priming complete for valve "), response, client, false);
         sendMessage(String(i + 1).c_str(), response, client);
 
-        // Reset timers for next priming cycle
-        primeStartTime[i] = 0;
-        additionalPrimeStartTime[i] = 0;
-      }
-      // Check if priming has exceeded the maximum timeout
-      else if (!bubbleSensors[i]->isLiquidDetected() && currentTime - primeStartTime[i] >= PRIME_TIMEOUT_MS)
-      {
-        // Priming failed: close valves and reset
-        reagentValves[i]->closeValve();
-        mediaValves[i]->closeValve();
-        valveControls[i].manualControl = false;
-        valveControls[i].isPriming = false;
-        sendMessage(F("Priming failed for valve "), response, client, false);
-        sendMessage(String(i + 1).c_str(), response, client);
-        sendMessage(F(". Check if reagent bottle is empty."), response, client);
+        // Set primingSuccess flag to prevent any failure messages
+        primingSuccess[i] = true;
 
-        // Reset timers for next priming cycle
+        // Reset all timing variables for next priming cycle
         primeStartTime[i] = 0;
         additionalPrimeStartTime[i] = 0;
+        stableDetectionStartTime[i] = 0;
       }
+    }
+    else
+    {
+      // Reset flags when priming is not in progress
+      primingFailed[i] = false;
+      primingSuccess[i] = false;
     }
   }
 }
