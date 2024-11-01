@@ -233,6 +233,7 @@ void checkModbusConnection(unsigned long currentTime);
 void logSystemState(unsigned long currentTime);
 void resetFlowSensor(int sensorIndex, FDXSensor *flowSensors[]);
 void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetClient client);
+void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetClient client);
 void sendMessage(const char *message, Stream *serial, EthernetClient client, bool addNewline = true);
 void sendMessage(const __FlashStringHelper *message, Stream *serial, EthernetClient client, bool addNewline = true);
 
@@ -347,6 +348,7 @@ void loop()
   monitorFlowSensors(currentTime, &Serial, tcpServer.getClient());
   monitorFillSensors(currentTime, &Serial, tcpServer.getClient());
   monitorPrimeSensors(currentTime, &Serial, tcpServer.getClient());
+  monitorWasteSensors(currentTime, &Serial, tcpServer.getClient());
 
   // Regular system updates
   checkModbusConnection(currentTime);
@@ -682,7 +684,7 @@ void sendMessage(const __FlashStringHelper *message, Stream *serial, EthernetCli
 // Function to monitor flow sensors for each valve
 void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
-  const unsigned long resetDuration = 5;
+  const unsigned long resetDuration = 10;
   const unsigned long flowTimeoutPeriod = 5000;     // Flow timeout period (milliseconds)
   const unsigned long bubbleDetectionPeriod = 5000; // Time to wait for continuous bubbles before timeout
 
@@ -1901,7 +1903,7 @@ void cmd_device_info(char *args, Stream *response)
   }
 }
 
-// Enhanced function to monitor the priming process with stricter conditions for liquid detection
+// Function to monitor the fluid line priming process 
 void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
   const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000;
@@ -2076,6 +2078,71 @@ void cmd_prime_valves(char *args, Stream *response)
   else
   {
     response->println(F("Error: Invalid valve number. Use 1-4 or 'all'."));
+  }
+}
+
+// Monitor and manage waste sensors to control the drainage process
+void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetClient client)
+{
+  const unsigned long DRAIN_COMPLETE_DELAY = 500;         // Delay to confirm drainage is complete
+  static unsigned long lastDrainCompleteTime[2] = {0, 0}; // Time of last detected liquid on each waste sensor
+
+  // Loop through each waste sensor (0 for waste sensor 1, 1 for waste sensor 2)
+  for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
+  {
+    // Detect if waste sensor sees liquid
+    if (wasteSensors[sensorIdx]->isLiquidDetected())
+    {
+      // Update lastDrainCompleteTime to the current time
+      lastDrainCompleteTime[sensorIdx] = currentTime;
+    }
+    else if (currentTime - lastDrainCompleteTime[sensorIdx] >= DRAIN_COMPLETE_DELAY)
+    {
+      // No liquid detected for the specified delay; check associated troughs for drainage
+
+      // Handle troughs 1 and 2 if monitoring waste sensor 1
+      if (sensorIdx == 0)
+      {
+        // Allow only compatible draining troughs (1 with 3 or 4, and 2 with 3 or 4)
+        if (valveControls[0].isDraining && (valveControls[2].isDraining || valveControls[3].isDraining))
+        {
+          valveControls[0].isDraining = false;
+          wasteValves[0]->closeValve(); // Close primary waste valve for trough 1
+          wasteValves[2]->closeValve(); // Close secondary waste valve for trough 3 or 4
+          sendMessage(F("Draining complete for trough 1"), response, client);
+        }
+        if (valveControls[1].isDraining && (valveControls[2].isDraining || valveControls[3].isDraining))
+        {
+          valveControls[1].isDraining = false;
+          wasteValves[0]->closeValve(); // Close primary waste valve for trough 2
+          wasteValves[3]->closeValve(); // Close secondary waste valve for trough 3 or 4
+          sendMessage(F("Draining complete for trough 2"), response, client);
+        }
+      }
+
+      // Handle troughs 3 and 4 if monitoring waste sensor 2
+      else if (sensorIdx == 1)
+      {
+        // Allow only compatible draining troughs (3 with 1 or 2, and 4 with 1 or 2)
+        if (valveControls[2].isDraining && (valveControls[0].isDraining || valveControls[1].isDraining))
+        {
+          valveControls[2].isDraining = false;
+          wasteValves[1]->closeValve(); // Close primary waste valve for trough 3
+          wasteValves[3]->closeValve(); // Close secondary waste valve for trough 1 or 2
+          sendMessage(F("Draining complete for trough 3"), response, client);
+        }
+        if (valveControls[3].isDraining && (valveControls[0].isDraining || valveControls[1].isDraining))
+        {
+          valveControls[3].isDraining = false;
+          wasteValves[1]->closeValve(); // Close primary waste valve for trough 4
+          wasteValves[2]->closeValve(); // Close secondary waste valve for trough 1 or 2
+          sendMessage(F("Draining complete for trough 4"), response, client);
+        }
+      }
+
+      // Reset the timer and state for waste sensor to be ready for next drain cycle
+      lastDrainCompleteTime[sensorIdx] = 0; // Reset the timer for this waste sensor
+    }
   }
 }
 
