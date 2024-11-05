@@ -2111,7 +2111,7 @@ void cmd_prime_valves(char *args, Stream *response)
 // Monitor and manage waste sensors to control the drainage process
 void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
-  const unsigned long DRAIN_COMPLETE_DELAY = 500;          // Delay to confirm drainage is complete
+  const unsigned long DRAIN_COMPLETE_DELAY = 3000;          // Delay to confirm drainage is complete
   static unsigned long lastDrainCompleteTime[2] = {0, 0};  // Time of last detected liquid on each waste sensor
   static bool liquidInitiallyDetected[2] = {false, false}; // Track if liquid was initially detected
 
