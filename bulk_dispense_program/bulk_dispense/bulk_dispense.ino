@@ -2156,6 +2156,20 @@ void cmd_drain_trough(char *args, Stream *response)
   // Parse the trough number from the arguments
   if (sscanf(args, "%d", &troughNumber) == 1 && troughNumber >= 1 && troughNumber <= 4)
   {
+    // Check for incompatible drainage
+    if ((troughNumber == 1 && valveControls[1].isDraining) ||
+        (troughNumber == 2 && valveControls[0].isDraining))
+    {
+      response->println(F("Error: Troughs 1 and 2 cannot be drained simultaneously."));
+      return;
+    }
+    if ((troughNumber == 3 && valveControls[3].isDraining) ||
+        (troughNumber == 4 && valveControls[2].isDraining))
+    {
+      response->println(F("Error: Troughs 3 and 4 cannot be drained simultaneously."));
+      return;
+    }
+
     // Check if fill mode is enabled for the specified trough and disable it
     if (valveControls[troughNumber - 1].fillMode == true) // Check if fill mode is enabled
     {
@@ -2166,7 +2180,7 @@ void cmd_drain_trough(char *args, Stream *response)
 
     // Set isDraining to true and execute the drain logic
     valveControls[troughNumber - 1].isDraining = true;
-    
+
     // Execute the drain logic based on the trough number
     switch (troughNumber)
     {
