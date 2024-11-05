@@ -1907,7 +1907,7 @@ void cmd_device_info(char *args, Stream *response)
 void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
   const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000;
-  const unsigned long PRIME_TIMEOUT_MS = 5000;          // Max time allowed for priming in milliseconds
+  const unsigned long PRIME_TIMEOUT_MS = 6000;          // Max time allowed for priming in milliseconds
   const unsigned long STABLE_DETECTION_PERIOD_MS = 500; // Minimum stable detection period
 
   static unsigned long primeStartTime[4] = {0, 0, 0, 0};           // Track the start time of each priming
@@ -2084,8 +2084,9 @@ void cmd_prime_valves(char *args, Stream *response)
 // Monitor and manage waste sensors to control the drainage process
 void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
-  const unsigned long DRAIN_COMPLETE_DELAY = 500;         // Delay to confirm drainage is complete
-  static unsigned long lastDrainCompleteTime[2] = {0, 0}; // Time of last detected liquid on each waste sensor
+  const unsigned long DRAIN_COMPLETE_DELAY = 500;          // Delay to confirm drainage is complete
+  static unsigned long lastDrainCompleteTime[2] = {0, 0};  // Time of last detected liquid on each waste sensor
+  static bool liquidInitiallyDetected[2] = {false, false}; // Track if liquid was initially detected
 
   // Loop through each waste sensor (0 for waste sensor 1, 1 for waste sensor 2)
   for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
@@ -2095,27 +2096,28 @@ void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetCl
     {
       // Update lastDrainCompleteTime to the current time
       lastDrainCompleteTime[sensorIdx] = currentTime;
+      liquidInitiallyDetected[sensorIdx] = true; // Confirm initial liquid detection
     }
-    else if (currentTime - lastDrainCompleteTime[sensorIdx] >= DRAIN_COMPLETE_DELAY)
+    // Proceed only if we initially detected liquid, then wait for delay to confirm drainage complete
+    else if (liquidInitiallyDetected[sensorIdx] && (currentTime - lastDrainCompleteTime[sensorIdx] >= DRAIN_COMPLETE_DELAY))
     {
       // No liquid detected for the specified delay; check associated troughs for drainage
 
       // Handle troughs 1 and 2 if monitoring waste sensor 1
       if (sensorIdx == 0)
       {
-        // Allow only compatible draining troughs (1 with 3 or 4, and 2 with 3 or 4)
-        if (valveControls[0].isDraining && (valveControls[2].isDraining || valveControls[3].isDraining))
+        if (valveControls[0].isDraining)
         {
           valveControls[0].isDraining = false;
-          wasteValves[0]->closeValve(); // Close primary waste valve for trough 1
-          wasteValves[2]->closeValve(); // Close secondary waste valve for trough 3 or 4
+          wasteValves[0]->closeValve(); // Close waste valve for trough 1
+          wasteValves[2]->closeValve(); // Close secondary waste valve
           sendMessage(F("Draining complete for trough 1"), response, client);
         }
-        if (valveControls[1].isDraining && (valveControls[2].isDraining || valveControls[3].isDraining))
+        if (valveControls[1].isDraining)
         {
           valveControls[1].isDraining = false;
-          wasteValves[0]->closeValve(); // Close primary waste valve for trough 2
-          wasteValves[3]->closeValve(); // Close secondary waste valve for trough 3 or 4
+          wasteValves[0]->closeValve(); // Close waste valve for trough 2
+          wasteValves[3]->closeValve(); // Close secondary waste valve
           sendMessage(F("Draining complete for trough 2"), response, client);
         }
       }
@@ -2123,25 +2125,25 @@ void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetCl
       // Handle troughs 3 and 4 if monitoring waste sensor 2
       else if (sensorIdx == 1)
       {
-        // Allow only compatible draining troughs (3 with 1 or 2, and 4 with 1 or 2)
-        if (valveControls[2].isDraining && (valveControls[0].isDraining || valveControls[1].isDraining))
+        if (valveControls[2].isDraining)
         {
           valveControls[2].isDraining = false;
-          wasteValves[1]->closeValve(); // Close primary waste valve for trough 3
-          wasteValves[3]->closeValve(); // Close secondary waste valve for trough 1 or 2
+          wasteValves[1]->closeValve(); // Close waste valve for trough 3
+          wasteValves[3]->closeValve(); // Close secondary waste valve
           sendMessage(F("Draining complete for trough 3"), response, client);
         }
-        if (valveControls[3].isDraining && (valveControls[0].isDraining || valveControls[1].isDraining))
+        if (valveControls[3].isDraining)
         {
           valveControls[3].isDraining = false;
-          wasteValves[1]->closeValve(); // Close primary waste valve for trough 4
-          wasteValves[2]->closeValve(); // Close secondary waste valve for trough 1 or 2
+          wasteValves[1]->closeValve(); // Close waste valve for trough 4
+          wasteValves[2]->closeValve(); // Close secondary waste valve
           sendMessage(F("Draining complete for trough 4"), response, client);
         }
       }
 
-      // Reset the timer and state for waste sensor to be ready for next drain cycle
-      lastDrainCompleteTime[sensorIdx] = 0; // Reset the timer for this waste sensor
+      // Reset the timer and state for this sensor to be ready for the next cycle
+      lastDrainCompleteTime[sensorIdx] = 0;
+      liquidInitiallyDetected[sensorIdx] = false; // Reset initial detection flag
     }
   }
 }
