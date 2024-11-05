@@ -1688,16 +1688,18 @@ void cmd_print_help(char *args, Stream *response)
 // Command to get the system state (SS)
 void cmd_get_system_state(char *args, Stream *response)
 {
-  int systemState = 1; // Default state is Idle (1)
   bool isDispensing = false;
   bool inFillMode = false;
+  bool isDraining = false;
   bool errorState = false;
-  String dispensingValves = "";  // Track which valves are dispensing
-  String fillingTroughs = "";    // Track which troughs are in fill mode
+  String systemStateMessage = "System State: ";
+  String dispensingValves = "";
+  String fillingTroughs = "";
+  String drainingTroughs = "";
 
-  const float PRESSURE_THRESHOLD_GOOD = 15.0; // Threshold for pressure being "Good"
-  float currentPressure = pressureSensor.readPressure(); // Read the pressure sensor value
-  String pressureStatus = (currentPressure >= PRESSURE_THRESHOLD_GOOD) ? "Pressure Level: OK" : "Pressure Level: Insufficient";  // Determine pressure status
+  const float PRESSURE_THRESHOLD_GOOD = 15.0;
+  float currentPressure = pressureSensor.readPressure();
+  String pressureStatus = (currentPressure >= PRESSURE_THRESHOLD_GOOD) ? "Pressure Level: OK" : "Pressure Level: Insufficient";
 
   // Check Modbus connection, set error state if Modbus is disconnected
   if (!modbus.isConnected())
@@ -1705,89 +1707,85 @@ void cmd_get_system_state(char *args, Stream *response)
     errorState = true;
   }
 
-  // Check which valves are dispensing
+  // Check each trough for active states
   for (int i = 0; i < 4; i++)
   {
     if (valveControls[i].isDispensing)
     {
       isDispensing = true;
-      dispensingValves += String(i + 1) + " ";  // Store the valve number (1-based indexing)
+      dispensingValves += String(i + 1) + " ";
     }
-  }
-
-  // Check which troughs are in fill mode
-  for (int i = 0; i < 4; i++)
-  {
     if (valveControls[i].fillMode)
     {
       inFillMode = true;
-      fillingTroughs += String(i + 1) + " ";  // Store the trough number (1-based indexing)
+      fillingTroughs += String(i + 1) + " ";
+    }
+    if (valveControls[i].isDraining)
+    {
+      isDraining = true;
+      drainingTroughs += String(i + 1) + " ";
     }
   }
 
-  // Determine the system state based on precedence (Error > Fill Mode and Dispensing > Fill Mode > Dispensing > Idle)
+  // Determine and construct the system state message based on active operations
   if (errorState)
   {
-    systemState = 4; // Error State
+    systemStateMessage += "Error - Modbus Disconnected";
   }
-  else if (inFillMode && isDispensing)
+  else
   {
-    systemState = 5; // Fill Mode and Dispensing
-  }
-  else if (inFillMode)
-  {
-    systemState = 3; // Fill Mode
-  }
-  else if (isDispensing)
-  {
-    systemState = 2; // Dispensing
+    if (inFillMode || isDispensing || isDraining) {
+      if (inFillMode) {
+        systemStateMessage += "Fill Mode";
+      }
+      if (isDispensing) {
+        if (inFillMode) systemStateMessage += " and ";
+        systemStateMessage += "Dispensing";
+      }
+      if (isDraining) {
+        if (inFillMode || isDispensing) systemStateMessage += " and ";
+        systemStateMessage += "Draining";
+      }
+    } else {
+      systemStateMessage += "Idle"; // No operations are active
+    }
   }
 
-  // Send the system state as a response to the client
-  if (systemState == 1)
+  // Send the system state message as a response to the client
+  response->println(systemStateMessage);
+
+  // Provide details on filling, dispensing, and draining troughs
+  if (inFillMode)
   {
-    response->println(F("System State: Idle"));
-  }
-  else if (systemState == 2)
-  {
-    response->println(F("System State: Dispensing"));
-    response->print(F("Dispensing valves: "));
-    response->println(dispensingValves);  // Print which valves are dispensing
-  }
-  else if (systemState == 3)
-  {
-    response->println(F("System State: Fill Mode"));
     response->print(F("Troughs in fill mode: "));
-    response->println(fillingTroughs);  // Print which troughs are in fill mode
+    response->println(fillingTroughs);
   }
-  else if (systemState == 4)
+  if (isDispensing)
   {
-    response->println(F("System State: Error - Modbus Disconnected"));
-  }
-  else if (systemState == 5)
-  {
-    response->println(F("System State: Fill Mode and Dispensing"));
-    response->print(F("Troughs in fill mode: "));
-    response->println(fillingTroughs);  // Print which troughs are in fill mode
     response->print(F("Dispensing valves: "));
-    response->println(dispensingValves);  // Print which valves are dispensing
+    response->println(dispensingValves);
+  }
+  if (isDraining)
+  {
+    response->print(F("Troughs draining: "));
+    response->println(drainingTroughs);
   }
 
-  // Add additional system information
+  // Additional System Info
   response->println(F("=== Additional System Info ==="));
 
   // Pressure Valve Feedback and Percentage
   float feedbackVoltage = pressureValve.getFeedback();
-  float valvePercent = (feedbackVoltage / 7.0) * 100; // Assuming 7V max feedback voltage
+  float valvePercent = (feedbackVoltage / 7.0) * 100;
   response->print(F("Pressure Valve (PV%): "));
   response->print(valvePercent, 2);
   response->println(F("%"));
 
   // Pressure Sensor Reading and Pressure Status
   response->print(F("Pressure Sensor (PS1): "));
-  response->print(currentPressure, 2); // 2 decimal places for pressure
+  response->print(currentPressure, 2);
   response->print(F(" psi - "));
-  response->println(pressureStatus);  // Display pressure status (Good/Insufficient)
+  response->println(pressureStatus);
 
   // Reagent Valves State
   response->println(F("Reagent Valves:"));
@@ -1809,13 +1807,43 @@ void cmd_get_system_state(char *args, Stream *response)
   }
   response->println();
 
-   // Waste Valves State
+  // Waste Valves State
   response->println(F("Waste Valves:"));
   for (int i = 0; i < 4; i++)
   {
     response->print(i + 1);
     response->print(F(": "));
     response->print(wasteValves[i]->isValveOpen() ? F("Open  ") : F("Closed  "));
+  }
+  response->println();
+
+  // Trough Fill Mode State
+  response->println(F("Trough Fill Mode State:"));
+  for (int i = 0; i < 4; i++)
+  {
+    response->print(i + 1);
+    response->print(F(": "));
+    response->print(valveControls[i].fillMode ? F("In Fill Mode  ") : F("Not in Fill Mode  "));
+  }
+  response->println();
+
+  // Trough Dispensing State
+  response->println(F("Trough Dispensing State:"));
+  for (int i = 0; i < 4; i++)
+  {
+    response->print(i + 1);
+    response->print(F(": "));
+    response->print(valveControls[i].isDispensing ? F("Dispensing  ") : F("Not Dispensing  "));
+  }
+  response->println();
+
+  // Trough Draining State
+  response->println(F("Trough Draining State:"));
+  for (int i = 0; i < 4; i++)
+  {
+    response->print(i + 1);
+    response->print(F(": "));
+    response->print(valveControls[i].isDraining ? F("Draining  ") : F("Not Draining  "));
   }
   response->println();
 
@@ -1839,7 +1867,6 @@ void cmd_get_system_state(char *args, Stream *response)
   }
   response->println();
 }
-
 
 
 // Command to reset the Modbus connection (MR)
@@ -1873,7 +1900,7 @@ void cmd_modbus_reset(char *args, Stream *response)
   }
 }
 
-// Command to provide device IP, TCP/IP, and Modbus info (Serial only)
+// Command to provide device IP, TCP/IP, and Modbus info (Serial only) (DI)
 void cmd_device_info(char *args, Stream *response)
 {
   // Check if the command is coming from Serial (local access only)
