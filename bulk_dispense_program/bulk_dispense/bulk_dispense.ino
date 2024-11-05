@@ -2170,6 +2170,22 @@ void cmd_drain_trough(char *args, Stream *response)
       return;
     }
 
+    // Check if the trough is currently dispensing and stop dispensing if so
+    if (valveControls[troughNumber - 1].isDispensing)
+    {
+      // Close the reagent and media valves to stop dispensing
+      reagentValves[troughNumber - 1]->closeValve();
+      mediaValves[troughNumber - 1]->closeValve();
+
+      // Reset dispensing state for this trough
+      valveControls[troughNumber - 1].isDispensing = false;
+      valveControls[troughNumber - 1].targetVolume = -1; // Clear target volume
+
+      // Notify the user that dispensing was stopped
+      response->print(F("Dispensing stopped for trough "));
+      response->println(troughNumber);
+    }
+
     // Check if fill mode is enabled for the specified trough and disable it
     if (valveControls[troughNumber - 1].fillMode == true) // Check if fill mode is enabled
     {
