@@ -2136,15 +2136,15 @@ void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetCl
         if (valveControls[0].isDraining)
         {
           valveControls[0].isDraining = false;
-          wasteValves[0]->closeValve(); // Close waste valve for trough 1
-          wasteValves[2]->closeValve(); // Close secondary waste valve
+          wasteValves[0]->closeValve();  // Close the main waste bottle 1 valve
+          wasteValves[2]->openValve();   // Keep trough 1's valve open
           sendMessage(F("Draining complete for trough 1"), response, client);
         }
         if (valveControls[1].isDraining)
         {
           valveControls[1].isDraining = false;
-          wasteValves[0]->closeValve(); // Close waste valve for trough 2
-          wasteValves[3]->closeValve(); // Close secondary waste valve
+          wasteValves[0]->closeValve();  // Close the main waste bottle 1 valve
+          wasteValves[2]->closeValve();  // Keep trough 2's valve closed
           sendMessage(F("Draining complete for trough 2"), response, client);
         }
       }
@@ -2155,15 +2155,15 @@ void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetCl
         if (valveControls[2].isDraining)
         {
           valveControls[2].isDraining = false;
-          wasteValves[1]->closeValve(); // Close waste valve for trough 3
-          wasteValves[3]->closeValve(); // Close secondary waste valve
+          wasteValves[1]->closeValve();  // Close the main waste bottle 2 valve
+          wasteValves[3]->openValve();   // Keep trough 3's valve open
           sendMessage(F("Draining complete for trough 3"), response, client);
         }
         if (valveControls[3].isDraining)
         {
           valveControls[3].isDraining = false;
-          wasteValves[1]->closeValve(); // Close waste valve for trough 4
-          wasteValves[2]->closeValve(); // Close secondary waste valve
+          wasteValves[1]->closeValve(); // Close the main waste bottle 2 valve
+          wasteValves[3]->closeValve();   // Keep trough 4's valve closed
           sendMessage(F("Draining complete for trough 4"), response, client);
         }
       }
@@ -2287,7 +2287,7 @@ void cmd_stop_drain_trough(char *args, Stream *response)
     {
     case 1:
       wasteValves[0]->closeValve();
-      wasteValves[2]->closeValve();
+      wasteValves[2]->openValve();
       response->println(F("Draining stopped for trough 1."));
       break;
 
@@ -2299,7 +2299,7 @@ void cmd_stop_drain_trough(char *args, Stream *response)
 
     case 3:
       wasteValves[1]->closeValve();
-      wasteValves[3]->closeValve();
+      wasteValves[3]->openValve();
       response->println(F("Draining stopped for trough 3."));
       break;
 
