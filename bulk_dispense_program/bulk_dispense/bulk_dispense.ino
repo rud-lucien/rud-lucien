@@ -400,7 +400,7 @@ void log()
     }
   }
 
-  // Determine drain status for each trough based on valve combinations
+  // Determine drain status (DS) for each trough based on valve combinations
   drainStatus += (wasteValves[0]->isValveOpen() && wasteValves[2]->isValveOpen()) ? '1' : '0'; // Trough 1
   drainStatus += (wasteValves[0]->isValveOpen() && !wasteValves[2]->isValveOpen()) ? '1' : '0'; // Trough 2
   drainStatus += (wasteValves[1]->isValveOpen() && wasteValves[3]->isValveOpen()) ? '1' : '0'; // Trough 3
@@ -685,7 +685,7 @@ void sendMessage(const __FlashStringHelper *message, Stream *serial, EthernetCli
 void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
   const unsigned long resetDuration = 10;
-  const unsigned long flowTimeoutPeriod = 5000;     // Flow timeout period (milliseconds)
+  const unsigned long flowTimeoutPeriod = 10000;     // Flow timeout period (milliseconds)
   const unsigned long bubbleDetectionPeriod = 5000; // Time to wait for continuous bubbles before timeout
 
   static unsigned long bubbleStartTime[4] = {0, 0, 0, 0}; // Time when bubbles were first detected for each valve
