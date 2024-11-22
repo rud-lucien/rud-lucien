@@ -50,6 +50,10 @@
 #define OVERFLOW_SENSOR_TROUGH_3_PIN CONTROLLINO_DI2
 #define OVERFLOW_SENSOR_TROUGH_4_PIN CONTROLLINO_DI3
 
+// Waste Bottle Liquid Sensors
+#define WASTE_BOTTLE_1_LIQUID_SENSOR_PIN CONTROLLINO_AI6
+#define WASTE_BOTTLE_2_LIQUID_SENSOR_PIN CONTROLLINO_AI7
+
 // Pressure Control and Feedback
 #define PRESSURE_VALVE_CONTROL_PIN CONTROLLINO_AO0   // Analog Output for control
 #define PRESSURE_VALVE_FEEDBACK_PIN CONTROLLINO_AI13 // Analog Input for feedback
@@ -158,6 +162,10 @@ BubbleSensor reagent4BubbleSensor(REAGENT_4_BUBBLE_SENSOR_PIN);
 BubbleSensor waste1LiquidSensor(WASTE_1_LIQUID_SENSOR_PIN);
 BubbleSensor waste2LiquidSensor(WASTE_2_LIQUID_SENSOR_PIN);
 
+// Waste Bottle Sensors
+OverflowSensor overflowSensorWasteBottle1(WASTE_BOTTLE_1_LIQUID_SENSOR_PIN);
+OverflowSensor overflowSensorWasteBottle2(WASTE_BOTTLE_2_LIQUID_SENSOR_PIN);
+
 // Overflow Sensors
 OverflowSensor overflowSensorTrough1(OVERFLOW_SENSOR_TROUGH_1_PIN);
 OverflowSensor overflowSensorTrough2(OVERFLOW_SENSOR_TROUGH_2_PIN);
@@ -183,6 +191,7 @@ SolenoidValve *wasteValves[] = {&wasteValve1, &wasteValve2, &wasteValve3, &waste
 BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
 BubbleSensor *wasteSensors[] = {&waste1LiquidSensor, &waste2LiquidSensor};
 OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
+OverflowSensor *wasteBottleSensors[] = {&overflowSensorWasteBottle1, &overflowSensorWasteBottle2};
 FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
 
 // ======================[Command Function Prototypes]============================
@@ -205,6 +214,7 @@ void cmd_prime_valves(char *args, Stream *response);
 void cmd_drain_trough(char *args, Stream *response);
 void cmd_stop_drain_trough(char *args, Stream *response);
 void cmd_trough_state(char *args, Stream *response);
+void cmd_idle_system(char *args, Stream *response);
 
 // ======================[Overflow and Timeout Handling]===========================
 // Functions to handle overflow and timeout conditions
@@ -267,8 +277,10 @@ Commander::API_t API_tree[] = {
     apiElement("H", "Print available commands and usage: H", cmd_print_help),
     apiElement("h", "Print available commands and usage: h", cmd_print_help),
     apiElement("help", "Print available commands and usage: help", cmd_print_help),
-    apiElement("TS", "Check trough state: TS <1-4> (returns if the trough is full or not)", cmd_trough_state)
-};
+    apiElement("TS", "Check trough state: TS <1-4> (returns if the trough is full or not)", cmd_trough_state),
+    apiElement("idle", "Set the system to idle state", cmd_idle_system),
+    apiElement("IDLE", "Set the system to idle state", cmd_idle_system),
+    apiElement("IDL", "Set the system to idle state", cmd_idle_system)};
 
 // ======================[Setup and Loop]==========================================
 
@@ -401,39 +413,39 @@ void log()
   }
 
   // Determine drain status (DS) for each trough based on valve combinations
-  drainStatus += (wasteValves[0]->isValveOpen() && wasteValves[2]->isValveOpen()) ? '1' : '0'; // Trough 1
+  drainStatus += (wasteValves[0]->isValveOpen() && wasteValves[2]->isValveOpen()) ? '1' : '0';  // Trough 1
   drainStatus += (wasteValves[0]->isValveOpen() && !wasteValves[2]->isValveOpen()) ? '1' : '0'; // Trough 2
-  drainStatus += (wasteValves[1]->isValveOpen() && wasteValves[3]->isValveOpen()) ? '1' : '0'; // Trough 3
+  drainStatus += (wasteValves[1]->isValveOpen() && wasteValves[3]->isValveOpen()) ? '1' : '0';  // Trough 3
   drainStatus += (wasteValves[1]->isValveOpen() && !wasteValves[3]->isValveOpen()) ? '1' : '0'; // Trough 4
 
   // Print initial log prefix
   Serial.print(F("LOG,STATE,"));
   Serial.print(systemState);
-  Serial.print(F(",RV,")); //Reagent valve prefix
+  Serial.print(F(",RV,")); // Reagent valve prefix
   Serial.print(reagentValve1.isValveOpen() ? 1 : 0);
   Serial.print(reagentValve2.isValveOpen() ? 1 : 0);
   Serial.print(reagentValve3.isValveOpen() ? 1 : 0);
   Serial.print(reagentValve4.isValveOpen() ? 1 : 0);
 
-  Serial.print(F(",MV,")); //Media valve prefix
+  Serial.print(F(",MV,")); // Media valve prefix
   Serial.print(mediaValve1.isValveOpen() ? 1 : 0);
   Serial.print(mediaValve2.isValveOpen() ? 1 : 0);
   Serial.print(mediaValve3.isValveOpen() ? 1 : 0);
   Serial.print(mediaValve4.isValveOpen() ? 1 : 0);
 
-  Serial.print(F(",WV,")); //Waste valve prefix
+  Serial.print(F(",WV,")); // Waste valve prefix
   Serial.print(wasteValve1.isValveOpen() ? 1 : 0);
   Serial.print(wasteValve2.isValveOpen() ? 1 : 0);
   Serial.print(wasteValve3.isValveOpen() ? 1 : 0);
   Serial.print(wasteValve4.isValveOpen() ? 1 : 0);
 
-  Serial.print(F(",BS,")); //Bubble sensor prefix
+  Serial.print(F(",BS,")); // Bubble sensor prefix
   Serial.print(reagent1BubbleSensor.isLiquidDetected() ? 1 : 0);
   Serial.print(reagent2BubbleSensor.isLiquidDetected() ? 1 : 0);
   Serial.print(reagent3BubbleSensor.isLiquidDetected() ? 1 : 0);
   Serial.print(reagent4BubbleSensor.isLiquidDetected() ? 1 : 0);
 
-  Serial.print(F(",OV,")); //Overflow sensor prefix
+  Serial.print(F(",OV,")); // Overflow sensor prefix
   Serial.print(overflowSensorTrough1.isOverflowing() ? 1 : 0);
   Serial.print(overflowSensorTrough2.isOverflowing() ? 1 : 0);
   Serial.print(overflowSensorTrough3.isOverflowing() ? 1 : 0);
@@ -486,6 +498,11 @@ void log()
   Serial.print(F(",WS,"));
   Serial.print(waste1LiquidSensor.isLiquidDetected() ? 1 : 0);
   Serial.print(waste2LiquidSensor.isLiquidDetected() ? 1 : 0);
+
+  // Waste Bottle Sensors (WSB)
+  Serial.print(F(",WSB,"));
+  Serial.print(wasteBottleSensors[0]->isOverflowing() ? 1 : 0);
+  Serial.print(wasteBottleSensors[1]->isOverflowing() ? 1 : 0);
   Serial.println();
 }
 
@@ -541,6 +558,8 @@ void initializeSensors()
   overflowSensorTrough4.setup();
   waste1LiquidSensor.setup();
   waste2LiquidSensor.setup();
+  overflowSensorWasteBottle1.setup();
+  overflowSensorWasteBottle2.setup();
 }
 
 // Function to handle flow sensor reset
@@ -685,7 +704,7 @@ void sendMessage(const __FlashStringHelper *message, Stream *serial, EthernetCli
 void monitorFlowSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
   const unsigned long resetDuration = 10;
-  const unsigned long flowTimeoutPeriod = 10000;     // Flow timeout period (milliseconds)
+  const unsigned long flowTimeoutPeriod = 10000;    // Flow timeout period (milliseconds)
   const unsigned long bubbleDetectionPeriod = 5000; // Time to wait for continuous bubbles before timeout
 
   static unsigned long bubbleStartTime[4] = {0, 0, 0, 0}; // Time when bubbles were first detected for each valve
@@ -1040,7 +1059,6 @@ void cmd_set_waste_valve(char *args, Stream *response)
     response->println(F("Invalid waste valve command. Use W <1-4> <0/1>."));
   }
 }
-
 
 // Command to set pressure valve (P <percentage>)
 void cmd_set_pressure_valve(char *args, Stream *response)
@@ -1734,19 +1752,27 @@ void cmd_get_system_state(char *args, Stream *response)
   }
   else
   {
-    if (inFillMode || isDispensing || isDraining) {
-      if (inFillMode) {
+    if (inFillMode || isDispensing || isDraining)
+    {
+      if (inFillMode)
+      {
         systemStateMessage += "Fill Mode";
       }
-      if (isDispensing) {
-        if (inFillMode) systemStateMessage += " and ";
+      if (isDispensing)
+      {
+        if (inFillMode)
+          systemStateMessage += " and ";
         systemStateMessage += "Dispensing";
       }
-      if (isDraining) {
-        if (inFillMode || isDispensing) systemStateMessage += " and ";
+      if (isDraining)
+      {
+        if (inFillMode || isDispensing)
+          systemStateMessage += " and ";
         systemStateMessage += "Draining";
       }
-    } else {
+    }
+    else
+    {
       systemStateMessage += "Idle"; // No operations are active
     }
   }
@@ -1866,8 +1892,18 @@ void cmd_get_system_state(char *args, Stream *response)
     response->print(bubbleSensors[i]->isLiquidDetected() ? F("Primed  ") : F("Not Primed  "));
   }
   response->println();
-}
 
+  // Waste Bottle Status
+  response->println(F("Waste Bottle Status:"));
+  for (int i = 0; i < 2; i++)
+  {
+    response->print(F("Bottle "));
+    response->print(i + 1);
+    response->print(F(": "));
+    response->println(wasteBottleSensors[i]->isOverflowing() ? F("Full") : F("Not Full"));
+  }
+  response->println();
+}
 
 // Command to reset the Modbus connection (MR)
 void cmd_modbus_reset(char *args, Stream *response)
@@ -1930,7 +1966,7 @@ void cmd_device_info(char *args, Stream *response)
   }
 }
 
-// Function to monitor the fluid line priming process 
+// Function to monitor the fluid line priming process
 void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
   const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000;
@@ -2111,13 +2147,29 @@ void cmd_prime_valves(char *args, Stream *response)
 // Monitor and manage waste sensors to control the drainage process
 void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetClient client)
 {
-  const unsigned long DRAIN_COMPLETE_DELAY = 3000;          // Delay to confirm drainage is complete
+  const unsigned long DRAIN_COMPLETE_DELAY = 3000;         // Delay to confirm drainage is complete
   static unsigned long lastDrainCompleteTime[2] = {0, 0};  // Time of last detected liquid on each waste sensor
   static bool liquidInitiallyDetected[2] = {false, false}; // Track if liquid was initially detected
 
   // Loop through each waste sensor (0 for waste sensor 1, 1 for waste sensor 2)
   for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
   {
+    // Check if the waste bottle is full and stop all draining for that bottle
+    if (wasteBottleSensors[sensorIdx]->isOverflowing())
+    {
+      for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++) // Troughs 1-2 or 3-4
+      {
+        if (valveControls[i].isDraining)
+        {
+          valveControls[i].isDraining = false;
+          wasteValves[sensorIdx]->closeValve(); // Close the main waste bottle valve
+          sendMessage(F("Draining stopped due to waste bottle overflow for trough "), response, client, false);
+          sendMessage(String(i + 1).c_str(), response, client);
+        }
+      }
+      continue; // Skip further checks for this waste bottle
+    }
+
     // Detect if waste sensor sees liquid
     if (wasteSensors[sensorIdx]->isLiquidDetected())
     {
@@ -2136,15 +2188,15 @@ void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetCl
         if (valveControls[0].isDraining)
         {
           valveControls[0].isDraining = false;
-          wasteValves[0]->closeValve();  // Close the main waste bottle 1 valve
-          wasteValves[2]->openValve();   // Keep trough 1's valve open
+          wasteValves[0]->closeValve(); // Close the main waste bottle 1 valve
+          wasteValves[2]->openValve();  // Keep trough 1's valve open
           sendMessage(F("Draining complete for trough 1"), response, client);
         }
         if (valveControls[1].isDraining)
         {
           valveControls[1].isDraining = false;
-          wasteValves[0]->closeValve();  // Close the main waste bottle 1 valve
-          wasteValves[2]->closeValve();  // Keep trough 2's valve closed
+          wasteValves[0]->closeValve(); // Close the main waste bottle 1 valve
+          wasteValves[2]->closeValve(); // Keep trough 2's valve closed
           sendMessage(F("Draining complete for trough 2"), response, client);
         }
       }
@@ -2155,15 +2207,15 @@ void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetCl
         if (valveControls[2].isDraining)
         {
           valveControls[2].isDraining = false;
-          wasteValves[1]->closeValve();  // Close the main waste bottle 2 valve
-          wasteValves[3]->openValve();   // Keep trough 3's valve open
+          wasteValves[1]->closeValve(); // Close the main waste bottle 2 valve
+          wasteValves[3]->openValve();  // Keep trough 3's valve open
           sendMessage(F("Draining complete for trough 3"), response, client);
         }
         if (valveControls[3].isDraining)
         {
           valveControls[3].isDraining = false;
           wasteValves[1]->closeValve(); // Close the main waste bottle 2 valve
-          wasteValves[3]->closeValve();   // Keep trough 4's valve closed
+          wasteValves[3]->closeValve(); // Keep trough 4's valve closed
           sendMessage(F("Draining complete for trough 4"), response, client);
         }
       }
@@ -2183,6 +2235,16 @@ void cmd_drain_trough(char *args, Stream *response)
   // Parse the trough number from the arguments
   if (sscanf(args, "%d", &troughNumber) == 1 && troughNumber >= 1 && troughNumber <= 4)
   {
+    // Check if the corresponding waste bottle is full
+    if ((troughNumber <= 2 && wasteBottleSensors[0]->isOverflowing()) || // Waste bottle 1
+        (troughNumber >= 3 && wasteBottleSensors[1]->isOverflowing()))   // Waste bottle 2
+    {
+      response->print(F("Error: Waste bottle "));
+      response->print(troughNumber <= 2 ? "1" : "2");
+      response->println(F(" is full. Cannot start drainage."));
+      return;
+    }
+
     // Check for incompatible drainage
     if ((troughNumber == 1 && valveControls[1].isDraining) ||
         (troughNumber == 2 && valveControls[0].isDraining))
@@ -2352,3 +2414,54 @@ void cmd_trough_state(char *args, Stream *response)
   }
 }
 
+// Command to set the system to an idle state
+void cmd_idle_system(char *args, Stream *response)
+{
+  response->println(F("Setting system to idle state..."));
+
+  // Close the pressure valve
+  pressureValve.setPosition(0);
+  response->println(F("Pressure valve closed."));
+
+  // Close all reagent and media valves
+  for (int i = 0; i < 4; i++)
+  {
+    reagentValves[i]->closeValve();
+    mediaValves[i]->closeValve();
+    valveControls[i].isDispensing = false;
+    valveControls[i].fillMode = false;
+    valveControls[i].targetVolume = -1; // Reset target volume
+
+    response->print(F("Reagent valve "));
+    response->print(i + 1);
+    response->println(F(" closed."));
+    response->print(F("Media valve "));
+    response->print(i + 1);
+    response->println(F(" closed."));
+  }
+
+  // Close the vacuum valves connected to waste bottles to eliminate vacuum pressure
+  wasteValves[0]->closeValve(); // Close valve for waste bottle 1
+  wasteValves[1]->closeValve(); // Close valve for waste bottle 2
+  response->println(F("Waste bottle vacuum valves closed to eliminate vacuum pressure."));
+
+  // Stop any priming, dispensing, or draining operations
+  for (int i = 0; i < 4; i++)
+  {
+    valveControls[i].isPriming = false;
+    valveControls[i].isDraining = false;
+    response->print(F("Stopped any ongoing operations for trough "));
+    response->println(i + 1);
+  }
+
+  // Reset flow sensor states
+  for (int i = 0; i < 4; i++)
+  {
+    flowSensorReset.resetInProgress[i] = false;
+    flowSensorReset.resetStartTime[i] = 0;
+    response->print(F("Flow sensor reset for valve "));
+    response->println(i + 1);
+  }
+
+  response->println(F("System is now in a safe idle state."));
+}
