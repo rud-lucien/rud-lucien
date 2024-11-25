@@ -2443,6 +2443,8 @@ void cmd_idle_system(char *args, Stream *response)
   // Close the vacuum valves connected to waste bottles to eliminate vacuum pressure
   wasteValves[0]->closeValve(); // Close valve for waste bottle 1
   wasteValves[1]->closeValve(); // Close valve for waste bottle 2
+  wasteValves[2]->closeValve(); // Close valve for trough 1 and 2
+  wasteValves[3]->closeValve(); // Close valve for trough 3 and 4
   response->println(F("Waste bottle vacuum valves closed to eliminate vacuum pressure."));
 
   // Stop any priming, dispensing, or draining operations
