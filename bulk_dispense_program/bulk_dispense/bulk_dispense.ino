@@ -2166,6 +2166,7 @@ void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetCl
   const unsigned long DRAIN_COMPLETE_DELAY = 3000;         // Delay to confirm drainage is complete
   static unsigned long lastDrainCompleteTime[2] = {0, 0};  // Time of last detected liquid on each waste sensor
   static bool liquidInitiallyDetected[2] = {false, false}; // Track if liquid was initially detected
+  static bool vacuumReleased[2] = {false, false};          // Track if vacuum has been released for each bottle
 
   // Loop through each waste sensor (0 for waste sensor 1, 1 for waste sensor 2)
   for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
@@ -2239,6 +2240,24 @@ void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetCl
       // Reset the timer and state for this sensor to be ready for the next cycle
       lastDrainCompleteTime[sensorIdx] = 0;
       liquidInitiallyDetected[sensorIdx] = false; // Reset initial detection flag
+      vacuumReleased[sensorIdx] = false;          // Reset vacuum state tracking
+    }
+    // After the draining process, check vacuum sensors to close valves
+    if (!vacuumReleased[sensorIdx] && !wasteVacuumSensors[sensorIdx]->isVacuumDetected())
+    {
+      // Close the corresponding waste valves once vacuum is no longer detected
+      if (sensorIdx == 0) // Waste bottle 1
+      {
+        wasteValves[2]->closeValve(); // Close valve for trough 1 and 2
+        sendMessage(F("Vacuum released. Waste valve 3 closed."), response, client);
+      }
+      else if (sensorIdx == 1) // Waste bottle 2
+      {
+        wasteValves[3]->closeValve(); // Close valve for trough 3 and 4
+        sendMessage(F("Vacuum released. Waste valve 4 closed."), response, client);
+      }
+
+      vacuumReleased[sensorIdx] = true; // Mark vacuum as released
     }
   }
 }
