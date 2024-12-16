@@ -127,6 +127,9 @@ struct FlowSensorReset
 // Global instance
 FlowSensorReset flowSensorReset = {{false, false, false, false}, {0, 0, 0, 0}};
 
+// Global vacuum monitoring flags
+bool globalVacuumMonitoring[2] = {false, false}; // Flags for vacuum release monitoring for bottle 1 and 2
+
 // ======================[Logging and Timeout Management]==========================
 struct LoggingManagement
 {
@@ -253,6 +256,7 @@ void logSystemState(unsigned long currentTime);
 void resetFlowSensor(int sensorIndex, FDXSensor *flowSensors[]);
 void monitorPrimeSensors(unsigned long currentTime, Stream *response, EthernetClient client);
 void monitorWasteSensors(unsigned long currentTime, Stream *response, EthernetClient client);
+void monitorVacuumRelease(unsigned long currentTime, Stream *response, EthernetClient client);
 void sendMessage(const char *message, Stream *serial, EthernetClient client, bool addNewline = true);
 void sendMessage(const __FlashStringHelper *message, Stream *serial, EthernetClient client, bool addNewline = true);
 
@@ -370,6 +374,7 @@ void loop()
   monitorFillSensors(currentTime, &Serial, tcpServer.getClient());
   monitorPrimeSensors(currentTime, &Serial, tcpServer.getClient());
   monitorWasteSensors(currentTime, &Serial, tcpServer.getClient());
+  monitorVacuumRelease(currentTime, &Serial, tcpServer.getClient());
 
   // Regular system updates
   checkModbusConnection(currentTime);
@@ -2359,6 +2364,41 @@ void cmd_drain_trough(char *args, Stream *response)
   }
 }
 
+// Monitor vacuum release after SDT is issued
+void monitorVacuumRelease(unsigned long currentTime, Stream *response, EthernetClient client)
+{
+  // Check each waste vacuum sensor
+  for (int bottleIdx = 0; bottleIdx < 2; bottleIdx++)
+  {
+    // Skip if vacuum release is not being monitored for this bottle
+    if (!globalVacuumMonitoring[bottleIdx])
+      continue;
+
+    // Check if vacuum has been released
+    if (!wasteVacuumSensors[bottleIdx]->isVacuumDetected())
+    {
+      // Close the corresponding waste valves once vacuum is released
+      if (bottleIdx == 0) // Waste bottle 1
+      {
+        wasteValves[2]->closeValve(); // Close valve for trough 1 and 2
+        sendMessage(F("Vacuum released. Waste valve 3 closed."), response, client);
+      }
+      else if (bottleIdx == 1) // Waste bottle 2
+      {
+        wasteValves[3]->closeValve(); // Close valve for trough 3 and 4
+        sendMessage(F("Vacuum released. Waste valve 4 closed."), response, client);
+      }
+
+      // Disable monitoring for this bottle
+      globalVacuumMonitoring[bottleIdx] = false;
+
+      // Log the flag reset
+      sendMessage(F("Vacuum monitoring disabled for bottle "), response, client, false);
+      sendMessage(String(bottleIdx + 1).c_str(), response, client);
+    }
+  }
+}
+
 // Command to stop draining reagent trough (SDT <1-4> or SDT all)
 void cmd_stop_drain_trough(char *args, Stream *response)
 {
@@ -2371,41 +2411,53 @@ void cmd_stop_drain_trough(char *args, Stream *response)
     for (int i = 0; i < 4; i++)
     {
       valveControls[i].isDraining = false;
-      wasteValves[i]->closeValve();
     }
+
+    // Set vacuum monitoring flags for both bottles
+    globalVacuumMonitoring[0] = true; // Monitor vacuum release for bottle 1
+    globalVacuumMonitoring[1] = true; // Monitor vacuum release for bottle 2
+
+    wasteValves[0]->closeValve(); // Close vacuum valve for waste bottle 1
+    wasteValves[1]->closeValve(); // Close vacuum valve for waste bottle 2
+
     response->println(F("Draining stopped for all troughs. Waste valves closed."));
   }
   else if (sscanf(args, "%d", &troughNumber) == 1 && troughNumber >= 1 && troughNumber <= 4)
   {
     // Stop draining the specific trough
     valveControls[troughNumber - 1].isDraining = false;
+
+    // Determine which vacuum bottle to monitor
+    if (troughNumber <= 2)
+    {
+      globalVacuumMonitoring[0] = true; // Monitor vacuum release for bottle 1
+      wasteValves[0]->closeValve();     // Close vacuum valve for waste bottle 1
+    }
+    else
+    {
+      globalVacuumMonitoring[1] = true; // Monitor vacuum release for bottle 2
+      wasteValves[1]->closeValve();     // Close vacuum valve for waste bottle 2
+    }
+
     // Execute the stop drain logic based on the trough number
     switch (troughNumber)
     {
     case 1:
-      wasteValves[0]->closeValve();
       wasteValves[2]->openValve();
       response->println(F("Draining stopped for trough 1."));
       break;
-
     case 2:
-      wasteValves[0]->closeValve();
       wasteValves[2]->closeValve();
       response->println(F("Draining stopped for trough 2."));
       break;
-
     case 3:
-      wasteValves[1]->closeValve();
       wasteValves[3]->openValve();
       response->println(F("Draining stopped for trough 3."));
       break;
-
     case 4:
-      wasteValves[1]->closeValve();
       wasteValves[3]->closeValve();
       response->println(F("Draining stopped for trough 4."));
       break;
-
     default:
       response->println(F("Invalid trough number. Use 1-4 or 'all'."));
       return;
