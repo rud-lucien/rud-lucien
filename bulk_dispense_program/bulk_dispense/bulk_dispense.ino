@@ -2,6 +2,7 @@
 #include <Controllino.h>
 #include "SolenoidValve.h"
 #include "BubbleSensor.h"
+#include "VacuumSensor.h"
 #include "OverflowSensor.h"
 #include "ProportionalValve.h"
 #include "PressureSensor.h"
@@ -53,6 +54,10 @@
 // Waste Bottle Liquid Sensors
 #define WASTE_BOTTLE_1_LIQUID_SENSOR_PIN CONTROLLINO_AI6
 #define WASTE_BOTTLE_2_LIQUID_SENSOR_PIN CONTROLLINO_AI7
+
+// Waste Bottle Vaccum Detection Switch
+#define WASTE_BOTTLE_1_VACUUM_SENSOR_PIN CONTROLLINO_AI8
+#define WASTE_BOTTLE_2_VACUUM_SENSOR_PIN CONTROLLINO_AI9
 
 // Pressure Control and Feedback
 #define PRESSURE_VALVE_CONTROL_PIN CONTROLLINO_AO0   // Analog Output for control
@@ -166,6 +171,10 @@ BubbleSensor waste2LiquidSensor(WASTE_2_LIQUID_SENSOR_PIN);
 OverflowSensor overflowSensorWasteBottle1(WASTE_BOTTLE_1_LIQUID_SENSOR_PIN);
 OverflowSensor overflowSensorWasteBottle2(WASTE_BOTTLE_2_LIQUID_SENSOR_PIN);
 
+// Waste Bottle Vacuum Sensors
+VacuumSensor waste1VacuumSensor(WASTE_BOTTLE_1_VACUUM_SENSOR_PIN);
+VacuumSensor waste2VacuumSensor(WASTE_BOTTLE_2_VACUUM_SENSOR_PIN);
+
 // Overflow Sensors
 OverflowSensor overflowSensorTrough1(OVERFLOW_SENSOR_TROUGH_1_PIN);
 OverflowSensor overflowSensorTrough2(OVERFLOW_SENSOR_TROUGH_2_PIN);
@@ -187,9 +196,9 @@ FDXSensor flowSensorReagent4(modbus, FLOW_SENSOR_REAGENT_4_MODBUS_REGISTER, FLOW
 SolenoidValve *reagentValves[] = {&reagentValve1, &reagentValve2, &reagentValve3, &reagentValve4};
 SolenoidValve *mediaValves[] = {&mediaValve1, &mediaValve2, &mediaValve3, &mediaValve4};
 SolenoidValve *wasteValves[] = {&wasteValve1, &wasteValve2, &wasteValve3, &wasteValve4}; // For waste valves
-
 BubbleSensor *bubbleSensors[] = {&reagent1BubbleSensor, &reagent2BubbleSensor, &reagent3BubbleSensor, &reagent4BubbleSensor};
 BubbleSensor *wasteSensors[] = {&waste1LiquidSensor, &waste2LiquidSensor};
+VacuumSensor *wasteVacuumSensors[] = {&waste1VacuumSensor, &waste2VacuumSensor};
 OverflowSensor *overflowSensors[] = {&overflowSensorTrough1, &overflowSensorTrough2, &overflowSensorTrough3, &overflowSensorTrough4};
 OverflowSensor *wasteBottleSensors[] = {&overflowSensorWasteBottle1, &overflowSensorWasteBottle2};
 FDXSensor *flowSensors[] = {&flowSensorReagent1, &flowSensorReagent2, &flowSensorReagent3, &flowSensorReagent4};
@@ -494,15 +503,20 @@ void log()
   Serial.print(F(",TDS,"));
   Serial.print(drainStatus); // TD as 4-bit binary string indicating draining status for each trough
 
-  // Waste Sensor for waste line
-  Serial.print(F(",WS,"));
+  // Waste Line Sensor (WSL)
+  Serial.print(F(",WLS,"));
   Serial.print(waste1LiquidSensor.isLiquidDetected() ? 1 : 0);
   Serial.print(waste2LiquidSensor.isLiquidDetected() ? 1 : 0);
 
   // Waste Bottle Sensors (WSB)
-  Serial.print(F(",WSB,"));
+  Serial.print(F(",WBS,"));
   Serial.print(wasteBottleSensors[0]->isOverflowing() ? 1 : 0);
   Serial.print(wasteBottleSensors[1]->isOverflowing() ? 1 : 0);
+
+  // Waste Bottle Vacuum Sensors (WBVS)
+  Serial.print(F(",WBVS,"));
+  Serial.print(waste1VacuumSensor.isVacuumDetected() ? 1 : 0); 
+  Serial.print(waste2VacuumSensor.isVacuumDetected() ? 1 : 0);
   Serial.println();
 }
 
@@ -558,6 +572,8 @@ void initializeSensors()
   overflowSensorTrough4.setup();
   waste1LiquidSensor.setup();
   waste2LiquidSensor.setup();
+  waste1VacuumSensor.setup();
+  waste2VacuumSensor.setup();
   overflowSensorWasteBottle1.setup();
   overflowSensorWasteBottle2.setup();
 }
@@ -1893,8 +1909,8 @@ void cmd_get_system_state(char *args, Stream *response)
   }
   response->println();
 
-  // Waste Bottle Status
-  response->println(F("Waste Bottle Status:"));
+  // Waste Bottle Liquid Level Status
+  response->println(F("Waste Bottle Liquid Level Status:"));
   for (int i = 0; i < 2; i++)
   {
     response->print(F("Bottle "));

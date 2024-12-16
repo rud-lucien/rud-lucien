@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+<ItemGroup>
+  <Reference Include="ids_peak_dotnet">
+    <HintPath>C:\Program Files\IDS\ids_peak\generic_sdk\api\binding\dotnet\x86_64\ids_peak_dotnet.dll</HintPath>
+  </Reference>
+  <Reference Include="ids_peak_dotnet_interface">
+    <HintPath>C:\Program Files\IDS\ids_peak\generic_sdk\api\binding\dotnet\x86_64\ids_peak_dotnet_interface.dll</HintPath>
+  </Reference>
+</ItemGroup>
+
+</Project>

@@ -1,0 +1,6 @@
+C:\Users\rlucien\OneDrive - Moderna\Desktop\rud-lucien\camera_project\MyCameraApp\obj\Debug\net9.0\MyCameraApp.csproj.AssemblyReference.cache
+C:\Users\rlucien\OneDrive - Moderna\Desktop\rud-lucien\camera_project\MyCameraApp\obj\Debug\net9.0\MyCameraApp.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\rlucien\OneDrive - Moderna\Desktop\rud-lucien\camera_project\MyCameraApp\obj\Debug\net9.0\MyCameraApp.AssemblyInfoInputs.cache
+C:\Users\rlucien\OneDrive - Moderna\Desktop\rud-lucien\camera_project\MyCameraApp\obj\Debug\net9.0\MyCameraApp.AssemblyInfo.cs
+C:\Users\rlucien\OneDrive - Moderna\Desktop\rud-lucien\camera_project\MyCameraApp\obj\Debug\net9.0\MyCameraApp.csproj.CoreCompileInputs.cache
+C:\Users\rlucien\OneDrive - Moderna\Desktop\rud-lucien\camera_project\MyCameraApp\obj\Debug\net9.0\MyCameraApp.sourcelink.json
