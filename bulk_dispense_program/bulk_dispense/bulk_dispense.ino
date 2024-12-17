@@ -1923,7 +1923,7 @@ void cmd_get_system_state(char *args, Stream *response)
     response->print(F("Bottle "));
     response->print(i + 1);
     response->print(F(": "));
-    response->println(wasteBottleSensors[i]->isOverflowing() ? F("Full") : F("Not Full"));
+    response->print(wasteBottleSensors[i]->isOverflowing() ? F("Full") : F("Not Full"));
   }
   response->println();
 
@@ -1934,7 +1934,7 @@ void cmd_get_system_state(char *args, Stream *response)
       response->print(F("Bottle "));
       response->print(i + 1);
       response->print(F(": "));
-      response->println(wasteVacuumSensors[i]->isVacuumDetected() ? F("Vacuum Detected") : F("No Vacuum"));
+      response->print(wasteVacuumSensors[i]->isVacuumDetected() ? F("Vacuum Detected") : F("No Vacuum"));
   }
   response->println();
 }
