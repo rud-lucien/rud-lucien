@@ -127,6 +127,8 @@ struct FlowSensorReset
 // Global instance
 FlowSensorReset flowSensorReset = {{false, false, false, false}, {0, 0, 0, 0}};
 
+
+// ======================[Vacuum Sensor Global Variables]=============================
 // Global vacuum monitoring flags
 bool globalVacuumMonitoring[2] = {false, false}; // Flags for vacuum release monitoring for bottle 1 and 2
 
@@ -1922,6 +1924,17 @@ void cmd_get_system_state(char *args, Stream *response)
     response->print(i + 1);
     response->print(F(": "));
     response->println(wasteBottleSensors[i]->isOverflowing() ? F("Full") : F("Not Full"));
+  }
+  response->println();
+
+  // Waste Bottle Vacuum State
+  response->println(F("Waste Bottle Vacuum State:"));
+  for (int i = 0; i < 2; i++)
+  {
+      response->print(F("Bottle "));
+      response->print(i + 1);
+      response->print(F(": "));
+      response->println(wasteVacuumSensors[i]->isVacuumDetected() ? F("Vacuum Detected") : F("No Vacuum"));
   }
   response->println();
 }
