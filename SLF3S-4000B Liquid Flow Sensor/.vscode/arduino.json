@@ -1,0 +1,5 @@
+{
+    "board": "CONTROLLINO_Boards:avr:controllino_maxi_automation",
+    "sketch": "flow_sensor\\flow_sensor.ino",
+    "port": "COM5"
+}
