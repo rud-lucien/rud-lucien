@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include <Controllino.h>
 
-
 void resetI2CBus() {
   Serial.println(F("Resetting I2C bus..."));
   Wire.end();
@@ -11,28 +10,29 @@ void resetI2CBus() {
 
 void selectMultiplexerChannel(uint8_t multiplexerAddr, uint8_t channel) {
   Wire.beginTransmission(multiplexerAddr);
-  Wire.write(1 << channel); // Select specific channel
+  Wire.write(1 << channel);  // Select specific channel
   Wire.endTransmission();
 }
 
 class FlowSensor {
 private:
-  uint8_t multiplexerAddr; // Multiplexer I2C address
-  uint8_t sensorAddr;      // Sensor I2C address
-  uint8_t channel;         // Multiplexer channel
-  uint16_t measurementCmd; // Measurement command
-  bool sensorInitialized;  // Tracks if the sensor is initialized
-  bool sensorStopped;      // Tracks if the sensor is intentionally stopped
+  uint8_t multiplexerAddr;  // Multiplexer I2C address
+  uint8_t sensorAddr;       // Sensor I2C address
+  uint8_t channel;          // Multiplexer channel
+  uint16_t measurementCmd;  // Measurement command
+  bool sensorInitialized;   // Tracks if the sensor is initialized
+  bool sensorStopped;       // Tracks if the sensor is intentionally stopped
 
 public:
-  float flowRate;     // Flow rate in mL/min
-  float temperature;  // Temperature in °C
-  int highFlowFlag;   // High flow flag (1 for yes, 0 for no)
+  float flowRate;       // Flow rate in mL/min
+  float temperature;    // Temperature in °C
+  int highFlowFlag;     // High flow flag (1 for yes, 0 for no)
+  int sensorConnected;  // Connection flag (1 = connected, 0 = disconnected)
 
   FlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_t cmd)
-      : multiplexerAddr(muxAddr), sensorAddr(addr), channel(chan),
-        measurementCmd(cmd), sensorInitialized(false), sensorStopped(false),
-        flowRate(0.0), temperature(0.0), highFlowFlag(0) {}
+    : multiplexerAddr(muxAddr), sensorAddr(addr), channel(chan),
+      measurementCmd(cmd), sensorInitialized(false), sensorStopped(true),
+      flowRate(0.0), temperature(0.0), highFlowFlag(0), sensorConnected(0) {}
 
   bool initializeSensor() {
     if (sensorStopped) {
@@ -50,52 +50,72 @@ public:
     if (Wire.endTransmission() != 0) {
       Serial.println(F("Soft reset failed"));
       resetI2CBus();
+      sensorConnected = 0;  // Mark sensor as disconnected
       return false;
     }
     delay(50);
 
     // Start continuous measurement mode
     Wire.beginTransmission(sensorAddr);
-    Wire.write(measurementCmd >> 8); // Send MSB
-    Wire.write(measurementCmd & 0xFF); // Send LSB
+    Wire.write(measurementCmd >> 8);    // Send MSB
+    Wire.write(measurementCmd & 0xFF);  // Send LSB
     if (Wire.endTransmission() != 0) {
       Serial.println(F("Failed to start measurement mode"));
       resetI2CBus();
+      sensorConnected = 0;  // Mark sensor as disconnected
       return false;
     }
 
     Serial.println(F("Sensor reinitialized successfully"));
-    delay(100); // Allow time for the sensor to stabilize
+    delay(100);  // Allow time for the sensor to stabilize
     sensorInitialized = true;
+    sensorConnected = 1;  // Mark sensor as connected
     return true;
+  }
+
+  bool checkConnection() {
+    selectMultiplexerChannel(multiplexerAddr, channel);
+
+    Wire.beginTransmission(sensorAddr);
+    if (Wire.endTransmission() == 0) {
+      sensorConnected = 1;  // Sensor is connected
+      return true;
+    } else {
+      sensorConnected = 0;  // Sensor is disconnected
+      return false;
+    }
   }
 
   bool readSensorData() {
     if (!sensorInitialized || sensorStopped) {
-      return false; // Skip reading if the sensor is not initialized or stopped
+      return false;  // Skip reading if the sensor is not initialized or stopped
     }
 
     selectMultiplexerChannel(multiplexerAddr, channel);
 
-    Wire.requestFrom(sensorAddr, (uint8_t)9); // Request 9 bytes from the sensor
+    Wire.requestFrom(sensorAddr, (uint8_t)9);  // Request 9 bytes from the sensor
     if (Wire.available() < 9) {
-      Serial.println(F("Error: Not enough bytes received, sensor disconnected"));
-      sensorInitialized = false; // Mark sensor as uninitialized
+      Serial.print(F("Error: Not enough bytes received from sensor on channel "));
+      Serial.println(channel);
+      sensorInitialized = false;  // Mark sensor as uninitialized
+      sensorStopped = true;       // Treat as stopped
+      sensorConnected = 0;        // Mark sensor as disconnected
       return false;
     }
 
     // Parse data
     uint16_t flowRaw = (Wire.read() << 8) | Wire.read();
-    Wire.read(); // Skip flow CRC
+    Wire.read();  // Skip flow CRC
     uint16_t tempRaw = (Wire.read() << 8) | Wire.read();
-    Wire.read(); // Skip temp CRC
+    Wire.read();  // Skip temp CRC
     uint16_t auxRaw = (Wire.read() << 8) | Wire.read();
-    Wire.read(); // Skip aux CRC
+    Wire.read();  // Skip aux CRC
 
     // Convert to physical values
     flowRate = (int16_t)flowRaw / 32.0;      // Scale factor for flow
-    temperature = (int16_t)tempRaw / 200.0; // Scale factor for temperature
-    highFlowFlag = (auxRaw & 0x02) ? 1 : 0; // Bit 1: High flow flag
+    temperature = (int16_t)tempRaw / 200.0;  // Scale factor for temperature
+    highFlowFlag = (auxRaw & 0x02) ? 1 : 0;  // Bit 1: High flow flag
+    sensorConnected = 1;                     // Mark as connected after successful read
 
     return true;
   }
@@ -105,8 +125,8 @@ public:
 
     // Send stop measurement command
     Wire.beginTransmission(sensorAddr);
-    Wire.write(0x3F); // Stop command MSB
-    Wire.write(0xF9); // Stop command LSB
+    Wire.write(0x3F);  // Stop command MSB
+    Wire.write(0xF9);  // Stop command LSB
     if (Wire.endTransmission() == 0) {
       Serial.print(F("Sensor on channel "));
       Serial.print(channel);
@@ -116,12 +136,21 @@ public:
       Serial.println(channel);
     }
 
-    sensorInitialized = false; // Mark the sensor as no longer initialized
-    sensorStopped = true;      // Mark the sensor as intentionally stopped
+    sensorInitialized = false;  // Mark the sensor as no longer initialized
+    sensorStopped = true;       // Mark the sensor as intentionally stopped
+    // Connection status remains updated via checkConnection()
   }
 
-  void startMeasurement() { // Previously resumeMeasurement
-    sensorStopped = false; // Clear the stopped state
+  void startMeasurement() {
+    // Check if the sensor is physically connected
+    if (!sensorConnected) {
+      Serial.print(F("Error: Cannot start measurement for sensor on channel "));
+      Serial.print(channel);
+      Serial.println(F(" because it is physically disconnected."));
+      return;
+    }
+
+    sensorStopped = false;  // Clear the stopped state
     if (initializeSensor()) {
       Serial.print(F("Sensor on channel "));
       Serial.print(channel);
@@ -131,8 +160,10 @@ public:
 };
 
 
-FlowSensor flow0(0x70, 0x08, 0, 0x3608); // Multiplexer at 0x70, channel 0
-FlowSensor flow1(0x70, 0x08, 1, 0x3608); // Multiplexer at 0x70, channel 1
+
+
+FlowSensor flow0(0x70, 0x08, 0, 0x3608);  // Multiplexer at 0x70, channel 0
+FlowSensor flow1(0x70, 0x08, 1, 0x3608);  // Multiplexer at 0x70, channel 1
 
 void setup() {
   Wire.begin();
@@ -151,7 +182,7 @@ void setup() {
 void handleSerialCommands() {
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
-    command.trim(); // Remove any extra whitespace or newline characters
+    command.trim();  // Remove any extra whitespace or newline characters
 
     if (command == "start0") {
       flow0.startMeasurement();
@@ -172,7 +203,7 @@ void handleSerialCommands() {
 }
 
 
-/////////////////////////////////////////////Code Using String Class///////////////////////////////////////////////////////////
+/////////////////////////////////////////////Code Using String Class (want to keep this as back up way of doing things, currently commented out)///////////////////////////////////////////////////////////
 // void loop() {
 //   handleSerialCommands();
 
@@ -212,32 +243,36 @@ void loop() {
 
   unsigned long currentMillis = millis();
   static unsigned long lastPrintTime = 0;
-  const unsigned long printInterval = 250;
+  const unsigned long printInterval = 500;
+
+  // Check sensor connection status
+  flow0.checkConnection();
+  flow1.checkConnection();
 
   // Temporary buffers to hold sensor output
-  char flow0Output[50]; // Buffer for sensor0 output
-  char flow1Output[50]; // Buffer for sensor1 output
-  char flow0RateBuffer[10]; // Temporary buffer for flowRate
-  char flow0TempBuffer[10]; // Temporary buffer for temperature
-  char flow1RateBuffer[10]; // Temporary buffer for flowRate
-  char flow1TempBuffer[10]; // Temporary buffer for temperature
+  char flow0Output[50];      // Buffer for flow0 output
+  char flow1Output[50];      // Buffer for flow1 output
+  char flow0RateBuffer[10];  // Temporary buffer for flowRate
+  char flow0TempBuffer[10];  // Temporary buffer for temperature
+  char flow1RateBuffer[10];  // Temporary buffer for flowRate
+  char flow1TempBuffer[10];  // Temporary buffer for temperature
 
   // Read and format data from flow0
   if (flow0.readSensorData()) {
-    dtostrf(flow0.flowRate, 6, 2, flow0RateBuffer); // Convert flowRate to string
-    dtostrf(flow0.temperature, 6, 2, flow0TempBuffer); // Convert temperature to string
-    snprintf(flow0Output, sizeof(flow0Output), "flow0, %s, %s, %d", flow0RateBuffer, flow0TempBuffer, flow0.highFlowFlag);
+    dtostrf(flow0.flowRate, 6, 2, flow0RateBuffer);     // Convert flowRate to string
+    dtostrf(flow0.temperature, 6, 2, flow0TempBuffer);  // Convert temperature to string
+    snprintf(flow0Output, sizeof(flow0Output), "flow0, %d, %s, %s, %d", flow0.sensorConnected, flow0RateBuffer, flow0TempBuffer, flow0.highFlowFlag);
   } else {
-    snprintf(flow0Output, sizeof(flow0Output), "flow0, n/a, n/a, n/a");
+    snprintf(flow0Output, sizeof(flow0Output), "flow0, %d, n/a, n/a, n/a", flow0.sensorConnected);
   }
 
   // Read and format data from flow1
   if (flow1.readSensorData()) {
-    dtostrf(flow1.flowRate, 6, 2, flow1RateBuffer); // Convert flowRate to string
-    dtostrf(flow1.temperature, 6, 2, flow1TempBuffer); // Convert temperature to string
-    snprintf(flow1Output, sizeof(flow1Output), "flow1, %s, %s, %d", flow1RateBuffer, flow1TempBuffer, flow1.highFlowFlag);
+    dtostrf(flow1.flowRate, 6, 2, flow1RateBuffer);     // Convert flowRate to string
+    dtostrf(flow1.temperature, 6, 2, flow1TempBuffer);  // Convert temperature to string
+    snprintf(flow1Output, sizeof(flow1Output), "flow1, %d, %s, %s, %d", flow1.sensorConnected, flow1RateBuffer, flow1TempBuffer, flow1.highFlowFlag);
   } else {
-    snprintf(flow1Output, sizeof(flow1Output), "flow1, n/a, n/a, n/a");
+    snprintf(flow1Output, sizeof(flow1Output), "flow1, %d, n/a, n/a, n/a", flow1.sensorConnected);
   }
 
   // Print both sensor outputs on the same line
@@ -246,4 +281,3 @@ void loop() {
     lastPrintTime = currentMillis;
   }
 }
-
