@@ -16,23 +16,27 @@ void selectMultiplexerChannel(uint8_t multiplexerAddr, uint8_t channel) {
 
 class FlowSensor {
 private:
-  uint8_t multiplexerAddr;  // Multiplexer I2C address
-  uint8_t sensorAddr;       // Sensor I2C address
-  uint8_t channel;          // Multiplexer channel
-  uint16_t measurementCmd;  // Measurement command
-  bool sensorInitialized;   // Tracks if the sensor is initialized
-  bool sensorStopped;       // Tracks if the sensor is intentionally stopped
+  uint8_t multiplexerAddr;       // Multiplexer I2C address
+  uint8_t sensorAddr;            // Sensor I2C address
+  uint8_t channel;               // Multiplexer channel
+  uint16_t measurementCmd;       // Measurement command
+  bool sensorInitialized;        // Tracks if the sensor is initialized
+  bool sensorStopped;            // Tracks if the sensor is intentionally stopped
+  unsigned long lastUpdateTime;  // Tracks the last time volume was updated
 
 public:
-  float flowRate;       // Flow rate in mL/min
-  float temperature;    // Temperature in °C
-  int highFlowFlag;     // High flow flag (1 for yes, 0 for no)
-  int sensorConnected;  // Connection flag (1 = connected, 0 = disconnected)
+  float flowRate;        // Flow rate in mL/min
+  float temperature;     // Temperature in °C
+  int highFlowFlag;      // High flow flag (1 for yes, 0 for no)
+  int sensorConnected;   // Connection flag (1 = connected, 0 = disconnected)
+  float dispenseVolume;  // Volume for specific dispense operations
+  float totalVolume;     // Running total volume
 
   FlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_t cmd)
     : multiplexerAddr(muxAddr), sensorAddr(addr), channel(chan),
       measurementCmd(cmd), sensorInitialized(false), sensorStopped(true),
-      flowRate(0.0), temperature(0.0), highFlowFlag(0), sensorConnected(0) {}
+      flowRate(0.0), temperature(0.0), highFlowFlag(0), sensorConnected(0),
+      dispenseVolume(0.0), totalVolume(0.0), lastUpdateTime(0) {}
 
   bool initializeSensor() {
     if (sensorStopped) {
@@ -69,7 +73,9 @@ public:
     Serial.println(F("Sensor reinitialized successfully"));
     delay(100);  // Allow time for the sensor to stabilize
     sensorInitialized = true;
-    sensorConnected = 1;  // Mark sensor as connected
+    sensorConnected = 1;        // Mark sensor as connected
+    lastUpdateTime = millis();  // Initialize the update timestamp
+    dispenseVolume = 0.0;       // Reset volume on initialization
     return true;
   }
 
@@ -117,7 +123,34 @@ public:
     highFlowFlag = (auxRaw & 0x02) ? 1 : 0;  // Bit 1: High flow flag
     sensorConnected = 1;                     // Mark as connected after successful read
 
+    // Apply flow rate filtering
+    if (flowRate < 0) {
+      flowRate = 0.0;  // Ignore negative flow rates
+    }
+
+    // Update integrated flow (volume)
+    unsigned long currentTime = millis();
+    if (lastUpdateTime > 0) {
+      float elapsedMinutes = (currentTime - lastUpdateTime) / 60000.0;  // Convert ms to minutes
+      float increment = flowRate * elapsedMinutes;                      // Calculate volume increment
+      dispenseVolume += increment;                                      // Increment specific volume
+      totalVolume += increment;                                         // Increment total volume
+    }
+    lastUpdateTime = currentTime;
+
     return true;
+  }
+
+  void resetVolume() {
+    dispenseVolume = 0.0;  // Reset only the dispense volume
+    Serial.print(F("Dispense volume reset for sensor on channel "));
+    Serial.println(channel);
+  }
+
+  void resetTotalVolume() {
+    totalVolume = 0.0;  // Reset the total volume
+    Serial.print(F("Total volume reset for sensor on channel "));
+    Serial.println(channel);
   }
 
   void stopMeasurement() {
@@ -160,23 +193,13 @@ public:
 };
 
 
-
-
 FlowSensor flow0(0x70, 0x08, 0, 0x3608);  // Multiplexer at 0x70, channel 0
 FlowSensor flow1(0x70, 0x08, 1, 0x3608);  // Multiplexer at 0x70, channel 1
 
 void setup() {
   Wire.begin();
   Serial.begin(115200);
-  Serial.println(F("Enter commands to start/stop sensors: start0, stop0, start1, stop1"));
-
-  // // Initialize sensors if you want it to display data upon startup
-  // if (!flow0.initializeSensor()) {
-  //   Serial.println(F("Flow 0 initialization failed"));
-  // }
-  // if (!flow1.initializeSensor()) {
-  //   Serial.println(F("Flow 1 initialization failed"));
-  // }
+  Serial.println(F("Enter commands to start/stop sensors: start0, stop0, start1, stop1, reset0, reset1, resetTotal0, resetTotal1"));
 }
 
 void handleSerialCommands() {
@@ -196,48 +219,20 @@ void handleSerialCommands() {
     } else if (command == "stop1") {
       flow1.stopMeasurement();
       Serial.println(F("Flow 1 stopped"));
+    } else if (command == "reset0") {
+      flow0.resetVolume();
+    } else if (command == "reset1") {
+      flow1.resetVolume();
+    } else if (command == "resetTotal0") {
+      flow0.resetTotalVolume();
+    } else if (command == "resetTotal1") {
+      flow1.resetTotalVolume();
     } else {
-      Serial.println(F("Unknown command. Use: start0, stop0, start1, stop1"));
+      Serial.println(F("Unknown command. Use: start0, stop0, start1, stop1, reset0, reset1, resetTotal0, resetTotal1"));
     }
   }
 }
 
-
-/////////////////////////////////////////////Code Using String Class (want to keep this as back up way of doing things, currently commented out)///////////////////////////////////////////////////////////
-// void loop() {
-//   handleSerialCommands();
-
-//   unsigned long currentMillis = millis();
-//   static unsigned long lastPrintTime = 0;
-//   const unsigned long printInterval = 500;
-
-//   // Temporary variables to hold sensor output
-//   String flow0Output = "";
-//   String flow1Output = "";
-
-//   // Read and format data from sensor0
-//   if (flow0.readSensorData()) {
-//     flow0Output = "flow0, " + String(flow0.flowRate, 2) + ", " + String(flow0.temperature, 2) + ", " + String(flow0.highFlowFlag);
-//   } else {
-//     flow0Output = "flow0, n/a, n/a, n/a"; // Default values for stopped sensor
-//   }
-
-//   // Read and format data from sensor1
-//   if (flow1.readSensorData()) {
-//     flow1Output = "flow1, " + String(flow1.flowRate, 2) + ", " + String(flow1.temperature, 2) + ", " + String(flow1.highFlowFlag);
-//   } else {
-//     flow1Output = "flow1, n/a, n/a, n/a"; // Default values for stopped sensor
-//   }
-
-//   // Print both sensor outputs on the same line
-//   if (currentMillis - lastPrintTime >= printInterval) {
-//     Serial.println(flow0Output + " | " + flow1Output);
-//     lastPrintTime = currentMillis;
-//   }
-// }
-
-
-/////////////////////////////////////////////Code Using dtostrf///////////////////////////////////////////////////////////
 void loop() {
   handleSerialCommands();
 
@@ -250,29 +245,39 @@ void loop() {
   flow1.checkConnection();
 
   // Temporary buffers to hold sensor output
-  char flow0Output[50];      // Buffer for flow0 output
-  char flow1Output[50];      // Buffer for flow1 output
-  char flow0RateBuffer[10];  // Temporary buffer for flowRate
-  char flow0TempBuffer[10];  // Temporary buffer for temperature
-  char flow1RateBuffer[10];  // Temporary buffer for flowRate
-  char flow1TempBuffer[10];  // Temporary buffer for temperature
+  char flow0Output[100];         // Buffer for flow0 output
+  char flow1Output[100];         // Buffer for flow1 output
+  char flow0RateBuffer[10];      // Temporary buffer for flowRate
+  char flow0TempBuffer[10];      // Temporary buffer for temperature
+  char flow0DispenseBuffer[10];  // Temporary buffer for dispense volume
+  char flow0TotalBuffer[10];     // Temporary buffer for total volume
+  char flow1RateBuffer[10];      // Temporary buffer for flowRate
+  char flow1TempBuffer[10];      // Temporary buffer for temperature
+  char flow1DispenseBuffer[10];  // Temporary buffer for dispense volume
+  char flow1TotalBuffer[10];     // Temporary buffer for total volume
 
   // Read and format data from flow0
   if (flow0.readSensorData()) {
-    dtostrf(flow0.flowRate, 6, 2, flow0RateBuffer);     // Convert flowRate to string
-    dtostrf(flow0.temperature, 6, 2, flow0TempBuffer);  // Convert temperature to string
-    snprintf(flow0Output, sizeof(flow0Output), "flow0, %d, %s, %s, %d", flow0.sensorConnected, flow0RateBuffer, flow0TempBuffer, flow0.highFlowFlag);
+    dtostrf(flow0.flowRate, 6, 2, flow0RateBuffer);      // Convert flowRate to string
+    dtostrf(flow0.temperature, 6, 2, flow0TempBuffer);   // Convert temperature to string
+    dtostrf(flow0.volume, 6, 2, flow0VolumeBuffer);      // Convert dispense volume to string
+    dtostrf(flow0.totalVolume, 6, 2, flow0TotalBuffer);  // Convert total volume to string
+    snprintf(flow0Output, sizeof(flow0Output), "flow0, %d, %s, %s, %s, %s, %d",
+             flow0.sensorConnected, flow0RateBuffer, flow0TempBuffer, flow0VolumeBuffer, flow0TotalBuffer, flow0.highFlowFlag);
   } else {
-    snprintf(flow0Output, sizeof(flow0Output), "flow0, %d, n/a, n/a, n/a", flow0.sensorConnected);
+    snprintf(flow0Output, sizeof(flow0Output), "flow0, %d, n/a, n/a, n/a, n/a, n/a", flow0.sensorConnected);
   }
 
   // Read and format data from flow1
   if (flow1.readSensorData()) {
-    dtostrf(flow1.flowRate, 6, 2, flow1RateBuffer);     // Convert flowRate to string
-    dtostrf(flow1.temperature, 6, 2, flow1TempBuffer);  // Convert temperature to string
-    snprintf(flow1Output, sizeof(flow1Output), "flow1, %d, %s, %s, %d", flow1.sensorConnected, flow1RateBuffer, flow1TempBuffer, flow1.highFlowFlag);
+    dtostrf(flow1.flowRate, 6, 2, flow1RateBuffer);      // Convert flowRate to string
+    dtostrf(flow1.temperature, 6, 2, flow1TempBuffer);   // Convert temperature to string
+    dtostrf(flow1.volume, 6, 2, flow1VolumeBuffer);      // Convert dispense volume to string
+    dtostrf(flow1.totalVolume, 6, 2, flow1TotalBuffer);  // Convert total volume to string
+    snprintf(flow1Output, sizeof(flow1Output), "flow1, %d, %s, %s, %s, %s, %d",
+             flow1.sensorConnected, flow1RateBuffer, flow1TempBuffer, flow1VolumeBuffer, flow1TotalBuffer, flow1.highFlowFlag);
   } else {
-    snprintf(flow1Output, sizeof(flow1Output), "flow1, %d, n/a, n/a, n/a", flow1.sensorConnected);
+    snprintf(flow1Output, sizeof(flow1Output), "flow1, %d, n/a, n/a, n/a, n/a, n/a", flow1.sensorConnected);
   }
 
   // Print both sensor outputs on the same line
