@@ -1,0 +1,349 @@
+#################Pressure Sensor Example###############################################
+
+Functional Programming Pattern for Embedded Systems (Arduino, Sensors, and I2C Devices)
+1️⃣ Use a struct for Configuration Instead of a Class
+Encapsulate sensor/device-specific settings in a struct.
+Example:
+cpp
+Copy
+Edit
+struct SensorConfig {
+    byte analogPin;
+    float minValue;
+    float maxValue;
+};
+Why?
+✅ Makes the configuration explicit.
+✅ Reduces unnecessary global state.
+✅ Avoids using class unless object-oriented behavior is needed.
+2️⃣ Use Pure Functions Instead of Methods
+Write stateless functions that take configuration as input.
+Example:
+cpp
+Copy
+Edit
+float readVoltage(const SensorConfig &config) {
+    int analogValue = analogRead(config.analogPin);
+    return (analogValue / 1023.0) * 10.0;
+}
+Why?
+✅ Functions don’t depend on hidden object state.
+✅ Easier to test, debug, and reuse.
+3️⃣ Pass Configuration by const & to Avoid Copying
+Use const & (constant reference) to avoid unnecessary memory usage.
+Example:
+cpp
+Copy
+Edit
+float readPressure(const SensorConfig &config) {
+    float voltage = readVoltage(config);
+    return (voltage / 10.0) * config.maxValue;
+}
+Why?
+✅ Avoids copying large structs, saving memory.
+✅ Ensures functions don’t accidentally modify config.
+4️⃣ Use Higher-Order Functions to Separate Data Collection from Processing
+Instead of hardcoding what to do with sensor data, pass a function pointer (callback).
+Example:
+cpp
+Copy
+Edit
+void processSensorData(const SensorConfig &config, void (*callback)(float)) {
+    float value = readPressure(config);
+    callback(value);
+}
+Why?
+✅ Allows different behaviors without modifying core logic.
+✅ Example:
+cpp
+Copy
+Edit
+processSensorData(sensor1, printData);
+processSensorData(sensor1, logData);
+5️⃣ Use Dedicated Output Functions
+Instead of printing inside the sensor function, pass a function pointer to handle the output.
+Example:
+cpp
+Copy
+Edit
+void printData(float value) {
+    Serial.print("Value: ");
+    Serial.println(value);
+}
+
+void logData(float value) {
+    // Log data to a file or server
+}
+Why?
+✅ Keeps business logic separate from output behavior.
+✅ Flexible (can print, log, or trigger actions based on data).
+6️⃣ Use Non-Blocking Code (millis() Instead of delay())
+Avoid using delay() so the microcontroller can do other tasks.
+Example:
+cpp
+Copy
+Edit
+void loop() {
+    static unsigned long lastUpdate = 0;
+    const unsigned long interval = 500;
+
+    if (millis() - lastUpdate >= interval) {
+        lastUpdate = millis();
+        processSensorData(sensor1, printData);
+    }
+}
+Why?
+✅ Allows the system to remain responsive.
+✅ Supports multitasking, e.g., handling multiple sensors.
+📌 Summary of the Functional Pattern
+✅ Encapsulate configuration in a struct instead of a class.
+✅ Use pure functions that take the struct as input instead of methods.
+✅ Pass configuration by const & to avoid copying.
+✅ Use higher-order functions to process sensor data dynamically.
+✅ Keep sensor logic and output logic separate.
+✅ Use millis() for non-blocking execution.
+
+📌 Example Pattern Applied
+cpp
+Copy
+Edit
+// Step 1: Define a struct for sensor configuration
+struct SensorConfig {
+    byte analogPin;
+    float minValue;
+    float maxValue;
+};
+
+// Step 2: Write pure functions for sensor logic
+float readVoltage(const SensorConfig &config) {
+    return (analogRead(config.analogPin) / 1023.0) * 10.0;
+}
+
+float readPressure(const SensorConfig &config) {
+    return (readVoltage(config) / 10.0) * config.maxValue;
+}
+
+// Step 3: Use higher-order function for flexible processing
+void processSensorData(const SensorConfig &config, void (*callback)(float)) {
+    callback(readPressure(config));
+}
+
+// Step 4: Separate output logic
+void printData(float value) {
+    Serial.print("Pressure: ");
+    Serial.print(value);
+    Serial.println(" psi");
+}
+
+// Step 5: Use non-blocking execution
+void loop() {
+    static unsigned long lastUpdate = 0;
+    const unsigned long interval = 500;
+
+    if (millis() - lastUpdate >= interval) {
+        lastUpdate = millis();
+        processSensorData(sensor1, printData);
+    }
+}
+
+########################Temp & Humidity Sensor Example###################################
+Functional Programming Pattern for Embedded Systems (Arduino, Sensors, and I2C Devices)
+This pattern applies to Arduino-based sensor projects, especially those using I2C devices like the Adafruit SHT31-D Temperature & Humidity Sensor.
+
+🔹 Key Principles of the Functional Style
+✅ Encapsulate sensor configuration in a struct instead of a class.
+✅ Use pure functions that take the struct as input instead of methods.
+✅ Pass configuration by const & to avoid unnecessary copies.
+✅ Use higher-order functions to process sensor data dynamically.
+✅ Keep sensor logic and output logic separate.
+✅ Use millis() for non-blocking execution.
+
+📌 Step-by-Step Breakdown Using a Temperature & Humidity Sensor
+1️⃣ Define a struct for Sensor Configuration
+cpp
+Copy
+Edit
+struct TempHumiditySensorConfig {
+    uint8_t i2cAddress;  // I2C address of the sensor
+    uint8_t muxChannel;  // Multiplexer channel (if using an I2C multiplexer)
+};
+This struct stores the sensor’s configuration, keeping it explicit and separate from logic.
+2️⃣ Write Pure Functions for Sensor Logic
+cpp
+Copy
+Edit
+#include <Wire.h>
+#include "Adafruit_SHT31.h"
+
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
+
+// Function to select the correct I2C multiplexer channel
+void selectMultiplexerChannel(uint8_t channel) {
+    Wire.beginTransmission(0x70); // Multiplexer I2C address
+    Wire.write(1 << channel);
+    Wire.endTransmission();
+}
+
+// Function to read temperature and humidity from the sensor
+float readTemperature(const TempHumiditySensorConfig &config) {
+    selectMultiplexerChannel(config.muxChannel);
+    return sht31.readTemperature();
+}
+
+float readHumidity(const TempHumiditySensorConfig &config) {
+    selectMultiplexerChannel(config.muxChannel);
+    return sht31.readHumidity();
+}
+These are pure functions:
+They take the sensor configuration as input.
+They return a value without modifying global state.
+They do not print data (output logic is separate).
+3️⃣ Use a Higher-Order Function for Dynamic Processing
+cpp
+Copy
+Edit
+void processSensorData(const TempHumiditySensorConfig &config, void (*callback)(float, float)) {
+    float temperature = readTemperature(config);
+    float humidity = readHumidity(config);
+    callback(temperature, humidity);
+}
+Instead of hardcoding what to do with the data, this function:
+Reads the temperature and humidity.
+Calls a function pointer (callback) to process the values dynamically.
+4️⃣ Define Different Output Functions
+cpp
+Copy
+Edit
+void printSensorData(float temperature, float humidity) {
+    Serial.print(F("Temperature: "));
+    Serial.print(temperature);
+    Serial.print(F(" °C\tHumidity: "));
+    Serial.print(humidity);
+    Serial.println(F(" %"));
+}
+
+void logSensorData(float temperature, float humidity) {
+    // Example: Log to SD card, cloud, or another system
+    Serial.print(F("Logging data -> Temp: "));
+    Serial.print(temperature);
+    Serial.print(F(", Humidity: "));
+    Serial.println(humidity);
+}
+These functions handle output separately, making it easy to swap different behaviors.
+5️⃣ Use Non-Blocking Execution (millis() Instead of delay())
+cpp
+Copy
+Edit
+void loop() {
+    static unsigned long lastUpdate = 0;
+    const unsigned long interval = 1000; // Read every 1 second
+
+    if (millis() - lastUpdate >= interval) {
+        lastUpdate = millis();
+        processSensorData(sensor1, printSensorData); // Print data
+        processSensorData(sensor2, logSensorData);   // Log data
+    }
+}
+Avoids delay(), allowing other tasks to run while waiting for sensor reads.
+📌 Final Example Code
+cpp
+Copy
+Edit
+#include <Wire.h>
+#include "Adafruit_SHT31.h"
+
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
+
+struct TempHumiditySensorConfig {
+    uint8_t i2cAddress;  
+    uint8_t muxChannel;  
+};
+
+// Function to select I2C multiplexer channel
+void selectMultiplexerChannel(uint8_t channel) {
+    Wire.beginTransmission(0x70); // I2C multiplexer address
+    Wire.write(1 << channel);
+    Wire.endTransmission();
+}
+
+// Pure functions for reading sensor values
+float readTemperature(const TempHumiditySensorConfig &config) {
+    selectMultiplexerChannel(config.muxChannel);
+    return sht31.readTemperature();
+}
+
+float readHumidity(const TempHumiditySensorConfig &config) {
+    selectMultiplexerChannel(config.muxChannel);
+    return sht31.readHumidity();
+}
+
+// Higher-order function: process sensor data dynamically
+void processSensorData(const TempHumiditySensorConfig &config, void (*callback)(float, float)) {
+    float temperature = readTemperature(config);
+    float humidity = readHumidity(config);
+    callback(temperature, humidity);
+}
+
+// Output functions
+void printSensorData(float temperature, float humidity) {
+    Serial.print(F("Temperature: "));
+    Serial.print(temperature);
+    Serial.print(F(" °C\tHumidity: "));
+    Serial.print(humidity);
+    Serial.println(F(" %"));
+}
+
+void logSensorData(float temperature, float humidity) {
+    Serial.print(F("Logging data -> Temp: "));
+    Serial.print(temperature);
+    Serial.print(F(", Humidity: "));
+    Serial.println(humidity);
+}
+
+// Sensor configurations
+TempHumiditySensorConfig sensor1 = {0x44, 1};  // Sensor 1 on multiplexer channel 1
+TempHumiditySensorConfig sensor2 = {0x45, 2};  // Sensor 2 on multiplexer channel 2
+
+void setup() {
+    Serial.begin(115200);
+    Wire.begin();
+
+    // Initialize sensor
+    selectMultiplexerChannel(sensor1.muxChannel);
+    if (!sht31.begin(sensor1.i2cAddress)) {
+        Serial.println(F("Sensor 1 not detected!"));
+    }
+
+    selectMultiplexerChannel(sensor2.muxChannel);
+    if (!sht31.begin(sensor2.i2cAddress)) {
+        Serial.println(F("Sensor 2 not detected!"));
+    }
+}
+
+void loop() {
+    static unsigned long lastUpdate = 0;
+    const unsigned long interval = 1000; 
+
+    if (millis() - lastUpdate >= interval) {
+        lastUpdate = millis();
+        processSensorData(sensor1, printSensorData); 
+        processSensorData(sensor2, logSensorData);
+    }
+}
+🔹 Key Takeaways
+✅ Encapsulated sensor configuration in a struct (TempHumiditySensorConfig)
+✅ Used pure functions (readTemperature(), readHumidity()) instead of class methods
+✅ Passed config by reference (const &) to avoid copying
+✅ Used a higher-order function (processSensorData()) for flexibility
+✅ Separated sensor logic from output handling (printSensorData(), logSensorData())
+✅ Used millis() instead of delay() for non-blocking execution
+
+📌 Save This as a Reference for Future Projects
+Whenever you need to write sensor-based embedded code, follow these steps:
+
+Define a struct for configuration (sensor settings, pins, addresses).
+Use pure functions for sensor reading logic.
+Pass configuration by const & to avoid memory overhead.
+Use higher-order functions (processSensorData()) to separate logic from behavior.
+Write different output functions (printSensorData(), logSensorData()).
+Use millis() for non-blocking execution.
