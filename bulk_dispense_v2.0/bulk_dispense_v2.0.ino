@@ -10,10 +10,13 @@
 #include <Controllino.h>
 #include "Commander-API.hpp"
 #include "Commander-IO.hpp"
+#include <string.h> // for strtok
+#include <ctype.h>  // for isspace
 
 // =====================
 // Global Constants
 // =====================
+#define COMMAND_SIZE 30
 #define FAN_CONTROL_PIN CONTROLLINO_R6
 
 // Reagent Valves
@@ -81,15 +84,17 @@ struct BinarySensor;
 // =====================
 // Command Function Prototypes
 // =====================
-void cmd_set_log_frequency(char *args, Stream *response);
-void cmd_fan(char *args, Stream *response);
-void cmd_set_reagent_valve(char *args, Stream *response);
-void cmd_set_media_valve(char *args, Stream *response);
-void cmd_set_waste_valve(char *args, Stream *response);
+void cmd_set_log_frequency(char *args, CommandCaller* caller);
+void cmd_fan(char *args, CommandCaller* caller);
+void cmd_set_reagent_valve(char *args, CommandCaller* caller);
+void cmd_set_media_valve(char *args, CommandCaller* caller);
+void cmd_set_waste_valve(char *args, CommandCaller* caller);
 
 // =====================
 // Helper Function Prototypes
 // =====================
+char* trimLeadingSpaces(char* str);
+void processMultipleCommands(char* commandLine, Stream* stream);
 void handleSerialCommands();
 void logSystemState();
 void monitorOverflowSensors(unsigned long currentTime);
@@ -306,78 +311,68 @@ BinarySensor wasteVacuumSensors[NUM_WASTE_VACUUM_SENSORS] = {
 // =====================
 
 // Command callback to set the log frequency ("LF <ms>")
-void cmd_set_log_frequency(char *args, Stream *response) {
+void cmd_set_log_frequency(char *args, CommandCaller* caller) {
   int newInterval = -1;
   if (sscanf(args, "%d", &newInterval) == 1 && newInterval > 0) {
     logging.logInterval = newInterval;
-    response->print(F("Log frequency set to "));
-    response->print(newInterval);
-    response->println(F(" ms"));
+    caller->print("Log frequency set to ");
+    caller->print(newInterval);
+    caller->println(" ms");
   } else {
-    response->println(F("Invalid log frequency. Use: LF <positive number>"));
+    caller->println("Invalid log frequency. Use: LF <positive number>");
   }
 }
 
 // Command callback to control the fan ("FN <0/1>")
-void cmd_fan(char *args, Stream *response) {
+void cmd_fan(char *args, CommandCaller* caller) {
   int fanState = -1;
   if (sscanf(args, "%d", &fanState) == 1 && (fanState == 0 || fanState == 1)) {
     bool state = (fanState == 1);
     setFanState(fan, state);
     printFanState(state);
-    logData("Fan", state ? "1" : "0");
-    response->println(F("Fan command executed."));
+    caller->print("Fan command executed.\r\n");
   } else {
-    response->println(F("Invalid fan command. Use: FN <0/1>"));
+    caller->print("Invalid fan command. Use: FN <0/1>\r\n");
   }
 }
 
 // Command callback to control reagent valves ("R <valve number> <0/1>")
-void cmd_set_reagent_valve(char *args, Stream *response) {
+void cmd_set_reagent_valve(char *args, CommandCaller* caller) {
   int valveNumber = -1;
   int valveState = -1;
   if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 &&
       valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES &&
       (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
-    // Using individual global variables (or you can use the array if preferred)
     switch (valveNumber) {
       case 1:
         reagentValve1 = state ? openValve(reagentValve1) : closeValve(reagentValve1);
-        response->print(F("Reagent valve 1 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Reagent valve 1 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 2:
         reagentValve2 = state ? openValve(reagentValve2) : closeValve(reagentValve2);
-        response->print(F("Reagent valve 2 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Reagent valve 2 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 3:
         reagentValve3 = state ? openValve(reagentValve3) : closeValve(reagentValve3);
-        response->print(F("Reagent valve 3 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Reagent valve 3 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 4:
         reagentValve4 = state ? openValve(reagentValve4) : closeValve(reagentValve4);
-        response->print(F("Reagent valve 4 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Reagent valve 4 set to ");
+        caller->println(state ? "open" : "closed");
         break;
     }
-    // Log reagent valve states in compact format.
-    char rvBuffer[6];
-    sprintf(rvBuffer, "%c%c%c%c", 
-            (reagentValve1.isOpen ? '1' : '0'),
-            (reagentValve2.isOpen ? '1' : '0'),
-            (reagentValve3.isOpen ? '1' : '0'),
-            (reagentValve4.isOpen ? '1' : '0'));
-    logData("RV", rvBuffer);
   } else {
-    response->println(F("Invalid reagent valve command. Use: R <1-4> <0/1>"));
+    caller->println("Invalid reagent valve command. Use: R <1-4> <0/1>");
   }
 }
 
 // Command callback to control media valves ("M <valve number> <0/1>")
-void cmd_set_media_valve(char *args, Stream *response) {
+void cmd_set_media_valve(char *args, CommandCaller* caller) {
   int valveNumber = -1;
   int valveState = -1;
   if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 &&
@@ -387,40 +382,32 @@ void cmd_set_media_valve(char *args, Stream *response) {
     switch (valveNumber) {
       case 1:
         mediaValve1 = state ? openValve(mediaValve1) : closeValve(mediaValve1);
-        response->print(F("Media valve 1 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Media valve 1 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 2:
         mediaValve2 = state ? openValve(mediaValve2) : closeValve(mediaValve2);
-        response->print(F("Media valve 2 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Media valve 2 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 3:
         mediaValve3 = state ? openValve(mediaValve3) : closeValve(mediaValve3);
-        response->print(F("Media valve 3 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Media valve 3 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 4:
         mediaValve4 = state ? openValve(mediaValve4) : closeValve(mediaValve4);
-        response->print(F("Media valve 4 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Media valve 4 set to ");
+        caller->println(state ? "open" : "closed");
         break;
     }
-    // Log media valve states in compact format.
-    char mvBuffer[6];
-    sprintf(mvBuffer, "%c%c%c%c", 
-            (mediaValve1.isOpen ? '1' : '0'),
-            (mediaValve2.isOpen ? '1' : '0'),
-            (mediaValve3.isOpen ? '1' : '0'),
-            (mediaValve4.isOpen ? '1' : '0'));
-    logData("MV", mvBuffer);
   } else {
-    response->println(F("Invalid media valve command. Use: M <1-4> <0/1>"));
+    caller->println("Invalid media valve command. Use: M <1-4> <0/1>");
   }
 }
 
 // Command callback to control waste valves ("W <valve number> <0/1>")
-void cmd_set_waste_valve(char *args, Stream *response) {
+void cmd_set_waste_valve(char *args, CommandCaller* caller) {
   int valveNumber = -1;
   int valveState = -1;
   if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 &&
@@ -430,50 +417,46 @@ void cmd_set_waste_valve(char *args, Stream *response) {
     switch (valveNumber) {
       case 1:
         wasteValve1 = state ? openValve(wasteValve1) : closeValve(wasteValve1);
-        response->print(F("Waste valve 1 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Waste valve 1 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 2:
         wasteValve2 = state ? openValve(wasteValve2) : closeValve(wasteValve2);
-        response->print(F("Waste valve 2 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Waste valve 2 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 3:
         wasteValve3 = state ? openValve(wasteValve3) : closeValve(wasteValve3);
-        response->print(F("Waste valve 3 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Waste valve 3 set to ");
+        caller->println(state ? "open" : "closed");
         break;
       case 4:
         wasteValve4 = state ? openValve(wasteValve4) : closeValve(wasteValve4);
-        response->print(F("Waste valve 4 set to "));
-        response->println(state ? F("open") : F("closed"));
+        caller->print("Waste valve 4 set to ");
+        caller->println(state ? "open" : "closed");
         break;
     }
-    // Log waste valve states in compact format.
-    char wvBuffer[6];
-    sprintf(wvBuffer, "%c%c%c%c", 
-            (wasteValve1.isOpen ? '1' : '0'),
-            (wasteValve2.isOpen ? '1' : '0'),
-            (wasteValve3.isOpen ? '1' : '0'),
-            (wasteValve4.isOpen ? '1' : '0'));
-    logData("WV", wvBuffer);
   } else {
-    response->println(F("Invalid waste valve command. Use: W <1-4> <0/1>"));
+    caller->println("Invalid waste valve command. Use: W <1-4> <0/1>");
   }
 }
+
 
 // =====================
 // Commander API Setup
 // =====================
 Commander commander;
 
-Commander::API_t API_tree[] = {
-  apiElement("LF", "Set log frequency: LF <ms>", cmd_set_log_frequency),
-  apiElement("FN", "Fan: FN <0/1> (0 = off, 1 = on)", cmd_fan),
-  apiElement("R", "Reagent valve: R <1-4> <0/1>", cmd_set_reagent_valve),
-  apiElement("M", "Media valve: M <1-4> <0/1>", cmd_set_media_valve),
-  apiElement("W", "Waste valve: W <1-4> <0/1> (0 = close, 1 = open)", cmd_set_waste_valve)
+Commander::systemCommand_t API_tree[] = {
+  systemCommand("LF", "Set log frequency: LF <ms>", cmd_set_log_frequency),
+  systemCommand("FN", "Fan: FN <0/1> (0 = off, 1 = on)", cmd_fan),
+  systemCommand("R",  "Reagent valve: R <1-4> <0/1>",     cmd_set_reagent_valve),
+  systemCommand("M",  "Media valve: M <1-4> <0/1>",        cmd_set_media_valve),
+  systemCommand("W",  "Waste valve: W <1-4> <0/1>",        cmd_set_waste_valve)
 };
+
+// This buffer is used to store command from Serial port.
+char commandBuffer[ COMMAND_SIZE ];
 
 // =====================
 // Setup Function
@@ -516,8 +499,22 @@ void setup() {
   binarySensorSetup(reagent1BubbleSensor3);
   binarySensorSetup(reagent1BubbleSensor4);
 
+  // Setup waste line sensors.
+  binarySensorSetup(waste1LiquidSensor);
+  binarySensorSetup(waste2LiquidSensor);
+
+  // Setup waste bottle sensors.
+  binarySensorSetup(overflowSensorWasteBottle1);
+  binarySensorSetup(overflowSensorWasteBottle2);
+
+  // Setup vacuum sensors.
+  binarySensorSetup(waste1VacuumSensor);
+  binarySensorSetup(waste2VacuumSensor);
+
+
+
   // Attach and initialize the Commander API.
-  commander.attachTree(API_tree);
+  commander.attachTree( API_tree );
   commander.init();
 }
 
@@ -526,6 +523,7 @@ void setup() {
 // =====================
 void loop() {
   unsigned long currentTime = millis();
+  // commander.update( commandBuffer, COMMAND_SIZE, &Serial );
   
   // Process serial commands using your custom handler.
   handleSerialCommands();
@@ -549,74 +547,149 @@ void loop() {
 // =====================
 // Helper Function: Handle Serial Input for Commands
 // =====================
-void handleSerialCommands() {
-  static char commandBuffer[32]; // Buffer for incoming command
-  static uint8_t commandIndex = 0;
+// void handleSerialCommands() {
+//   static char commandBuffer[32]; // Buffer for incoming command
+//   static uint8_t commandIndex = 0;
 
-  while (Serial.available()) {
-    char c = Serial.read();
-    if (c == '\n') {
-      commandBuffer[commandIndex] = '\0'; // Terminate the string
-      commander.execute(commandBuffer, &Serial);
-      commandIndex = 0; // Reset buffer index
+//   while (Serial.available()) {
+//     char c = Serial.read();
+//     if (c == '\n') {
+//       commandBuffer[commandIndex] = '\0'; // Terminate the string
+//       commander.execute(commandBuffer, &Serial);
+//       commandIndex = 0; // Reset buffer index
+//     }
+//     else if (c != '\r') {
+//       commandBuffer[commandIndex++] = c;
+//       if (commandIndex >= sizeof(commandBuffer) - 1) {
+//         commandIndex = sizeof(commandBuffer) - 1;
+//       }
+//     }
+//   }
+// }
+
+// Helper function to trim leading spaces
+char* trimLeadingSpaces(char* str) {
+  while (*str && isspace(*str)) {
+    str++;
+  }
+  return str;
+}
+
+// Process a command line that may include multiple comma-delimited commands
+void processMultipleCommands(char* commandLine, Stream* stream) {
+  // Split the commandLine by commas using strtok()
+  char* token = strtok(commandLine, ",");
+  while (token != NULL) {
+    // Trim leading whitespace from the token
+    token = trimLeadingSpaces(token);
+    // If the token isn't empty, execute it.
+    if (strlen(token) > 0) {
+      commander.execute(token, stream);
     }
-    else if (c != '\r') {
-      commandBuffer[commandIndex++] = c;
-      if (commandIndex >= sizeof(commandBuffer) - 1) {
-        commandIndex = sizeof(commandBuffer) - 1;
+    token = strtok(NULL, ",");
+  }
+}
+
+// Improved serial handler
+void handleSerialCommands() {
+  static char commandBuffer[COMMAND_SIZE];
+  static uint8_t commandIndex = 0;
+  
+  // Check if data is available
+  while (Serial.available() > 0) {
+    char c = Serial.read();  // Read a single character
+
+    // If we see a newline (or carriage return), we have a full command.
+    if (c == '\n') {
+      commandBuffer[commandIndex] = '\0';  // Null-terminate the string
+      
+      // Process the full command line (which may include multiple comma-delimited commands)
+      processMultipleCommands(commandBuffer, &Serial);
+      
+      // Reset the buffer index for the next command
+      commandIndex = 0;
+      
+      // Optionally, break if you want to process one command per loop iteration.
+    } 
+    else if (c != '\r') {  // Ignore carriage returns
+      if (commandIndex < (COMMAND_SIZE - 1)) {  // Avoid buffer overflow
+        commandBuffer[commandIndex++] = c;
       }
     }
   }
 }
 
+
+
+
+
 // =====================
 // Helper Function: Log Overall System State
 // =====================
-// Format: [LOG] F<fanState>, RV<r1><r2><r3><r4>, MV<m1><m2><m3><m4>, WV<w1><w2><w3><w4>, BS<b1><b2><b3><b4>, OS<o1><o2><o3><o4>
+// Helper Function: Log Overall System State
+// Format: [LOG] F<fanState>, RV<r1><r2><r3><r4>, MV<m1><m2><m3><m4>, WV<w1><w2><w3><w4>, WSL<wsl1><wsl2>, WBL<wbl1><wbl2>, WVS<wvs1><wvs2>, BS<b1><b2><b3><b4>, OS<o1><o2><o3><o4>
 void logSystemState() {
-  char buffer[100];
-  // Fan state
+  char buffer[150];  // Increase buffer size as needed
+
+  // Fan state (F)
   char fState = (digitalRead(fan.relayPin) == HIGH ? '1' : '0');
 
-  // Reagent valve states
+  // Reagent valve states (RV)
   char rv1 = (reagentValve1.isOpen ? '1' : '0');
   char rv2 = (reagentValve2.isOpen ? '1' : '0');
   char rv3 = (reagentValve3.isOpen ? '1' : '0');
   char rv4 = (reagentValve4.isOpen ? '1' : '0');
 
-  // Media valve states
+  // Media valve states (MV)
   char mv1 = (mediaValve1.isOpen ? '1' : '0');
   char mv2 = (mediaValve2.isOpen ? '1' : '0');
   char mv3 = (mediaValve3.isOpen ? '1' : '0');
   char mv4 = (mediaValve4.isOpen ? '1' : '0');
 
-  // Waste valve states
+  // Waste valve states (WV)
   char wv1 = (wasteValve1.isOpen ? '1' : '0');
   char wv2 = (wasteValve2.isOpen ? '1' : '0');
   char wv3 = (wasteValve3.isOpen ? '1' : '0');
   char wv4 = (wasteValve4.isOpen ? '1' : '0');
 
-  // Bubble sensor states (BS)
+  // Waste Line Sensor states (WSL) -- assume NUM_WASTE_LINE_SENSORS == 2
+  char wsl1 = (readBinarySensor(wasteLineSensors[0]) ? '1' : '0');
+  char wsl2 = (readBinarySensor(wasteLineSensors[1]) ? '1' : '0');
+
+  // Waste Bottle Sensor states (WBL) -- assume NUM_WASTE_BOTTLE_SENSORS == 2
+  char wbl1 = (readBinarySensor(wasteBottleSensors[0]) ? '1' : '0');
+  char wbl2 = (readBinarySensor(wasteBottleSensors[1]) ? '1' : '0');
+
+  // Waste Vacuum Sensor states (WVS) -- assume NUM_WASTE_VACUUM_SENSORS == 2
+  char wvs1 = (readBinarySensor(wasteVacuumSensors[0]) ? '1' : '0');
+  char wvs2 = (readBinarySensor(wasteVacuumSensors[1]) ? '1' : '0');
+
+  // Bubble Sensor states (BS)
   char bs1 = (readBinarySensor(reagent1BubbleSensor1) ? '1' : '0');
   char bs2 = (readBinarySensor(reagent1BubbleSensor2) ? '1' : '0');
   char bs3 = (readBinarySensor(reagent1BubbleSensor3) ? '1' : '0');
   char bs4 = (readBinarySensor(reagent1BubbleSensor4) ? '1' : '0');
 
-  // Overflow sensor states (OS)
+  // Overflow Sensor states (OS)
   char os1 = (readBinarySensor(overflowSensorTrough1) ? '1' : '0');
   char os2 = (readBinarySensor(overflowSensorTrough2) ? '1' : '0');
   char os3 = (readBinarySensor(overflowSensorTrough3) ? '1' : '0');
   char os4 = (readBinarySensor(overflowSensorTrough4) ? '1' : '0');
 
-  sprintf(buffer, "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, BS%c%c%c%c, OS%c%c%c%c",
-          fState, 
-          rv1, rv2, rv3, rv4, 
-          mv1, mv2, mv3, mv4, 
+  // Format the complete log line
+  sprintf(buffer, "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, WSL%c%c, WBL%c%c, WVS%c%c, BS%c%c%c%c, OS%c%c%c%c",
+          fState,
+          rv1, rv2, rv3, rv4,
+          mv1, mv2, mv3, mv4,
           wv1, wv2, wv3, wv4,
+          wsl1, wsl2,
+          wbl1, wbl2,
+          wvs1, wvs2,
           bs1, bs2, bs3, bs4,
           os1, os2, os3, os4);
   Serial.println(buffer);
 }
+
 
 // =====================
 // Helper Function: Monitor Overflow Sensors at Fast Intervals
