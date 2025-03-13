@@ -125,6 +125,7 @@ void cmd_start_flow_measurement(char* args, CommandCaller* caller);
 void cmd_stop_flow_measurement(char* args, CommandCaller* caller);
 void cmd_reset_flow_dispense(char* args, CommandCaller* caller);
 void cmd_reset_flow_total(char* args, CommandCaller* caller);
+void cmd_reset_i2c(char* args, CommandCaller* caller);
 
 
 // =====================
@@ -208,48 +209,14 @@ FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_
 // =====================
 // Flow Sensor Functions
 // =====================
-bool initializeFlowSensor(FlowSensor& sensor) {
-    if (sensor.sensorStopped) {
-        return false;
-    }
-
-    selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
-
-    Wire.beginTransmission(0x00);
-    Wire.write(0x06);
-    if (Wire.endTransmission() != 0) {
-        Serial.println(F("[ERROR] Soft reset failed"));
-        sensor.sensorConnected = 0;
-        return false;
-    }
-    delay(50);
-
-    Wire.beginTransmission(sensor.sensorAddr);
-    Wire.write(sensor.measurementCmd >> 8);
-    Wire.write(sensor.measurementCmd & 0xFF);
-    if (Wire.endTransmission() != 0) {
-        Serial.println(F("[ERROR] Failed to start measurement mode"));
-        sensor.sensorConnected = 0;
-        return false;
-    }
-    delay(100);
-
-    sensor.sensorInitialized = true;
-    sensor.sensorConnected = 1;
-    sensor.lastUpdateTime = millis();
-    sensor.dispenseVolume = 0.0;
-
-    return true;
-}
-
-
 bool readFlowSensorData(FlowSensor& sensor) {
+  static int softResetAttempt = 0;  // Prevent infinite resets
+
   if (!sensor.sensorInitialized || sensor.sensorStopped) {
     sensor.flowRate = -1;
     sensor.temperature = -1;
     sensor.highFlowFlag = -1;
 
-    // If totalVolume is 0.0 (sensor has never measured anything), ensure dispenseVolume is also 0.0
     if (sensor.totalVolume == 0.0) {
       sensor.dispenseVolume = 0.0;
     }
@@ -259,14 +226,33 @@ bool readFlowSensorData(FlowSensor& sensor) {
 
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
   Wire.requestFrom(sensor.sensorAddr, (uint8_t)9);
+
   if (Wire.available() < 9) {
     Serial.print(F("[ERROR] Not enough bytes received from flow sensor on channel "));
     Serial.println(sensor.channel);
+
+    // Attempt soft reset before giving up
+    if (softResetAttempt < 2) {
+      Serial.println(F("[WARNING] Attempting soft reset to recover..."));
+      Wire.beginTransmission(sensor.sensorAddr);
+      Wire.write(0x00);
+      Wire.write(0x06);
+      if (Wire.endTransmission() == 0) {
+        delay(25);  // Allow sensor time to reset
+        softResetAttempt++;
+        return false;  // Retry reading next cycle
+      }
+    }
+
+    Serial.println(F("[ERROR] Multiple failures. Sensor will remain in error state."));
     sensor.sensorInitialized = false;
     sensor.sensorStopped = true;
     sensor.sensorConnected = 0;
+    softResetAttempt = 0;  // Reset counter after giving up
     return false;
   }
+
+  softResetAttempt = 0;  // Reset failure counter on success
 
   uint16_t flowRaw = (Wire.read() << 8) | Wire.read();
   Wire.read();  // Skip CRC
@@ -287,14 +273,71 @@ bool readFlowSensorData(FlowSensor& sensor) {
     float elapsedMinutes = (currentTime - sensor.lastUpdateTime) / 60000.0;
     float increment = sensor.flowRate * elapsedMinutes;
 
-    sensor.dispenseVolume += increment;  // Dispense volume keeps tracking during measurement
-    sensor.totalVolume += increment;     // Total volume accumulates over multiple operations
+    sensor.dispenseVolume += increment;
+    sensor.totalVolume += increment;
   }
 
   sensor.lastUpdateTime = currentTime;
   sensor.isValidReading = true;
   return true;
 }
+
+
+
+
+bool initializeFlowSensor(FlowSensor& sensor) {
+  static int softResetAttempt = 0;  // Track soft reset attempts
+
+  if (sensor.sensorStopped) {
+    return false;
+  }
+
+  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+
+  // Attempt soft reset before initialization
+  Wire.beginTransmission(sensor.sensorAddr);
+  Wire.write(0x00);
+  Wire.write(0x06);
+  if (Wire.endTransmission() != 0) {
+    Serial.println(F("[WARNING] Soft reset failed during initialization."));
+    softResetAttempt++;
+
+    // Retry soft reset once before giving up
+    if (softResetAttempt < 2) {
+      delay(25);
+      return initializeFlowSensor(sensor);
+    }
+
+    Serial.println(F("[ERROR] Multiple soft reset failures. Sensor initialization aborted."));
+    sensor.sensorConnected = 0;
+    softResetAttempt = 0;  // Reset attempt counter
+    return false;
+  }
+
+  delay(50);
+
+  // Start continuous measurement mode
+  Wire.beginTransmission(sensor.sensorAddr);
+  Wire.write(sensor.measurementCmd >> 8);
+  Wire.write(sensor.measurementCmd & 0xFF);
+  if (Wire.endTransmission() != 0) {
+    Serial.println(F("[ERROR] Failed to start measurement mode."));
+    sensor.sensorConnected = 0;
+    return false;
+  }
+
+  delay(100);
+  sensor.sensorInitialized = true;
+  sensor.sensorConnected = 1;
+  sensor.lastUpdateTime = millis();
+  sensor.dispenseVolume = 0.0;
+  softResetAttempt = 0;  // Reset counter on success
+
+  return true;
+}
+
+
+
 
 // =====================
 // OnOffValve Functions
@@ -380,12 +423,12 @@ struct FanControl {
 };
 
 void setFanState(const FanControl& config, bool state) {
-  static bool lastState = false; // Store last fan state to avoid redundant logging
+  static bool lastState = false;  // Store last fan state to avoid redundant logging
   if (lastState != state) {
     digitalWrite(config.relayPin, state ? HIGH : LOW);
     Serial.print(F("[MESSAGE] Fan state set to "));
     Serial.println(state ? F("ON") : F("OFF"));
-    lastState = state; // Update last known state
+    lastState = state;  // Update last known state
   }
 }
 
@@ -757,6 +800,12 @@ void cmd_reset_flow_total(char* args, CommandCaller* caller) {
   }
 }
 
+void cmd_reset_i2c(char* args, CommandCaller* caller) {
+  Serial.println(F("[MESSAGE] Manual I2C bus reset initiated."));
+  resetI2CBus();
+  caller->println(F("[MESSAGE] I2C bus reset complete."));
+}
+
 
 // =====================
 // Commander API Setup
@@ -775,7 +824,8 @@ Commander::systemCommand_t API_tree[] = {
   systemCommand("STARTFS", "Start flow sensor: STARTFS <0-3>", cmd_start_flow_measurement),
   systemCommand("STOPFS", "Stop flow sensor: STOPFS <0-3>", cmd_stop_flow_measurement),
   systemCommand("RF", "Reset flow sensor dispense volume: RFS <0-3>", cmd_reset_flow_dispense),
-  systemCommand("RTF", "Reset total volume for Flow Sensor: RTF <0-3>", cmd_reset_flow_total)
+  systemCommand("RTF", "Reset total volume for Flow Sensor: RTF <0-3>", cmd_reset_flow_total),
+  systemCommand("RESETI2C", "Manually reset the I2C bus", cmd_reset_i2c)
 
 };
 
@@ -785,81 +835,105 @@ Commander::systemCommand_t API_tree[] = {
 char commandBuffer[COMMAND_SIZE];
 
 // =====================
-// Setup Function
+// Setup Function (Refined I2C Reset & Flow Sensor Initialization)
 // =====================
 void setup() {
-    Serial.begin(115200);
-    
-    Serial.println(F("[MESSAGE] System starting..."));
+  Serial.begin(115200);
+  Serial.println(F("[MESSAGE] System starting..."));
 
-    // Fan Setup
-    fanSetup(fan);
+  // Fan Setup
+  fanSetup(fan);
 
-    // Proportional Valve & Pressure Sensor Setup
-    proportionalValveSetup(proportionalValve);
-    calibrateProportionalValve();  // Calibrate at startup
+  // Proportional Valve & Pressure Sensor Setup
+  proportionalValveSetup(proportionalValve);
+  calibrateProportionalValve();
 
-    // **Check System Air Pressure After Calibration**
-    float systemPressure = readPressure(pressureSensor);
-    if (systemPressure > 15.0) {
-        Serial.print(F("[MESSAGE] System air pressure available: "));
-        Serial.print(systemPressure);
-        Serial.println(F(" psi."));
-    } else {
-        Serial.print(F("[WARNING] Low air pressure detected! Current pressure: "));
-        Serial.print(systemPressure);
-        Serial.println(F(" psi. Ensure air supply is available."));
+  // **Check System Air Pressure After Calibration**
+  float systemPressure = readPressure(pressureSensor);
+  if (systemPressure > 15.0) {
+    Serial.print(F("[MESSAGE] System air pressure available: "));
+    Serial.print(systemPressure);
+    Serial.println(F(" psi."));
+  } else {
+    Serial.print(F("[WARNING] Low air pressure detected! Current pressure: "));
+    Serial.print(systemPressure);
+    Serial.println(F(" psi. Ensure air supply is available."));
+  }
+  setValvePosition(proportionalValve, 0.0);  // Close valve after calibration
+
+  // **Initialize Flow Sensors**
+  Serial.println(F("[MESSAGE] Initializing Flow Sensors..."));
+
+  bool allFailed = true;      // Assume all fail, then disprove if any succeed
+  bool anyStopped = false;    // Track if any sensors are intentionally stopped
+  String failedSensors = "";  // Track failed sensor indices
+  FlowSensor* sensors[] = { &flow0, &flow1, &flow2, &flow3 };
+
+  for (int i = 0; i < NUM_FLOW_SENSORS; i++) {
+    if (sensors[i]->sensorStopped) {
+      anyStopped = true;
+      continue;  // Skip initialization for stopped sensors
     }
-    setValvePosition(proportionalValve, 0.0);  // Close valve after calibration
 
-    // Initialize Flow Sensors
-    Serial.println(F("[MESSAGE] Initializing Flow Sensors..."));
+    if (initializeFlowSensor(*sensors[i])) {
+      allFailed = false;  // At least one sensor succeeded
+    } else {
+      failedSensors += String(i) + " ";  // Store failed sensor numbers
+    }
+  }
 
-    bool anyFailures = false;
-    bool anyStopped = false;
-    String failedSensors = "";
+  // **Only reset I2C if all flow sensors failed**
+  if (allFailed) {
+    Serial.println(F("[WARNING] All flow sensors failed. Resetting I2C bus..."));
+    resetI2CBus();
+    delay(50);
 
-    FlowSensor* sensors[] = { &flow0, &flow1, &flow2, &flow3 };
+    // Retry only for failed sensors
+    failedSensors = "";  // Reset failed list
+    allFailed = true;    // Reassume all will fail until proven otherwise
 
     for (int i = 0; i < NUM_FLOW_SENSORS; i++) {
-        if (sensors[i]->sensorStopped) {
-            anyStopped = true;
-            continue;
+      if (!sensors[i]->sensorInitialized && !sensors[i]->sensorStopped) {
+        if (initializeFlowSensor(*sensors[i])) {
+          allFailed = false;  // At least one succeeded
+        } else {
+          failedSensors += String(i) + " ";
         }
-
-        if (!initializeFlowSensor(*sensors[i])) {
-            failedSensors += String(i) + " ";
-            anyFailures = true;
-        }
+      }
     }
+  }
 
-    if (anyStopped) {
-        Serial.println(F("[MESSAGE] Some flow sensors are intentionally stopped."));
-    }
+  // **Final success/failure messages**
+  if (anyStopped) {
+    Serial.println(F("[MESSAGE] Some flow sensors are intentionally stopped."));
+  }
+  if (allFailed) {
+    Serial.println(F("[ERROR] All active flow sensors failed to initialize!"));
+  } else if (failedSensors.length() > 0) {
+    Serial.print(F("[ERROR] The following Flow Sensors failed to initialize: "));
+    Serial.println(failedSensors);
+  } else {
+    Serial.println(F("[MESSAGE] All active flow sensors initialized successfully."));
+  }
 
-    if (anyFailures) {
-        Serial.print(F("[ERROR] Flow Sensors failed to initialize: "));
-        Serial.println(failedSensors);
-    } else {
-        Serial.println(F("[MESSAGE] All active flow sensors initialized successfully."));
-    }
+  // Delay for sensor stabilization
+  delay(500);
 
-    // Delay to stabilize sensors
-    delay(500);
+  // **Initialize Temperature/Humidity Sensor**
+  if (!tempHumSensorInit()) {
+    Serial.println(F("[ERROR] Temp/Humidity sensor not detected!"));
+  } else {
+    Serial.println(F("[MESSAGE] Temp/Humidity sensor initialized successfully."));
+  }
 
-    // Initialize Temperature/Humidity Sensor via Multiplexer
-    if (!tempHumSensorInit()) {
-        Serial.println(F("[ERROR] Temp/Humidity sensor not detected!"));
-    } else {
-        Serial.println(F("[MESSAGE] Temp/Humidity sensor initialized successfully."));
-    }
+  // **Commander API Initialization**
+  commander.attachTree(API_tree);
+  commander.init();
 
-    // Commander API Initialization
-    commander.attachTree(API_tree);
-    commander.init();
-
-    Serial.println(F("[MESSAGE] System ready."));
+  Serial.println(F("[MESSAGE] System ready."));
 }
+
+
 
 
 
