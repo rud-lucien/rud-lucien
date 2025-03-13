@@ -205,41 +205,43 @@ FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_
   return sensor;
 }
 
+// =====================
+// Flow Sensor Functions
+// =====================
 bool initializeFlowSensor(FlowSensor& sensor) {
-  if (sensor.sensorStopped) {
-    Serial.print("Flow sensor on channel ");
-    Serial.print(sensor.channel);
-    Serial.println(" is intentionally stopped.");
-    return false;
-  }
-  // Select channel via multiplexer
-  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
-  // Soft reset
-  Wire.beginTransmission(0x00);
-  Wire.write(0x06);
-  if (Wire.endTransmission() != 0) {
-    Serial.println("Soft reset failed");
-    // Optionally, reset I2C bus here...
-    sensor.sensorConnected = 0;
-    return false;
-  }
-  delay(50);
-  // Start continuous measurement mode
-  Wire.beginTransmission(sensor.sensorAddr);
-  Wire.write(sensor.measurementCmd >> 8);
-  Wire.write(sensor.measurementCmd & 0xFF);
-  if (Wire.endTransmission() != 0) {
-    Serial.println("Failed to start measurement mode");
-    sensor.sensorConnected = 0;
-    return false;
-  }
-  delay(100);
-  sensor.sensorInitialized = true;
-  sensor.sensorConnected = 1;
-  sensor.lastUpdateTime = millis();
-  sensor.dispenseVolume = 0.0;
-  return true;
+    if (sensor.sensorStopped) {
+        return false;
+    }
+
+    selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+
+    Wire.beginTransmission(0x00);
+    Wire.write(0x06);
+    if (Wire.endTransmission() != 0) {
+        Serial.println(F("[ERROR] Soft reset failed"));
+        sensor.sensorConnected = 0;
+        return false;
+    }
+    delay(50);
+
+    Wire.beginTransmission(sensor.sensorAddr);
+    Wire.write(sensor.measurementCmd >> 8);
+    Wire.write(sensor.measurementCmd & 0xFF);
+    if (Wire.endTransmission() != 0) {
+        Serial.println(F("[ERROR] Failed to start measurement mode"));
+        sensor.sensorConnected = 0;
+        return false;
+    }
+    delay(100);
+
+    sensor.sensorInitialized = true;
+    sensor.sensorConnected = 1;
+    sensor.lastUpdateTime = millis();
+    sensor.dispenseVolume = 0.0;
+
+    return true;
 }
+
 
 bool readFlowSensorData(FlowSensor& sensor) {
   if (!sensor.sensorInitialized || sensor.sensorStopped) {
@@ -258,7 +260,7 @@ bool readFlowSensorData(FlowSensor& sensor) {
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
   Wire.requestFrom(sensor.sensorAddr, (uint8_t)9);
   if (Wire.available() < 9) {
-    Serial.print("Error: Not enough bytes from flow sensor on channel ");
+    Serial.print(F("[ERROR] Not enough bytes received from flow sensor on channel "));
     Serial.println(sensor.channel);
     sensor.sensorInitialized = false;
     sensor.sensorStopped = true;
@@ -378,19 +380,28 @@ struct FanControl {
 };
 
 void setFanState(const FanControl& config, bool state) {
-  digitalWrite(config.relayPin, state ? HIGH : LOW);
+  static bool lastState = false; // Store last fan state to avoid redundant logging
+  if (lastState != state) {
+    digitalWrite(config.relayPin, state ? HIGH : LOW);
+    Serial.print(F("[MESSAGE] Fan state set to "));
+    Serial.println(state ? F("ON") : F("OFF"));
+    lastState = state; // Update last known state
+  }
 }
 
+
 void printFanState(bool state) {
-  Serial.print(F("Fan is "));
+  Serial.print(F("[MESSAGE] Fan is "));
   Serial.println(state ? F("ON") : F("OFF"));
 }
 
 void fanSetup(const FanControl& fc) {
   pinMode(fc.relayPin, OUTPUT);
   digitalWrite(fc.relayPin, LOW);
+  Serial.println(F("[MESSAGE] Fan initialized and set to OFF"));
 }
 
+// Global Fan Configuration
 const FanControl fan = { FAN_CONTROL_PIN };
 
 // =====================
@@ -585,11 +596,11 @@ void cmd_set_log_frequency(char* args, CommandCaller* caller) {
   int newInterval = -1;
   if (sscanf(args, "%d", &newInterval) == 1 && newInterval > 0) {
     logging.logInterval = newInterval;
-    caller->print("Log frequency set to ");
+    caller->print(F("[MESSAGE] Log frequency set to "));
     caller->print(newInterval);
-    caller->println(" ms");
+    caller->println(F(" ms"));
   } else {
-    caller->println("Invalid log frequency. Use: LF <positive number>");
+    caller->println(F("[ERROR] Invalid log frequency. Use: LF <positive number>"));
   }
 }
 
@@ -603,45 +614,35 @@ void cmd_fan(char* args, CommandCaller* caller) {
     printFanState(state);
     // Disable auto mode when a manual command is used.
     fanAutoMode = false;
-    caller->print("Fan manual override active. Use FNAUTO to re-enable auto control.\r\n");
+    caller->println(F("[MESSAGE] Fan manual override active. Use FNAUTO to re-enable auto control."));
   } else {
-    caller->print("Invalid fan command. Use: FN <0/1>\r\n");
+    caller->println(F("[ERROR] Invalid fan command. Use: FN <0/1>"));
   }
 }
 
 void cmd_fan_auto(char* args, CommandCaller* caller) {
   fanAutoMode = true;
-  caller->println("Fan auto control re-enabled.");
+  caller->println(F("[MESSAGE] Fan auto control re-enabled."));
 }
 
 void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
   if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES && (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
+
+    caller->print(F("[MESSAGE] Reagent valve "));
+    caller->print(valveNumber);
+    caller->print(F(" set to "));
+    caller->println(state ? "OPEN" : "CLOSED");
+
     switch (valveNumber) {
-      case 1:
-        reagentValve1 = state ? openValve(reagentValve1) : closeValve(reagentValve1);
-        caller->print("Reagent valve 1 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 2:
-        reagentValve2 = state ? openValve(reagentValve2) : closeValve(reagentValve2);
-        caller->print("Reagent valve 2 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 3:
-        reagentValve3 = state ? openValve(reagentValve3) : closeValve(reagentValve3);
-        caller->print("Reagent valve 3 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 4:
-        reagentValve4 = state ? openValve(reagentValve4) : closeValve(reagentValve4);
-        caller->print("Reagent valve 4 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
+      case 1: reagentValve1 = state ? openValve(reagentValve1) : closeValve(reagentValve1); break;
+      case 2: reagentValve2 = state ? openValve(reagentValve2) : closeValve(reagentValve2); break;
+      case 3: reagentValve3 = state ? openValve(reagentValve3) : closeValve(reagentValve3); break;
+      case 4: reagentValve4 = state ? openValve(reagentValve4) : closeValve(reagentValve4); break;
     }
   } else {
-    caller->println("Invalid reagent valve command. Use: R <1-4> <0/1>");
+    caller->println(F("[ERROR] Invalid reagent valve command. Use: R <1-4> <0/1>"));
   }
 }
 
@@ -649,30 +650,20 @@ void cmd_set_media_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
   if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES && (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
+
+    caller->print(F("[MESSAGE] Media valve "));
+    caller->print(valveNumber);
+    caller->print(F(" set to "));
+    caller->println(state ? "OPEN" : "CLOSED");
+
     switch (valveNumber) {
-      case 1:
-        mediaValve1 = state ? openValve(mediaValve1) : closeValve(mediaValve1);
-        caller->print("Media valve 1 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 2:
-        mediaValve2 = state ? openValve(mediaValve2) : closeValve(mediaValve2);
-        caller->print("Media valve 2 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 3:
-        mediaValve3 = state ? openValve(mediaValve3) : closeValve(mediaValve3);
-        caller->print("Media valve 3 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 4:
-        mediaValve4 = state ? openValve(mediaValve4) : closeValve(mediaValve4);
-        caller->print("Media valve 4 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
+      case 1: mediaValve1 = state ? openValve(mediaValve1) : closeValve(mediaValve1); break;
+      case 2: mediaValve2 = state ? openValve(mediaValve2) : closeValve(mediaValve2); break;
+      case 3: mediaValve3 = state ? openValve(mediaValve3) : closeValve(mediaValve3); break;
+      case 4: mediaValve4 = state ? openValve(mediaValve4) : closeValve(mediaValve4); break;
     }
   } else {
-    caller->println("Invalid media valve command. Use: M <1-4> <0/1>");
+    caller->println(F("[ERROR] Invalid media valve command. Use: M <1-4> <0/1>"));
   }
 }
 
@@ -680,30 +671,20 @@ void cmd_set_waste_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
   if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES && (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
+
+    caller->print(F("[MESSAGE] Waste valve "));
+    caller->print(valveNumber);
+    caller->print(F(" set to "));
+    caller->println(state ? "OPEN" : "CLOSED");
+
     switch (valveNumber) {
-      case 1:
-        wasteValve1 = state ? openValve(wasteValve1) : closeValve(wasteValve1);
-        caller->print("Waste valve 1 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 2:
-        wasteValve2 = state ? openValve(wasteValve2) : closeValve(wasteValve2);
-        caller->print("Waste valve 2 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 3:
-        wasteValve3 = state ? openValve(wasteValve3) : closeValve(wasteValve3);
-        caller->print("Waste valve 3 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
-      case 4:
-        wasteValve4 = state ? openValve(wasteValve4) : closeValve(wasteValve4);
-        caller->print("Waste valve 4 set to ");
-        caller->println(state ? "open" : "closed");
-        break;
+      case 1: wasteValve1 = state ? openValve(wasteValve1) : closeValve(wasteValve1); break;
+      case 2: wasteValve2 = state ? openValve(wasteValve2) : closeValve(wasteValve2); break;
+      case 3: wasteValve3 = state ? openValve(wasteValve3) : closeValve(wasteValve3); break;
+      case 4: wasteValve4 = state ? openValve(wasteValve4) : closeValve(wasteValve4); break;
     }
   } else {
-    caller->println("Invalid waste valve command. Use: W <1-4> <0/1>");
+    caller->println(F("[ERROR] Invalid waste valve command. Use: W <1-4> <0/1>"));
   }
 }
 
@@ -711,31 +692,32 @@ void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
   int percentage = -1;
   if (sscanf(args, "%d", &percentage) == 1 && percentage >= 0 && percentage <= 100) {
     proportionalValve = setValvePosition(proportionalValve, (float)percentage);
-    caller->print("Pressure valve set to ");
+    caller->print(F("[MESSAGE] Pressure valve set to "));
     caller->print(percentage);
-    caller->println("%.");
+    caller->println(F("%."));
   } else {
-    caller->println("Error: Invalid value for pressure valve. Use a percentage between 0 and 100.");
+    caller->println(F("[ERROR] Invalid value for pressure valve. Use a percentage between 0 and 100."));
   }
 }
 
 void cmd_calibrate_pressure_valve(char* args, CommandCaller* caller) {
-  caller->println("Calibrating pressure valve, please wait...");
+  caller->println(F("[MESSAGE] Calibrating pressure valve, please wait..."));
   calibrateProportionalValve();
   // After calibration, you might choose to close the valve:
   // proportionalValve = setValvePosition(proportionalValve, 0.0);
-  caller->println("Pressure valve calibration complete.");
+  caller->println(F("[MESSAGE] Pressure valve calibration complete."));
 }
+
 
 void cmd_start_flow_measurement(char* args, CommandCaller* caller) {
   int sensorNumber = -1;
   if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber <= 3) {
     FlowSensor* sensors[] = { &flow0, &flow1, &flow2, &flow3 };
     startFlowSensorMeasurement(*sensors[sensorNumber]);
-    caller->print(F("Started measurement for Flow Sensor "));
+    caller->print(F("[MESSAGE] Started measurement for Flow Sensor "));
     caller->println(sensorNumber);
   } else {
-    caller->println(F("Invalid sensor number. Use: STARTFS <0-3>"));
+    caller->println(F("[ERROR] Invalid sensor number. Use: STARTFS <0-3>"));
   }
 }
 
@@ -744,23 +726,22 @@ void cmd_stop_flow_measurement(char* args, CommandCaller* caller) {
   if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber <= 3) {
     FlowSensor* sensors[] = { &flow0, &flow1, &flow2, &flow3 };
     stopFlowSensorMeasurement(*sensors[sensorNumber]);
-    caller->print(F("Stopped measurement for Flow Sensor "));
+    caller->print(F("[MESSAGE] Stopped measurement for Flow Sensor "));
     caller->println(sensorNumber);
   } else {
-    caller->println(F("Invalid sensor number. Use: STOPFS <0-3>"));
+    caller->println(F("[ERROR] Invalid sensor number. Use: STOPFS <0-3>"));
   }
 }
-
 
 void cmd_reset_flow_dispense(char* args, CommandCaller* caller) {
   int sensorNumber = -1;
   if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber <= 3) {
     FlowSensor* sensors[] = { &flow0, &flow1, &flow2, &flow3 };
     resetFlowSensorDispenseVolume(*sensors[sensorNumber]);
-    caller->print(F("Reset dispense volume for Flow Sensor "));
+    caller->print(F("[MESSAGE] Reset dispense volume for Flow Sensor "));
     caller->println(sensorNumber);
   } else {
-    caller->println(F("Invalid sensor number. Use: RESETFS <0-3>"));
+    caller->println(F("[ERROR] Invalid sensor number. Use: RESETFS <0-3>"));
   }
 }
 
@@ -769,10 +750,10 @@ void cmd_reset_flow_total(char* args, CommandCaller* caller) {
   if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber <= 3) {
     FlowSensor* sensors[] = { &flow0, &flow1, &flow2, &flow3 };
     resetFlowSensorTotalVolume(*sensors[sensorNumber]);
-    caller->print(F("Reset total volume for Flow Sensor "));
+    caller->print(F("[MESSAGE] Reset total volume for Flow Sensor "));
     caller->println(sensorNumber);
   } else {
-    caller->println(F("Invalid sensor number. Use: RESETTOTALFS <0-3>"));
+    caller->println(F("[ERROR] Invalid sensor number. Use: RESETTOTALFS <0-3>"));
   }
 }
 
@@ -807,69 +788,80 @@ char commandBuffer[COMMAND_SIZE];
 // Setup Function
 // =====================
 void setup() {
-  Serial.begin(115200);
-  Serial.println(F("System ready."));
+    Serial.begin(115200);
+    
+    Serial.println(F("[MESSAGE] System starting..."));
 
-  // Fan Setup
-  fanSetup(fan);
+    // Fan Setup
+    fanSetup(fan);
 
-  // Valve Setups
-  valveSetup(reagentValve1);
-  valveSetup(reagentValve2);
-  valveSetup(reagentValve3);
-  valveSetup(reagentValve4);
-  valveSetup(mediaValve1);
-  valveSetup(mediaValve2);
-  valveSetup(mediaValve3);
-  valveSetup(mediaValve4);
-  valveSetup(wasteValve1);
-  valveSetup(wasteValve2);
-  valveSetup(wasteValve3);
-  valveSetup(wasteValve4);
+    // Proportional Valve & Pressure Sensor Setup
+    proportionalValveSetup(proportionalValve);
+    calibrateProportionalValve();  // Calibrate at startup
 
-  // Sensor Setups
-  binarySensorSetup(overflowSensorTrough1);
-  binarySensorSetup(overflowSensorTrough2);
-  binarySensorSetup(overflowSensorTrough3);
-  binarySensorSetup(overflowSensorTrough4);
-  binarySensorSetup(reagent1BubbleSensor1);
-  binarySensorSetup(reagent1BubbleSensor2);
-  binarySensorSetup(reagent1BubbleSensor3);
-  binarySensorSetup(reagent1BubbleSensor4);
-  binarySensorSetup(waste1LiquidSensor);
-  binarySensorSetup(waste2LiquidSensor);
-  binarySensorSetup(overflowSensorWasteBottle1);
-  binarySensorSetup(overflowSensorWasteBottle2);
-  binarySensorSetup(waste1VacuumSensor);
-  binarySensorSetup(waste2VacuumSensor);
-  binarySensorSetup(enclosureLiquidSensor);
+    // **Check System Air Pressure After Calibration**
+    float systemPressure = readPressure(pressureSensor);
+    if (systemPressure > 15.0) {
+        Serial.print(F("[MESSAGE] System air pressure available: "));
+        Serial.print(systemPressure);
+        Serial.println(F(" psi."));
+    } else {
+        Serial.print(F("[WARNING] Low air pressure detected! Current pressure: "));
+        Serial.print(systemPressure);
+        Serial.println(F(" psi. Ensure air supply is available."));
+    }
+    setValvePosition(proportionalValve, 0.0);  // Close valve after calibration
 
-  // Proportional Valve & Pressure Sensor Setup
-  proportionalValveSetup(proportionalValve);
-  calibrateProportionalValve();              // Calibrate at startup
-  setValvePosition(proportionalValve, 0.0);  // Close valve after calibration
-  pressureSensorSetup(pressureSensor);
+    // Initialize Flow Sensors
+    Serial.println(F("[MESSAGE] Initializing Flow Sensors..."));
 
-  // Initialize Temperature/Humidity Sensor via Multiplexer
-  if (!tempHumSensorInit()) {
-    Serial.println(F("Error: Temp/Humidity sensor not detected!"));
-    // You may choose to halt here if sensor is critical:
-    // while(1) delay(1000);
-  } else {
-    Serial.println(F("Temp/Humidity sensor initialized successfully."));
-  }
+    bool anyFailures = false;
+    bool anyStopped = false;
+    String failedSensors = "";
 
-  // Initialize Flow Sensors (if desired, you can call initializeFlowSensor() here for each)
-  // For example, you might start measurement on all flow sensors:
-  initializeFlowSensor(flow0);
-  initializeFlowSensor(flow1);
-  initializeFlowSensor(flow2);
-  initializeFlowSensor(flow3);
+    FlowSensor* sensors[] = { &flow0, &flow1, &flow2, &flow3 };
 
-  // Commander API Initialization
-  commander.attachTree(API_tree);
-  commander.init();
+    for (int i = 0; i < NUM_FLOW_SENSORS; i++) {
+        if (sensors[i]->sensorStopped) {
+            anyStopped = true;
+            continue;
+        }
+
+        if (!initializeFlowSensor(*sensors[i])) {
+            failedSensors += String(i) + " ";
+            anyFailures = true;
+        }
+    }
+
+    if (anyStopped) {
+        Serial.println(F("[MESSAGE] Some flow sensors are intentionally stopped."));
+    }
+
+    if (anyFailures) {
+        Serial.print(F("[ERROR] Flow Sensors failed to initialize: "));
+        Serial.println(failedSensors);
+    } else {
+        Serial.println(F("[MESSAGE] All active flow sensors initialized successfully."));
+    }
+
+    // Delay to stabilize sensors
+    delay(500);
+
+    // Initialize Temperature/Humidity Sensor via Multiplexer
+    if (!tempHumSensorInit()) {
+        Serial.println(F("[ERROR] Temp/Humidity sensor not detected!"));
+    } else {
+        Serial.println(F("[MESSAGE] Temp/Humidity sensor initialized successfully."));
+    }
+
+    // Commander API Initialization
+    commander.attachTree(API_tree);
+    commander.init();
+
+    Serial.println(F("[MESSAGE] System ready."));
 }
+
+
 
 // =====================
 // Main Loop
@@ -1152,10 +1144,11 @@ void monitorFlowSensorConnections() {
 
 
 void calibrateProportionalValve() {
+  Serial.println(F("[MESSAGE] Starting proportional valve calibration..."));
   proportionalValve = setValvePosition(proportionalValve, 100.0);
   delay(1000);  // Allow time for the valve to settle and feedback to stabilize
   proportionalValveMaxFeedback = getValveFeedback(proportionalValve);
-  Serial.print("Calibrated max feedback voltage: ");
+  Serial.print(F("[MESSAGE] Calibrated max feedback voltage: "));
   Serial.println(proportionalValveMaxFeedback);
 }
 
@@ -1165,16 +1158,19 @@ void monitorEnclosureTemp() {
   TempHumidity th = readTempHumidity();
   if (th.valid) {
     if (th.temperature > ENCLOSURE_TEMP_SETPOINT) {
+      Serial.println(F("[WARNING] Enclosure temperature exceeded setpoint! Activating fan."));
       setFanState(fan, true);
     } else {
       setFanState(fan, false);
     }
+  } else {
+    Serial.println(F("[ERROR] Failed to read enclosure temperature!"));
   }
 }
 
 // Function to reset the I2C bus
 void resetI2CBus() {
-  Serial.println(F("Resetting I2C bus..."));
+  Serial.println(F("[MESSAGE] Resetting I2C bus..."));
   Wire.end();
   delay(100);
   Wire.begin();
@@ -1182,28 +1178,31 @@ void resetI2CBus() {
 
 void resetFlowSensorDispenseVolume(FlowSensor& sensor) {
   sensor.dispenseVolume = 0.0;
-  Serial.print(F("Dispense volume reset for flow sensor on channel "));
+  Serial.print(F("[MESSAGE] Dispense volume reset for flow sensor on channel "));
   Serial.println(sensor.channel);
 }
 
 void resetFlowSensorTotalVolume(FlowSensor& sensor) {
   sensor.totalVolume = 0.0;
-  Serial.print(F("Total volume reset for flow sensor on channel "));
+  Serial.print(F("[MESSAGE] Total volume reset for flow sensor on channel "));
   Serial.println(sensor.channel);
 }
 
 void startFlowSensorMeasurement(FlowSensor& sensor) {
   if (!sensor.sensorConnected) {
-    Serial.print(F("Error: Cannot start measurement for flow sensor on channel "));
+    Serial.print(F("[ERROR] Cannot start measurement for flow sensor on channel "));
     Serial.print(sensor.channel);
     Serial.println(F(" because it is disconnected."));
     return;
   }
   sensor.sensorStopped = false;
   if (initializeFlowSensor(sensor)) {
-    Serial.print(F("Flow sensor on channel "));
+    Serial.print(F("[MESSAGE] Flow sensor on channel "));
     Serial.print(sensor.channel);
     Serial.println(F(" started measurement mode."));
+  } else {
+    Serial.print(F("[ERROR] Failed to start measurement for flow sensor on channel "));
+    Serial.println(sensor.channel);
   }
 }
 
@@ -1213,11 +1212,11 @@ void stopFlowSensorMeasurement(FlowSensor& sensor) {
   Wire.write(0x3F);  // Stop measurement command MSB
   Wire.write(0xF9);  // Stop measurement command LSB
   if (Wire.endTransmission() == 0) {
-    Serial.print(F("Flow sensor on channel "));
+    Serial.print(F("[MESSAGE] Flow sensor on channel "));
     Serial.print(sensor.channel);
     Serial.println(F(" stopped measurement mode."));
   } else {
-    Serial.print(F("Failed to stop measurement for flow sensor on channel "));
+    Serial.print(F("[ERROR] Failed to stop measurement for flow sensor on channel "));
     Serial.println(sensor.channel);
   }
   sensor.sensorInitialized = false;
