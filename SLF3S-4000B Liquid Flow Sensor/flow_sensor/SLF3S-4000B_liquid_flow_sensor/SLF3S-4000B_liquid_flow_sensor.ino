@@ -258,24 +258,24 @@ void loop() {
 
   // Read and format data from flow0
   if (flow0.readSensorData()) {
-    dtostrf(flow0.flowRate, 6, 2, flow0RateBuffer);      // Convert flowRate to string
-    dtostrf(flow0.temperature, 6, 2, flow0TempBuffer);   // Convert temperature to string
-    dtostrf(flow0.volume, 6, 2, flow0VolumeBuffer);      // Convert dispense volume to string
-    dtostrf(flow0.totalVolume, 6, 2, flow0TotalBuffer);  // Convert total volume to string
+    dtostrf(flow0.flowRate, 6, 2, flow0RateBuffer);         // Convert flowRate to string
+    dtostrf(flow0.temperature, 6, 2, flow0TempBuffer);      // Convert temperature to string
+    dtostrf(flow0.dispenseVolume, 6, 2, flow0DispenseBuffer);  // Convert dispense volume to string
+    dtostrf(flow0.totalVolume, 6, 2, flow0TotalBuffer);     // Convert total volume to string
     snprintf(flow0Output, sizeof(flow0Output), "flow0, %d, %s, %s, %s, %s, %d",
-             flow0.sensorConnected, flow0RateBuffer, flow0TempBuffer, flow0VolumeBuffer, flow0TotalBuffer, flow0.highFlowFlag);
+             flow0.sensorConnected, flow0RateBuffer, flow0TempBuffer, flow0DispenseBuffer, flow0TotalBuffer, flow0.highFlowFlag);
   } else {
     snprintf(flow0Output, sizeof(flow0Output), "flow0, %d, n/a, n/a, n/a, n/a, n/a", flow0.sensorConnected);
   }
 
   // Read and format data from flow1
   if (flow1.readSensorData()) {
-    dtostrf(flow1.flowRate, 6, 2, flow1RateBuffer);      // Convert flowRate to string
-    dtostrf(flow1.temperature, 6, 2, flow1TempBuffer);   // Convert temperature to string
-    dtostrf(flow1.volume, 6, 2, flow1VolumeBuffer);      // Convert dispense volume to string
-    dtostrf(flow1.totalVolume, 6, 2, flow1TotalBuffer);  // Convert total volume to string
+    dtostrf(flow1.flowRate, 6, 2, flow1RateBuffer);         // Convert flowRate to string
+    dtostrf(flow1.temperature, 6, 2, flow1TempBuffer);      // Convert temperature to string
+    dtostrf(flow1.dispenseVolume, 6, 2, flow1DispenseBuffer);  // Convert dispense volume to string
+    dtostrf(flow1.totalVolume, 6, 2, flow1TotalBuffer);     // Convert total volume to string
     snprintf(flow1Output, sizeof(flow1Output), "flow1, %d, %s, %s, %s, %s, %d",
-             flow1.sensorConnected, flow1RateBuffer, flow1TempBuffer, flow1VolumeBuffer, flow1TotalBuffer, flow1.highFlowFlag);
+             flow1.sensorConnected, flow1RateBuffer, flow1TempBuffer, flow1DispenseBuffer, flow1TotalBuffer, flow1.highFlowFlag);
   } else {
     snprintf(flow1Output, sizeof(flow1Output), "flow1, %d, n/a, n/a, n/a, n/a, n/a", flow1.sensorConnected);
   }
@@ -286,3 +286,4 @@ void loop() {
     lastPrintTime = currentMillis;
   }
 }
+
