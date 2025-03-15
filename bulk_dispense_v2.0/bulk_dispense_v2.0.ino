@@ -294,76 +294,76 @@ bool readFlowSensorData(FlowSensor& sensor) {
 
 
 bool initializeFlowSensor(FlowSensor& sensor) {
-    static int resetAttempt = 0;
+  static int resetAttempt = 0;
 
-    // **Step 1: Select the correct multiplexer channel**
-    Serial.print(F("[DEBUG] Selecting multiplexer channel "));
-    Serial.println(sensor.channel);
-    selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+  // **Step 1: Select the correct multiplexer channel**
+  Serial.print(F("[DEBUG] Selecting multiplexer channel "));
+  Serial.println(sensor.channel);
+  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
 
-    // **Step 2: Check if Flow Sensor is Connected**
-    if (!isFlowSensorConnected(sensor)) {
-        Serial.print(F("[ERROR] Flow sensor on channel "));
-        Serial.print(sensor.channel);
-        Serial.println(F(" is not connected. Aborting initialization."));
-        return false;
-    }
+  // **Step 2: Check if Flow Sensor is Connected**
+  if (!isFlowSensorConnected(sensor)) {
+    Serial.print(F("[ERROR] Flow sensor on channel "));
+    Serial.print(sensor.channel);
+    Serial.println(F(" is not connected. Aborting initialization."));
+    return false;
+  }
 
-    // **Step 3: If this is a retry attempt, send a soft reset**
-    if (resetAttempt > 0) {
-        Serial.print(F("[DEBUG] Sending soft reset to sensor on channel "));
-        Serial.println(sensor.channel);
-
-        Wire.beginTransmission(sensor.sensorAddr);
-        Wire.write(0x00);
-        Wire.write(0x06);
-        if (Wire.endTransmission() != 0) {
-            Serial.println(F("[WARNING] Soft reset command was not acknowledged."));
-            return false;
-        }
-
-        delay(25);  // Allow reset to take effect
-
-        // **Recheck sensor after reset**
-        if (!isFlowSensorConnected(sensor)) {
-            Serial.println(F("[ERROR] Sensor did not respond after soft reset."));
-            return false;
-        }
-    }
-
-    // **Step 4: Start Continuous Measurement Mode**
-    Serial.print(F("[DEBUG] Sending start measurement command to sensor on channel "));
+  // **Step 3: If this is a retry attempt, send a soft reset**
+  if (resetAttempt > 0) {
+    Serial.print(F("[DEBUG] Sending soft reset to sensor on channel "));
     Serial.println(sensor.channel);
 
     Wire.beginTransmission(sensor.sensorAddr);
-    Wire.write(sensor.measurementCmd >> 8);
-    Wire.write(sensor.measurementCmd & 0xFF);
-    if (Wire.endTransmission() != 0) {  
-        Serial.println(F("[ERROR] Failed to start measurement mode."));
-
-        // **Only attempt a reset if the first attempt failed**
-        if (resetAttempt == 0) {
-            resetAttempt++;
-            return initializeFlowSensor(sensor);
-        }
-
-        return false; // Give up after reset attempt
+    Wire.write(0x00);
+    Wire.write(0x06);
+    if (Wire.endTransmission() != 0) {
+      Serial.println(F("[WARNING] Soft reset command was not acknowledged."));
+      return false;
     }
 
-    delay(100);  // Allow sensor to stabilize
+    delay(25);  // Allow reset to take effect
 
-    // **Step 5: Sensor Successfully Initialized**
-    sensor.sensorInitialized = true;
-    sensor.sensorConnected = 1;
-    sensor.lastUpdateTime = millis();
-    sensor.dispenseVolume = 0.0;
-    resetAttempt = 0;  // Reset failure counter after success
+    // **Recheck sensor after reset**
+    if (!isFlowSensorConnected(sensor)) {
+      Serial.println(F("[ERROR] Sensor did not respond after soft reset."));
+      return false;
+    }
+  }
 
-    Serial.print(F("[MESSAGE] Flow sensor on channel "));
-    Serial.print(sensor.channel);
-    Serial.println(F(" successfully initialized."));
-    
-    return true;
+  // **Step 4: Start Continuous Measurement Mode**
+  Serial.print(F("[DEBUG] Sending start measurement command to sensor on channel "));
+  Serial.println(sensor.channel);
+
+  Wire.beginTransmission(sensor.sensorAddr);
+  Wire.write(sensor.measurementCmd >> 8);
+  Wire.write(sensor.measurementCmd & 0xFF);
+  if (Wire.endTransmission() != 0) {
+    Serial.println(F("[ERROR] Failed to start measurement mode."));
+
+    // **Only attempt a reset if the first attempt failed**
+    if (resetAttempt == 0) {
+      resetAttempt++;
+      return initializeFlowSensor(sensor);
+    }
+
+    return false;  // Give up after reset attempt
+  }
+
+  delay(100);  // Allow sensor to stabilize
+
+  // **Step 5: Sensor Successfully Initialized**
+  sensor.sensorInitialized = true;
+  sensor.sensorConnected = 1;
+  sensor.lastUpdateTime = millis();
+  sensor.dispenseVolume = 0.0;
+  resetAttempt = 0;  // Reset failure counter after success
+
+  Serial.print(F("[MESSAGE] Flow sensor on channel "));
+  Serial.print(sensor.channel);
+  Serial.println(F(" successfully initialized."));
+
+  return true;
 }
 
 
@@ -840,27 +840,27 @@ void cmd_start_flow_sensor_manually(char* args, CommandCaller* caller) {
 // Command: STOPFSM <1-4> - Manually Stop Flow Sensor Measurement
 // =====================
 void cmd_stop_flow_sensor_manually(char* args, CommandCaller* caller) {
-    int sensorNumber = -1;
-    if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
-        FlowSensor* sensor = flowSensors[sensorNumber - 1];
+  int sensorNumber = -1;
+  if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
+    FlowSensor* sensor = flowSensors[sensorNumber - 1];
 
-        if (!sensor) {
-            caller->print(F("[ERROR] Flow Sensor "));
-            caller->print(sensorNumber);
-            caller->println(F(" not found."));
-            return;
-        }
-
-        if (stopFlowSensorMeasurement(*sensor)) {
-            caller->print(F("[MESSAGE] Manually stopped measurement for Flow Sensor "));
-            caller->println(sensorNumber);
-        } else {
-            caller->print(F("[ERROR] Failed to manually stop Flow Sensor "));
-            caller->println(sensorNumber);
-        }
-    } else {
-        caller->println(F("[ERROR] Invalid sensor number. Use: STOPFSM <1-4>"));
+    if (!sensor) {
+      caller->print(F("[ERROR] Flow Sensor "));
+      caller->print(sensorNumber);
+      caller->println(F(" not found."));
+      return;
     }
+
+    if (stopFlowSensorMeasurement(*sensor)) {
+      caller->print(F("[MESSAGE] Manually stopped measurement for Flow Sensor "));
+      caller->println(sensorNumber);
+    } else {
+      caller->print(F("[ERROR] Failed to manually stop Flow Sensor "));
+      caller->println(sensorNumber);
+    }
+  } else {
+    caller->println(F("[ERROR] Invalid sensor number. Use: STOPFSM <1-4>"));
+  }
 }
 
 void cmd_reset_flow_dispense(char* args, CommandCaller* caller) {
@@ -898,6 +898,8 @@ void cmd_reset_i2c(char* args, CommandCaller* caller) {
 void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   int troughNumber = -1;
   float requestedVolume = -1.0;
+  const float MIN_VOLUME = 1.0;
+  const float MAX_VOLUME = 200.0;
 
   // **Command Acknowledgment**
   caller->print(F("[MESSAGE] Received command: D "));
@@ -918,22 +920,39 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   }
 
   // **Check if a dispense is already in progress**
-    if (valveControls[troughNumber - 1].isDispensing) {
-        caller->print(F("[WARNING] A dispense is already in progress for Trough "));
-        caller->println(troughNumber);
-        caller->println(F("Use STOPD <trough number> to stop it first."));
-        return;
+  if (valveControls[troughNumber - 1].isDispensing) {
+    caller->print(F("[WARNING] A dispense is already in progress for Trough "));
+    caller->println(troughNumber);
+    caller->println(F("Use STOPD <trough number> to stop it first."));
+    return;
+  }
+
+
+
+  // **Validate requested volume (if specified)**
+  if (requestedVolume > 0) {
+    if (requestedVolume < MIN_VOLUME) {
+      caller->print(F("[ERROR] Requested volume too low. Minimum: "));
+      caller->print(MIN_VOLUME);
+      caller->println(F(" mL."));
+      return;
+    } else if (requestedVolume > MAX_VOLUME) {
+      caller->print(F("[ERROR] Requested volume too high. Maximum: "));
+      caller->print(MAX_VOLUME);
+      caller->println(F(" mL."));
+      return;
     }
+  }
 
   const float PRESSURE_THRESHOLD_PSI = 15.0;
   const int VALVE_POSITION = 100;
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
 
   // **Pressure Check**
-    if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
-        caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
-        return;
-    }
+  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
+    caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
+    return;
+  }
 
   // **Get Flow Sensor**
   FlowSensor* sensor = flowSensors[troughNumber - 1];
@@ -943,6 +962,12 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
     return;
   }
 
+  // **Check for Overflow Before Dispensing**
+  if (readBinarySensor(overflowSensors[troughNumber - 1])) {
+    caller->print(F("[ERROR] Cannot dispense: Overflow detected for Trough "));
+    caller->println(troughNumber);
+    return;
+  }
 
 
   // **Start Flow Sensor Measurement**
@@ -1217,7 +1242,7 @@ void handleSerialCommands() {
 
       // Reset command buffer
       commandIndex = 0;
-    } else if (c != '\r') {  
+    } else if (c != '\r') {
       // Store character in buffer (if within limit)
       if (commandIndex < (COMMAND_SIZE - 1)) {
         commandBuffer[commandIndex++] = c;
@@ -1367,6 +1392,7 @@ void monitorFlowSensors(unsigned long currentTime) {
   static unsigned long previousCheckTime = 0;
   const unsigned long FLOW_TIMEOUT_MS = 5000;
   const float MIN_FLOW_RATE_THRESHOLD = 1.0;
+  const float MAX_TROUGH_VOLUME = 205.0;  // Maximum safe volume per trough (backup safety)
 
   if (currentTime - previousCheckTime >= 25) {
     previousCheckTime = currentTime;
@@ -1416,6 +1442,23 @@ void monitorFlowSensors(unsigned long currentTime) {
         Serial.print(F(". Final volume dispensed: "));
         Serial.print(sensor->dispenseVolume, 1);
         Serial.println(F(" mL."));
+
+        resetFlowSensorDispenseVolume(*sensor);
+        stopFlowSensorMeasurement(*sensor);
+        valveControls[i].isDispensing = false;
+        continue;
+      }
+
+      // ** Secondary Safety: Check if Maximum Trough Volume is Exceeded**
+      if (sensor->dispenseVolume >= MAX_TROUGH_VOLUME) {
+        closeDispenseValves(i + 1);
+        Serial.print(F("[ERROR] Safety Limit Reached! Dispense stopped for Trough "));
+        Serial.print(i + 1);
+        Serial.print(F(". Final dispensed volume: "));
+        Serial.print(sensor->dispenseVolume, 1);  // Log exact final volume
+        Serial.print(F(" mL. (Max Allowed: "));
+        Serial.print(MAX_TROUGH_VOLUME);
+        Serial.println(F(" mL)"));
 
         resetFlowSensorDispenseVolume(*sensor);
         stopFlowSensorMeasurement(*sensor);
@@ -1544,12 +1587,12 @@ void resetI2CBus() {
 }
 
 void resetFlowSensorDispenseVolume(FlowSensor& sensor) {
-    sensor.dispenseVolume = 0.0;
-    sensor.lastUpdateTime = millis();
-    sensor.sensorStopped = true; // Ensure sensor is actually stopped
+  sensor.dispenseVolume = 0.0;
+  sensor.lastUpdateTime = millis();
+  sensor.sensorStopped = true;  // Ensure sensor is actually stopped
 
-    Serial.print(F("[MESSAGE] Dispense volume reset for flow sensor on channel "));
-    Serial.println(sensor.channel);
+  Serial.print(F("[MESSAGE] Dispense volume reset for flow sensor on channel "));
+  Serial.println(sensor.channel);
 }
 
 
@@ -1560,37 +1603,37 @@ void resetFlowSensorTotalVolume(FlowSensor& sensor) {
 }
 
 bool startFlowSensorMeasurement(FlowSensor& sensor) {
-    Serial.print(F("[DEBUG] Attempting to start flow measurement for sensor on channel "));
-    Serial.println(sensor.channel);
+  Serial.print(F("[DEBUG] Attempting to start flow measurement for sensor on channel "));
+  Serial.println(sensor.channel);
 
-    if (!isFlowSensorConnected(sensor)) {
-        Serial.print(F("[ERROR] Cannot start measurement for flow sensor on channel "));
-        Serial.print(sensor.channel);
-        Serial.println(F(" because it is disconnected."));
-        return false;
-    }
-
-    // **Reset `sensorStopped` before initialization**
-    sensor.sensorStopped = false;
-
-    // **Retry Initialization Before Failing**
-    for (int i = 0; i < 3; i++) {
-        Serial.print(F("[DEBUG] Attempt "));
-        Serial.print(i + 1);
-        Serial.println(F(" to initialize sensor."));
-
-        if (initializeFlowSensor(sensor)) {
-            Serial.print(F("[MESSAGE] Flow sensor on channel "));
-            Serial.print(sensor.channel);
-            Serial.println(F(" started measurement mode."));
-            return true;
-        }
-        delay(50);
-    }
-
-    Serial.print(F("[ERROR] Failed to start measurement for flow sensor on channel "));
-    Serial.println(sensor.channel);
+  if (!isFlowSensorConnected(sensor)) {
+    Serial.print(F("[ERROR] Cannot start measurement for flow sensor on channel "));
+    Serial.print(sensor.channel);
+    Serial.println(F(" because it is disconnected."));
     return false;
+  }
+
+  // **Reset `sensorStopped` before initialization**
+  sensor.sensorStopped = false;
+
+  // **Retry Initialization Before Failing**
+  for (int i = 0; i < 3; i++) {
+    Serial.print(F("[DEBUG] Attempt "));
+    Serial.print(i + 1);
+    Serial.println(F(" to initialize sensor."));
+
+    if (initializeFlowSensor(sensor)) {
+      Serial.print(F("[MESSAGE] Flow sensor on channel "));
+      Serial.print(sensor.channel);
+      Serial.println(F(" started measurement mode."));
+      return true;
+    }
+    delay(50);
+  }
+
+  Serial.print(F("[ERROR] Failed to start measurement for flow sensor on channel "));
+  Serial.println(sensor.channel);
+  return false;
 }
 
 
@@ -1600,23 +1643,23 @@ bool startFlowSensorMeasurement(FlowSensor& sensor) {
 
 bool stopFlowSensorMeasurement(FlowSensor& sensor) {
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
-  
+
   Wire.beginTransmission(sensor.sensorAddr);
   Wire.write(0x3F);  // Stop measurement command MSB
   Wire.write(0xF9);  // Stop measurement command LSB
-  
+
   if (Wire.endTransmission() == 0) {
     Serial.print(F("[MESSAGE] Flow sensor on channel "));
     Serial.print(sensor.channel);
     Serial.println(F(" stopped measurement mode."));
-    
+
     sensor.sensorInitialized = false;
     sensor.sensorStopped = true;
     return true;  // **Return success**
   } else {
     Serial.print(F("[ERROR] Failed to stop measurement for flow sensor on channel "));
     Serial.println(sensor.channel);
-    
+
     return false;  // **Return failure**
   }
 }
@@ -1627,28 +1670,28 @@ bool stopFlowSensorMeasurement(FlowSensor& sensor) {
 // Handle Overflow Condition
 // =====================
 void handleOverflowCondition(int triggeredTrough) {
-    if (valveControls[triggeredTrough - 1].isDispensing) {
-        Serial.print(F("[WARNING] Overflow detected in Trough "));
-        Serial.println(triggeredTrough);
+  if (valveControls[triggeredTrough - 1].isDispensing) {
+    Serial.print(F("[WARNING] Overflow detected in Trough "));
+    Serial.println(triggeredTrough);
 
-        closeDispenseValves(triggeredTrough);
-        Serial.print(F("[MESSAGE] Closed reagent and media valves for Trough "));
-        Serial.println(triggeredTrough);
+    closeDispenseValves(triggeredTrough);
+    Serial.print(F("[MESSAGE] Closed reagent and media valves for Trough "));
+    Serial.println(triggeredTrough);
 
-        FlowSensor* sensor = flowSensors[triggeredTrough - 1];
-        if (sensor) {
-            Serial.print(F("[MESSAGE] Dispensed volume before overflow: "));
-            Serial.print(sensor->dispenseVolume, 1);
-            Serial.println(F(" mL."));
-            stopFlowSensorMeasurement(*sensor);
-            resetFlowSensorDispenseVolume(*sensor);
-        }
-
-        valveControls[triggeredTrough - 1].isDispensing = false;
-        valveControls[triggeredTrough - 1].lastFlowCheckTime = 0;
-        valveControls[triggeredTrough - 1].lastFlowChangeTime = 0;
-        valveControls[triggeredTrough - 1].dispensingValveNumber = -1;
+    FlowSensor* sensor = flowSensors[triggeredTrough - 1];
+    if (sensor) {
+      Serial.print(F("[MESSAGE] Dispensed volume before overflow: "));
+      Serial.print(sensor->dispenseVolume, 1);
+      Serial.println(F(" mL."));
+      stopFlowSensorMeasurement(*sensor);
+      resetFlowSensorDispenseVolume(*sensor);
     }
+
+    valveControls[triggeredTrough - 1].isDispensing = false;
+    valveControls[triggeredTrough - 1].lastFlowCheckTime = 0;
+    valveControls[triggeredTrough - 1].lastFlowChangeTime = 0;
+    valveControls[triggeredTrough - 1].dispensingValveNumber = -1;
+  }
 }
 
 
@@ -1657,31 +1700,31 @@ void handleOverflowCondition(int triggeredTrough) {
 // Handle Timeout Conditions
 // =====================
 void handleTimeoutCondition(int troughNumber) {
-    if (valveControls[troughNumber - 1].isDispensing) {
-        Serial.print(F("[ERROR] Timeout: No or insufficient flow detected for Trough "));
-        Serial.print(troughNumber);
-        Serial.println(F(". Stopping dispense."));
+  if (valveControls[troughNumber - 1].isDispensing) {
+    Serial.print(F("[ERROR] Timeout: No or insufficient flow detected for Trough "));
+    Serial.print(troughNumber);
+    Serial.println(F(". Stopping dispense."));
 
-        // Close dispense valves
-        closeDispenseValves(troughNumber);
+    // Close dispense valves
+    closeDispenseValves(troughNumber);
 
-        // Stop and reset flow sensor
-        FlowSensor* sensor = flowSensors[troughNumber - 1];
-        if (sensor) {
-            Serial.print(F("[MESSAGE] Dispensed volume before timeout: "));
-            Serial.print(sensor->dispenseVolume, 1);
-            Serial.println(F(" mL."));
-            stopFlowSensorMeasurement(*sensor);
-            resetFlowSensorDispenseVolume(*sensor);
-        }
-
-        // **Additional Resets**
-        valveControls[troughNumber - 1].isDispensing = false;
-        valveControls[troughNumber - 1].lastFlowCheckTime = 0;
-        valveControls[troughNumber - 1].lastFlowChangeTime = 0;
-        valveControls[troughNumber - 1].dispensingValveNumber = -1;
-        valveControls[troughNumber - 1].targetVolume = -1;
+    // Stop and reset flow sensor
+    FlowSensor* sensor = flowSensors[troughNumber - 1];
+    if (sensor) {
+      Serial.print(F("[MESSAGE] Dispensed volume before timeout: "));
+      Serial.print(sensor->dispenseVolume, 1);
+      Serial.println(F(" mL."));
+      stopFlowSensorMeasurement(*sensor);
+      resetFlowSensorDispenseVolume(*sensor);
     }
+
+    // **Additional Resets**
+    valveControls[troughNumber - 1].isDispensing = false;
+    valveControls[troughNumber - 1].lastFlowCheckTime = 0;
+    valveControls[troughNumber - 1].lastFlowChangeTime = 0;
+    valveControls[troughNumber - 1].dispensingValveNumber = -1;
+    valveControls[troughNumber - 1].targetVolume = -1;
+  }
 }
 
 
@@ -1708,13 +1751,11 @@ void closeDispenseValves(int troughNumber) {
       case 3: mediaValve3 = closeValve(mediaValve3); break;
       case 4: mediaValve4 = closeValve(mediaValve4); break;
     }
-
-    Serial.print(F("[MESSAGE] Closed reagent and media valves for Trough "));
-    Serial.println(troughNumber);
   } else {
     Serial.println(F("[ERROR] Invalid trough number provided to closeDispenseValves()"));
   }
 }
+
 
 // =====================
 // Open Reagent & Media Valves for a Given Trough
