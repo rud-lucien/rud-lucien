@@ -1,7 +1,7 @@
 #include "Logging.h"
-#include "Hardware.h"   // For global hardware objects and hardware functions
-#include "Sensors.h"    // For reading temperature, humidity, pressure, and flow sensor data
-#include "Utils.h"      // (Optional) For any additional helper functions
+#include "Hardware.h"  // For global hardware objects and hardware functions
+#include "Sensors.h"   // For reading temperature, humidity, pressure, and flow sensor data
+#include "Utils.h"     // (Optional) For any additional helper functions
 
 // Define the global logging instance (default log interval: 250 ms)
 LoggingManagement logging = { 0, 250 };
@@ -14,7 +14,7 @@ void logData(const char* module, const char* message) {
 }
 
 void logSystemState() {
-  char buffer[300];
+  char buffer[400];
 
   // --- Fan state ---
   char fanState = (digitalRead(fan.relayPin) == HIGH ? '1' : '0');
@@ -112,12 +112,25 @@ void logSystemState() {
   dtostrf(flow4.totalVolume, 4, 1, f4Total);
   snprintf(f4Flag, sizeof(f4Flag), "%d", flow4.isValidReading ? flow4.highFlowFlag : -1);
 
+  // Dispensing state for valves 1-4
+  char ds1 = (valveControls[0].isDispensing ? '1' : '0');
+  char ds2 = (valveControls[1].isDispensing ? '1' : '0');
+  char ds3 = (valveControls[2].isDispensing ? '1' : '0');
+  char ds4 = (valveControls[3].isDispensing ? '1' : '0');
+
+  // Convert target volumes to strings
+  char tv1[8], tv2[8], tv3[8], tv4[8];
+  dtostrf(valveControls[0].targetVolume, 4, 1, tv1);
+  dtostrf(valveControls[1].targetVolume, 4, 1, tv2);
+  dtostrf(valveControls[2].targetVolume, 4, 1, tv3);
+  dtostrf(valveControls[3].targetVolume, 4, 1, tv4);
+
   // Format the log message.
   sprintf(buffer,
           "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, PV,%s, PV%%,%s, "
           "WSL%c%c, WBL%c%c, WVS%c%c, ELS%c, BS%c%c%c%c, OS%c%c%c%c, "
           "PS,%s, T,%s, H,%s, FS1,%s,%s,%s,%s,%s; FS2,%s,%s,%s,%s,%s; "
-          "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s",
+          "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s, ,DS,%c%c%c%c, TV,%s,%s,%s,%s;",
           // Fan state
           fanState,
           // Reagent valves
@@ -149,9 +162,9 @@ void logSystemState() {
           // Flow Sensor 3 data
           f3Rate, f3Temp, f3Disp, f3Total, f3Flag,
           // Flow Sensor 4 data
-          f4Rate, f4Temp, f4Disp, f4Total, f4Flag);
+          f4Rate, f4Temp, f4Disp, f4Total, f4Flag,
+          ds1, ds2, ds3, ds4,
+          tv1, tv2, tv3, tv4);
 
   Serial.println(buffer);
 }
-
-

@@ -40,6 +40,7 @@ const uint8_t WASTE_VACUUM_SENSORS[NUM_WASTE_VACUUM_SENSORS] = {
 // Global Hardware Object Definitions
 // ------------------------------------------------------------------
 
+
 // Fan
 bool fanAutoMode = true;
 const FanControl fan = { FAN_CONTROL_PIN };
@@ -59,7 +60,7 @@ FlowSensor flow2 = { MULTIPLEXER_ADDR, 0x08, 1, FLOW_SENSOR_CMD, false, true, 0,
 FlowSensor flow3 = { MULTIPLEXER_ADDR, 0x08, 2, FLOW_SENSOR_CMD, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false };
 FlowSensor flow4 = { MULTIPLEXER_ADDR, 0x08, 3, FLOW_SENSOR_CMD, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false };
 
-FlowSensor* flowSensors[NUM_FLOW_SENSORS] = { &flow1, &flow2, &flow3, &flow4 };
+FlowSensor *flowSensors[NUM_FLOW_SENSORS] = { &flow1, &flow2, &flow3, &flow4 };
 
 // Valve control array
 ValveControl valveControls[NUM_OVERFLOW_SENSORS] = {};
@@ -194,5 +195,3 @@ bool readBinarySensor(const BinarySensor &sensor) {
   int reading = digitalRead(sensor.inputPin);
   return sensor.activeHigh ? (reading == HIGH) : (reading == LOW);
 }
-
-

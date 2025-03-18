@@ -40,7 +40,7 @@ void processMultipleCommands(char* commandLine, Stream* stream) {
 void handleSerialCommands() {
   static char commandBuffer[COMMAND_SIZE];
   static uint8_t commandIndex = 0;
-  
+
   while (Serial.available() > 0) {
     char c = Serial.read();
     if (c == '\n') {
@@ -48,7 +48,7 @@ void handleSerialCommands() {
       Serial.print(F("[COMMAND] Received: "));
       Serial.println(commandBuffer);
       processMultipleCommands(commandBuffer, &Serial);
-      commandIndex = 0;  // Reset the buffer index for the next command
+      commandIndex = 0;      // Reset the buffer index for the next command
     } else if (c != '\r') {  // Ignore carriage return characters
       if (commandIndex < (COMMAND_SIZE - 1)) {
         commandBuffer[commandIndex++] = c;
@@ -64,18 +64,18 @@ bool checkAndSetPressure(float thresholdPressure, float valvePosition, unsigned 
   unsigned long startTime = millis();
   float currentPressure = readPressure(pressureSensor);
   float currentValvePos = proportionalValve.controlVoltage;  // current valve setting
-  
+
   if (currentPressure >= thresholdPressure && currentValvePos == valvePosition) {
     Serial.println(F("[MESSAGE] System is already pressurized and valve is at the correct position."));
     return true;
   }
-  
+
   // Set the valve to the desired position.
   proportionalValve = setValvePosition(proportionalValve, valvePosition);
   Serial.print(F("[MESSAGE] Pressure valve set to "));
   Serial.print(valvePosition);
   Serial.println(F("%. Waiting for pressure stabilization..."));
-  
+
   // Wait until the pressure threshold is met or timeout occurs.
   while (millis() - startTime < timeout) {
     currentPressure = readPressure(pressureSensor);
@@ -85,7 +85,7 @@ bool checkAndSetPressure(float thresholdPressure, float valvePosition, unsigned 
     }
     delay(100);
   }
-  
+
   Serial.print(F("[ERROR] Pressure threshold not reached. Current pressure: "));
   Serial.print(currentPressure);
   Serial.println(F(" psi. Operation aborted."));
@@ -113,19 +113,19 @@ void openDispenseValves(int troughNumber) {
   switch (troughNumber) {
     case 1:
       reagentValve1 = openValve(reagentValve1);
-      mediaValve1   = openValve(mediaValve1);
+      mediaValve1 = openValve(mediaValve1);
       break;
     case 2:
       reagentValve2 = openValve(reagentValve2);
-      mediaValve2   = openValve(mediaValve2);
+      mediaValve2 = openValve(mediaValve2);
       break;
     case 3:
       reagentValve3 = openValve(reagentValve3);
-      mediaValve3   = openValve(mediaValve3);
+      mediaValve3 = openValve(mediaValve3);
       break;
     case 4:
       reagentValve4 = openValve(reagentValve4);
-      mediaValve4   = openValve(mediaValve4);
+      mediaValve4 = openValve(mediaValve4);
       break;
   }
   Serial.print(F("[MESSAGE] Opened reagent and media valves for Trough "));
@@ -143,19 +143,19 @@ void closeDispenseValves(int troughNumber) {
   switch (troughNumber) {
     case 1:
       reagentValve1 = closeValve(reagentValve1);
-      mediaValve1   = closeValve(mediaValve1);
+      mediaValve1 = closeValve(mediaValve1);
       break;
     case 2:
       reagentValve2 = closeValve(reagentValve2);
-      mediaValve2   = closeValve(mediaValve2);
+      mediaValve2 = closeValve(mediaValve2);
       break;
     case 3:
       reagentValve3 = closeValve(reagentValve3);
-      mediaValve3   = closeValve(mediaValve3);
+      mediaValve3 = closeValve(mediaValve3);
       break;
     case 4:
       reagentValve4 = closeValve(reagentValve4);
-      mediaValve4   = closeValve(mediaValve4);
+      mediaValve4 = closeValve(mediaValve4);
       break;
   }
   Serial.print(F("[MESSAGE] Closed reagent and media valves for Trough "));
@@ -168,7 +168,7 @@ void closeDispenseValves(int troughNumber) {
 void stopDispenseOperation(int troughNumber, CommandCaller* caller) {
   // Close the dispense valves.
   closeDispenseValves(troughNumber);
-  
+
   // Get the flow sensor associated with this trough.
   FlowSensor* sensor = flowSensors[troughNumber - 1];
   if (sensor) {
@@ -177,16 +177,12 @@ void stopDispenseOperation(int troughNumber, CommandCaller* caller) {
     caller->print(F(" Dispense Stopped. Total Volume: "));
     caller->print(sensor->dispenseVolume, 1);
     caller->println(F(" mL."));
-    
+
     // Stop measurement and reset the sensor's dispense volume.
     stopFlowSensorMeasurement(*sensor);
     sensor->dispenseVolume = 0.0;
   }
-  
+
   // Mark the dispensing state as false.
   valveControls[troughNumber - 1].isDispensing = false;
 }
-
-
-
-

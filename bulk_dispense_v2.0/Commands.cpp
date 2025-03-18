@@ -45,9 +45,7 @@ void cmd_fan_auto(char* args, CommandCaller* caller) {
 
 void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
-  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 &&
-      valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES && (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
     caller->print(F("[MESSAGE] Reagent valve "));
     caller->print(valveNumber);
@@ -66,9 +64,7 @@ void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
 
 void cmd_set_media_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
-  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 &&
-      valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES && (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
     caller->print(F("[MESSAGE] Media valve "));
     caller->print(valveNumber);
@@ -87,9 +83,7 @@ void cmd_set_media_valve(char* args, CommandCaller* caller) {
 
 void cmd_set_waste_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
-  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 &&
-      valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES && (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
     caller->print(F("[MESSAGE] Waste valve "));
     caller->print(valveNumber);
@@ -203,17 +197,29 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   float requestedVolume = -1.0;
   const float MIN_VOLUME = 1.0;
   const float MAX_VOLUME = 200.0;
-  
+
   caller->print(F("[MESSAGE] Received command: D "));
   caller->println(args);
-  
-  int parsedItems = sscanf(args, "%d %f", &troughNumber, &requestedVolume);
-  if (parsedItems == 1) {
-    requestedVolume = -1.0;  // Continuous mode if volume not provided
-  } else if (parsedItems != 2) {
+
+  // Use strtok to split the arguments
+  char* token = strtok(args, " ");
+  if (token != NULL) {
+    troughNumber = atoi(token);
+    token = strtok(NULL, " ");
+    if (token != NULL) {
+      requestedVolume = atof(token);
+    } else {
+      requestedVolume = -1.0;  // Continuous mode if no volume provided
+    }
+  } else {
     caller->println(F("[ERROR] Invalid command format. Use: D <1-4> [volume]"));
     return;
   }
+  caller->print(F("[MESSAGE] Parsed troughNumber: "));
+  caller->print(troughNumber);
+  caller->print(F(", requestedVolume: "));
+  caller->println(requestedVolume);
+
   if (troughNumber < 1 || troughNumber > 4) {
     caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
     return;
@@ -237,43 +243,43 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
       return;
     }
   }
-  
+
   const float PRESSURE_THRESHOLD_PSI = 15.0;
   const int VALVE_POSITION = 100;
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
-  
+
   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
     return;
   }
-  
+
   // Check for overflow before dispensing.
   if (readBinarySensor(overflowSensors[troughNumber - 1])) {
     caller->print(F("[ERROR] Cannot dispense: Overflow detected for Trough "));
     caller->println(troughNumber);
     return;
   }
-  
+
   FlowSensor* sensor = flowSensors[troughNumber - 1];
   if (!sensor) {
     caller->print(F("[ERROR] No flow sensor found for Trough "));
     caller->println(troughNumber);
     return;
   }
-  
+
   if (!startFlowSensorMeasurement(*sensor)) {
     caller->print(F("[ERROR] Failed to start flow sensor for Trough "));
     caller->println(troughNumber);
     return;
   }
-  
+
   caller->print(F("[MESSAGE] Flow sensor measurement started for Trough "));
   caller->println(troughNumber);
-  
+
   openDispenseValves(troughNumber);
   caller->print(F("[MESSAGE] Dispensing started for Trough "));
   caller->println(troughNumber);
-  
+
   valveControls[troughNumber - 1].isDispensing = true;
   valveControls[troughNumber - 1].targetVolume = requestedVolume;
 }
@@ -281,14 +287,14 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
 void cmd_stop_dispense(char* args, CommandCaller* caller) {
   int troughNumber = -1;
   bool stopAll = false;
-  
+
   if (strncmp(args, "all", 3) == 0) {
     stopAll = true;
   } else if (sscanf(args, "%d", &troughNumber) != 1 || troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
     caller->println(F("[ERROR] Invalid trough number. Use STOPD <1-4> or STOPD all."));
     return;
   }
-  
+
   if (stopAll) {
     caller->println(F("[MESSAGE] Stopping all dispensing operations..."));
     for (int i = 1; i <= NUM_OVERFLOW_SENSORS; i++) {
@@ -325,7 +331,3 @@ Commander::systemCommand_t API_tree[] = {
   systemCommand("STOPD", "Stop dispensing: STOPD <1-4> (stop specific trough) or STOPD ALL", cmd_stop_dispense)
   // systemCommand("P", "Prime valves: P <1-4 or all> (prime valves until liquid detected)", cmd_prime_valves)
 };
-
-
-
-

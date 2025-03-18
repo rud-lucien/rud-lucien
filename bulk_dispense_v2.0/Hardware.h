@@ -143,6 +143,7 @@ struct BinarySensor {
 // Extern Global Hardware Object Declarations
 // ------------------------------------------------------------------
 
+
 // Constant arrays (definitions provided in Hardware.cpp)
 extern const uint8_t REAGENT_VALVES[NUM_REAGENT_VALVES];
 extern const uint8_t MEDIA_VALVES[NUM_MEDIA_VALVES];
@@ -163,7 +164,7 @@ extern Adafruit_SHT31 sht31;  // SHT31 instance
 
 // Flow Sensors (for channels 0-3)
 extern FlowSensor flow1, flow2, flow3, flow4;
-extern FlowSensor* flowSensors[NUM_FLOW_SENSORS];
+extern FlowSensor *flowSensors[NUM_FLOW_SENSORS];
 
 // Valve Control Array (one per overflow sensor/trough)
 extern ValveControl valveControls[NUM_OVERFLOW_SENSORS];
@@ -206,4 +207,3 @@ void selectMultiplexerChannel(uint8_t multiplexerAddr, uint8_t channel);
 bool readBinarySensor(const BinarySensor &sensor);
 
 #endif  // HARDWARE_H
-
