@@ -20,9 +20,10 @@ void cmd_reset_flow_total(char* args, CommandCaller* caller);
 void cmd_reset_i2c(char* args, CommandCaller* caller);
 void cmd_dispense_reagent(char* args, CommandCaller* caller);
 void cmd_stop_dispense(char* args, CommandCaller* caller);
+void cmd_prime_valves(char* args, CommandCaller* caller);
 
 // Global command tree and Commander object declarations:
-extern Commander::systemCommand_t API_tree[15];
+extern Commander::systemCommand_t API_tree[16];
 extern Commander commander;
 
 #endif // COMMANDS_H

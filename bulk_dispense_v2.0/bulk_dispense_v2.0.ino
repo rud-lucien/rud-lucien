@@ -108,13 +108,14 @@ void loop() {
   handleSerialCommands();
   monitorOverflowSensors(currentTime);
   monitorFlowSensors(currentTime);
-  monitorReagentBubbleSensors(currentTime);
+  monitorPrimeSensors(currentTime);
   monitorWasteLineSensors(currentTime);
   monitorWasteBottleSensors(currentTime);
   monitorWasteVacuumSensors(currentTime);
   monitorEnclosureLiquidSensor(currentTime);
   monitorEnclosureTemp();
   monitorFlowSensorConnections();
+  
 
   readFlowSensorData(flow1);
   readFlowSensorData(flow2);

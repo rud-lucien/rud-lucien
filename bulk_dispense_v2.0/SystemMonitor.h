@@ -22,6 +22,8 @@ void monitorWasteVacuumSensors(unsigned long currentTime);
 void monitorEnclosureLiquidSensor(unsigned long currentTime);
 void monitorEnclosureTemp();
 void monitorFlowSensorConnections();
+void monitorPrimeSensors(unsigned long currentTime);
+
 
 // Helper functions used by the monitor functions.
 void handleOverflowCondition(int triggeredTrough);

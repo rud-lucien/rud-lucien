@@ -308,6 +308,63 @@ void cmd_stop_dispense(char* args, CommandCaller* caller) {
   }
 }
 
+void cmd_prime_valves(char* args, CommandCaller* caller) {
+  int localValveNumber = -1;
+  char extra;
+
+  // Try to parse exactly one integer. If there's any extra character after it, that's an error.
+  if (sscanf(args, "%d %c", &localValveNumber, &extra) != 1) {
+    caller->println(F("[ERROR] Invalid arguments for prime command. Use: P <valve number>"));
+    return;
+  }
+  
+  // Check for valid valve number (1 to 4).
+  if (localValveNumber < 1 || localValveNumber > 4) {
+    caller->println(F("[ERROR] Invalid valve number. Use 1-4."));
+    return;
+  }
+
+  // Pressure check (using same threshold as dispense)
+  const float PRESSURE_THRESHOLD_PSI = 15.0;
+  const int VALVE_POSITION = 100;
+  const unsigned long PRESSURE_TIMEOUT_MS = 500;
+
+  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
+    caller->println(F("[ERROR] Pressure check failed. Prime aborted."));
+    return;
+  }
+
+  // Check if the reagent bubble sensor already detects liquid.
+  // (Using readBinarySensor on reagentBubbleSensors array.)
+  if (readBinarySensor(reagentBubbleSensors[localValveNumber - 1])) {
+    caller->print(F("[MESSAGE] Valve "));
+    caller->print(localValveNumber);
+    caller->println(F(" already primed."));
+    return;
+  }
+
+  // If the valve is in fill mode, disable it.
+  if (valveControls[localValveNumber - 1].fillMode) {
+    valveControls[localValveNumber - 1].fillMode = false;
+    caller->print(F("[MESSAGE] Fill mode disabled for trough "));
+    caller->println(localValveNumber);
+  }
+
+  // Mark the valve as under manual control for priming.
+  valveControls[localValveNumber - 1].manualControl = true;
+
+  // Open the reagent and media valves for this trough.
+  // (Assuming openDispenseValves() opens both valves.)
+  openDispenseValves(localValveNumber);
+
+  // Mark that priming is in progress.
+  valveControls[localValveNumber - 1].isPriming = true;
+
+  caller->print(F("[MESSAGE] Priming started for valve "));
+  caller->println(localValveNumber);
+}
+
+
 // ------------------------------------------------------------------
 // Global Command Tree and Commander Object
 // ------------------------------------------------------------------
@@ -328,6 +385,6 @@ Commander::systemCommand_t API_tree[] = {
   systemCommand("RTF", "Reset total volume for Flow Sensor: RTF <0-3>", cmd_reset_flow_total),
   systemCommand("RESETI2C", "Manually reset the I2C bus", cmd_reset_i2c),
   systemCommand("D", "Dispense reagent: D <1-4> [volume] (volume in mL, continuous if omitted)", cmd_dispense_reagent),
-  systemCommand("STOPD", "Stop dispensing: STOPD <1-4> (stop specific trough) or STOPD ALL", cmd_stop_dispense)
-  // systemCommand("P", "Prime valves: P <1-4 or all> (prime valves until liquid detected)", cmd_prime_valves)
+  systemCommand("STOPD", "Stop dispensing: STOPD <1-4> (stop specific trough) or STOPD ALL", cmd_stop_dispense),
+  systemCommand("P", "Prime valves: P <1-4> (prime valves until liquid detected)", cmd_prime_valves)
 };

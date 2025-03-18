@@ -2,89 +2,90 @@
 #define UTILS_H
 
 #include <Controllino.h>
-#include "Hardware.h"         // For global hardware objects and functions (e.g., openValve, closeValve)
-#include "Sensors.h"          // For functions like readPressure()
+#include "Hardware.h"         // For global hardware objects and functions
+#include "Sensors.h"          // For sensor-related functions
 #include "Commands.h"
 #include "Commander-API.hpp"  // For CommandCaller and commander
 #include "Commander-IO.hpp"
 
-
 /**
  * trimLeadingSpaces()
  * ---------------------
- * Removes any leading whitespace from the input string.
- *
+ * Removes leading whitespace from the input string.
  * @param str The string to trim.
- * @return A pointer to the first non-whitespace character.
+ * @return Pointer to the first non-space character.
  */
 char* trimLeadingSpaces(char* str);
 
 /**
  * processMultipleCommands()
  * ---------------------------
- * Splits a command line (using commas as delimiters), trims each token, and dispatches them
- * via the global commander.
- *
- * @param commandLine The command line (will be modified).
- * @param stream The output stream (e.g., Serial) to print logs.
+ * Splits the commandLine string using commas as delimiters. Each token is trimmed
+ * and then passed to the global commander for execution.
+ * @param commandLine The command line string (will be modified).
+ * @param stream The output stream (e.g., Serial) for logging.
  */
 void processMultipleCommands(char* commandLine, Stream* stream);
 
 /**
  * handleSerialCommands()
  * ------------------------
- * Reads from Serial, builds complete commands, and dispatches them.
+ * Reads from Serial and dispatches complete command lines.
  */
 void handleSerialCommands();
 
 /**
  * checkAndSetPressure()
  * -----------------------
- * Checks if the system pressure meets the desired threshold.
- * If not, sets the proportional valve to the specified position and waits
- * until the pressure stabilizes or a timeout occurs.
- *
- * @param thresholdPressure The pressure threshold (in psi).
- * @param valvePosition The desired valve position (percentage).
- * @param timeout The maximum wait time (in ms).
- * @return true if the threshold is reached; false otherwise.
+ * Checks if system pressure meets the threshold. If not, it sets the valve and waits
+ * until the threshold is reached or a timeout occurs.
+ * @param thresholdPressure Pressure threshold (psi).
+ * @param valvePosition Desired valve position.
+ * @param timeout Maximum wait time (ms).
+ * @return true if threshold reached; false otherwise.
  */
 bool checkAndSetPressure(float thresholdPressure, float valvePosition, unsigned long timeout);
 
 /**
  * resetI2CBus()
  * -------------
- * Resets the I²C bus by ending the Wire connection, delaying briefly, and restarting Wire.
+ * Resets the I²C bus.
  */
 void resetI2CBus();
 
 /**
  * openDispenseValves()
  * ---------------------
- * Opens the reagent and media valves for the specified trough.
- *
- * @param troughNumber The trough number (1 to NUM_OVERFLOW_SENSORS).
+ * Opens the reagent and media valves for a given trough.
+ * @param troughNumber Trough number (1 to NUM_OVERFLOW_SENSORS).
  */
 void openDispenseValves(int troughNumber);
 
 /**
  * closeDispenseValves()
  * ----------------------
- * Closes the reagent and media valves for the specified trough.
- *
- * @param troughNumber The trough number (1 to NUM_OVERFLOW_SENSORS).
+ * Closes the reagent and media valves for a given trough.
+ * @param troughNumber Trough number (1 to NUM_OVERFLOW_SENSORS).
  */
 void closeDispenseValves(int troughNumber);
 
 /**
  * stopDispenseOperation()
  * ------------------------
- * Stops the dispense operation for a given trough by closing its valves,
- * stopping the associated flow sensor measurement, and resetting volumes.
- *
- * @param troughNumber The trough number.
- * @param caller Pointer to a CommandCaller for output messaging.
+ * Stops dispensing for a trough by closing valves, stopping flow sensor measurement, and resetting volumes.
+ * @param troughNumber Trough number.
+ * @param caller Pointer to a CommandCaller for messages.
  */
 void stopDispenseOperation(int troughNumber, CommandCaller* caller);
 
+/**
+ * isCommandPrefix()
+ * -----------------
+ * Checks whether a token starts with a valid command prefix. (This example uses a simple comparison.)
+ * @param token The token to check.
+ * @return true if token starts with a registered command; false otherwise.
+ */
+bool isCommandPrefix(const char* token);
+
 #endif // UTILS_H
+

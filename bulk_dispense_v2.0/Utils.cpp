@@ -20,19 +20,96 @@ char* trimLeadingSpaces(char* str) {
 // ------------------------------------------------------------------
 // processMultipleCommands()
 // ------------------------------------------------------------------
+/**
+ * Checks if the token starts with one of the valid command strings
+ * defined in the Commander API tree.
+ */
+bool isCommandPrefix(const char* token) {
+  const int numCommands = sizeof(API_tree) / sizeof(API_tree[0]);
+  for (int i = 0; i < numCommands; i++) {
+    const char* cmdName = API_tree[i].name; // use "name" as defined by the API macro
+    size_t len = strlen(cmdName);
+    if (strncmp(token, cmdName, len) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void processMultipleCommands(char* commandLine, Stream* stream) {
-  char* token = strtok(commandLine, ",");  // Split at commas
+  char buffer[COMMAND_SIZE] = "";
+  bool newCommand = true;
+  
+  // Split the input on commas only.
+  char* token = strtok(commandLine, ",");
+  
   while (token != NULL) {
     token = trimLeadingSpaces(token);
-    if (strlen(token) > 0) {
-      Serial.print(F("[COMMAND] Processing: "));
-      Serial.println(token);
-      // Execute command using the global commander (declared in Commands.cpp)
-      commander.execute(token, stream);
+    
+    // Check if token starts with a valid command (from the API tree).
+    if (isCommandPrefix(token)) {
+      // If we already have accumulated a command, execute it.
+      if (!newCommand && strlen(buffer) > 0) {
+        Serial.print(F("[DEBUG] Token extracted: '"));
+        Serial.print(buffer);
+        Serial.println(F("'"));
+        commander.execute(buffer, stream);
+        buffer[0] = '\0'; // Reset the buffer.
+      }
+      // Copy the new token into the buffer.
+      strncpy(buffer, token, COMMAND_SIZE - 1);
+      buffer[COMMAND_SIZE - 1] = '\0';
+      newCommand = false;
+    } else {
+      // If token does not start with a valid command, assume it belongs to the previous command.
+      if (strlen(buffer) + strlen(token) + 1 < COMMAND_SIZE) {
+        strcat(buffer, " ");
+        strcat(buffer, token);
+      }
     }
+    
     token = strtok(NULL, ",");
   }
+  
+  // Execute any remaining command in the buffer.
+  if (strlen(buffer) > 0) {
+    Serial.print(F("[DEBUG] Token extracted: '"));
+    Serial.print(buffer);
+    Serial.println(F("'"));
+    commander.execute(buffer, stream);
+  }
 }
+
+
+// void processMultipleCommands(char* commandLine, Stream* stream) {
+//   char* token = strtok(commandLine, ",");
+//   while (token != NULL) {
+//     token = trimLeadingSpaces(token);
+//     Serial.print(F("[DEBUG] Token extracted: '"));
+//     Serial.print(token);
+//     Serial.println(F("'"));
+//     if (strlen(token) > 0) {
+//       Serial.print(F("[COMMAND] Processing: "));
+//       Serial.println(token);
+//       commander.execute(token, stream);
+//     }
+//     token = strtok(NULL, ",");
+//   }
+// }
+
+// void processMultipleCommands(char* commandLine, Stream* stream) {
+//   char* token = strtok(commandLine, ",");  // Split at commas
+//   while (token != NULL) {
+//     token = trimLeadingSpaces(token);
+//     if (strlen(token) > 0) {
+//       Serial.print(F("[COMMAND] Processing: "));
+//       Serial.println(token);
+//       // Execute command using the global commander (declared in Commands.cpp)
+//       commander.execute(token, stream);
+//     }
+//     token = strtok(NULL, ",");
+//   }
+// }
 
 // ------------------------------------------------------------------
 // handleSerialCommands()
