@@ -218,10 +218,20 @@ void closeDispenseValves(int troughNumber) {
 // stopDispenseOperation()
 // ------------------------------------------------------------------
 void stopDispenseOperation(int troughNumber, CommandCaller* caller) {
-  // Close the dispense valves.
+  // If priming is in progress, stop it first.
+  if (valveControls[troughNumber - 1].isPriming) {
+    caller->print(F("[MESSAGE] Priming stopped for Trough "));
+    caller->println(troughNumber);
+    // Close the valves to stop priming.
+    closeDispenseValves(troughNumber);
+    // Reset priming flags.
+    valveControls[troughNumber - 1].isPriming = false;
+    valveControls[troughNumber - 1].manualControl = false;
+  }
+  
+  // Now proceed with stopping dispensing.
   closeDispenseValves(troughNumber);
-
-  // Get the flow sensor associated with this trough.
+  
   FlowSensor* sensor = flowSensors[troughNumber - 1];
   if (sensor) {
     caller->print(F("[MESSAGE] Trough "));
@@ -229,12 +239,12 @@ void stopDispenseOperation(int troughNumber, CommandCaller* caller) {
     caller->print(F(" Dispense Stopped. Total Volume: "));
     caller->print(sensor->dispenseVolume, 1);
     caller->println(F(" mL."));
-
-    // Stop measurement and reset the sensor's dispense volume.
+    
+    // Stop measurement and reset sensor's dispense volume.
     stopFlowSensorMeasurement(*sensor);
-    sensor->dispenseVolume = 0.0;
+    resetFlowSensorDispenseVolume(*sensor);
   }
-
-  // Mark the dispensing state as false.
+  
   valveControls[troughNumber - 1].isDispensing = false;
 }
+

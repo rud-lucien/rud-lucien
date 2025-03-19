@@ -125,12 +125,20 @@ void logSystemState() {
   dtostrf(valveControls[2].targetVolume, 4, 1, tv3);
   dtostrf(valveControls[3].targetVolume, 4, 1, tv4);
 
+  // --- Priming State for valves 1-4 ---
+  char pr1 = (valveControls[0].isPriming ? '1' : '0');
+  char pr2 = (valveControls[1].isPriming ? '1' : '0');
+  char pr3 = (valveControls[2].isPriming ? '1' : '0');
+  char pr4 = (valveControls[3].isPriming ? '1' : '0');
+
+
   // Format the log message.
   sprintf(buffer,
           "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, PV,%s, PV%%,%s, "
           "WSL%c%c, WBL%c%c, WVS%c%c, ELS%c, BS%c%c%c%c, OS%c%c%c%c, "
           "PS,%s, T,%s, H,%s, FS1,%s,%s,%s,%s,%s; FS2,%s,%s,%s,%s,%s; "
-          "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s, ,DS,%c%c%c%c, TV,%s,%s,%s,%s;",
+          "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s, ,DS%c%c%c%c, TV,%s,%s,%s,%s, "
+          "PR%c%c%c%c,",
           // Fan state
           fanState,
           // Reagent valves
@@ -163,8 +171,13 @@ void logSystemState() {
           f3Rate, f3Temp, f3Disp, f3Total, f3Flag,
           // Flow Sensor 4 data
           f4Rate, f4Temp, f4Disp, f4Total, f4Flag,
+          // Dispensing state for valves (DS)
           ds1, ds2, ds3, ds4,
-          tv1, tv2, tv3, tv4);
+          // Target volume for valves (TV)
+          tv1, tv2, tv3, tv4,
+          // Priming state for valves (PR)
+          pr1, pr2, pr3, pr4);
+
 
   Serial.println(buffer);
 }
