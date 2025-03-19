@@ -37,79 +37,54 @@ bool isCommandPrefix(const char* token) {
 }
 
 void processMultipleCommands(char* commandLine, Stream* stream) {
-  char buffer[COMMAND_SIZE] = "";
-  bool newCommand = true;
-  
-  // Split the input on commas only.
-  char* token = strtok(commandLine, ",");
-  
-  while (token != NULL) {
-    token = trimLeadingSpaces(token);
+  // Pointer to the current position in the command line.
+  char* start = commandLine;
+  // Temporary buffer for each command.
+  char commandCopy[COMMAND_SIZE];
+
+  while (*start) {
+    // Find the next comma.
+    char* comma = strchr(start, ',');
     
-    // Check if token starts with a valid command (from the API tree).
-    if (isCommandPrefix(token)) {
-      // If we already have accumulated a command, execute it.
-      if (!newCommand && strlen(buffer) > 0) {
-        Serial.print(F("[DEBUG] Token extracted: '"));
-        Serial.print(buffer);
-        Serial.println(F("'"));
-        commander.execute(buffer, stream);
-        buffer[0] = '\0'; // Reset the buffer.
-      }
-      // Copy the new token into the buffer.
-      strncpy(buffer, token, COMMAND_SIZE - 1);
-      buffer[COMMAND_SIZE - 1] = '\0';
-      newCommand = false;
+    // If a comma was found, compute the length of this command.
+    size_t len;
+    if (comma != NULL) {
+      len = comma - start;
     } else {
-      // If token does not start with a valid command, assume it belongs to the previous command.
-      if (strlen(buffer) + strlen(token) + 1 < COMMAND_SIZE) {
-        strcat(buffer, " ");
-        strcat(buffer, token);
-      }
+      // No comma found; this is the last command.
+      len = strlen(start);
+    }
+
+    // If the command length is too long, truncate it.
+    if (len >= COMMAND_SIZE) {
+      len = COMMAND_SIZE - 1;
+    }
+
+    // Copy the command substring into the buffer.
+    strncpy(commandCopy, start, len);
+    commandCopy[len] = '\0'; // Null-terminate
+
+    // Trim any leading whitespace.
+    char* trimmed = trimLeadingSpaces(commandCopy);
+
+    // If there's anything in the token, execute it.
+    if (strlen(trimmed) > 0) {
+      Serial.print(F("[DEBUG] Token extracted: '"));
+      Serial.print(trimmed);
+      Serial.println(F("'"));
+      commander.execute(trimmed, stream);
+    }
+
+    // If no comma was found, break out of the loop.
+    if (comma == NULL) {
+      break;
     }
     
-    token = strtok(NULL, ",");
-  }
-  
-  // Execute any remaining command in the buffer.
-  if (strlen(buffer) > 0) {
-    Serial.print(F("[DEBUG] Token extracted: '"));
-    Serial.print(buffer);
-    Serial.println(F("'"));
-    commander.execute(buffer, stream);
+    // Move start pointer to the character after the comma.
+    start = comma + 1;
   }
 }
 
-
-// void processMultipleCommands(char* commandLine, Stream* stream) {
-//   char* token = strtok(commandLine, ",");
-//   while (token != NULL) {
-//     token = trimLeadingSpaces(token);
-//     Serial.print(F("[DEBUG] Token extracted: '"));
-//     Serial.print(token);
-//     Serial.println(F("'"));
-//     if (strlen(token) > 0) {
-//       Serial.print(F("[COMMAND] Processing: "));
-//       Serial.println(token);
-//       commander.execute(token, stream);
-//     }
-//     token = strtok(NULL, ",");
-//   }
-// }
-
-// void processMultipleCommands(char* commandLine, Stream* stream) {
-//   char* token = strtok(commandLine, ",");  // Split at commas
-//   while (token != NULL) {
-//     token = trimLeadingSpaces(token);
-//     if (strlen(token) > 0) {
-//       Serial.print(F("[COMMAND] Processing: "));
-//       Serial.println(token);
-//       // Execute command using the global commander (declared in Commands.cpp)
-//       commander.execute(token, stream);
-//     }
-//     token = strtok(NULL, ",");
-//   }
-// }
 
 // ------------------------------------------------------------------
 // handleSerialCommands()
