@@ -11,8 +11,14 @@
 // Command Function Definitions
 // ------------------------------------------------------------------
 void cmd_set_log_frequency(char* args, CommandCaller* caller) {
+  // Create a local copy of args
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   int newInterval = -1;
-  if (sscanf(args, "%d", &newInterval) == 1 && newInterval > 0) {
+  // Use localArgs for parsing rather than args.
+  if (sscanf(localArgs, "%d", &newInterval) == 1 && newInterval > 0) {
     logging.logInterval = newInterval;
     caller->print(F("[MESSAGE] Log frequency set to "));
     caller->print(newInterval);
@@ -23,14 +29,16 @@ void cmd_set_log_frequency(char* args, CommandCaller* caller) {
 }
 
 void cmd_fan(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   int stateInt = -1;
-  if (sscanf(args, "%d", &stateInt) == 1 && (stateInt == 0 || stateInt == 1)) {
+  if (sscanf(localArgs, "%d", &stateInt) == 1 && (stateInt == 0 || stateInt == 1)) {
     bool state = (stateInt == 1);
-    // Set fan state (using hardware-level control)
     digitalWrite(fan.relayPin, state ? HIGH : LOW);
     Serial.print(F("[MESSAGE] Fan turned "));
     Serial.println(state ? F("ON") : F("OFF"));
-    // Disable auto mode on manual command.
     fanAutoMode = false;
     caller->println(F("[MESSAGE] Fan manual override active. Use FNAUTO to re-enable auto control."));
   } else {
@@ -39,13 +47,23 @@ void cmd_fan(char* args, CommandCaller* caller) {
 }
 
 void cmd_fan_auto(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   fanAutoMode = true;
   caller->println(F("[MESSAGE] Fan auto control re-enabled."));
 }
 
 void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   int valveNumber = -1, valveState = -1;
-  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES && (valveState == 0 || valveState == 1)) {
+  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
+      valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES &&
+      (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
     caller->print(F("[MESSAGE] Reagent valve "));
     caller->print(valveNumber);
@@ -62,9 +80,16 @@ void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_set_media_valve(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   int valveNumber = -1, valveState = -1;
-  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES && (valveState == 0 || valveState == 1)) {
+  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
+      valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES &&
+      (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
     caller->print(F("[MESSAGE] Media valve "));
     caller->print(valveNumber);
@@ -81,9 +106,16 @@ void cmd_set_media_valve(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_set_waste_valve(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   int valveNumber = -1, valveState = -1;
-  if (sscanf(args, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES && (valveState == 0 || valveState == 1)) {
+  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
+      valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES &&
+      (valveState == 0 || valveState == 1)) {
     bool state = (valveState == 1);
     caller->print(F("[MESSAGE] Waste valve "));
     caller->print(valveNumber);
@@ -100,9 +132,14 @@ void cmd_set_waste_valve(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+  
   int percentage = -1;
-  if (sscanf(args, "%d", &percentage) == 1 && percentage >= 0 && percentage <= 100) {
+  if (sscanf(localArgs, "%d", &percentage) == 1 && percentage >= 0 && percentage <= 100) {
     proportionalValve = setValvePosition(proportionalValve, (float)percentage);
     caller->print(F("[MESSAGE] Pressure valve set to "));
     caller->print(percentage);
@@ -112,15 +149,25 @@ void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_calibrate_pressure_valve(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+  
   caller->println(F("[MESSAGE] Calibrating pressure valve, please wait..."));
   calibrateProportionalValve();
   caller->println(F("[MESSAGE] Pressure valve calibration complete."));
 }
 
+
 void cmd_start_flow_sensor_manually(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+  
   int sensorNumber = -1;
-  if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
+  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
     FlowSensor* sensor = flowSensors[sensorNumber - 1];
     if (!sensor) {
       caller->print(F("[ERROR] Flow Sensor "));
@@ -140,9 +187,14 @@ void cmd_start_flow_sensor_manually(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_stop_flow_sensor_manually(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+  
   int sensorNumber = -1;
-  if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
+  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
     FlowSensor* sensor = flowSensors[sensorNumber - 1];
     if (!sensor) {
       caller->print(F("[ERROR] Flow Sensor "));
@@ -162,9 +214,15 @@ void cmd_stop_flow_sensor_manually(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_reset_flow_dispense(char* args, CommandCaller* caller) {
+  // Make a local copy of args.
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+  
   int sensorNumber = -1;
-  if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
+  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
     FlowSensor* sensors[] = { &flow1, &flow2, &flow3, &flow4 };
     resetFlowSensorDispenseVolume(*sensors[sensorNumber]);
     caller->print(F("[MESSAGE] Reset dispense volume for Flow Sensor "));
@@ -174,9 +232,15 @@ void cmd_reset_flow_dispense(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_reset_flow_total(char* args, CommandCaller* caller) {
+  // Make a local copy of args.
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+  
   int sensorNumber = -1;
-  if (sscanf(args, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
+  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
     FlowSensor* sensors[] = { &flow1, &flow2, &flow3, &flow4 };
     resetFlowSensorTotalVolume(*sensors[sensorNumber]);
     caller->print(F("[MESSAGE] Reset total volume for Flow Sensor "));
@@ -186,50 +250,66 @@ void cmd_reset_flow_total(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_reset_i2c(char* args, CommandCaller* caller) {
+  // Make a local copy of args (even if not used, for consistency).
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   Serial.println(F("[MESSAGE] Manual I2C bus reset initiated."));
   resetI2CBus();
   caller->println(F("[MESSAGE] I2C bus reset complete."));
 }
 
+
 void cmd_dispense_reagent(char* args, CommandCaller* caller) {
+  // Create a local copy of the input arguments.
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   int troughNumber = -1;
   float requestedVolume = -1.0;
   const float MIN_VOLUME = 1.0;
   const float MAX_VOLUME = 200.0;
 
   caller->print(F("[MESSAGE] Received command: D "));
-  caller->println(args);
+  caller->println(localArgs);
 
-  // Use strtok to split the arguments
-  char* token = strtok(args, " ");
+  // Use strtok to split the arguments in the local copy.
+  char* token = strtok(localArgs, " ");
   if (token != NULL) {
     troughNumber = atoi(token);
     token = strtok(NULL, " ");
     if (token != NULL) {
       requestedVolume = atof(token);
     } else {
-      requestedVolume = -1.0;  // Continuous mode if no volume provided
+      requestedVolume = -1.0;  // Continuous mode if no volume provided.
     }
   } else {
     caller->println(F("[ERROR] Invalid command format. Use: D <1-4> [volume]"));
     return;
   }
+
   caller->print(F("[MESSAGE] Parsed troughNumber: "));
   caller->print(troughNumber);
   caller->print(F(", requestedVolume: "));
   caller->println(requestedVolume);
 
+  // Validate the trough number.
   if (troughNumber < 1 || troughNumber > 4) {
     caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
     return;
   }
+  // Check if a dispense is already in progress.
   if (valveControls[troughNumber - 1].isDispensing) {
     caller->print(F("[WARNING] A dispense is already in progress for Trough "));
     caller->println(troughNumber);
     caller->println(F("Use STOPD <trough number> to stop it first."));
     return;
   }
+  // Validate requested volume if specified.
   if (requestedVolume > 0) {
     if (requestedVolume < MIN_VOLUME) {
       caller->print(F("[ERROR] Requested volume too low. Minimum: "));
@@ -248,12 +328,13 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   const int VALVE_POSITION = 100;
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
 
+  // Check pressure.
   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
     return;
   }
 
-  // Check for overflow before dispensing.
+  // Check for overflow.
   if (readBinarySensor(overflowSensors[troughNumber - 1])) {
     caller->print(F("[ERROR] Cannot dispense: Overflow detected for Trough "));
     caller->println(troughNumber);
@@ -267,6 +348,7 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
     return;
   }
 
+  // Start flow sensor measurement.
   if (!startFlowSensorMeasurement(*sensor)) {
     caller->print(F("[ERROR] Failed to start flow sensor for Trough "));
     caller->println(troughNumber);
@@ -276,6 +358,7 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   caller->print(F("[MESSAGE] Flow sensor measurement started for Trough "));
   caller->println(troughNumber);
 
+  // Open valves and start dispensing.
   openDispenseValves(troughNumber);
   caller->print(F("[MESSAGE] Dispensing started for Trough "));
   caller->println(troughNumber);
@@ -285,14 +368,19 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
 }
 
 
-
 void cmd_stop_dispense(char* args, CommandCaller* caller) {
+  // Create a local copy of the arguments.
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   int troughNumber = -1;
   bool stopAll = false;
 
-  if (strncmp(args, "all", 3) == 0) {
+  // Check if the local arguments specify "all" (case sensitive).
+  if (strncmp(localArgs, "all", 3) == 0) {
     stopAll = true;
-  } else if (sscanf(args, "%d", &troughNumber) != 1 || troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
+  } else if (sscanf(localArgs, "%d", &troughNumber) != 1 || troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
     caller->println(F("[ERROR] Invalid trough number. Use STOPD <1-4> or STOPD all."));
     return;
   }
@@ -310,12 +398,18 @@ void cmd_stop_dispense(char* args, CommandCaller* caller) {
   }
 }
 
+
 void cmd_prime_valves(char* args, CommandCaller* caller) {
+  // Create a local copy of the args to work with.
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
   int localValveNumber = -1;
   char extra;
 
   // Try to parse exactly one integer. If there's any extra character after it, that's an error.
-  if (sscanf(args, "%d %c", &localValveNumber, &extra) != 1) {
+  if (sscanf(localArgs, "%d %c", &localValveNumber, &extra) != 1) {
     caller->println(F("[ERROR] Invalid arguments for prime command. Use: P <valve number>"));
     return;
   }
@@ -337,7 +431,6 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   }
 
   // Check if the reagent bubble sensor already detects liquid.
-  // (Using readBinarySensor on reagentBubbleSensors array.)
   if (readBinarySensor(reagentBubbleSensors[localValveNumber - 1])) {
     caller->print(F("[MESSAGE] Valve "));
     caller->print(localValveNumber);
@@ -356,7 +449,6 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   valveControls[localValveNumber - 1].manualControl = true;
 
   // Open the reagent and media valves for this trough.
-  // (Assuming openDispenseValves() opens both valves.)
   openDispenseValves(localValveNumber);
 
   // Mark that priming is in progress.
@@ -365,6 +457,7 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   caller->print(F("[MESSAGE] Priming started for valve "));
   caller->println(localValveNumber);
 }
+
 
 
 // ------------------------------------------------------------------
