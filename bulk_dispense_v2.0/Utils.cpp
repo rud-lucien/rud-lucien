@@ -112,37 +112,47 @@ void handleSerialCommands() {
 // ------------------------------------------------------------------
 // checkAndSetPressure()
 // ------------------------------------------------------------------
-bool checkAndSetPressure(float thresholdPressure, float valvePosition, unsigned long timeout) {
-  unsigned long startTime = millis();
+bool isPressureOK(float thresholdPressure) {
   float currentPressure = readPressure(pressureSensor);
-  float currentValvePos = proportionalValve.controlVoltage;  // current valve setting
+  return (currentPressure >= thresholdPressure);
+}
 
-  if (currentPressure >= thresholdPressure && currentValvePos == valvePosition) {
-    Serial.println(F("[MESSAGE] System is already pressurized and valve is at the correct position."));
-    return true;
-  }
 
-  // Set the valve to the desired position.
+void setPressureValve(int valvePosition) {
   proportionalValve = setValvePosition(proportionalValve, valvePosition);
   Serial.print(F("[MESSAGE] Pressure valve set to "));
   Serial.print(valvePosition);
   Serial.println(F("%. Waiting for pressure stabilization..."));
+}
 
-  // Wait until the pressure threshold is met or timeout occurs.
+bool checkAndSetPressure(float thresholdPressure, int valvePosition, unsigned long timeout) {
+  unsigned long startTime = millis();
+  
+  // First, check if the pressure is already OK.
+  if (isPressureOK(thresholdPressure)) {
+    Serial.println(F("[MESSAGE] System is already pressurized."));
+    return true;
+  }
+  
+  // If not, set the valve.
+  setPressureValve(valvePosition);
+  
+  // Now wait until the pressure reaches the threshold or timeout occurs.
   while (millis() - startTime < timeout) {
-    currentPressure = readPressure(pressureSensor);
-    if (currentPressure >= thresholdPressure) {
+    if (isPressureOK(thresholdPressure)) {
       Serial.println(F("[MESSAGE] Pressure threshold reached."));
       return true;
     }
     delay(100);
   }
-
+  
   Serial.print(F("[ERROR] Pressure threshold not reached. Current pressure: "));
-  Serial.print(currentPressure);
+  Serial.print(readPressure(pressureSensor));
   Serial.println(F(" psi. Operation aborted."));
   return false;
 }
+
+
 
 // ------------------------------------------------------------------
 // resetI2CBus()

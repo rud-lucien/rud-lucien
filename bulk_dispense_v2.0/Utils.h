@@ -44,7 +44,8 @@ void handleSerialCommands();
  * @param timeout Maximum wait time (ms).
  * @return true if threshold reached; false otherwise.
  */
-bool checkAndSetPressure(float thresholdPressure, float valvePosition, unsigned long timeout);
+bool checkAndSetPressure(float thresholdPressure, int valvePosition, unsigned long timeout);
+
 
 /**
  * resetI2CBus()
@@ -120,6 +121,10 @@ void disableFillModeForAll(CommandCaller* caller);
 
 // Function to check if a specific trough is in fill mode
 bool isFillModeActive(int troughNumber);
+
+bool isPressureOK(float thresholdPressure);
+
+void setPressureValve(int valvePosition);
 
 
 #endif // UTILS_H
