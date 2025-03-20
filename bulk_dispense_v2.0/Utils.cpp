@@ -248,3 +248,75 @@ void stopDispenseOperation(int troughNumber, CommandCaller* caller) {
   valveControls[troughNumber - 1].isDispensing = false;
 }
 
+bool areDispenseValvesOpen(int troughNumber) {
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
+    return false;
+  }
+  switch (troughNumber) {
+    case 1:
+      return reagentValve1.isOpen && mediaValve1.isOpen;
+    case 2:
+      return reagentValve2.isOpen && mediaValve2.isOpen;
+    case 3:
+      return reagentValve3.isOpen && mediaValve3.isOpen;
+    case 4:
+      return reagentValve4.isOpen && mediaValve4.isOpen;
+    default:
+      return false;
+  }
+}
+
+void enableManualControl(int index, CommandCaller* caller) {
+  valveControls[index].manualControl = true;
+  caller->print(F("[MESSAGE] Manual control enabled for trough "));
+  caller->println(index + 1); // Trough numbers are 1-based.
+}
+
+void disableManualControl(int index, CommandCaller* caller) {
+  valveControls[index].manualControl = false;
+  caller->print(F("[MESSAGE] Manual control disabled for trough "));
+  caller->println(index + 1);
+}
+
+// Enable Fill Mode
+void enableFillMode(int troughNumber, CommandCaller* caller) {
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
+    return; // Prevent invalid access
+  }
+
+  valveControls[troughNumber - 1].fillMode = true;
+
+  caller->print(F("[MESSAGE] Fill mode enabled for trough "));
+  caller->println(troughNumber);
+}
+
+// Disable Fill Mode
+void disableFillMode(int troughNumber, CommandCaller* caller) {
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
+    return; // Prevent invalid access
+  }
+
+  if (valveControls[troughNumber - 1].fillMode) {
+    valveControls[troughNumber - 1].fillMode = false;
+    caller->print(F("[MESSAGE] Fill mode disabled for trough "));
+    caller->println(troughNumber);
+  }
+}
+
+// Disable Fill Mode for All Troughs
+void disableFillModeForAll(CommandCaller* caller) {
+  for (int i = 1; i <= NUM_OVERFLOW_SENSORS; i++) {
+    disableFillMode(i, caller);
+  }
+}
+
+// Check if Fill Mode is Active
+bool isFillModeActive(int troughNumber) {
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
+    return false;
+  }
+  return valveControls[troughNumber - 1].fillMode;
+}
+
+
+

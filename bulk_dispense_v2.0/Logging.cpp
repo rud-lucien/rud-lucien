@@ -131,6 +131,11 @@ void logSystemState() {
   char pr3 = (valveControls[2].isPriming ? '1' : '0');
   char pr4 = (valveControls[3].isPriming ? '1' : '0');
 
+  // Determine fill mode for each trough.
+  char fm1 = (valveControls[0].fillMode ? '1' : '0');
+  char fm2 = (valveControls[1].fillMode ? '1' : '0');
+  char fm3 = (valveControls[2].fillMode ? '1' : '0');
+  char fm4 = (valveControls[3].fillMode ? '1' : '0');
 
   // Format the log message.
   sprintf(buffer,
@@ -138,7 +143,7 @@ void logSystemState() {
           "WSL%c%c, WBL%c%c, WVS%c%c, ELS%c, BS%c%c%c%c, OS%c%c%c%c, "
           "PS,%s, T,%s, H,%s, FS1,%s,%s,%s,%s,%s; FS2,%s,%s,%s,%s,%s; "
           "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s, ,DS%c%c%c%c, TV,%s,%s,%s,%s, "
-          "PR%c%c%c%c,",
+          "PR%c%c%c%c, FM%c%c%c%c",
           // Fan state
           fanState,
           // Reagent valves
@@ -176,7 +181,9 @@ void logSystemState() {
           // Target volume for valves (TV)
           tv1, tv2, tv3, tv4,
           // Priming state for valves (PR)
-          pr1, pr2, pr3, pr4);
+          pr1, pr2, pr3, pr4,
+          // Fill mode (FM) – new part
+          fm1, fm2, fm3, fm4);
 
 
   Serial.println(buffer);

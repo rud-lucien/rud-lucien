@@ -23,6 +23,7 @@ void monitorEnclosureLiquidSensor(unsigned long currentTime);
 void monitorEnclosureTemp();
 void monitorFlowSensorConnections();
 void monitorPrimeSensors(unsigned long currentTime);
+void monitorFillSensors(unsigned long currentTime);
 
 
 // Helper functions used by the monitor functions.

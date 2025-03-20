@@ -109,6 +109,7 @@ void loop() {
   monitorOverflowSensors(currentTime);
   monitorFlowSensors(currentTime);
   monitorPrimeSensors(currentTime);
+  monitorFillSensors(currentTime);
   monitorWasteLineSensors(currentTime);
   monitorWasteBottleSensors(currentTime);
   monitorWasteVacuumSensors(currentTime);

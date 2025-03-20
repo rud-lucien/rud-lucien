@@ -64,11 +64,23 @@ void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
   if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
       valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES &&
       (valveState == 0 || valveState == 1)) {
+
+    // Disable fill mode if active.
+    disableFillMode(valveNumber, caller);
+
     bool state = (valveState == 1);
+    
+    // Enable manual control ONLY when opening the valve.
+    if (state) {
+      enableManualControl(valveNumber - 1, caller);
+    }
+    
+
     caller->print(F("[MESSAGE] Reagent valve "));
     caller->print(valveNumber);
     caller->print(F(" set to "));
     caller->println(state ? "OPEN" : "CLOSED");
+
     switch (valveNumber) {
       case 1: reagentValve1 = state ? openValve(reagentValve1) : closeValve(reagentValve1); break;
       case 2: reagentValve2 = state ? openValve(reagentValve2) : closeValve(reagentValve2); break;
@@ -81,6 +93,7 @@ void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
 }
 
 
+
 void cmd_set_media_valve(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
@@ -90,11 +103,23 @@ void cmd_set_media_valve(char* args, CommandCaller* caller) {
   if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
       valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES &&
       (valveState == 0 || valveState == 1)) {
+
+    // Disable fill mode if active.
+    disableFillMode(valveNumber, caller);
+
     bool state = (valveState == 1);
+    
+    // Enable manual control ONLY when opening the valve.
+    if (state) {
+      enableManualControl(valveNumber - 1, caller);
+    }
+
+
     caller->print(F("[MESSAGE] Media valve "));
     caller->print(valveNumber);
     caller->print(F(" set to "));
     caller->println(state ? "OPEN" : "CLOSED");
+
     switch (valveNumber) {
       case 1: mediaValve1 = state ? openValve(mediaValve1) : closeValve(mediaValve1); break;
       case 2: mediaValve2 = state ? openValve(mediaValve2) : closeValve(mediaValve2); break;
@@ -106,7 +131,6 @@ void cmd_set_media_valve(char* args, CommandCaller* caller) {
   }
 }
 
-
 void cmd_set_waste_valve(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
@@ -116,11 +140,23 @@ void cmd_set_waste_valve(char* args, CommandCaller* caller) {
   if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
       valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES &&
       (valveState == 0 || valveState == 1)) {
+
+    // Disable fill mode if active.
+    disableFillMode(valveNumber, caller);
+
     bool state = (valveState == 1);
+    
+    // Enable manual control ONLY when opening the valve.
+    if (state) {
+      enableManualControl(valveNumber - 1, caller);
+    }
+
+
     caller->print(F("[MESSAGE] Waste valve "));
     caller->print(valveNumber);
     caller->print(F(" set to "));
     caller->println(state ? "OPEN" : "CLOSED");
+
     switch (valveNumber) {
       case 1: wasteValve1 = state ? openValve(wasteValve1) : closeValve(wasteValve1); break;
       case 2: wasteValve2 = state ? openValve(wasteValve2) : closeValve(wasteValve2); break;
@@ -131,7 +167,6 @@ void cmd_set_waste_valve(char* args, CommandCaller* caller) {
     caller->println(F("[ERROR] Invalid waste valve command. Use: W <1-4> <0/1>"));
   }
 }
-
 
 void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
@@ -168,6 +203,11 @@ void cmd_start_flow_sensor_manually(char* args, CommandCaller* caller) {
   
   int sensorNumber = -1;
   if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
+    // Disable fill mode if active.
+    disableFillMode(sensorNumber, caller);
+    
+    enableManualControl(sensorNumber - 1, caller);
+    
     FlowSensor* sensor = flowSensors[sensorNumber - 1];
     if (!sensor) {
       caller->print(F("[ERROR] Flow Sensor "));
@@ -195,6 +235,12 @@ void cmd_stop_flow_sensor_manually(char* args, CommandCaller* caller) {
   
   int sensorNumber = -1;
   if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
+    // Disable fill mode if active.
+    disableFillMode(sensorNumber - 1, caller);
+        
+    // Set manual control to false.
+    disableManualControl(sensorNumber - 1, caller);
+    
     FlowSensor* sensor = flowSensors[sensorNumber - 1];
     if (!sensor) {
       caller->print(F("[ERROR] Flow Sensor "));
@@ -223,6 +269,12 @@ void cmd_reset_flow_dispense(char* args, CommandCaller* caller) {
   
   int sensorNumber = -1;
   if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
+    // Disable fill mode if active.
+    disableFillMode(sensorNumber, caller);
+       
+    // Set manual control to true.
+    enableManualControl(sensorNumber, caller);
+
     FlowSensor* sensors[] = { &flow1, &flow2, &flow3, &flow4 };
     resetFlowSensorDispenseVolume(*sensors[sensorNumber]);
     caller->print(F("[MESSAGE] Reset dispense volume for Flow Sensor "));
@@ -241,6 +293,13 @@ void cmd_reset_flow_total(char* args, CommandCaller* caller) {
   
   int sensorNumber = -1;
   if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
+    // Disable fill mode if active.
+    disableFillMode(sensorNumber, caller);
+     
+    // Set manual control to true.
+    enableManualControl(sensorNumber, caller);
+
+    // Create an array of pointers to the flow sensors.
     FlowSensor* sensors[] = { &flow1, &flow2, &flow3, &flow4 };
     resetFlowSensorTotalVolume(*sensors[sensorNumber]);
     caller->print(F("[MESSAGE] Reset total volume for Flow Sensor "));
@@ -252,10 +311,18 @@ void cmd_reset_flow_total(char* args, CommandCaller* caller) {
 
 
 void cmd_reset_i2c(char* args, CommandCaller* caller) {
-  // Make a local copy of args (even if not used, for consistency).
+  // Create a local copy of args (for consistency)
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
+
+  // For every trough, disable fill mode using our helper function,
+  // and enable manual control.
+  for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
+    disableFillMode(i + 1, caller); // i+1 converts from 0-based to 1-based indexing.
+    enableManualControl(i, caller); // This function takes 0-based index.
+  }
+  
 
   Serial.println(F("[MESSAGE] Manual I2C bus reset initiated."));
   resetI2CBus();
@@ -302,6 +369,10 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
     caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
     return;
   }
+
+  // Disable fill mode if active
+  disableFillMode(troughNumber, caller);
+
   // Check if a dispense is already in progress.
   if (valveControls[troughNumber - 1].isDispensing) {
     caller->print(F("[WARNING] A dispense is already in progress for Trough "));
@@ -369,7 +440,6 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
 
 
 void cmd_stop_dispense(char* args, CommandCaller* caller) {
-  // Create a local copy of the arguments.
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
@@ -377,7 +447,6 @@ void cmd_stop_dispense(char* args, CommandCaller* caller) {
   int troughNumber = -1;
   bool stopAll = false;
 
-  // Check if the local arguments specify "all" (case sensitive).
   if (strncmp(localArgs, "all", 3) == 0) {
     stopAll = true;
   } else if (sscanf(localArgs, "%d", &troughNumber) != 1 || troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
@@ -387,11 +456,16 @@ void cmd_stop_dispense(char* args, CommandCaller* caller) {
 
   if (stopAll) {
     caller->println(F("[MESSAGE] Stopping all dispensing operations..."));
-    for (int i = 1; i <= NUM_OVERFLOW_SENSORS; i++) {
-      stopDispenseOperation(i, caller);
+    // disable fill mode for all trough.
+    disableFillModeForAll(caller);
+    for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
+      // Stop the dispensing operation.
+      stopDispenseOperation(i + 1, caller);
     }
     caller->println(F("[MESSAGE] All dispensing operations stopped."));
   } else {
+    disableFillMode(troughNumber, caller);
+    // Stop the dispensing operation.
     stopDispenseOperation(troughNumber, caller);
     caller->print(F("[MESSAGE] Dispensing stopped for Trough "));
     caller->println(troughNumber);
@@ -420,6 +494,9 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
     return;
   }
 
+  // Disable fill mode if active
+  disableFillMode(localValveNumber, caller);
+
   // Pressure check (using same threshold as dispense)
   const float PRESSURE_THRESHOLD_PSI = 15.0;
   const int VALVE_POSITION = 100;
@@ -438,16 +515,6 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
     return;
   }
 
-  // If the valve is in fill mode, disable it.
-  if (valveControls[localValveNumber - 1].fillMode) {
-    valveControls[localValveNumber - 1].fillMode = false;
-    caller->print(F("[MESSAGE] Fill mode disabled for trough "));
-    caller->println(localValveNumber);
-  }
-
-  // Mark the valve as under manual control for priming.
-  valveControls[localValveNumber - 1].manualControl = true;
-
   // Open the reagent and media valves for this trough.
   openDispenseValves(localValveNumber);
 
@@ -456,6 +523,64 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
 
   caller->print(F("[MESSAGE] Priming started for valve "));
   caller->println(localValveNumber);
+}
+
+
+void cmd_fill_reagent(char* args, CommandCaller* caller) {
+  // Create a local copy of the input arguments.
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  int troughNumber = -1;
+  char extra; // to capture any extra token
+
+  // Try to parse exactly one integer. If there's any extra token, that's an error.
+  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1) {
+    caller->println(F("[ERROR] Invalid arguments for fill command. Use: F <valve number>"));
+    return;
+  }
+  
+  // Validate valve number (must be between 1 and 4).
+  if (troughNumber < 1 || troughNumber > 4) {
+    caller->println(F("[ERROR] Invalid valve number. Use 1-4."));
+    return;
+  }
+  
+  // If dispensing is in progress on this trough, stop it.
+  if (valveControls[troughNumber - 1].isDispensing) {
+    stopDispenseOperation(troughNumber, caller);
+    caller->print(F("[MESSAGE] Dispense operation for trough "));
+    caller->print(troughNumber);
+    caller->println(F(" stopped prematurely due to fill command."));
+  }
+
+  // If priming is in progress on this trough, stop it as well.
+  if (valveControls[troughNumber - 1].isPriming) {
+    valveControls[troughNumber - 1].isPriming = false;
+    closeDispenseValves(troughNumber);
+    caller->print(F("[MESSAGE] Priming operation for trough "));
+    caller->print(troughNumber);
+    caller->println(F(" stopped prematurely due to fill command."));
+  }
+
+  // Pressure check (using same threshold as dispense/prime).
+  const float PRESSURE_THRESHOLD_PSI = 15.0;
+  const int VALVE_POSITION = 100;
+  const unsigned long PRESSURE_TIMEOUT_MS = 500;
+  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
+    caller->println(F("[ERROR] Pressure check failed. Fill aborted."));
+    return;
+  }
+  
+  // Reset the flow sensor so we start fresh.
+  resetFlowSensorDispenseVolume(*flowSensors[troughNumber - 1]);
+
+  // Open the reagent and media valves.
+  openDispenseValves(troughNumber);
+
+  // Enable fill mode for this trough.
+  enableFillMode(troughNumber, caller);
 }
 
 
@@ -481,5 +606,6 @@ Commander::systemCommand_t API_tree[] = {
   systemCommand("RESETI2C", "Manually reset the I2C bus", cmd_reset_i2c),
   systemCommand("D", "Dispense reagent: D <1-4> [volume] (volume in mL, continuous if omitted)", cmd_dispense_reagent),
   systemCommand("STOPD", "Stop dispensing: STOPD <1-4> (stop specific trough) or STOPD ALL", cmd_stop_dispense),
-  systemCommand("P", "Prime valves: P <1-4> (prime valves until liquid detected)", cmd_prime_valves)
+  systemCommand("P", "Prime valves: P <1-4> (prime valves until liquid detected)", cmd_prime_valves),
+  systemCommand("F", "Fill reagent: F <1-4>", cmd_fill_reagent)
 };

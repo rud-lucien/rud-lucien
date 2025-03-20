@@ -116,6 +116,13 @@ void monitorFlowSensors(unsigned long currentTime) {
         continue;
       }
 
+      // --- NEW: If manual control is active, reset timers and skip automated checks.
+      if (valveControls[i].manualControl) {
+        valveControls[i].lastFlowCheckTime = 0;
+        valveControls[i].lastFlowChangeTime = 0;
+        continue;
+      }
+
       // Check for no flow timeout
       if (sensor->flowRate < MIN_FLOW_RATE_THRESHOLD) {
         if (valveControls[i].lastFlowCheckTime == 0) {
@@ -168,18 +175,18 @@ void monitorFlowSensors(unsigned long currentTime) {
 
 // Define timing and threshold constants for priming
 const unsigned long PRIME_TIMEOUT_MS = 6000;           // Maximum time allowed for priming (no bubble detected)
-const unsigned long STABLE_DETECTION_PERIOD_MS = 500;    // Time bubble sensor must be continuously triggered
-const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000;     // Additional priming time after stable detection
-const unsigned long PRIMING_FLOW_TIMEOUT_MS = 5000;      // Time allowed with insufficient flow
-const float MIN_FLOW_RATE_PRIME = 5.0;                   // Minimum acceptable flow rate during priming
+const unsigned long STABLE_DETECTION_PERIOD_MS = 500;  // Time bubble sensor must be continuously triggered
+const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000;   // Additional priming time after stable detection
+const unsigned long PRIMING_FLOW_TIMEOUT_MS = 5000;    // Time allowed with insufficient flow
+const float MIN_FLOW_RATE_PRIME = 5.0;                 // Minimum acceptable flow rate during priming
 
 // Static arrays to track timing and low-flow conditions for each valve (assumed 4 valves)
-static unsigned long primeStartTime[NUM_OVERFLOW_SENSORS] = {0, 0, 0, 0};
-static unsigned long stableDetectionStartTime[NUM_OVERFLOW_SENSORS] = {0, 0, 0, 0};
-static unsigned long additionalPrimeStartTime[NUM_OVERFLOW_SENSORS] = {0, 0, 0, 0};
-static unsigned long lowFlowStartTime[NUM_OVERFLOW_SENSORS] = {0, 0, 0, 0};
-static bool primingFailed[NUM_OVERFLOW_SENSORS] = {false, false, false, false};
-static bool primingSuccess[NUM_OVERFLOW_SENSORS] = {false, false, false, false};
+static unsigned long primeStartTime[NUM_OVERFLOW_SENSORS] = { 0, 0, 0, 0 };
+static unsigned long stableDetectionStartTime[NUM_OVERFLOW_SENSORS] = { 0, 0, 0, 0 };
+static unsigned long additionalPrimeStartTime[NUM_OVERFLOW_SENSORS] = { 0, 0, 0, 0 };
+static unsigned long lowFlowStartTime[NUM_OVERFLOW_SENSORS] = { 0, 0, 0, 0 };
+static bool primingFailed[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
+static bool primingSuccess[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
 
 void monitorPrimeSensors(unsigned long currentTime) {
   for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
@@ -233,10 +240,7 @@ void monitorPrimeSensors(unsigned long currentTime) {
       }
 
       // --- Check for bubble detection timeout ---
-      if (!readBinarySensor(reagentBubbleSensors[i]) &&
-          (currentTime - primeStartTime[i] >= PRIME_TIMEOUT_MS) &&
-          !primingFailed[i] && !primingSuccess[i])
-      {
+      if (!readBinarySensor(reagentBubbleSensors[i]) && (currentTime - primeStartTime[i] >= PRIME_TIMEOUT_MS) && !primingFailed[i] && !primingSuccess[i]) {
         Serial.print(F("[ERROR] Priming failed for valve "));
         Serial.print(i + 1);
         Serial.println(F(" due to no liquid detected."));
@@ -291,6 +295,99 @@ void monitorPrimeSensors(unsigned long currentTime) {
     }
   }
 }
+
+void monitorFillSensors(unsigned long currentTime) {
+  // Define constants (adjust as needed).
+  const float MAX_FILL_VOLUME_ML = 200.0;           // Maximum fill volume in mL
+  const unsigned long MAX_FILL_TIME_MS = 60000;     // Maximum fill time in ms
+  const unsigned long FLOW_TIMEOUT_MS = 5000;       // Time allowed with insufficient flow during fill
+  const float MIN_FLOW_RATE_FILL = 1;               // Minimum acceptable flow rate during fill
+  const unsigned long SENSOR_CHECK_INTERVAL = 500;  // How often to check overflow sensor
+
+  // Static arrays to track fill state for each trough.
+  static unsigned long fillStartTime[NUM_OVERFLOW_SENSORS] = { 0 };
+  static unsigned long lowFlowStartTime[NUM_OVERFLOW_SENSORS] = { 0 };
+  static float initialVolume[NUM_OVERFLOW_SENSORS] = { 0 };
+  static unsigned long lastSensorCheck[NUM_OVERFLOW_SENSORS] = { 0 };
+
+  for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
+    if (valveControls[i].fillMode) {
+      FlowSensor* sensor = flowSensors[i];
+      if (!sensor) {
+        continue;
+      }
+
+      // Record fill start time and initial volume when filling begins.
+      if (fillStartTime[i] == 0) {
+        fillStartTime[i] = currentTime;
+        initialVolume[i] = sensor->dispenseVolume;
+        lowFlowStartTime[i] = 0;  // Reset low flow timer.
+      }
+
+      // Calculate added volume since fill started.
+      float addedVolume = sensor->dispenseVolume - initialVolume[i];
+
+      // Check for no-flow condition: if flow rate is below threshold.
+      if (sensor->flowRate < MIN_FLOW_RATE_FILL) {
+        if (lowFlowStartTime[i] == 0) {
+          lowFlowStartTime[i] = currentTime;
+        } else if ((currentTime - lowFlowStartTime[i]) >= FLOW_TIMEOUT_MS) {
+          Serial.print(F("[ERROR] Fill timeout (insufficient flow) for trough "));
+          Serial.println(i + 1);
+          // Close valves and disable fill mode on error.
+          closeDispenseValves(i + 1);
+          valveControls[i].fillMode = false;
+          fillStartTime[i] = 0;
+          lowFlowStartTime[i] = 0;
+          continue;
+        }
+      } else {
+        // Flow rate is acceptable; reset low flow timer.
+        lowFlowStartTime[i] = 0;
+      }
+
+      // Check if fill volume or fill time is exceeded.
+      bool volumeExceeded = addedVolume >= MAX_FILL_VOLUME_ML;
+      bool timeExceeded = (currentTime - fillStartTime[i]) >= MAX_FILL_TIME_MS;
+      if (volumeExceeded || timeExceeded) {
+        Serial.print(F("[MESSAGE] Fill complete for trough "));
+        Serial.println(i + 1);
+        // Close valves and disable fill mode.
+        closeDispenseValves(i + 1);
+        valveControls[i].fillMode = false;
+        fillStartTime[i] = 0;
+        lowFlowStartTime[i] = 0;
+        continue;
+      }
+
+      // Periodically check overflow sensor.
+      if ((currentTime - lastSensorCheck[i]) >= SENSOR_CHECK_INTERVAL) {
+        lastSensorCheck[i] = currentTime;
+        if (readBinarySensor(overflowSensors[i])) {
+          Serial.print(F("[MESSAGE] Overflow condition detected for trough "));
+          Serial.println(i + 1);
+          Serial.println(F(" - temporarily closing valves to prevent overfill."));
+          closeDispenseValves(i + 1);
+        } else {
+          if (!areDispenseValvesOpen(i + 1)) {
+            openDispenseValves(i + 1);
+            Serial.print(F("[MESSAGE] No overflow detected for trough "));
+            Serial.print(i + 1);
+            Serial.println(F(" - valves re-opened to resume filling."));
+          }
+        }
+      }
+
+    } else {
+      // If not in fill mode, ensure our static timers are reset.
+      fillStartTime[i] = 0;
+      lowFlowStartTime[i] = 0;
+      lastSensorCheck[i] = 0;
+    }
+  }
+}
+
+
 
 
 // --------------------

@@ -87,5 +87,40 @@ void stopDispenseOperation(int troughNumber, CommandCaller* caller);
  */
 bool isCommandPrefix(const char* token);
 
+bool areDispenseValvesOpen(int troughNumber);
+
+/**
+ * enableManualControl()
+ * ---------------------
+ * Enables manual control for the given trough (index) and prints a message.
+ *
+ * @param index  The trough index (0-based).
+ * @param caller Pointer to the CommandCaller for logging.
+ */
+void enableManualControl(int index, CommandCaller* caller);
+
+/**
+ * disableManualControl()
+ * ----------------------
+ * Disables manual control for the given trough (index) and prints a message.
+ *
+ * @param index  The trough index (0-based).
+ * @param caller Pointer to the CommandCaller for logging.
+ */
+void disableManualControl(int index, CommandCaller* caller);
+
+// Function to enable fill mode for a specific trough
+void enableFillMode(int troughNumber, CommandCaller* caller);
+
+// Function to disable fill mode for a specific trough
+void disableFillMode(int troughNumber, CommandCaller* caller);
+
+// Function to disable fill mode for all troughs
+void disableFillModeForAll(CommandCaller* caller);
+
+// Function to check if a specific trough is in fill mode
+bool isFillModeActive(int troughNumber);
+
+
 #endif // UTILS_H
 
