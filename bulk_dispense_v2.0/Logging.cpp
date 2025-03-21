@@ -137,13 +137,25 @@ void logSystemState() {
   char fm3 = (valveControls[2].fillMode ? '1' : '0');
   char fm4 = (valveControls[3].fillMode ? '1' : '0');
 
+  // --- Trough Drain Status (TDS) for Troughs 1-4 ---
+// Trough 1: draining if wasteValve1 and wasteValve3 are open.
+// Trough 2: draining if wasteValve1 is open and wasteValve3 is closed.
+// Trough 3: draining if wasteValve2 and wasteValve4 are open.
+// Trough 4: draining if wasteValve2 is open and wasteValve4 are closed.
+char tds1 = (wasteValve1.isOpen && wasteValve3.isOpen) ? '1' : '0';
+char tds2 = (wasteValve1.isOpen && !wasteValve3.isOpen) ? '1' : '0';
+char tds3 = (wasteValve2.isOpen && wasteValve4.isOpen) ? '1' : '0';
+char tds4 = (wasteValve2.isOpen && !wasteValve4.isOpen) ? '1' : '0';
+
+
+
   // Format the log message.
   sprintf(buffer,
           "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, PV,%s, PV%%,%s, "
           "WSL%c%c, WBL%c%c, WVS%c%c, ELS%c, BS%c%c%c%c, OS%c%c%c%c, "
           "PS,%s, T,%s, H,%s, FS1,%s,%s,%s,%s,%s; FS2,%s,%s,%s,%s,%s; "
           "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s, ,DS%c%c%c%c, TV,%s,%s,%s,%s, "
-          "PR%c%c%c%c, FM%c%c%c%c",
+          "PR%c%c%c%c, FM%c%c%c%c, TDS%c%c%c%c",
           // Fan state
           fanState,
           // Reagent valves
@@ -182,8 +194,10 @@ void logSystemState() {
           tv1, tv2, tv3, tv4,
           // Priming state for valves (PR)
           pr1, pr2, pr3, pr4,
-          // Fill mode (FM) – new part
-          fm1, fm2, fm3, fm4);
+          // Fill mode (FM) 
+          fm1, fm2, fm3, fm4,
+          // Trough drain state (TDS)
+          tds1, tds2, tds3, tds4);
 
 
   Serial.println(buffer);

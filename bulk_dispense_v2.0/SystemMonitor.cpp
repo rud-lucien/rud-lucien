@@ -388,63 +388,160 @@ void monitorFillSensors(unsigned long currentTime) {
 }
 
 
+// --------------------
+// monitorWasteSensors()
+// --------------------
+// Monitors waste bottle and line sensors to manage the drainage process.
+void monitorWasteSensors(unsigned long currentTime) {
+  const unsigned long DRAIN_COMPLETE_DELAY = 3000; // Delay (ms) to confirm drainage is complete
+  static unsigned long lastDrainCompleteTime[2] = {0, 0};  // Last time liquid was seen on each waste line sensor
+  static bool liquidInitiallyDetected[2] = {false, false}; // Flag if liquid was ever detected for each bottle
+  static bool vacuumReleased[2] = {false, false};          // Flag for whether vacuum has been released
+
+  // Loop over the two waste bottles (sensorIdx 0 => bottle 1; sensorIdx 1 => bottle 2)
+  for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++) {
+    // Check if the waste bottle is full (using the waste bottle sensor)
+    if (readBinarySensor(wasteBottleSensors[sensorIdx])) {
+      // For bottle 1, stop draining troughs 1-2; for bottle 2, stop draining troughs 3-4.
+      for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++) {
+        if (valveControls[i].isDraining) {
+          valveControls[i].isDraining = false;
+          if (sensorIdx == 0) {
+            wasteValve1 = closeValve(wasteValve1);  // Close main waste bottle 1 valve
+          } else {
+            wasteValve2 = closeValve(wasteValve2);  // Close main waste bottle 2 valve
+          }
+          Serial.print(F("[ERROR] Draining halted for trough "));
+          Serial.print(i + 1);
+          Serial.println(F(" because the waste bottle is full."));
+
+        }
+      }
+      continue; // Skip further processing for this waste bottle.
+    }
+
+    // Check if the waste line sensor (for detecting liquid) is active.
+    // (Assuming wasteLineSensors are used for liquid detection.)
+    if (readBinarySensor(wasteLineSensors[sensorIdx])) {
+      lastDrainCompleteTime[sensorIdx] = currentTime;
+      liquidInitiallyDetected[sensorIdx] = true;
+    }
+    // If liquid was detected but now absent for the delay period, mark drainage complete.
+    else if (liquidInitiallyDetected[sensorIdx] &&
+             (currentTime - lastDrainCompleteTime[sensorIdx] >= DRAIN_COMPLETE_DELAY)) {
+      if (sensorIdx == 0) {  // Waste bottle 1 handles troughs 1 and 2.
+        if (valveControls[0].isDraining) {
+          valveControls[0].isDraining = false;
+          wasteValve1 = closeValve(wasteValve1);  // Close main valve for bottle 1
+          wasteValve3 = openValve(wasteValve3);    // Open trough 1's valve
+          Serial.println(F("[MESSAGE] Draining complete for trough 1"));
+        }
+        if (valveControls[1].isDraining) {
+          valveControls[1].isDraining = false;
+          wasteValve1 = closeValve(wasteValve1);  // Close main valve for bottle 1
+          wasteValve3 = closeValve(wasteValve3);   // Close trough 2's valve
+          Serial.println(F("[MESSAGE] Draining complete for trough 2"));
+        }
+      }
+      else if (sensorIdx == 1) {  // Waste bottle 2 handles troughs 3 and 4.
+        if (valveControls[2].isDraining) {
+          valveControls[2].isDraining = false;
+          wasteValve2 = closeValve(wasteValve2);  // Close main valve for bottle 2
+          wasteValve4 = openValve(wasteValve4);    // Open trough 3's valve
+          Serial.println(F("[MESSAGE] Draining complete for trough 3"));
+        }
+        if (valveControls[3].isDraining) {
+          valveControls[3].isDraining = false;
+          wasteValve2 = closeValve(wasteValve2);  // Close main valve for bottle 2
+          wasteValve4 = closeValve(wasteValve4);   // Close trough 4's valve
+          Serial.println(F("[MESSAGE] Draining complete for trough 4"));
+        }
+      }
+      // Reset state for this sensor.
+      lastDrainCompleteTime[sensorIdx] = 0;
+      liquidInitiallyDetected[sensorIdx] = false;
+      vacuumReleased[sensorIdx] = false;
+    }
+
+    // After drainage, check vacuum sensor to see if vacuum has been released.
+    if (!vacuumReleased[sensorIdx] && !readBinarySensor(wasteVacuumSensors[sensorIdx])) {
+      if (sensorIdx == 0) {  // For waste bottle 1
+        wasteValve3 = closeValve(wasteValve3);
+        Serial.println(F("[MESSAGE] Vacuum released. Waste valve 3 closed."));
+      }
+      else if (sensorIdx == 1) {  // For waste bottle 2
+        wasteValve4 = closeValve(wasteValve4);
+        Serial.println(F("[MESSAGE] Vacuum released. Waste valve 4 closed."));
+      }
+      vacuumReleased[sensorIdx] = true;
+    }
+  }
+}
 
 
 // --------------------
-// Other monitor functions (bubble, waste, etc.)
+// monitorVacuumRelease()
 // --------------------
-
-void monitorWasteLineSensors(unsigned long currentTime) {
-  static unsigned long previousCheckTime = 0;
-  if (currentTime - previousCheckTime >= 25) {
-    previousCheckTime = currentTime;
-    for (int i = 0; i < NUM_WASTE_LINE_SENSORS; i++) {
-      if (readBinarySensor(wasteLineSensors[i])) {
-        Serial.print(F("[WARNING] Waste line sensor "));
-        Serial.print(i + 1);
-        Serial.println(F(" active."));
+// After a stop-drain command, this function monitors the vacuum sensors and
+// closes the corresponding trough valves once vacuum is no longer detected.
+void monitorVacuumRelease(unsigned long currentTime) {
+  // Loop over the two waste bottles.
+  for (int bottleIdx = 0; bottleIdx < 2; bottleIdx++) {
+    // Skip monitoring if not enabled for this bottle.
+    if (!globalVacuumMonitoring[bottleIdx])
+      continue;
+    
+    // If the vacuum sensor no longer detects vacuum:
+    if (!readBinarySensor(wasteVacuumSensors[bottleIdx])) {
+      if (bottleIdx == 0) {  // Waste bottle 1
+        wasteValve3 = closeValve(wasteValve3);
+        Serial.println(F("[MESSAGE] Vacuum released. Waste valve 3 closed."));
+      } else if (bottleIdx == 1) {  // Waste bottle 2
+        wasteValve4 = closeValve(wasteValve4);
+        Serial.println(F("[MESSAGE] Vacuum released. Waste valve 4 closed."));
       }
+      // Disable further monitoring for this bottle.
+      globalVacuumMonitoring[bottleIdx] = false;
+      Serial.print(F("[MESSAGE] Vacuum monitoring disabled for bottle "));
+      Serial.println(bottleIdx + 1);
     }
   }
 }
 
-void monitorWasteBottleSensors(unsigned long currentTime) {
-  static unsigned long previousCheckTime = 0;
-  if (currentTime - previousCheckTime >= 25) {
-    previousCheckTime = currentTime;
-    for (int i = 0; i < NUM_WASTE_BOTTLE_SENSORS; i++) {
-      if (readBinarySensor(wasteBottleSensors[i])) {
-        Serial.print(F("[WARNING] Waste bottle sensor "));
-        Serial.print(i + 1);
-        Serial.println(F(" active."));
-      }
-    }
-  }
-}
 
-void monitorWasteVacuumSensors(unsigned long currentTime) {
-  static unsigned long previousCheckTime = 0;
-  if (currentTime - previousCheckTime >= 25) {
-    previousCheckTime = currentTime;
-    for (int i = 0; i < NUM_WASTE_VACUUM_SENSORS; i++) {
-      if (readBinarySensor(wasteVacuumSensors[i])) {
-        Serial.print(F("[WARNING] Waste vacuum sensor "));
-        Serial.print(i + 1);
-        Serial.println(F(" active."));
-      }
-    }
-  }
-}
-
+// --------------------
+// monitorEnclosureLiquidSensor()
+// --------------------
+// Continuously monitors the enclosure liquid sensor. If liquid is detected,
+// it sets a global error flag and prints an error message every 30 seconds.
+// Automated operations should check globalEnclosureLiquidError before executing.
 void monitorEnclosureLiquidSensor(unsigned long currentTime) {
+  // Check sensor every 25 ms.
   static unsigned long previousCheckTime = 0;
-  if (currentTime - previousCheckTime >= 25) {
+  // Timestamp of last error message printed.
+  static unsigned long lastErrorPrintTime = 0;
+  const unsigned long CHECK_INTERVAL = 25;      // 25 ms check interval.
+  const unsigned long ERROR_PRINT_INTERVAL = 30000; // 30 seconds.
+
+  if (currentTime - previousCheckTime >= CHECK_INTERVAL) {
     previousCheckTime = currentTime;
+    
     if (readBinarySensor(enclosureLiquidSensor)) {
-      Serial.println(F("[WARNING] Enclosure liquid detected."));
+      // Liquid is detected: set the global error flag.
+      globalEnclosureLiquidError = true;
+      
+      // If it's been 30 seconds since the last error message, print a persistent error message.
+      if (currentTime - lastErrorPrintTime >= ERROR_PRINT_INTERVAL) {
+        lastErrorPrintTime = currentTime;
+        Serial.println(F("[ERROR] Enclosure liquid detected. Automated operations halted. Resolve the leak before proceeding."));
+      }
+    } else {
+      // No liquid detected; clear the error flag.
+      globalEnclosureLiquidError = false;
     }
   }
 }
+
 
 void monitorEnclosureTemp() {
   if (!fanAutoMode) return;  // Skip auto control if manual override is active

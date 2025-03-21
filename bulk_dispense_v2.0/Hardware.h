@@ -185,6 +185,11 @@ extern BinarySensor enclosureLiquidSensor;
 // Calibration variable
 extern float proportionalValveMaxFeedback;
 
+// Global vacuum monitoring flags for bottle 1 and 2.
+extern bool globalVacuumMonitoring[NUM_WASTE_VACUUM_SENSORS];
+
+extern bool globalEnclosureLiquidError;
+
 // ------------------------------------------------------------------
 // Function Prototypes (Hardware Functions)
 // ------------------------------------------------------------------

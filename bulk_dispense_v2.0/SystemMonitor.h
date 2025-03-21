@@ -24,6 +24,8 @@ void monitorEnclosureTemp();
 void monitorFlowSensorConnections();
 void monitorPrimeSensors(unsigned long currentTime);
 void monitorFillSensors(unsigned long currentTime);
+void monitorWasteSensors(unsigned long currentTime);
+void monitorVacuumRelease(unsigned long currentTime);
 
 
 // Helper functions used by the monitor functions.

@@ -113,6 +113,12 @@ BinarySensor wasteVacuumSensors[NUM_WASTE_VACUUM_SENSORS] = {
 
 BinarySensor enclosureLiquidSensor = { ENCLOSURE_LIQUID_SENSOR_PIN, false };
 
+bool globalVacuumMonitoring[2] = { false, false };
+
+// Global flag for enclosure liquid error state.
+bool globalEnclosureLiquidError = false;
+
+
 // Calibration variable
 float proportionalValveMaxFeedback = 0.0;
 

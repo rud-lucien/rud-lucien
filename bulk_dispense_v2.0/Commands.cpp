@@ -280,7 +280,7 @@ void cmd_reset_flow_dispense(char* args, CommandCaller* caller) {
     caller->print(F("[MESSAGE] Reset dispense volume for Flow Sensor "));
     caller->println(sensorNumber);
   } else {
-    caller->println(F("[ERROR] Invalid sensor number. Use: RFS <0-3>"));
+    caller->println(F("[ERROR] Invalid sensor number. Use: RFS <1-4>"));
   }
 }
 
@@ -324,7 +324,7 @@ void cmd_reset_i2c(char* args, CommandCaller* caller) {
   }
   
 
-  Serial.println(F("[MESSAGE] Manual I2C bus reset initiated."));
+  caller->println(F("[MESSAGE] Manual I2C bus reset initiated."));
   resetI2CBus();
   caller->println(F("[MESSAGE] I2C bus reset complete."));
 }
@@ -335,6 +335,12 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
+
+  if (globalEnclosureLiquidError) {
+  caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
+  return;
+  }
+
 
   int troughNumber = -1;
   float requestedVolume = -1.0;
@@ -359,16 +365,17 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
     return;
   }
 
-  caller->print(F("[MESSAGE] Parsed troughNumber: "));
+  caller->print(F("[MESSAGE] Dispense command received for Trough "));
   caller->print(troughNumber);
-  caller->print(F(", requestedVolume: "));
+  caller->print(F(" with requested volume "));
   caller->println(requestedVolume);
 
+
   // Validate the trough number.
-  if (troughNumber < 1 || troughNumber > 4) {
-    caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
-    return;
+  if (!validateTroughNumber(troughNumber, caller)) {
+  return;
   }
+
 
   // Disable fill mode if active
   disableFillMode(troughNumber, caller);
@@ -479,6 +486,12 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
+  if (globalEnclosureLiquidError) {
+  caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
+  return;
+  }
+
+
   int localValveNumber = -1;
   char extra;
 
@@ -489,10 +502,9 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   }
   
   // Check for valid valve number (1 to 4).
-  if (localValveNumber < 1 || localValveNumber > 4) {
-    caller->println(F("[ERROR] Invalid valve number. Use 1-4."));
-    return;
-  }
+  if (!validateValveNumber(localValveNumber, caller)) {
+  return;
+}
 
   // Disable fill mode if active
   disableFillMode(localValveNumber, caller);
@@ -508,12 +520,9 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   }
 
   // Check if the reagent bubble sensor already detects liquid.
-  if (readBinarySensor(reagentBubbleSensors[localValveNumber - 1])) {
-    caller->print(F("[MESSAGE] Valve "));
-    caller->print(localValveNumber);
-    caller->println(F(" already primed."));
-    return;
-  }
+  if (isValveAlreadyPrimed(localValveNumber, caller)) {
+  return;
+}
 
   // Open the reagent and media valves for this trough.
   openDispenseValves(localValveNumber);
@@ -532,6 +541,11 @@ void cmd_fill_reagent(char* args, CommandCaller* caller) {
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
+  if (globalEnclosureLiquidError) {
+  caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
+  return;
+  }
+
   int troughNumber = -1;
   char extra; // to capture any extra token
 
@@ -541,28 +555,17 @@ void cmd_fill_reagent(char* args, CommandCaller* caller) {
     return;
   }
   
-  // Validate valve number (must be between 1 and 4).
-  if (troughNumber < 1 || troughNumber > 4) {
-    caller->println(F("[ERROR] Invalid valve number. Use 1-4."));
-    return;
-  }
+  // Validate trough number (must be between 1 and 4).
+  if (!validateTroughNumber(troughNumber, caller)) {
+  return;
+}
+
   
   // If dispensing is in progress on this trough, stop it.
-  if (valveControls[troughNumber - 1].isDispensing) {
-    stopDispenseOperation(troughNumber, caller);
-    caller->print(F("[MESSAGE] Dispense operation for trough "));
-    caller->print(troughNumber);
-    caller->println(F(" stopped prematurely due to fill command."));
-  }
+  stopDispensingForFill(troughNumber, caller);
 
   // If priming is in progress on this trough, stop it as well.
-  if (valveControls[troughNumber - 1].isPriming) {
-    valveControls[troughNumber - 1].isPriming = false;
-    closeDispenseValves(troughNumber);
-    caller->print(F("[MESSAGE] Priming operation for trough "));
-    caller->print(troughNumber);
-    caller->println(F(" stopped prematurely due to fill command."));
-  }
+  stopPrimingForFill(troughNumber, caller);
 
   // Pressure check (using same threshold as dispense/prime).
   const float PRESSURE_THRESHOLD_PSI = 15.0;
@@ -582,6 +585,151 @@ void cmd_fill_reagent(char* args, CommandCaller* caller) {
   // Enable fill mode for this trough.
   enableFillMode(troughNumber, caller);
 }
+
+void cmd_drain_trough(char* args, CommandCaller* caller) {
+  // Create a local copy of the input arguments.
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  if (globalEnclosureLiquidError) {
+  caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
+  return;
+  }
+
+  int troughNumber = -1;
+  char extra; // to catch any extra tokens
+
+  // Expect exactly one integer argument (the trough number)
+  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1) {
+    caller->println(F("[ERROR] Invalid arguments for drain command. Use: DT <trough number>"));
+    return;
+  }
+  
+  // Validate the trough number.
+  if (!validateTroughNumber(troughNumber, caller)) {
+  return;
+  }
+
+  
+  // Check if the corresponding waste bottle is full.
+  // For troughs 1-2, check waste bottle 1; for 3-4, check waste bottle 2.
+  if (isWasteBottleFullForTrough(troughNumber, caller)) {
+    return;
+  }
+
+    
+  // Check for incompatible drainage.
+  if (hasIncompatibleDrainage(troughNumber, caller)) {
+    return;
+  }
+  
+  // Stop any dispensing or fill mode if active.
+  stopDispensingIfActive(troughNumber, caller);
+  
+  // Disable fill mode if active
+  disableFillMode(troughNumber, caller);
+  
+  // Set the draining flag.
+  valveControls[troughNumber - 1].isDraining = true;
+  
+  // Execute the drain logic based on the trough number.
+  // Note: Assign the return value of openValve/closeValve back to the valve.
+  switch (troughNumber) {
+    case 1:
+      wasteValve1 = openValve(wasteValve1);
+      wasteValve3 = openValve(wasteValve3);
+      caller->println(F("[MESSAGE] Draining trough 1... Waste valve 1 opened, waste valve 3 opened."));
+      break;
+    case 2:
+      wasteValve1 = openValve(wasteValve1);
+      wasteValve3 = closeValve(wasteValve3);
+      caller->println(F("[MESSAGE] Draining trough 2... Waste valve 1 opened, waste valve 3 closed."));
+      break;
+    case 3:
+      wasteValve2 = openValve(wasteValve2);
+      wasteValve4 = openValve(wasteValve4);
+      caller->println(F("[MESSAGE] Draining trough 3... Waste valve 2 opened, waste valve 4 opened."));
+      break;
+    case 4:
+      wasteValve2 = openValve(wasteValve2);
+      wasteValve4 = closeValve(wasteValve4);
+      caller->println(F("[MESSAGE] Draining trough 4... Waste valve 2 opened, waste valve 4 closed."));
+      break;
+    default:
+      caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
+      return;
+  }
+}
+
+
+void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
+  // Create a local copy of the input arguments.
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  // Check if "all" was provided.
+  if (strncmp(localArgs, "all", 3) == 0) {
+    // Stop draining all troughs.
+    for (int i = 0; i < 4; i++) {
+      valveControls[i].isDraining = false;
+    }
+    // Set vacuum monitoring flags for both bottles.
+    globalVacuumMonitoring[0] = true; // Monitor waste bottle 1
+    globalVacuumMonitoring[1] = true; // Monitor waste bottle 2
+
+    // Close vacuum valves using the hardware functions.
+    wasteValve1 = closeValve(wasteValve1);
+    wasteValve2 = closeValve(wasteValve2);
+
+    caller->println(F("[MESSAGE] Draining stopped for all troughs. Waste valves closed."));
+    return;
+  }
+
+  // Otherwise, expect a trough number (1-4).
+  int troughNumber = -1;
+  char extra;
+  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1 || troughNumber < 1 || troughNumber > 4) {
+    caller->println(F("[ERROR] Invalid arguments. Use: SDT <1-4> or SDT all."));
+    return;
+  }
+
+  // Validate trough number (must be between 1 and 4).
+  if (!validateTroughNumber(troughNumber, caller)) {
+  return;
+}
+
+  // Stop draining the specific trough.
+  valveControls[troughNumber - 1].isDraining = false;
+
+  // Determine which vacuum bottle to monitor and close its valve.
+  setVacuumMonitoringAndCloseMainValve(troughNumber, caller);
+
+  // Execute the stop drain logic based on the trough number.
+  switch (troughNumber) {
+    case 1:
+      wasteValve3 = openValve(wasteValve3);
+      caller->println(F("[MESSAGE] Draining stopped for trough 1."));
+      break;
+    case 2:
+      wasteValve3 = closeValve(wasteValve3);
+      caller->println(F("[MESSAGE] Draining stopped for trough 2."));
+      break;
+    case 3:
+      wasteValve4 = openValve(wasteValve4);
+      caller->println(F("[MESSAGE] Draining stopped for trough 3."));
+      break;
+    case 4:
+      wasteValve4 = closeValve(wasteValve4);
+      caller->println(F("[MESSAGE] Draining stopped for trough 4."));
+      break;
+    default:
+      caller->println(F("[ERROR] Invalid trough number. Use 1-4 or 'all'."));
+      return;
+  }
+}
+
 
 
 
@@ -607,5 +755,8 @@ Commander::systemCommand_t API_tree[] = {
   systemCommand("D", "Dispense reagent: D <1-4> [volume] (volume in mL, continuous if omitted)", cmd_dispense_reagent),
   systemCommand("STOPD", "Stop dispensing: STOPD <1-4> (stop specific trough) or STOPD ALL", cmd_stop_dispense),
   systemCommand("P", "Prime valves: P <1-4> (prime valves until liquid detected)", cmd_prime_valves),
-  systemCommand("F", "Fill reagent: F <1-4>", cmd_fill_reagent)
+  systemCommand("F", "Fill reagent: F <1-4>", cmd_fill_reagent),
+  systemCommand("DT", "Drain trough: DT <1-4> (drain the specified trough)", cmd_drain_trough),
+  systemCommand("SDT", "Stop draining reagent trough: SDT <1-4> or SDT all", cmd_stop_drain_trough)
+
 };

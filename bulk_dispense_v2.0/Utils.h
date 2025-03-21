@@ -126,6 +126,23 @@ bool isPressureOK(float thresholdPressure);
 
 void setPressureValve(int valvePosition);
 
+void stopDispensingIfActive(int troughNumber, CommandCaller* caller);
+
+bool isWasteBottleFullForTrough(int troughNumber, CommandCaller* caller);
+
+bool hasIncompatibleDrainage(int troughNumber, CommandCaller* caller);
+
+bool validateTroughNumber(int troughNumber, CommandCaller* caller);
+
+void stopDispensingForFill(int troughNumber, CommandCaller* caller);
+
+void stopPrimingForFill(int troughNumber, CommandCaller* caller);
+
+bool isValveAlreadyPrimed(int valveNumber, CommandCaller* caller);
+
+bool validateValveNumber(int valveNumber, CommandCaller* caller);
+
+void setVacuumMonitoringAndCloseMainValve(int troughNumber, CommandCaller* caller);
 
 #endif // UTILS_H
 

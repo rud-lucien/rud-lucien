@@ -328,5 +328,124 @@ bool isFillModeActive(int troughNumber) {
   return valveControls[troughNumber - 1].fillMode;
 }
 
+// Helper function to stop dispensing on a trough if it's active.
+void stopDispensingIfActive(int troughNumber, CommandCaller* caller) {
+  // Check if dispensing is in progress.
+  if (valveControls[troughNumber - 1].isDispensing) {
+    // Stop the dispense operation.
+    stopDispenseOperation(troughNumber, caller);
+    caller->print(F("[MESSAGE] Dispensing stopped for trough "));
+    caller->println(troughNumber);
+  }
+}
+
+// Helper function to check if the waste bottle for a given trough is full.
+// Returns true if the bottle is full (and prints an error message); false otherwise.
+bool isWasteBottleFullForTrough(int troughNumber, CommandCaller* caller) {
+  // For troughs 1-2, use waste bottle sensor at index 0; for 3-4, use index 1.
+  int bottleIndex = (troughNumber <= 2) ? 0 : 1;
+  if (readBinarySensor(wasteBottleSensors[bottleIndex])) {
+    caller->print(F("[ERROR] Waste bottle "));
+    caller->print(bottleIndex + 1);  // Convert to 1-based numbering for display.
+    caller->println(F(" is full. Cannot start drainage."));
+    return true;
+  }
+  return false;
+}
+
+// Helper function to check for incompatible drainage conditions.
+// Returns true if an incompatible drainage is detected (and prints an error message), false otherwise.
+bool hasIncompatibleDrainage(int troughNumber, CommandCaller* caller) {
+  // Check for incompatible drainage between troughs 1 and 2.
+  if ((troughNumber == 1 && valveControls[1].isDraining) ||
+      (troughNumber == 2 && valveControls[0].isDraining)) {
+    caller->println(F("[ERROR] Troughs 1 and 2 cannot be drained simultaneously."));
+    return true;
+  }
+  
+  // Check for incompatible drainage between troughs 3 and 4.
+  if ((troughNumber == 3 && valveControls[3].isDraining) ||
+      (troughNumber == 4 && valveControls[2].isDraining)) {
+    caller->println(F("[ERROR] Troughs 3 and 4 cannot be drained simultaneously."));
+    return true;
+  }
+  
+  return false;
+}
+
+// Helper function to validate the trough number.
+// Returns true if valid; otherwise, prints an error and returns false.
+bool validateTroughNumber(int troughNumber, CommandCaller* caller) {
+  if (troughNumber < 1 || troughNumber > 4) {
+    caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
+    return false;
+  }
+  return true;
+}
+
+// Helper function to stop dispensing on a trough when a fill command is issued.
+void stopDispensingForFill(int troughNumber, CommandCaller* caller) {
+  if (valveControls[troughNumber - 1].isDispensing) {
+    stopDispenseOperation(troughNumber, caller);
+    caller->print(F("[MESSAGE] Dispense operation for trough "));
+    caller->print(troughNumber);
+    caller->println(F(" stopped prematurely due to fill command."));
+  }
+}
+
+// Helper function to stop priming on a trough when a fill command is issued.
+void stopPrimingForFill(int troughNumber, CommandCaller* caller) {
+  if (valveControls[troughNumber - 1].isPriming) {
+    valveControls[troughNumber - 1].isPriming = false;
+    closeDispenseValves(troughNumber);
+    caller->print(F("[MESSAGE] Priming operation for trough "));
+    caller->print(troughNumber);
+    caller->println(F(" stopped prematurely due to fill command."));
+  }
+}
+
+// Helper function to check if a valve is already primed.
+// Returns true if already primed (and prints a message), false otherwise.
+bool isValveAlreadyPrimed(int valveNumber, CommandCaller* caller) {
+  // Note: valveNumber is assumed to be 1-based.
+  if (readBinarySensor(reagentBubbleSensors[valveNumber - 1])) {
+    caller->print(F("[MESSAGE] Valve "));
+    caller->print(valveNumber);
+    caller->println(F(" already primed."));
+    return true;
+  }
+  return false;
+}
+
+// Helper function to validate a valve number (expected 1 to 4).
+// Returns true if the valve number is valid; otherwise, prints an error message and returns false.
+bool validateValveNumber(int valveNumber, CommandCaller* caller) {
+  if (valveNumber < 1 || valveNumber > 4) {
+    caller->println(F("[ERROR] Invalid valve number. Use 1-4."));
+    return false;
+  }
+  return true;
+}
+
+// Helper function to set vacuum monitoring and close the main waste valve
+// for a given trough.
+void setVacuumMonitoringAndCloseMainValve(int troughNumber, CommandCaller* caller) {
+  if (troughNumber <= 2) {
+    globalVacuumMonitoring[0] = true; // Monitor waste bottle 1
+    wasteValve1 = closeValve(wasteValve1);
+  } else {
+    globalVacuumMonitoring[1] = true; // Monitor waste bottle 2
+    wasteValve2 = closeValve(wasteValve2);
+  }
+}
+
+
+
+
+
+
+
+
+
 
 

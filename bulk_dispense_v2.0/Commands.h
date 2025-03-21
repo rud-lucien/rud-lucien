@@ -22,9 +22,11 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller);
 void cmd_stop_dispense(char* args, CommandCaller* caller);
 void cmd_prime_valves(char* args, CommandCaller* caller);
 void cmd_fill_reagent(char* args, CommandCaller* caller);
+void cmd_drain_trough(char* args, CommandCaller* caller);
+void cmd_stop_drain_trough(char* args, CommandCaller* caller);
 
 // Global command tree and Commander object declarations:
-extern Commander::systemCommand_t API_tree[17];
+extern Commander::systemCommand_t API_tree[19];
 extern Commander commander;
 
 #endif // COMMANDS_H

@@ -11,6 +11,16 @@ void setup() {
   Serial.begin(115200);
   Serial.println(F("[MESSAGE] System starting..."));
 
+  // Explicitly reset key global flags
+  globalVacuumMonitoring[0] = false;
+  globalVacuumMonitoring[1] = false;
+  globalEnclosureLiquidError = false;
+
+  logging.previousLogTime = 0;
+  fanAutoMode = true;
+  proportionalValveMaxFeedback = 0.0;
+
+
   // Initialize valveControls for each trough (0 to NUM_OVERFLOW_SENSORS-1)
   for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
     valveControls[i].isDispensing = false;
@@ -110,9 +120,8 @@ void loop() {
   monitorFlowSensors(currentTime);
   monitorPrimeSensors(currentTime);
   monitorFillSensors(currentTime);
-  monitorWasteLineSensors(currentTime);
-  monitorWasteBottleSensors(currentTime);
-  monitorWasteVacuumSensors(currentTime);
+  monitorWasteSensors(currentTime);
+  monitorVacuumRelease(currentTime); 
   monitorEnclosureLiquidSensor(currentTime);
   monitorEnclosureTemp();
   monitorFlowSensorConnections();
