@@ -3,6 +3,7 @@
 #include "Sensors.h"
 #include "Utils.h"
 #include <Wire.h>
+#include "CommandSession.h"
 
 // --------------------
 // Overflow Handling
@@ -89,7 +90,6 @@ void monitorFlowSensors(unsigned long currentTime) {
 
   if (currentTime - previousCheckTime >= 25) {
     previousCheckTime = currentTime;
-
     for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
       // Only check if dispensing is in progress.
       if (!valveControls[i].isDispensing) {
@@ -101,7 +101,7 @@ void monitorFlowSensors(unsigned long currentTime) {
         continue;
       }
 
-      // Check for overflow
+      // Check for overflow.
       if (readBinarySensor(overflowSensors[i])) {
         closeDispenseValves(i + 1);
         Serial.print(F("[WARNING] Overflow detected for Trough "));
@@ -109,33 +109,40 @@ void monitorFlowSensors(unsigned long currentTime) {
         Serial.print(F(". Dispensed volume: "));
         Serial.print(sensor->dispenseVolume, 1);
         Serial.println(F(" mL."));
-
         resetFlowSensorDispenseVolume(*sensor);
         stopFlowSensorMeasurement(*sensor);
         valveControls[i].isDispensing = false;
+        if (!dispenseAsyncCompleted[i]) {
+          asyncCommandCompleted(&Serial);
+          dispenseAsyncCompleted[i] = true;
+        }
         continue;
       }
 
-      // --- NEW: If manual control is active, reset timers and skip automated checks.
+      // If manual control is active, skip automated checks.
       if (valveControls[i].manualControl) {
         valveControls[i].lastFlowCheckTime = 0;
         valveControls[i].lastFlowChangeTime = 0;
         continue;
       }
 
-      // Check for no flow timeout
+      // Check for no flow timeout.
       if (sensor->flowRate < MIN_FLOW_RATE_THRESHOLD) {
         if (valveControls[i].lastFlowCheckTime == 0) {
           valveControls[i].lastFlowCheckTime = currentTime;
         } else if (currentTime - valveControls[i].lastFlowCheckTime >= FLOW_TIMEOUT_MS) {
           handleTimeoutCondition(i + 1);
+          if (!dispenseAsyncCompleted[i]) {
+            asyncCommandCompleted(&Serial);
+            dispenseAsyncCompleted[i] = true;
+          }
           continue;
         }
       } else {
         valveControls[i].lastFlowCheckTime = 0;
       }
 
-      // Check if requested volume is reached
+      // Check if requested volume is reached.
       if (valveControls[i].targetVolume > 0 && sensor->dispenseVolume >= valveControls[i].targetVolume) {
         closeDispenseValves(i + 1);
         Serial.print(F("[MESSAGE] Dispense complete for Trough "));
@@ -143,14 +150,17 @@ void monitorFlowSensors(unsigned long currentTime) {
         Serial.print(F(". Final volume dispensed: "));
         Serial.print(sensor->dispenseVolume, 1);
         Serial.println(F(" mL."));
-
         resetFlowSensorDispenseVolume(*sensor);
         stopFlowSensorMeasurement(*sensor);
         valveControls[i].isDispensing = false;
+        if (!dispenseAsyncCompleted[i]) {
+          asyncCommandCompleted(&Serial);
+          dispenseAsyncCompleted[i] = true;
+        }
         continue;
       }
 
-      // Secondary safety: Check if maximum trough volume is exceeded
+      // Secondary safety: Check if maximum trough volume is exceeded.
       if (sensor->dispenseVolume >= MAX_TROUGH_VOLUME) {
         closeDispenseValves(i + 1);
         Serial.print(F("[ERROR] Safety Limit Reached! Dispense stopped for Trough "));
@@ -160,14 +170,18 @@ void monitorFlowSensors(unsigned long currentTime) {
         Serial.print(F(" mL. (Max Allowed: "));
         Serial.print(MAX_TROUGH_VOLUME);
         Serial.println(F(" mL)"));
-
         resetFlowSensorDispenseVolume(*sensor);
         stopFlowSensorMeasurement(*sensor);
         valveControls[i].isDispensing = false;
+        if (!dispenseAsyncCompleted[i]) {
+          asyncCommandCompleted(&Serial);
+          dispenseAsyncCompleted[i] = true;
+        }
       }
     }
   }
 }
+
 
 // --------------------
 // monitorPrimeSensors()
@@ -187,6 +201,8 @@ static unsigned long additionalPrimeStartTime[NUM_OVERFLOW_SENSORS] = { 0, 0, 0,
 static unsigned long lowFlowStartTime[NUM_OVERFLOW_SENSORS] = { 0, 0, 0, 0 };
 static bool primingFailed[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
 static bool primingSuccess[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
+// New flag to prevent duplicate async completion calls.
+static bool primeAsyncCompleted[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
 
 void monitorPrimeSensors(unsigned long currentTime) {
   for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
@@ -199,6 +215,8 @@ void monitorPrimeSensors(unsigned long currentTime) {
         Serial.println(F(" due to overflow detected."));
         closeDispenseValves(i + 1);
         valveControls[i].isPriming = false;
+        primeAsyncCompleted[i] = true;  // Mark as complete.
+        asyncCommandCompleted(&Serial);
         // Reset all prime-related timers and flags.
         primeStartTime[i] = 0;
         stableDetectionStartTime[i] = 0;
@@ -225,6 +243,8 @@ void monitorPrimeSensors(unsigned long currentTime) {
             Serial.println(F(" due to insufficient flow."));
             closeDispenseValves(i + 1);
             valveControls[i].isPriming = false;
+            primeAsyncCompleted[i] = true;  // Mark as complete.
+            asyncCommandCompleted(&Serial);
             // Reset timers.
             primeStartTime[i] = 0;
             stableDetectionStartTime[i] = 0;
@@ -240,18 +260,22 @@ void monitorPrimeSensors(unsigned long currentTime) {
       }
 
       // --- Check for bubble detection timeout ---
-      if (!readBinarySensor(reagentBubbleSensors[i]) && (currentTime - primeStartTime[i] >= PRIME_TIMEOUT_MS) && !primingFailed[i] && !primingSuccess[i]) {
-        Serial.print(F("[ERROR] Priming failed for valve "));
-        Serial.print(i + 1);
-        Serial.println(F(" due to no liquid detected."));
-        closeDispenseValves(i + 1);
-        valveControls[i].isPriming = false;
-        primingFailed[i] = true;
-        primeStartTime[i] = 0;
-        additionalPrimeStartTime[i] = 0;
-        stableDetectionStartTime[i] = 0;
-        continue;
-      }
+      if (!readBinarySensor(reagentBubbleSensors[i]) &&
+            (currentTime - primeStartTime[i] >= PRIME_TIMEOUT_MS) &&
+            !primingFailed[i] && !primingSuccess[i]) {
+          Serial.print(F("[ERROR] Priming failed for valve "));
+          Serial.print(i + 1);
+          Serial.println(F(" due to no liquid detected."));
+          closeDispenseValves(i + 1);
+          valveControls[i].isPriming = false;
+          primeAsyncCompleted[i] = true;  // Mark as complete.
+          asyncCommandCompleted(&Serial);
+          primingFailed[i] = true;
+          primeStartTime[i] = 0;
+          additionalPrimeStartTime[i] = 0;
+          stableDetectionStartTime[i] = 0;
+          continue;
+        }
 
       // --- Handle stable bubble detection ---
       if (readBinarySensor(reagentBubbleSensors[i]) && stableDetectionStartTime[i] == 0 && !primingFailed[i]) {
@@ -278,6 +302,9 @@ void monitorPrimeSensors(unsigned long currentTime) {
         Serial.println(i + 1);
         valveControls[i].isPriming = false;
         primingSuccess[i] = true;
+        // Mark as complete once.
+        primeAsyncCompleted[i] = true;
+        asyncCommandCompleted(&Serial);
         // Reset all timing variables for the next priming cycle.
         primeStartTime[i] = 0;
         stableDetectionStartTime[i] = 0;
@@ -286,6 +313,9 @@ void monitorPrimeSensors(unsigned long currentTime) {
       }
     } else {
       // If not priming, reset priming flags and timers.
+      // Reset async completion flag for valves that are not priming,
+      // so that when a new prime command starts, we can call asyncCommandCompleted() later.
+      primeAsyncCompleted[i] = false;
       primingFailed[i] = false;
       primingSuccess[i] = false;
       primeStartTime[i] = 0;
@@ -393,14 +423,14 @@ void monitorFillSensors(unsigned long currentTime) {
 // --------------------
 // Monitors waste bottle and line sensors to manage the drainage process.
 void monitorWasteSensors(unsigned long currentTime) {
-  const unsigned long DRAIN_COMPLETE_DELAY = 3000; // Delay (ms) to confirm drainage is complete
+  const unsigned long DRAIN_COMPLETE_DELAY = 3000; // Delay to confirm drainage is complete (ms)
   static unsigned long lastDrainCompleteTime[2] = {0, 0};  // Last time liquid was seen on each waste line sensor
   static bool liquidInitiallyDetected[2] = {false, false}; // Flag if liquid was ever detected for each bottle
   static bool vacuumReleased[2] = {false, false};          // Flag for whether vacuum has been released
 
   // Loop over the two waste bottles (sensorIdx 0 => bottle 1; sensorIdx 1 => bottle 2)
   for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++) {
-    // Check if the waste bottle is full (using the waste bottle sensor)
+    // Check if the waste bottle is full.
     if (readBinarySensor(wasteBottleSensors[sensorIdx])) {
       // For bottle 1, stop draining troughs 1-2; for bottle 2, stop draining troughs 3-4.
       for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++) {
@@ -414,19 +444,22 @@ void monitorWasteSensors(unsigned long currentTime) {
           Serial.print(F("[ERROR] Draining halted for trough "));
           Serial.print(i + 1);
           Serial.println(F(" because the waste bottle is full."));
-
+          // Signal asynchronous completion if not already done.
+          if (!drainAsyncCompleted[i]) {
+            asyncCommandCompleted(&Serial);
+            drainAsyncCompleted[i] = true;
+          }
         }
       }
       continue; // Skip further processing for this waste bottle.
     }
 
     // Check if the waste line sensor (for detecting liquid) is active.
-    // (Assuming wasteLineSensors are used for liquid detection.)
     if (readBinarySensor(wasteLineSensors[sensorIdx])) {
       lastDrainCompleteTime[sensorIdx] = currentTime;
       liquidInitiallyDetected[sensorIdx] = true;
     }
-    // If liquid was detected but now absent for the delay period, mark drainage complete.
+    // If liquid was detected but now absent for the required delay, mark drainage complete.
     else if (liquidInitiallyDetected[sensorIdx] &&
              (currentTime - lastDrainCompleteTime[sensorIdx] >= DRAIN_COMPLETE_DELAY)) {
       if (sensorIdx == 0) {  // Waste bottle 1 handles troughs 1 and 2.
@@ -435,29 +468,44 @@ void monitorWasteSensors(unsigned long currentTime) {
           wasteValve1 = closeValve(wasteValve1);  // Close main valve for bottle 1
           wasteValve3 = openValve(wasteValve3);    // Open trough 1's valve
           Serial.println(F("[MESSAGE] Draining complete for trough 1"));
+          if (!drainAsyncCompleted[0]) {
+            asyncCommandCompleted(&Serial);
+            drainAsyncCompleted[0] = true;
+          }
         }
         if (valveControls[1].isDraining) {
           valveControls[1].isDraining = false;
           wasteValve1 = closeValve(wasteValve1);  // Close main valve for bottle 1
           wasteValve3 = closeValve(wasteValve3);   // Close trough 2's valve
           Serial.println(F("[MESSAGE] Draining complete for trough 2"));
+          if (!drainAsyncCompleted[1]) {
+            asyncCommandCompleted(&Serial);
+            drainAsyncCompleted[1] = true;
+          }
         }
-      }
-      else if (sensorIdx == 1) {  // Waste bottle 2 handles troughs 3 and 4.
+      } else if (sensorIdx == 1) {  // Waste bottle 2 handles troughs 3 and 4.
         if (valveControls[2].isDraining) {
           valveControls[2].isDraining = false;
           wasteValve2 = closeValve(wasteValve2);  // Close main valve for bottle 2
           wasteValve4 = openValve(wasteValve4);    // Open trough 3's valve
           Serial.println(F("[MESSAGE] Draining complete for trough 3"));
+          if (!drainAsyncCompleted[2]) {
+            asyncCommandCompleted(&Serial);
+            drainAsyncCompleted[2] = true;
+          }
         }
         if (valveControls[3].isDraining) {
           valveControls[3].isDraining = false;
           wasteValve2 = closeValve(wasteValve2);  // Close main valve for bottle 2
           wasteValve4 = closeValve(wasteValve4);   // Close trough 4's valve
           Serial.println(F("[MESSAGE] Draining complete for trough 4"));
+          if (!drainAsyncCompleted[3]) {
+            asyncCommandCompleted(&Serial);
+            drainAsyncCompleted[3] = true;
+          }
         }
       }
-      // Reset state for this sensor.
+      // Reset state for this waste bottle sensor.
       lastDrainCompleteTime[sensorIdx] = 0;
       liquidInitiallyDetected[sensorIdx] = false;
       vacuumReleased[sensorIdx] = false;
@@ -468,8 +516,7 @@ void monitorWasteSensors(unsigned long currentTime) {
       if (sensorIdx == 0) {  // For waste bottle 1
         wasteValve3 = closeValve(wasteValve3);
         Serial.println(F("[MESSAGE] Vacuum released. Waste valve 3 closed."));
-      }
-      else if (sensorIdx == 1) {  // For waste bottle 2
+      } else if (sensorIdx == 1) {  // For waste bottle 2
         wasteValve4 = closeValve(wasteValve4);
         Serial.println(F("[MESSAGE] Vacuum released. Waste valve 4 closed."));
       }
@@ -477,6 +524,7 @@ void monitorWasteSensors(unsigned long currentTime) {
     }
   }
 }
+
 
 
 // --------------------
@@ -504,9 +552,13 @@ void monitorVacuumRelease(unsigned long currentTime) {
       globalVacuumMonitoring[bottleIdx] = false;
       Serial.print(F("[MESSAGE] Vacuum monitoring disabled for bottle "));
       Serial.println(bottleIdx + 1);
+
+      // *** Asynchronously complete the stop-drain command ***
+      asyncCommandCompleted(&Serial);
     }
   }
 }
+
 
 
 // --------------------

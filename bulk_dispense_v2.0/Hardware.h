@@ -158,6 +158,8 @@ extern const uint8_t WASTE_VACUUM_SENSORS[NUM_WASTE_VACUUM_SENSORS];
 extern const FanControl fan;
 extern bool fanAutoMode;
 
+
+
 extern ProportionalValve proportionalValve;
 extern PressureSensor pressureSensor;
 extern Adafruit_SHT31 sht31;  // SHT31 instance
@@ -189,6 +191,9 @@ extern float proportionalValveMaxFeedback;
 extern bool globalVacuumMonitoring[NUM_WASTE_VACUUM_SENSORS];
 
 extern bool globalEnclosureLiquidError;
+
+extern bool dispenseAsyncCompleted[NUM_OVERFLOW_SENSORS];
+extern bool drainAsyncCompleted[NUM_OVERFLOW_SENSORS];
 
 // ------------------------------------------------------------------
 // Function Prototypes (Hardware Functions)

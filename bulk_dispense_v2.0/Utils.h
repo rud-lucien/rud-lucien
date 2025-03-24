@@ -8,6 +8,8 @@
 #include "Commander-API.hpp"  // For CommandCaller and commander
 #include "Commander-IO.hpp"
 
+void executeCommandWithActionTags(const char* command, Stream* stream);
+
 /**
  * trimLeadingSpaces()
  * ---------------------

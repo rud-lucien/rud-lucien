@@ -6,6 +6,23 @@
 #include <Wire.h>
 #include <string.h>
 #include <ctype.h>
+#include "CommandSession.h"
+
+
+void executeCommandWithActionTags(const char* command, Stream* stream) {
+  unsigned long actionStartTime = millis();
+  stream->println(F("[ACTION START]"));
+  
+  // Execute the command.
+  commander.execute(command, stream);
+  
+  // When the command returns, calculate the elapsed time.
+  unsigned long actionDuration = millis() - actionStartTime;
+  stream->print(F("[ACTION END] Duration: "));
+  stream->print(actionDuration);
+  stream->println(F(" ms"));
+}
+
 
 // ------------------------------------------------------------------
 // trimLeadingSpaces()
@@ -37,53 +54,101 @@ bool isCommandPrefix(const char* token) {
 }
 
 void processMultipleCommands(char* commandLine, Stream* stream) {
-  // Pointer to the current position in the command line.
   char* start = commandLine;
-  // Temporary buffer for each command.
   char commandCopy[COMMAND_SIZE];
 
+  // Start a session for this batch.
+  startCommandSession(stream);
+
   while (*start) {
-    // Find the next comma.
     char* comma = strchr(start, ',');
-    
-    // If a comma was found, compute the length of this command.
     size_t len;
     if (comma != NULL) {
       len = comma - start;
     } else {
-      // No comma found; this is the last command.
       len = strlen(start);
     }
-
-    // If the command length is too long, truncate it.
     if (len >= COMMAND_SIZE) {
       len = COMMAND_SIZE - 1;
     }
-
-    // Copy the command substring into the buffer.
     strncpy(commandCopy, start, len);
-    commandCopy[len] = '\0'; // Null-terminate
-
-    // Trim any leading whitespace.
+    commandCopy[len] = '\0';
     char* trimmed = trimLeadingSpaces(commandCopy);
-
-    // If there's anything in the token, execute it.
     if (strlen(trimmed) > 0) {
       Serial.print(F("[DEBUG] Token extracted: '"));
       Serial.print(trimmed);
       Serial.println(F("'"));
+      
+      // Decide if this command is asynchronous.
+      if (isAsyncCommand(trimmed)) {
+        registerAsyncCommand();
+      }
+      
+      // Execute the command. (We call commander.execute directly here;
+      // asynchronous commands must later signal completion via asyncCommandCompleted.)
       commander.execute(trimmed, stream);
     }
-
-    // If no comma was found, break out of the loop.
     if (comma == NULL) {
       break;
     }
-    
-    // Move start pointer to the character after the comma.
     start = comma + 1;
   }
+
+  // For synchronous commands (or if no async commands were registered), end the session immediately.
+  if (pendingAsyncCommands == 0) {
+    endCommandSession(stream);
+  }
 }
+
+// void processMultipleCommands(char* commandLine, Stream* stream) {
+//   // Pointer to the current position in the command line.
+//   char* start = commandLine;
+//   // Temporary buffer for each command.
+//   char commandCopy[COMMAND_SIZE];
+
+//   while (*start) {
+//     // Find the next comma.
+//     char* comma = strchr(start, ',');
+    
+//     // If a comma was found, compute the length of this command.
+//     size_t len;
+//     if (comma != NULL) {
+//       len = comma - start;
+//     } else {
+//       // No comma found; this is the last command.
+//       len = strlen(start);
+//     }
+
+//     // If the command length is too long, truncate it.
+//     if (len >= COMMAND_SIZE) {
+//       len = COMMAND_SIZE - 1;
+//     }
+
+//     // Copy the command substring into the buffer.
+//     strncpy(commandCopy, start, len);
+//     commandCopy[len] = '\0'; // Null-terminate
+
+//     // Trim any leading whitespace.
+//     char* trimmed = trimLeadingSpaces(commandCopy);
+
+//     // If there's anything in the token, execute it.
+//     if (strlen(trimmed) > 0) {
+//       Serial.print(F("[DEBUG] Token extracted: '"));
+//       Serial.print(trimmed);
+//       Serial.println(F("'"));
+//       executeCommandWithActionTags(trimmed, stream);
+//       // commander.execute(trimmed, stream);
+//     }
+
+//     // If no comma was found, break out of the loop.
+//     if (comma == NULL) {
+//       break;
+//     }
+    
+//     // Move start pointer to the character after the comma.
+//     start = comma + 1;
+//   }
+// }
 
 
 // ------------------------------------------------------------------

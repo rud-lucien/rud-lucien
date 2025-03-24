@@ -4,6 +4,7 @@
 #include "Logging.h"
 #include "Utils.h"
 #include <Controllino.h>
+#include "CommandSession.h"
 
 
 
@@ -443,6 +444,10 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
 
   valveControls[troughNumber - 1].isDispensing = true;
   valveControls[troughNumber - 1].targetVolume = requestedVolume;
+
+  // Register this dispensing operation as asynchronous.
+  // Reset the async completion flag so that the monitor function will later call asyncCommandCompleted.
+  dispenseAsyncCompleted[troughNumber - 1] = false;
 }
 
 
@@ -529,7 +534,6 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
 
   // Mark that priming is in progress.
   valveControls[localValveNumber - 1].isPriming = true;
-
   caller->print(F("[MESSAGE] Priming started for valve "));
   caller->println(localValveNumber);
 }
@@ -584,6 +588,10 @@ void cmd_fill_reagent(char* args, CommandCaller* caller) {
 
   // Enable fill mode for this trough.
   enableFillMode(troughNumber, caller);
+
+  // For fill mode (a long-running process), immediately mark the command as complete.
+  // This causes the ACTION END tag to be printed now, even though fill mode continues.
+  asyncCommandCompleted(&Serial);
 }
 
 void cmd_drain_trough(char* args, CommandCaller* caller) {
@@ -592,9 +600,10 @@ void cmd_drain_trough(char* args, CommandCaller* caller) {
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
+  // Check for enclosure liquid error first.
   if (globalEnclosureLiquidError) {
-  caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
-  return;
+    caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
+    return;
   }
 
   int troughNumber = -1;
@@ -608,16 +617,14 @@ void cmd_drain_trough(char* args, CommandCaller* caller) {
   
   // Validate the trough number.
   if (!validateTroughNumber(troughNumber, caller)) {
-  return;
+    return;
   }
-
   
   // Check if the corresponding waste bottle is full.
-  // For troughs 1-2, check waste bottle 1; for 3-4, check waste bottle 2.
+  // For troughs 1–2, use waste bottle sensor index 0; for 3–4, use index 1.
   if (isWasteBottleFullForTrough(troughNumber, caller)) {
     return;
   }
-
     
   // Check for incompatible drainage.
   if (hasIncompatibleDrainage(troughNumber, caller)) {
@@ -626,15 +633,16 @@ void cmd_drain_trough(char* args, CommandCaller* caller) {
   
   // Stop any dispensing or fill mode if active.
   stopDispensingIfActive(troughNumber, caller);
-  
-  // Disable fill mode if active
   disableFillMode(troughNumber, caller);
   
   // Set the draining flag.
   valveControls[troughNumber - 1].isDraining = true;
   
+  // Reset the asynchronous completion flag for this trough.
+  drainAsyncCompleted[troughNumber - 1] = false;
+  
   // Execute the drain logic based on the trough number.
-  // Note: Assign the return value of openValve/closeValve back to the valve.
+  // Use the hardware functions to update valve state.
   switch (troughNumber) {
     case 1:
       wasteValve1 = openValve(wasteValve1);
@@ -660,7 +668,10 @@ void cmd_drain_trough(char* args, CommandCaller* caller) {
       caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
       return;
   }
+  // Note: We do not call asyncCommandCompleted() here.
+  // The asynchronous completion (ACTION END) will be signaled by monitorWasteSensors().
 }
+
 
 
 void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
@@ -695,10 +706,10 @@ void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
     return;
   }
 
-  // Validate trough number (must be between 1 and 4).
+  // Validate trough number.
   if (!validateTroughNumber(troughNumber, caller)) {
-  return;
-}
+    return;
+  }
 
   // Stop draining the specific trough.
   valveControls[troughNumber - 1].isDraining = false;
@@ -728,7 +739,11 @@ void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
       caller->println(F("[ERROR] Invalid trough number. Use 1-4 or 'all'."));
       return;
   }
+
+  // Note: We do NOT call asyncCommandCompleted() here because the completion
+  // of the stop-drain operation is determined by the vacuum release.
 }
+
 
 
 

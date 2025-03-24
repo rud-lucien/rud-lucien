@@ -45,6 +45,7 @@ const uint8_t WASTE_VACUUM_SENSORS[NUM_WASTE_VACUUM_SENSORS] = {
 bool fanAutoMode = true;
 const FanControl fan = { FAN_CONTROL_PIN };
 
+
 // Proportional Valve
 ProportionalValve proportionalValve = { PROPORTIONAL_VALVE_CONTROL_PIN, PROPORTIONAL_VALVE_FEEDBACK_PIN, 0.0 };
 
@@ -122,6 +123,11 @@ bool globalEnclosureLiquidError = false;
 // Calibration variable
 float proportionalValveMaxFeedback = 0.0;
 
+
+bool dispenseAsyncCompleted[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
+bool drainAsyncCompleted[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
+
+
 // ------------------------------------------------------------------
 // Function Definitions (Hardware Functions)
 // ------------------------------------------------------------------
@@ -133,14 +139,14 @@ void fanSetup(const FanControl &fc) {
 }
 
 void setFanState(const FanControl &config, bool state) {
-  static bool lastState = false;  // To avoid redundant changes
-  if (lastState != state) {
+  bool currentState = digitalRead(config.relayPin) == HIGH;
+  if (currentState != state) {
     digitalWrite(config.relayPin, state ? HIGH : LOW);
     Serial.print(F("[MESSAGE] Fan state set to "));
     Serial.println(state ? F("ON") : F("OFF"));
-    lastState = state;
   }
 }
+
 
 void printFanState(bool state) {
   Serial.print(F("[MESSAGE] Fan is "));

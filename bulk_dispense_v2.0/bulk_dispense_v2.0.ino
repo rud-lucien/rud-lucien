@@ -6,6 +6,7 @@
 #include "Commands.h"       // Commander API and command functions
 #include "Utils.h"          // Utility functions
 #include "SystemMonitor.h"  // System monitor functions
+#include "CommandSession.h"
 
 void setup() {
   Serial.begin(115200);
