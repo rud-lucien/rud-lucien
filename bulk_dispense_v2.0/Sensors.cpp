@@ -2,12 +2,24 @@
 #include <Wire.h>
 #include <math.h>  // For isnan()
 
-// ------------------------------------------------------------------
+/************************************************************
+ * Sensors.cpp
+ * 
+ * This file implements functions declared in Sensors.h.
+ * It handles initialization and data acquisition for the SHT31
+ * Temperature/Humidity sensor and the flow sensors.
+ *
+ * Author: Your Name
+ * Date: YYYY-MM-DD
+ * Version: 2.0
+ ************************************************************/
+
+// ============================================================
 // Internal Helper Functions
-// ------------------------------------------------------------------
+// ============================================================
 /**
  * Checks if a flow sensor is connected.
- * Selects the multiplexer channel, then attempts a transmission to the sensor.
+ * Selects the appropriate multiplexer channel and attempts a transmission.
  * @param sensor The flow sensor to check.
  * @return true if the sensor is connected, false otherwise.
  */
@@ -23,9 +35,9 @@ bool isFlowSensorConnected(FlowSensor &sensor) {
   }
 }
 
-// ------------------------------------------------------------------
+// ============================================================
 // Temperature & Humidity Sensor Functions
-// ------------------------------------------------------------------
+// ============================================================
 bool tempHumSensorInit() {
   selectMultiplexerChannel(MULTIPLEXER_ADDR, TEMP_HUM_SENSOR_CHANNEL);
   return sht31.begin(TEMP_HUM_SENSOR_ADDR);
@@ -40,9 +52,9 @@ TempHumidity readTempHumidity() {
   return data;
 }
 
-// ------------------------------------------------------------------
+// ============================================================
 // Flow Sensor Functions
-// ------------------------------------------------------------------
+// ============================================================
 FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_t cmd) {
   FlowSensor sensor;
   sensor.multiplexerAddr = muxAddr;
@@ -65,7 +77,7 @@ FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_
 bool initializeFlowSensor(FlowSensor &sensor) {
   static int resetAttempt = 0;
 
-  // Step 1: Select the correct multiplexer channel.
+  // Step 1: Select the multiplexer channel.
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
 
   // Step 2: Check sensor connection.
@@ -231,9 +243,9 @@ bool stopFlowSensorMeasurement(FlowSensor &sensor) {
   }
 }
 
-// ------------------------------------------------------------------
+// ============================================================
 // Pressure Sensor Functions
-// ------------------------------------------------------------------
+// ============================================================
 float readPressureVoltage(const PressureSensor &sensor) {
   int analogValue = analogRead(sensor.analogPin);
   return (analogValue / 1023.0) * 10.0;
@@ -244,12 +256,9 @@ float readPressure(const PressureSensor &sensor) {
   return (voltage / 10.0) * sensor.maxPressure;
 }
 
-// ------------------------------------------------------------------
+// ============================================================
 // Flow Sensor Volume Reset Helper Functions
-// ------------------------------------------------------------------
-/**
- * Resets the dispense volume for the flow sensor.
- */
+// ============================================================
 void resetFlowSensorDispenseVolume(FlowSensor &sensor) {
   sensor.dispenseVolume = 0.0;
   sensor.lastUpdateTime = millis();
@@ -258,9 +267,6 @@ void resetFlowSensorDispenseVolume(FlowSensor &sensor) {
   Serial.println(sensor.channel);
 }
 
-/**
- * Resets the total volume for the flow sensor.
- */
 void resetFlowSensorTotalVolume(FlowSensor &sensor) {
   sensor.totalVolume = 0.0;
   Serial.print(F("[MESSAGE] Total volume reset for flow sensor on channel "));

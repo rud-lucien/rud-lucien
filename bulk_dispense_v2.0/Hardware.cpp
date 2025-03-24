@@ -1,9 +1,22 @@
 #include "Hardware.h"
 #include <Wire.h>
 
-// ------------------------------------------------------------------
+/************************************************************
+ * Hardware.cpp
+ * 
+ * This file contains hardware-specific definitions including:
+ * - Pin assignment arrays for valves and sensors.
+ * - Global object definitions for hardware components.
+ * - Hardware functions for initializing and controlling devices.
+ *
+ * Author: Your Name
+ * Date: YYYY-MM-DD
+ * Version: 2.0
+ ************************************************************/
+
+// ============================================================
 // Constant Arrays for Pin Assignments
-// ------------------------------------------------------------------
+// ============================================================
 const uint8_t REAGENT_VALVES[NUM_REAGENT_VALVES] = {
   CONTROLLINO_R0, CONTROLLINO_R1, CONTROLLINO_R2, CONTROLLINO_R3
 };
@@ -36,15 +49,13 @@ const uint8_t WASTE_VACUUM_SENSORS[NUM_WASTE_VACUUM_SENSORS] = {
   CONTROLLINO_AI8, CONTROLLINO_AI9
 };
 
-// ------------------------------------------------------------------
+// ============================================================
 // Global Hardware Object Definitions
-// ------------------------------------------------------------------
-
+// ============================================================
 
 // Fan
 bool fanAutoMode = true;
 const FanControl fan = { FAN_CONTROL_PIN };
-
 
 // Proportional Valve
 ProportionalValve proportionalValve = { PROPORTIONAL_VALVE_CONTROL_PIN, PROPORTIONAL_VALVE_FEEDBACK_PIN, 0.0 };
@@ -63,7 +74,7 @@ FlowSensor flow4 = { MULTIPLEXER_ADDR, 0x08, 3, FLOW_SENSOR_CMD, false, true, 0,
 
 FlowSensor *flowSensors[NUM_FLOW_SENSORS] = { &flow1, &flow2, &flow3, &flow4 };
 
-// Valve control array
+// Valve Control Array (one per overflow sensor/trough)
 ValveControl valveControls[NUM_OVERFLOW_SENSORS] = {};
 
 // On/Off Valves for reagents, media, and waste
@@ -114,23 +125,22 @@ BinarySensor wasteVacuumSensors[NUM_WASTE_VACUUM_SENSORS] = {
 
 BinarySensor enclosureLiquidSensor = { ENCLOSURE_LIQUID_SENSOR_PIN, false };
 
-bool globalVacuumMonitoring[2] = { false, false };
+// Global vacuum monitoring flags for waste bottles.
+bool globalVacuumMonitoring[NUM_WASTE_VACUUM_SENSORS] = { false, false };
 
 // Global flag for enclosure liquid error state.
 bool globalEnclosureLiquidError = false;
 
-
-// Calibration variable
+// Calibration variable for proportional valve.
 float proportionalValveMaxFeedback = 0.0;
 
-
+// Async command flags.
 bool dispenseAsyncCompleted[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
 bool drainAsyncCompleted[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
 
-
-// ------------------------------------------------------------------
-// Function Definitions (Hardware Functions)
-// ------------------------------------------------------------------
+// ============================================================
+// Hardware Functions
+// ============================================================
 
 void fanSetup(const FanControl &fc) {
   pinMode(fc.relayPin, OUTPUT);
@@ -139,6 +149,7 @@ void fanSetup(const FanControl &fc) {
 }
 
 void setFanState(const FanControl &config, bool state) {
+  // Read current pin state to decide whether to update.
   bool currentState = digitalRead(config.relayPin) == HIGH;
   if (currentState != state) {
     digitalWrite(config.relayPin, state ? HIGH : LOW);
@@ -147,12 +158,10 @@ void setFanState(const FanControl &config, bool state) {
   }
 }
 
-
 void printFanState(bool state) {
   Serial.print(F("[MESSAGE] Fan is "));
   Serial.println(state ? F("ON") : F("OFF"));
 }
-
 
 OnOffValve openValve(OnOffValve valve) {
   digitalWrite(valve.controlPin, HIGH);
@@ -182,16 +191,16 @@ ProportionalValve setValvePosition(ProportionalValve valve, float percentage) {
 
 float getValveFeedback(const ProportionalValve &valve) {
   int analogValue = analogRead(valve.feedbackPin);
-  // Map analog reading (0-1023) to 0-10 volts (scaled to 10000 for millivolts then divided)
+  // Map analog reading (0-1023) to 0-10 volts (scaled to 10000 for mV then divided)
   float voltage = map(analogValue, 0, 1023, 0, 10000) / 1000.0;
   return voltage;
 }
 
 void calibrateProportionalValve() {
   Serial.println(F("[MESSAGE] Starting proportional valve calibration..."));
-  // Set valve to fully open (100%)
+  // Set valve to fully open (100%).
   proportionalValve = setValvePosition(proportionalValve, 100.0);
-  delay(1000);  // Wait for stabilization
+  delay(1000);  // Wait for stabilization.
   proportionalValveMaxFeedback = getValveFeedback(proportionalValve);
   Serial.print(F("[MESSAGE] Calibrated max feedback voltage: "));
   Serial.println(proportionalValveMaxFeedback);
@@ -199,7 +208,7 @@ void calibrateProportionalValve() {
 
 void selectMultiplexerChannel(uint8_t multiplexerAddr, uint8_t channel) {
   Wire.beginTransmission(multiplexerAddr);
-  Wire.write(1 << channel);  // Select channel by shifting 1 into the desired bit position
+  Wire.write(1 << channel);  // Select channel by shifting 1 into the desired bit position.
   Wire.endTransmission();
 }
 

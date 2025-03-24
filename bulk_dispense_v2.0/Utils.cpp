@@ -3,11 +3,31 @@
 #include "Sensors.h"
 #include "Commands.h"
 #include "Commander-API.hpp"
+#include "Commander-IO.hpp"
+#include "CommandSession.h"
 #include <Wire.h>
 #include <string.h>
 #include <ctype.h>
-#include "CommandSession.h"
 
+/************************************************************
+ * Utils.cpp
+ *
+ * This file implements the utility functions for the Bulk Dispense
+ * system, including:
+ *   - Command execution wrappers with asynchronous action tags.
+ *   - String trimming and multi-command processing.
+ *   - Serial command handling.
+ *   - Pressure check and I2C bus reset routines.
+ *   - Valve control and manual/fill mode helper functions.
+ *
+ * Author: Your Name
+ * Date: YYYY-MM-DD
+ * Version: 2.0
+ ************************************************************/
+
+// ============================================================
+// Command Session Utilities
+// ============================================================
 
 void executeCommandWithActionTags(const char* command, Stream* stream) {
   unsigned long actionStartTime = millis();
@@ -16,17 +36,17 @@ void executeCommandWithActionTags(const char* command, Stream* stream) {
   // Execute the command.
   commander.execute(command, stream);
   
-  // When the command returns, calculate the elapsed time.
+  // Calculate and print elapsed time.
   unsigned long actionDuration = millis() - actionStartTime;
   stream->print(F("[ACTION END] Duration: "));
   stream->print(actionDuration);
   stream->println(F(" ms"));
 }
 
+// ============================================================
+// String Utilities
+// ============================================================
 
-// ------------------------------------------------------------------
-// trimLeadingSpaces()
-// ------------------------------------------------------------------
 char* trimLeadingSpaces(char* str) {
   while (*str && isspace(*str)) {
     str++;
@@ -34,17 +54,14 @@ char* trimLeadingSpaces(char* str) {
   return str;
 }
 
-// ------------------------------------------------------------------
-// processMultipleCommands()
-// ------------------------------------------------------------------
-/**
- * Checks if the token starts with one of the valid command strings
- * defined in the Commander API tree.
- */
+// ============================================================
+// Command Processing
+// ============================================================
+
 bool isCommandPrefix(const char* token) {
   const int numCommands = sizeof(API_tree) / sizeof(API_tree[0]);
   for (int i = 0; i < numCommands; i++) {
-    const char* cmdName = API_tree[i].name; // use "name" as defined by the API macro
+    const char* cmdName = API_tree[i].name;
     size_t len = strlen(cmdName);
     if (strncmp(token, cmdName, len) == 0) {
       return true;
@@ -57,103 +74,42 @@ void processMultipleCommands(char* commandLine, Stream* stream) {
   char* start = commandLine;
   char commandCopy[COMMAND_SIZE];
 
-  // Start a session for this batch.
+  // Start a new asynchronous command session.
   startCommandSession(stream);
 
   while (*start) {
     char* comma = strchr(start, ',');
-    size_t len;
-    if (comma != NULL) {
-      len = comma - start;
-    } else {
-      len = strlen(start);
-    }
+    size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
     if (len >= COMMAND_SIZE) {
       len = COMMAND_SIZE - 1;
     }
     strncpy(commandCopy, start, len);
-    commandCopy[len] = '\0';
+    commandCopy[len] = '\0';  // Null-terminate the substring
     char* trimmed = trimLeadingSpaces(commandCopy);
     if (strlen(trimmed) > 0) {
       Serial.print(F("[DEBUG] Token extracted: '"));
       Serial.print(trimmed);
       Serial.println(F("'"));
       
-      // Decide if this command is asynchronous.
+      // If the command is asynchronous, register it.
       if (isAsyncCommand(trimmed)) {
         registerAsyncCommand();
       }
       
-      // Execute the command. (We call commander.execute directly here;
-      // asynchronous commands must later signal completion via asyncCommandCompleted.)
+      // Execute the command.
       commander.execute(trimmed, stream);
     }
-    if (comma == NULL) {
-      break;
-    }
+    
+    if (comma == NULL) break;
     start = comma + 1;
   }
 
-  // For synchronous commands (or if no async commands were registered), end the session immediately.
+  // End session if no asynchronous commands are pending.
   if (pendingAsyncCommands == 0) {
     endCommandSession(stream);
   }
 }
 
-// void processMultipleCommands(char* commandLine, Stream* stream) {
-//   // Pointer to the current position in the command line.
-//   char* start = commandLine;
-//   // Temporary buffer for each command.
-//   char commandCopy[COMMAND_SIZE];
-
-//   while (*start) {
-//     // Find the next comma.
-//     char* comma = strchr(start, ',');
-    
-//     // If a comma was found, compute the length of this command.
-//     size_t len;
-//     if (comma != NULL) {
-//       len = comma - start;
-//     } else {
-//       // No comma found; this is the last command.
-//       len = strlen(start);
-//     }
-
-//     // If the command length is too long, truncate it.
-//     if (len >= COMMAND_SIZE) {
-//       len = COMMAND_SIZE - 1;
-//     }
-
-//     // Copy the command substring into the buffer.
-//     strncpy(commandCopy, start, len);
-//     commandCopy[len] = '\0'; // Null-terminate
-
-//     // Trim any leading whitespace.
-//     char* trimmed = trimLeadingSpaces(commandCopy);
-
-//     // If there's anything in the token, execute it.
-//     if (strlen(trimmed) > 0) {
-//       Serial.print(F("[DEBUG] Token extracted: '"));
-//       Serial.print(trimmed);
-//       Serial.println(F("'"));
-//       executeCommandWithActionTags(trimmed, stream);
-//       // commander.execute(trimmed, stream);
-//     }
-
-//     // If no comma was found, break out of the loop.
-//     if (comma == NULL) {
-//       break;
-//     }
-    
-//     // Move start pointer to the character after the comma.
-//     start = comma + 1;
-//   }
-// }
-
-
-// ------------------------------------------------------------------
-// handleSerialCommands()
-// ------------------------------------------------------------------
 void handleSerialCommands() {
   static char commandBuffer[COMMAND_SIZE];
   static uint8_t commandIndex = 0;
@@ -161,12 +117,12 @@ void handleSerialCommands() {
   while (Serial.available() > 0) {
     char c = Serial.read();
     if (c == '\n') {
-      commandBuffer[commandIndex] = '\0';  // Null-terminate the string
+      commandBuffer[commandIndex] = '\0';  // Null-terminate the command
       Serial.print(F("[COMMAND] Received: "));
       Serial.println(commandBuffer);
       processMultipleCommands(commandBuffer, &Serial);
-      commandIndex = 0;      // Reset the buffer index for the next command
-    } else if (c != '\r') {  // Ignore carriage return characters
+      commandIndex = 0;  // Reset buffer index
+    } else if (c != '\r') {  // Ignore carriage returns
       if (commandIndex < (COMMAND_SIZE - 1)) {
         commandBuffer[commandIndex++] = c;
       }
@@ -174,14 +130,14 @@ void handleSerialCommands() {
   }
 }
 
-// ------------------------------------------------------------------
-// checkAndSetPressure()
-// ------------------------------------------------------------------
+// ============================================================
+// Pressure & I2C Utilities
+// ============================================================
+
 bool isPressureOK(float thresholdPressure) {
   float currentPressure = readPressure(pressureSensor);
   return (currentPressure >= thresholdPressure);
 }
-
 
 void setPressureValve(int valvePosition) {
   proportionalValve = setValvePosition(proportionalValve, valvePosition);
@@ -192,17 +148,11 @@ void setPressureValve(int valvePosition) {
 
 bool checkAndSetPressure(float thresholdPressure, int valvePosition, unsigned long timeout) {
   unsigned long startTime = millis();
-  
-  // First, check if the pressure is already OK.
   if (isPressureOK(thresholdPressure)) {
     Serial.println(F("[MESSAGE] System is already pressurized."));
     return true;
   }
-  
-  // If not, set the valve.
   setPressureValve(valvePosition);
-  
-  // Now wait until the pressure reaches the threshold or timeout occurs.
   while (millis() - startTime < timeout) {
     if (isPressureOK(thresholdPressure)) {
       Serial.println(F("[MESSAGE] Pressure threshold reached."));
@@ -210,18 +160,12 @@ bool checkAndSetPressure(float thresholdPressure, int valvePosition, unsigned lo
     }
     delay(100);
   }
-  
   Serial.print(F("[ERROR] Pressure threshold not reached. Current pressure: "));
   Serial.print(readPressure(pressureSensor));
   Serial.println(F(" psi. Operation aborted."));
   return false;
 }
 
-
-
-// ------------------------------------------------------------------
-// resetI2CBus()
-// ------------------------------------------------------------------
 void resetI2CBus() {
   Serial.println(F("[MESSAGE] Resetting I2C bus..."));
   Wire.end();
@@ -229,9 +173,10 @@ void resetI2CBus() {
   Wire.begin();
 }
 
-// ------------------------------------------------------------------
-// openDispenseValves()
-// ------------------------------------------------------------------
+// ============================================================
+// Valve Control Utilities
+// ============================================================
+
 void openDispenseValves(int troughNumber) {
   if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
     Serial.println(F("[ERROR] Invalid trough number provided to openDispenseValves()"));
@@ -259,9 +204,6 @@ void openDispenseValves(int troughNumber) {
   Serial.println(troughNumber);
 }
 
-// ------------------------------------------------------------------
-// closeDispenseValves()
-// ------------------------------------------------------------------
 void closeDispenseValves(int troughNumber) {
   if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
     Serial.println(F("[ERROR] Invalid trough number provided to closeDispenseValves()"));
@@ -289,62 +231,48 @@ void closeDispenseValves(int troughNumber) {
   Serial.println(troughNumber);
 }
 
-// ------------------------------------------------------------------
-// stopDispenseOperation()
-// ------------------------------------------------------------------
-void stopDispenseOperation(int troughNumber, CommandCaller* caller) {
-  // If priming is in progress, stop it first.
+void stopDispenseOperation(int troughNumber, Stream* stream) {
   if (valveControls[troughNumber - 1].isPriming) {
-    caller->print(F("[MESSAGE] Priming stopped for Trough "));
-    caller->println(troughNumber);
-    // Close the valves to stop priming.
+    stream->print(F("[MESSAGE] Priming stopped for Trough "));
+    stream->println(troughNumber);
     closeDispenseValves(troughNumber);
-    // Reset priming flags.
     valveControls[troughNumber - 1].isPriming = false;
     valveControls[troughNumber - 1].manualControl = false;
   }
-  
-  // Now proceed with stopping dispensing.
   closeDispenseValves(troughNumber);
-  
   FlowSensor* sensor = flowSensors[troughNumber - 1];
   if (sensor) {
-    caller->print(F("[MESSAGE] Trough "));
-    caller->print(troughNumber);
-    caller->print(F(" Dispense Stopped. Total Volume: "));
-    caller->print(sensor->dispenseVolume, 1);
-    caller->println(F(" mL."));
-    
-    // Stop measurement and reset sensor's dispense volume.
+    stream->print(F("[MESSAGE] Trough "));
+    stream->print(troughNumber);
+    stream->print(F(" Dispense Stopped. Total Volume: "));
+    stream->print(sensor->dispenseVolume, 1);
+    stream->println(F(" mL."));
     stopFlowSensorMeasurement(*sensor);
     resetFlowSensorDispenseVolume(*sensor);
   }
-  
   valveControls[troughNumber - 1].isDispensing = false;
 }
 
+
 bool areDispenseValvesOpen(int troughNumber) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
-    return false;
-  }
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return false;
   switch (troughNumber) {
-    case 1:
-      return reagentValve1.isOpen && mediaValve1.isOpen;
-    case 2:
-      return reagentValve2.isOpen && mediaValve2.isOpen;
-    case 3:
-      return reagentValve3.isOpen && mediaValve3.isOpen;
-    case 4:
-      return reagentValve4.isOpen && mediaValve4.isOpen;
-    default:
-      return false;
+    case 1: return reagentValve1.isOpen && mediaValve1.isOpen;
+    case 2: return reagentValve2.isOpen && mediaValve2.isOpen;
+    case 3: return reagentValve3.isOpen && mediaValve3.isOpen;
+    case 4: return reagentValve4.isOpen && mediaValve4.isOpen;
+    default: return false;
   }
 }
+
+// ============================================================
+// Manual & Fill Mode Control Utilities
+// ============================================================
 
 void enableManualControl(int index, CommandCaller* caller) {
   valveControls[index].manualControl = true;
   caller->print(F("[MESSAGE] Manual control enabled for trough "));
-  caller->println(index + 1); // Trough numbers are 1-based.
+  caller->println(index + 1);
 }
 
 void disableManualControl(int index, CommandCaller* caller) {
@@ -353,93 +281,72 @@ void disableManualControl(int index, CommandCaller* caller) {
   caller->println(index + 1);
 }
 
-// Enable Fill Mode
 void enableFillMode(int troughNumber, CommandCaller* caller) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
-    return; // Prevent invalid access
-  }
-
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return;
   valveControls[troughNumber - 1].fillMode = true;
-
   caller->print(F("[MESSAGE] Fill mode enabled for trough "));
   caller->println(troughNumber);
 }
 
-// Disable Fill Mode
-void disableFillMode(int troughNumber, CommandCaller* caller) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
-    return; // Prevent invalid access
-  }
-
+void disableFillMode(int troughNumber, Stream* stream) {
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return;
   if (valveControls[troughNumber - 1].fillMode) {
     valveControls[troughNumber - 1].fillMode = false;
-    caller->print(F("[MESSAGE] Fill mode disabled for trough "));
-    caller->println(troughNumber);
+    stream->print(F("[MESSAGE] Fill mode disabled for trough "));
+    stream->println(troughNumber);
   }
 }
 
-// Disable Fill Mode for All Troughs
+
 void disableFillModeForAll(CommandCaller* caller) {
   for (int i = 1; i <= NUM_OVERFLOW_SENSORS; i++) {
     disableFillMode(i, caller);
   }
 }
 
-// Check if Fill Mode is Active
 bool isFillModeActive(int troughNumber) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
-    return false;
-  }
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return false;
   return valveControls[troughNumber - 1].fillMode;
 }
 
-// Helper function to stop dispensing on a trough if it's active.
-void stopDispensingIfActive(int troughNumber, CommandCaller* caller) {
-  // Check if dispensing is in progress.
+// ============================================================
+// Helper Functions for Dispensing, Draining, and Priming
+// ============================================================
+
+void stopDispensingIfActive(int troughNumber, Stream* stream) {
   if (valveControls[troughNumber - 1].isDispensing) {
-    // Stop the dispense operation.
-    stopDispenseOperation(troughNumber, caller);
-    caller->print(F("[MESSAGE] Dispensing stopped for trough "));
-    caller->println(troughNumber);
+    stopDispenseOperation(troughNumber, stream);
+    stream->print(F("[MESSAGE] Dispensing stopped for trough "));
+    stream->println(troughNumber);
   }
 }
 
-// Helper function to check if the waste bottle for a given trough is full.
-// Returns true if the bottle is full (and prints an error message); false otherwise.
+
 bool isWasteBottleFullForTrough(int troughNumber, CommandCaller* caller) {
-  // For troughs 1-2, use waste bottle sensor at index 0; for 3-4, use index 1.
   int bottleIndex = (troughNumber <= 2) ? 0 : 1;
   if (readBinarySensor(wasteBottleSensors[bottleIndex])) {
     caller->print(F("[ERROR] Waste bottle "));
-    caller->print(bottleIndex + 1);  // Convert to 1-based numbering for display.
+    caller->print(bottleIndex + 1);
     caller->println(F(" is full. Cannot start drainage."));
     return true;
   }
   return false;
 }
 
-// Helper function to check for incompatible drainage conditions.
-// Returns true if an incompatible drainage is detected (and prints an error message), false otherwise.
 bool hasIncompatibleDrainage(int troughNumber, CommandCaller* caller) {
-  // Check for incompatible drainage between troughs 1 and 2.
   if ((troughNumber == 1 && valveControls[1].isDraining) ||
       (troughNumber == 2 && valveControls[0].isDraining)) {
     caller->println(F("[ERROR] Troughs 1 and 2 cannot be drained simultaneously."));
     return true;
   }
-  
-  // Check for incompatible drainage between troughs 3 and 4.
   if ((troughNumber == 3 && valveControls[3].isDraining) ||
       (troughNumber == 4 && valveControls[2].isDraining)) {
     caller->println(F("[ERROR] Troughs 3 and 4 cannot be drained simultaneously."));
     return true;
   }
-  
   return false;
 }
 
-// Helper function to validate the trough number.
-// Returns true if valid; otherwise, prints an error and returns false.
 bool validateTroughNumber(int troughNumber, CommandCaller* caller) {
   if (troughNumber < 1 || troughNumber > 4) {
     caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
@@ -448,31 +355,28 @@ bool validateTroughNumber(int troughNumber, CommandCaller* caller) {
   return true;
 }
 
-// Helper function to stop dispensing on a trough when a fill command is issued.
-void stopDispensingForFill(int troughNumber, CommandCaller* caller) {
+void stopDispensingForFill(int troughNumber, Stream* stream) {
   if (valveControls[troughNumber - 1].isDispensing) {
-    stopDispenseOperation(troughNumber, caller);
-    caller->print(F("[MESSAGE] Dispense operation for trough "));
-    caller->print(troughNumber);
-    caller->println(F(" stopped prematurely due to fill command."));
+    stopDispenseOperation(troughNumber, stream);
+    stream->print(F("[MESSAGE] Dispense operation for trough "));
+    stream->print(troughNumber);
+    stream->println(F(" stopped prematurely due to fill command."));
   }
 }
 
-// Helper function to stop priming on a trough when a fill command is issued.
-void stopPrimingForFill(int troughNumber, CommandCaller* caller) {
+
+void stopPrimingForFill(int troughNumber, Stream* stream) {
   if (valveControls[troughNumber - 1].isPriming) {
     valveControls[troughNumber - 1].isPriming = false;
     closeDispenseValves(troughNumber);
-    caller->print(F("[MESSAGE] Priming operation for trough "));
-    caller->print(troughNumber);
-    caller->println(F(" stopped prematurely due to fill command."));
+    stream->print(F("[MESSAGE] Priming operation for trough "));
+    stream->print(troughNumber);
+    stream->println(F(" stopped prematurely due to fill command."));
   }
 }
 
-// Helper function to check if a valve is already primed.
-// Returns true if already primed (and prints a message), false otherwise.
+
 bool isValveAlreadyPrimed(int valveNumber, CommandCaller* caller) {
-  // Note: valveNumber is assumed to be 1-based.
   if (readBinarySensor(reagentBubbleSensors[valveNumber - 1])) {
     caller->print(F("[MESSAGE] Valve "));
     caller->print(valveNumber);
@@ -482,8 +386,6 @@ bool isValveAlreadyPrimed(int valveNumber, CommandCaller* caller) {
   return false;
 }
 
-// Helper function to validate a valve number (expected 1 to 4).
-// Returns true if the valve number is valid; otherwise, prints an error message and returns false.
 bool validateValveNumber(int valveNumber, CommandCaller* caller) {
   if (valveNumber < 1 || valveNumber > 4) {
     caller->println(F("[ERROR] Invalid valve number. Use 1-4."));
@@ -492,24 +394,47 @@ bool validateValveNumber(int valveNumber, CommandCaller* caller) {
   return true;
 }
 
-// Helper function to set vacuum monitoring and close the main waste valve
-// for a given trough.
 void setVacuumMonitoringAndCloseMainValve(int troughNumber, CommandCaller* caller) {
   if (troughNumber <= 2) {
-    globalVacuumMonitoring[0] = true; // Monitor waste bottle 1
+    globalVacuumMonitoring[0] = true;
     wasteValve1 = closeValve(wasteValve1);
   } else {
-    globalVacuumMonitoring[1] = true; // Monitor waste bottle 2
+    globalVacuumMonitoring[1] = true;
     wasteValve2 = closeValve(wasteValve2);
   }
 }
 
-
-
-
-
-
-
+void abortAllAutomatedOperations(Stream* stream) {
+  // Abort operations on each trough.
+  for (int trough = 1; trough <= NUM_OVERFLOW_SENSORS; trough++) {
+    // Abort dispensing if active.
+    if (valveControls[trough - 1].isDispensing) {
+      stopDispenseOperation(trough, stream);
+    }
+    // Abort priming if active.
+    if (valveControls[trough - 1].isPriming) {
+      stopPrimingForFill(trough, stream);
+    }
+    // Disable fill mode if active.
+    if (valveControls[trough - 1].fillMode) {
+      disableFillMode(trough, stream);
+    }
+    // Abort draining if active.
+    if (valveControls[trough - 1].isDraining) {
+      valveControls[trough - 1].isDraining = false;
+      // Optionally, close any associated waste valves here.
+    }
+  }
+  
+  // Print the final error and abort messages.
+  stream->println(F("[ERROR] Enclosure liquid detected. Automated operations halted. Resolve the leak before proceeding."));
+  stream->println(F("[MESSAGE] All automated operations aborted due to enclosure leak."));
+  
+  // End the asynchronous command session so that the [ACTION END] tag is printed now.
+  if (commandSessionActive) {
+    endCommandSession(stream);
+  }
+}
 
 
 

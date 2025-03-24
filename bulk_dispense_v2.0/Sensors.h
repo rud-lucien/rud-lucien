@@ -3,9 +3,28 @@
 
 #include "Hardware.h"  // Provides definitions for TempHumidity, FlowSensor, PressureSensor, etc.
 
-// ------------------------------------------------------------------
+/************************************************************
+ * Sensors.h
+ * 
+ * This header declares functions for interfacing with the
+ * SHT31 Temperature/Humidity sensor and the flow sensors used 
+ * in the Bulk Dispense system.
+ *
+ * Functions include:
+ *  - Initialization and reading of temperature/humidity.
+ *  - Creation, initialization, data acquisition, and control 
+ *    of flow sensors.
+ *  - Reading and conversion of pressure sensor data.
+ *  - Resetting of flow sensor volumes.
+ *
+ * Author: Your Name
+ * Date: YYYY-MM-DD
+ * Version: 2.0
+ ************************************************************/
+
+// ============================================================
 // Temperature & Humidity Sensor Functions
-// ------------------------------------------------------------------
+// ============================================================
 /**
  * Initializes the SHT31 sensor via the I²C multiplexer.
  * @return true if initialization is successful, false otherwise.
@@ -18,11 +37,16 @@ bool tempHumSensorInit();
  */
 TempHumidity readTempHumidity();
 
-// ------------------------------------------------------------------
+// ============================================================
 // Flow Sensor Functions
-// ------------------------------------------------------------------
+// ============================================================
 /**
  * Creates and returns a FlowSensor structure with the specified parameters.
+ * @param muxAddr The I²C multiplexer address.
+ * @param addr The sensor's I²C address.
+ * @param chan The multiplexer channel.
+ * @param cmd The measurement command for the sensor.
+ * @return A FlowSensor structure.
  */
 FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_t cmd);
 
@@ -34,10 +58,9 @@ FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_
 bool initializeFlowSensor(FlowSensor &sensor);
 
 /**
- * Reads data from the specified flow sensor.
- * Updates the sensor’s internal state (flow rate, temperature, volume increments, etc.).
+ * Reads data from the specified flow sensor and updates its internal state.
  * @param sensor The flow sensor to read.
- * @return true if data was read successfully; false otherwise.
+ * @return true if data was read successfully, false otherwise.
  */
 bool readFlowSensorData(FlowSensor &sensor);
 
@@ -76,9 +99,9 @@ void resetFlowSensorDispenseVolume(FlowSensor &sensor);
  */
 void resetFlowSensorTotalVolume(FlowSensor &sensor);
 
-// ------------------------------------------------------------------
+// ============================================================
 // Pressure Sensor Functions
-// ------------------------------------------------------------------
+// ============================================================
 /**
  * Reads the raw voltage from the specified pressure sensor.
  * @param sensor The pressure sensor.
@@ -94,3 +117,4 @@ float readPressureVoltage(const PressureSensor &sensor);
 float readPressure(const PressureSensor &sensor);
 
 #endif // SENSORS_H
+

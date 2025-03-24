@@ -1,3 +1,20 @@
+/************************************************************
+ * Bulk Dispense v2.0 Main Sketch
+ * 
+ * This sketch is the main entry point for the Bulk Dispense
+ * system running on a Controllino Maxi Automation PLC.
+ * 
+ * It performs the following functions:
+ *  - Initializes global state and hardware (valves, sensors, fan, etc.)
+ *  - Sets up the Commander API for command processing.
+ *  - Enters the main loop to monitor system state (flow, temperature, 
+ *    enclosure, etc.) and process incoming commands.
+ *
+ * Author: Your Name
+ * Date: YYYY-MM-DD
+ * Version: 2.0
+ ************************************************************/
+
 #include <Wire.h>
 #include <Controllino.h>
 #include "Hardware.h"       // Hardware definitions and functions
@@ -6,23 +23,24 @@
 #include "Commands.h"       // Commander API and command functions
 #include "Utils.h"          // Utility functions
 #include "SystemMonitor.h"  // System monitor functions
-#include "CommandSession.h"
 
+//=================================================================
+// Setup Function: System Initialization
+//=================================================================
 void setup() {
+  // --- Serial and Global Flags Initialization ---
   Serial.begin(115200);
   Serial.println(F("[MESSAGE] System starting..."));
 
-  // Explicitly reset key global flags
+  // Reset key global flags
   globalVacuumMonitoring[0] = false;
   globalVacuumMonitoring[1] = false;
   globalEnclosureLiquidError = false;
-
   logging.previousLogTime = 0;
   fanAutoMode = true;
   proportionalValveMaxFeedback = 0.0;
 
-
-  // Initialize valveControls for each trough (0 to NUM_OVERFLOW_SENSORS-1)
+  // --- Initialize Valve Controls for Each Trough ---
   for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
     valveControls[i].isDispensing = false;
     valveControls[i].manualControl = false;
@@ -37,7 +55,7 @@ void setup() {
     valveControls[i].dispensingValveNumber = -1;
   }
 
-  // Initialize hardware.
+  // --- Initialize Hardware ---
   fanSetup(fan);
   proportionalValveSetup(proportionalValve);
   calibrateProportionalValve();
@@ -54,7 +72,7 @@ void setup() {
   }
   proportionalValve = setValvePosition(proportionalValve, 0.0);
 
-  // Initialize flow sensors.
+  // --- Initialize Flow Sensors ---
   Serial.println(F("[MESSAGE] Initializing Flow Sensors..."));
   bool allFailed = true;
   bool anyStopped = false;
@@ -99,24 +117,30 @@ void setup() {
   }
   delay(500);
 
-  // Initialize temperature/humidity sensor.
+  // --- Initialize Temperature/Humidity Sensor ---
   if (!tempHumSensorInit()) {
     Serial.println(F("[ERROR] Temp/Humidity sensor not detected!"));
   } else {
     Serial.println(F("[MESSAGE] Temp/Humidity sensor initialized successfully."));
   }
 
-  // Set up Commander API.
+  // --- Setup Commander API ---
   commander.attachTree(API_tree);
   commander.init();
 
   Serial.println(F("[MESSAGE] System ready."));
 }
 
+//=================================================================
+// Loop Function: Main Program Execution
+//=================================================================
 void loop() {
   unsigned long currentTime = millis();
 
+  // Process incoming serial commands.
   handleSerialCommands();
+
+  // Monitor various system parameters.
   monitorOverflowSensors(currentTime);
   monitorFlowSensors(currentTime);
   monitorPrimeSensors(currentTime);
@@ -126,15 +150,17 @@ void loop() {
   monitorEnclosureLiquidSensor(currentTime);
   monitorEnclosureTemp();
   monitorFlowSensorConnections();
-  
 
+  // Read flow sensor data.
   readFlowSensorData(flow1);
   readFlowSensorData(flow2);
   readFlowSensorData(flow3);
   readFlowSensorData(flow4);
 
+  // Log system state periodically.
   if (currentTime - logging.previousLogTime >= logging.logInterval) {
     logging.previousLogTime = currentTime;
     logSystemState();
   }
 }
+

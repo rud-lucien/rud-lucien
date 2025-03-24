@@ -1,11 +1,29 @@
 #include "Logging.h"
 #include "Hardware.h"  // For global hardware objects and hardware functions
-#include "Sensors.h"   // For reading temperature, humidity, pressure, and flow sensor data
-#include "Utils.h"     // (Optional) For any additional helper functions
+#include "Sensors.h"   // For sensor reading functions
+#include "Utils.h"     // For any helper functions
+#include <stdio.h>
 
-// Define the global logging instance (default log interval: 250 ms)
-LoggingManagement logging = { 0, 250 };
+/************************************************************
+ * Logging.cpp
+ * 
+ * This file implements functions declared in Logging.h.
+ * It provides functions for logging generic messages and 
+ * detailed system state.
+ *
+ * Author: Your Name
+ * Date: YYYY-MM-DD
+ * Version: 2.0
+ ************************************************************/
 
+// ============================================================
+// Global Logging Instance
+// ============================================================
+LoggingManagement logging = { 0, 250 };  // Default log interval: 250 ms
+
+// ============================================================
+// logData()
+// ============================================================
 void logData(const char* module, const char* message) {
   Serial.print(F("[LOG] "));
   Serial.print(module);
@@ -13,13 +31,16 @@ void logData(const char* module, const char* message) {
   Serial.println(message);
 }
 
+// ============================================================
+// logSystemState()
+// ============================================================
 void logSystemState() {
   char buffer[400];
 
-  // --- Fan state ---
+  // --- Fan State ---
   char fanState = (digitalRead(fan.relayPin) == HIGH ? '1' : '0');
 
-  // --- Valve states ---
+  // --- Valve States ---
   char rValve1 = (reagentValve1.isOpen ? '1' : '0');
   char rValve2 = (reagentValve2.isOpen ? '1' : '0');
   char rValve3 = (reagentValve3.isOpen ? '1' : '0');
@@ -112,44 +133,42 @@ void logSystemState() {
   dtostrf(flow4.totalVolume, 4, 1, f4Total);
   snprintf(f4Flag, sizeof(f4Flag), "%d", flow4.isValidReading ? flow4.highFlowFlag : -1);
 
-  // Dispensing state for valves 1-4
+  // --- Dispensing State (DS) ---
   char ds1 = (valveControls[0].isDispensing ? '1' : '0');
   char ds2 = (valveControls[1].isDispensing ? '1' : '0');
   char ds3 = (valveControls[2].isDispensing ? '1' : '0');
   char ds4 = (valveControls[3].isDispensing ? '1' : '0');
 
-  // Convert target volumes to strings
+  // --- Target Volume (TV) ---
   char tv1[8], tv2[8], tv3[8], tv4[8];
   dtostrf(valveControls[0].targetVolume, 4, 1, tv1);
   dtostrf(valveControls[1].targetVolume, 4, 1, tv2);
   dtostrf(valveControls[2].targetVolume, 4, 1, tv3);
   dtostrf(valveControls[3].targetVolume, 4, 1, tv4);
 
-  // --- Priming State for valves 1-4 ---
+  // --- Priming State (PR) ---
   char pr1 = (valveControls[0].isPriming ? '1' : '0');
   char pr2 = (valveControls[1].isPriming ? '1' : '0');
   char pr3 = (valveControls[2].isPriming ? '1' : '0');
   char pr4 = (valveControls[3].isPriming ? '1' : '0');
 
-  // Determine fill mode for each trough.
+  // --- Fill Mode (FM) ---
   char fm1 = (valveControls[0].fillMode ? '1' : '0');
   char fm2 = (valveControls[1].fillMode ? '1' : '0');
   char fm3 = (valveControls[2].fillMode ? '1' : '0');
   char fm4 = (valveControls[3].fillMode ? '1' : '0');
 
-  // --- Trough Drain Status (TDS) for Troughs 1-4 ---
-// Trough 1: draining if wasteValve1 and wasteValve3 are open.
-// Trough 2: draining if wasteValve1 is open and wasteValve3 is closed.
-// Trough 3: draining if wasteValve2 and wasteValve4 are open.
-// Trough 4: draining if wasteValve2 is open and wasteValve4 are closed.
-char tds1 = (wasteValve1.isOpen && wasteValve3.isOpen) ? '1' : '0';
-char tds2 = (wasteValve1.isOpen && !wasteValve3.isOpen) ? '1' : '0';
-char tds3 = (wasteValve2.isOpen && wasteValve4.isOpen) ? '1' : '0';
-char tds4 = (wasteValve2.isOpen && !wasteValve4.isOpen) ? '1' : '0';
+  // --- Trough Drain Status (TDS) ---
+  // Trough 1: draining if wasteValve1 and wasteValve3 are open.
+  // Trough 2: draining if wasteValve1 is open and wasteValve3 is closed.
+  // Trough 3: draining if wasteValve2 and wasteValve4 are open.
+  // Trough 4: draining if wasteValve2 is open and wasteValve4 are closed.
+  char tds1 = (wasteValve1.isOpen && wasteValve3.isOpen) ? '1' : '0';
+  char tds2 = (wasteValve1.isOpen && !wasteValve3.isOpen) ? '1' : '0';
+  char tds3 = (wasteValve2.isOpen && wasteValve4.isOpen) ? '1' : '0';
+  char tds4 = (wasteValve2.isOpen && !wasteValve4.isOpen) ? '1' : '0';
 
-
-
-  // Format the log message.
+  // --- Format and Print Log Message ---
   sprintf(buffer,
           "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, PV,%s, PV%%,%s, "
           "WSL%c%c, WBL%c%c, WVS%c%c, ELS%c, BS%c%c%c%c, OS%c%c%c%c, "
@@ -192,13 +211,11 @@ char tds4 = (wasteValve2.isOpen && !wasteValve4.isOpen) ? '1' : '0';
           ds1, ds2, ds3, ds4,
           // Target volume for valves (TV)
           tv1, tv2, tv3, tv4,
-          // Priming state for valves (PR)
+          // Priming state (PR)
           pr1, pr2, pr3, pr4,
-          // Fill mode (FM) 
+          // Fill mode (FM)
           fm1, fm2, fm3, fm4,
-          // Trough drain state (TDS)
+          // Trough Drain Status (TDS)
           tds1, tds2, tds3, tds4);
-
-
   Serial.println(buffer);
 }

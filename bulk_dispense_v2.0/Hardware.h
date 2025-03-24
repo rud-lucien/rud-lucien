@@ -4,9 +4,26 @@
 #include <Controllino.h>
 #include "Adafruit_SHT31.h"
 
-// ------------------------------------------------------------------
+/************************************************************
+ * Hardware.h
+ * 
+ * This header defines all hardware-related constants,
+ * pin assignments, structures, and global objects for the
+ * Bulk Dispense system.
+ *
+ * - Global Constants & Pin Definitions
+ * - Structure Definitions for valves, sensors, etc.
+ * - Extern declarations for global arrays and objects.
+ * - Function prototypes for hardware-related functions.
+ *
+ * Author: Your Name
+ * Date: YYYY-MM-DD
+ * Version: 2.0
+ ************************************************************/
+
+// ============================================================
 // Global Constants & Pin Definitions
-// ------------------------------------------------------------------
+// ============================================================
 
 // General
 #define COMMAND_SIZE 30
@@ -64,9 +81,9 @@ extern const uint8_t WASTE_VACUUM_SENSORS[NUM_WASTE_VACUUM_SENSORS];
 #define NUM_FLOW_SENSORS 4
 #define FLOW_SENSOR_CMD 0x3608
 
-// ------------------------------------------------------------------
+// ============================================================
 // Structure Definitions
-// ------------------------------------------------------------------
+// ============================================================
 
 // On/Off Valve Structure
 struct OnOffValve {
@@ -139,10 +156,9 @@ struct BinarySensor {
   bool activeHigh;
 };
 
-// ------------------------------------------------------------------
+// ============================================================
 // Extern Global Hardware Object Declarations
-// ------------------------------------------------------------------
-
+// ============================================================
 
 // Constant arrays (definitions provided in Hardware.cpp)
 extern const uint8_t REAGENT_VALVES[NUM_REAGENT_VALVES];
@@ -158,8 +174,6 @@ extern const uint8_t WASTE_VACUUM_SENSORS[NUM_WASTE_VACUUM_SENSORS];
 extern const FanControl fan;
 extern bool fanAutoMode;
 
-
-
 extern ProportionalValve proportionalValve;
 extern PressureSensor pressureSensor;
 extern Adafruit_SHT31 sht31;  // SHT31 instance
@@ -171,7 +185,7 @@ extern FlowSensor *flowSensors[NUM_FLOW_SENSORS];
 // Valve Control Array (one per overflow sensor/trough)
 extern ValveControl valveControls[NUM_OVERFLOW_SENSORS];
 
-// On/Off Valves
+// On/Off Valves for reagents, media, and waste
 extern OnOffValve reagentValve1, reagentValve2, reagentValve3, reagentValve4;
 extern OnOffValve mediaValve1, mediaValve2, mediaValve3, mediaValve4;
 extern OnOffValve wasteValve1, wasteValve2, wasteValve3, wasteValve4;
@@ -187,22 +201,23 @@ extern BinarySensor enclosureLiquidSensor;
 // Calibration variable
 extern float proportionalValveMaxFeedback;
 
-// Global vacuum monitoring flags for bottle 1 and 2.
+// Global vacuum monitoring flags for waste bottle 1 and 2.
 extern bool globalVacuumMonitoring[NUM_WASTE_VACUUM_SENSORS];
 
+// Global flag for enclosure liquid error state.
 extern bool globalEnclosureLiquidError;
 
+// Async command flags for dispensing and draining.
 extern bool dispenseAsyncCompleted[NUM_OVERFLOW_SENSORS];
 extern bool drainAsyncCompleted[NUM_OVERFLOW_SENSORS];
 
-// ------------------------------------------------------------------
+// ============================================================
 // Function Prototypes (Hardware Functions)
-// ------------------------------------------------------------------
+// ============================================================
 
 void fanSetup(const FanControl &fc);
 void setFanState(const FanControl &config, bool state);
 void printFanState(bool state);
-
 
 OnOffValve openValve(OnOffValve valve);
 OnOffValve closeValve(OnOffValve valve);
@@ -217,3 +232,4 @@ void selectMultiplexerChannel(uint8_t multiplexerAddr, uint8_t channel);
 bool readBinarySensor(const BinarySensor &sensor);
 
 #endif  // HARDWARE_H
+
