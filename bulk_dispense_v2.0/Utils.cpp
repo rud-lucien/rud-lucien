@@ -426,6 +426,75 @@ void abortAllAutomatedOperations(Stream* stream) {
   }
 }
 
+String getOverallTroughState() {
+  bool allIdle = true;
+  String stateSummary = "";
+  for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
+    String troughState = "";
+    // If none of the operations are active, mark as "Idle".
+    if (!valveControls[i].isDispensing && 
+        !valveControls[i].isPriming && 
+        !valveControls[i].fillMode && 
+        !valveControls[i].isDraining) {
+      troughState = "Idle";
+    } else {
+      allIdle = false;
+      bool first = true;
+      // If multiple operations are active, list them separated by commas.
+      if (valveControls[i].isDispensing) {
+        troughState += "Dispensing";
+        first = false;
+      }
+      if (valveControls[i].isDraining) {
+        if (!first) troughState += ", ";
+        troughState += "Draining";
+        first = false;
+      }
+      if (valveControls[i].fillMode) {
+        if (!first) troughState += ", ";
+        troughState += "Filling";
+        first = false;
+      }
+      if (valveControls[i].isPriming) {
+        if (!first) troughState += ", ";
+        troughState += "Priming";
+      }
+    }
+    stateSummary += "T" + String(i + 1) + ": " + troughState;
+    if (i < NUM_OVERFLOW_SENSORS - 1) {
+      stateSummary += " | ";
+    }
+  }
+  if (allIdle) {
+    return "Idle";
+  } else {
+    return "Active - " + stateSummary;
+  }
+}
+
+
+String getOpenValvesString(bool v1, bool v2, bool v3, bool v4) {
+  String openList = "";
+  if (v1) { openList += "Valve 1"; }
+  if (v2) { 
+    if (openList.length() > 0) { openList += " & "; }
+    openList += "Valve 2"; 
+  }
+  if (v3) { 
+    if (openList.length() > 0) { openList += " & "; }
+    openList += "Valve 3"; 
+  }
+  if (v4) { 
+    if (openList.length() > 0) { openList += " & "; }
+    openList += "Valve 4"; 
+  }
+  if (openList.length() == 0) {
+    openList = "None open";
+  }
+  return openList;
+}
+
+
 
 
 

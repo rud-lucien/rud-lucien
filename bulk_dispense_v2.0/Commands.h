@@ -64,11 +64,12 @@ void cmd_drain_trough(char* args, CommandCaller* caller);
 void cmd_stop_drain_trough(char* args, CommandCaller* caller);
 void cmd_log_help(char* args, CommandCaller* caller);
 void cmd_standby(char* args, CommandCaller* caller);
+void cmd_print_help(char* args, CommandCaller* caller);
 
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
-extern Commander::systemCommand_t API_tree[21];
+extern Commander::systemCommand_t API_tree[25];
 extern Commander commander;
 
 #endif // COMMANDS_H

@@ -295,6 +295,34 @@ void setVacuumMonitoringAndCloseMainValve(int troughNumber, Stream* stream);
  */
 void abortAllAutomatedOperations(Stream* stream);
 
+/**
+ * getOverallTroughState()
+ * ------------------------
+ * Iterates over each trough and builds a state summary.
+ * If every trough is idle (no dispensing, priming, filling, or draining), it
+ * returns "Idle". Otherwise, it returns "Active - " followed by a per‐trough summary.
+ *
+ * @return A String with the overall system state.
+ */
+String getOverallTroughState();
+
+/**
+ * getOpenValvesString()
+ * ----------------------
+ * Returns a human-readable list of open valves based on 4 boolean inputs.
+ * Each input corresponds to whether a valve is open (true) or closed (false).
+ * If multiple valves are open, they are joined using " & ".
+ * If none are open, the function returns "None open".
+ *
+ * @param v1 Boolean indicating if Valve 1 is open.
+ * @param v2 Boolean indicating if Valve 2 is open.
+ * @param v3 Boolean indicating if Valve 3 is open.
+ * @param v4 Boolean indicating if Valve 4 is open.
+ * @return A formatted String describing which valves are open.
+ */
+String getOpenValvesString(bool v1, bool v2, bool v3, bool v4);
+
+
 #endif // UTILS_H
 
 

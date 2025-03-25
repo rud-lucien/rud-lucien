@@ -773,14 +773,278 @@ void cmd_standby(char* args, CommandCaller* caller) {
   globalVacuumMonitoring[0] = false;
   globalVacuumMonitoring[1] = false;
 
+  caller->println(F("[MESSAGE] All automated operations aborted. System is now in STANDBY mode."));
+
   // End any active asynchronous command session so that an [ACTION END] tag is printed.
   if (commandSessionActive) {
     endCommandSession(&Serial);
   }
-
-  caller->println(F("[MESSAGE] All automated operations aborted. System is now in STANDBY mode."));
 }
 
+
+
+void cmd_get_system_state(char* args, CommandCaller* caller) {
+  // Make a local copy of the arguments (though not used here)
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  // Header
+  caller->println(F("--------------------------------------------------"));
+  caller->println(F("SYSTEM STATE SUMMARY"));
+  caller->println(F("--------------------------------------------------"));
+
+  // Overall system state: If any trough is active (dispensing, priming, filling, or draining)
+  String overallState = "Overall System State: " + getOverallTroughState();
+  caller->println(overallState);
+
+  // Fan section
+  caller->println(F("Fan:"));
+  caller->print(F("  • Mode          : "));
+  caller->println(fanAutoMode ? F("Auto") : F("Manual"));
+  caller->print(F("  • Current State : "));
+  bool fanState = (digitalRead(fan.relayPin) == HIGH);
+  caller->println(fanState ? F("ON") : F("OFF"));
+  caller->println();
+
+  // Enclosure section
+  caller->println(F("Enclosure:"));
+  caller->print(F("  • Liquid Leak   : "));
+  caller->println(globalEnclosureLiquidError ? F("Detected") : F("NONE"));
+  caller->println();
+
+  // Vacuum Monitoring section
+  caller->println(F("Vacuum Monitoring:"));
+  caller->print(F("  • Waste Bottle 1: "));
+  caller->println(globalVacuumMonitoring[0] ? F("Active") : F("Inactive"));
+  caller->print(F("  • Waste Bottle 2: "));
+  caller->println(globalVacuumMonitoring[1] ? F("Active") : F("Inactive"));
+  caller->println();
+
+  // Manual Control per Trough
+  caller->println(F("Manual Control (per Trough):"));
+  for (int i = 0; i < 4; i++) {
+    caller->print(F("  • Trough "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+    caller->println(valveControls[i].manualControl ? F("ON") : F("OFF"));
+  }
+  caller->println();
+
+  // Flow Sensors section
+  caller->println(F("Flow Sensors:"));
+  for (int i = 0; i < 4; i++) {
+    caller->print(F("  • FS"));
+    caller->print(i + 1);
+    caller->print(F(": Flow Rate: "));
+    char buf[10];
+    dtostrf(flowSensors[i]->flowRate, 4, 1, buf);
+    caller->print(buf);
+    caller->print(F(" mL/s, Status: "));
+    // Three states: If not dispensing → IDLE; if dispensing and valid → VALID; otherwise → INVALID.
+    if (!valveControls[i].isDispensing) {
+      caller->print(F("IDLE/NOT MEASURING"));
+    } else {
+      caller->print(flowSensors[i]->isValidReading ? F("VALID") : F("INVALID"));
+    }
+    caller->print(F(", Current Dispense Volume: "));
+    dtostrf(flowSensors[i]->dispenseVolume, 4, 1, buf);
+    caller->print(buf);
+    caller->print(F(" mL, Total Dispensed: "));
+    dtostrf(flowSensors[i]->totalVolume, 4, 1, buf);
+    caller->print(buf);
+    caller->println(F(" mL"));
+  }
+  caller->println();
+
+  // Priming, Dispensing, Filling, Draining Status
+  caller->println(F("Priming Status:"));
+  for (int i = 0; i < 4; i++) {
+    caller->print(F("  • Trough "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+    caller->println(valveControls[i].isPriming ? F("PRIMING") : F("NOT PRIMING"));
+  }
+  caller->println();
+
+  caller->println(F("Dispensing Status:"));
+  for (int i = 0; i < 4; i++) {
+    caller->print(F("  • Trough "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+    caller->println(valveControls[i].isDispensing ? F("DISPENSING") : F("NOT DISPENSING"));
+  }
+  caller->println();
+
+  caller->println(F("Filling Status:"));
+  for (int i = 0; i < 4; i++) {
+    caller->print(F("  • Trough "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+    caller->println(valveControls[i].fillMode ? F("FILLING") : F("NOT FILLING"));
+  }
+  caller->println();
+
+  caller->println(F("Draining Status:"));
+  for (int i = 0; i < 4; i++) {
+    caller->print(F("  • Trough "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+    caller->println(valveControls[i].isDraining ? F("DRAINING") : F("NOT DRAINING"));
+  }
+  caller->println();
+
+  // Pressure Valve section
+  caller->println(F("Pressure Valve:"));
+  caller->print(F("  • Feedback Voltage : "));
+  char voltageStr[10];
+  dtostrf(getValveFeedback(proportionalValve), 4, 1, voltageStr);
+  caller->print(voltageStr);
+  caller->println(F(" V"));
+  caller->print(F("  • Valve Position   : "));
+  float feedback = getValveFeedback(proportionalValve);
+  float valvePercent = (proportionalValveMaxFeedback > 0) ? (feedback / proportionalValveMaxFeedback) * 100.0 : 0.0;
+  char percentStr[10];
+  dtostrf(valvePercent, 4, 1, percentStr);
+  caller->print(percentStr);
+  caller->println(F("%"));
+  caller->println();
+
+  // Pressure Sensor section
+  float currentPressure = readPressure(pressureSensor);
+  caller->println(F("Pressure Sensor:"));
+  caller->print(F("  • Reading          : "));
+  char pressureStr[10];
+  dtostrf(currentPressure, 4, 1, pressureStr);
+  caller->print(pressureStr);
+  caller->print(F(" psi - "));
+  caller->println(currentPressure >= 15.0 ? F("(OK)") : F("(Insufficient)"));
+  caller->println();
+
+  // Environment section
+  TempHumidity th = readTempHumidity();
+  caller->println(F("Environment:"));
+  if (th.valid) {
+    caller->print(F("  • Temperature      : "));
+    char tempStr[10];
+    dtostrf(th.temperature, 4, 1, tempStr);
+    caller->print(tempStr);
+    caller->println(F(" °C"));
+    caller->print(F("  • Humidity         : "));
+    char humStr[10];
+    dtostrf(th.humidity, 4, 1, humStr);
+    caller->print(humStr);
+    caller->println(F(" %"));
+  } else {
+    caller->println(F("  • Temperature      : Error reading sensor"));
+    caller->println(F("  • Humidity         : Error reading sensor"));
+  }
+  caller->println();
+
+  // Valve States section
+  caller->println(F("Valve States:"));
+  // Reagent Valves
+  caller->print(F("  • Reagent Valves   : "));
+  char reagentState[5];
+  sprintf(reagentState, "%d%d%d%d",
+          reagentValve1.isOpen ? 1 : 0,
+          reagentValve2.isOpen ? 1 : 0,
+          reagentValve3.isOpen ? 1 : 0,
+          reagentValve4.isOpen ? 1 : 0);
+  caller->print(reagentState);
+  caller->print("  (");
+  caller->print(getOpenValvesString(reagentValve1.isOpen, reagentValve2.isOpen, reagentValve3.isOpen, reagentValve4.isOpen));
+  caller->println(")");
+  // caller->println(F("  (e.g., Valve 1 & 3 Open)"));
+  // Media Valves
+  caller->print(F("  • Media Valves     : "));
+  char mediaState[5];
+  sprintf(mediaState, "%d%d%d%d",
+          mediaValve1.isOpen ? 1 : 0,
+          mediaValve2.isOpen ? 1 : 0,
+          mediaValve3.isOpen ? 1 : 0,
+          mediaValve4.isOpen ? 1 : 0);
+  caller->print(mediaState);
+  caller->print("  (");
+  caller->print(getOpenValvesString(mediaValve1.isOpen, mediaValve2.isOpen, mediaValve3.isOpen, mediaValve4.isOpen));
+  caller->println(")");
+  // caller->println(F("  (e.g., Valve 1 & 4 Open)"));
+  // Waste Valves
+  caller->print(F("  • Waste Valves     : "));
+  char wasteState[5];
+  sprintf(wasteState, "%d%d%d%d",
+          wasteValve1.isOpen ? 1 : 0,
+          wasteValve2.isOpen ? 1 : 0,
+          wasteValve3.isOpen ? 1 : 0,
+          wasteValve4.isOpen ? 1 : 0);
+  caller->print(wasteState);
+  caller->print("  (");
+  caller->print(getOpenValvesString(wasteValve1.isOpen, wasteValve2.isOpen, wasteValve3.isOpen, wasteValve4.isOpen));
+  caller->println(")");
+  // caller->println(F("  (e.g., Valve 4 Open)"));
+  caller->println();
+
+  // Command Session section
+  caller->println(F("Command Session:"));
+  caller->print(F("  • Status           : "));
+  if (commandSessionActive) {
+    caller->println(F("ACTIVE (asynchronous operations still in progress)"));
+  } else {
+    caller->println(F("INACTIVE (No asynchronous commands pending)"));
+  }
+  caller->println();
+
+  // Logging section
+  caller->println(F("Logging:"));
+  caller->print(F("  • Frequency        : "));
+  char logFreqStr[10];
+  dtostrf(logging.logInterval, 4, 0, logFreqStr);
+  caller->print(logFreqStr);
+  caller->println(F(" ms"));
+  caller->println();
+  
+  // Separator
+  caller->println(F("--------------------------------------------------"));
+  // Diagnostic Flags section
+  caller->println(F("DIAGNOSTIC FLAGS:"));
+  caller->print(F("  • Fan Auto Mode            : "));
+  caller->println(fanAutoMode ? F("ON") : F("OFF"));
+  caller->print(F("  • Enclosure Liquid Error   : "));
+  caller->println(globalEnclosureLiquidError ? F("TRUE") : F("FALSE"));
+  caller->print(F("  • Global Vacuum Monitoring : Bottle 1 = "));
+  caller->print(globalVacuumMonitoring[0] ? F("TRUE") : F("FALSE"));
+  caller->print(F(", Bottle 2 = "));
+  caller->println(globalVacuumMonitoring[1] ? F("TRUE") : F("FALSE"));
+  caller->println(F("--------------------------------------------------"));
+}
+
+void cmd_print_help(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  char* trimmed = trimLeadingSpaces(localArgs);
+  
+  // If the user requested help for a specific command, 
+  // we currently do not have detailed help implemented.
+  if (strlen(trimmed) > 0) {
+    caller->println(F("[ERROR] Detailed help for specific commands is not implemented."));
+  } else {
+    // No specific command requested; print general help.
+    // Pass a pointer to the Serial stream.
+
+    // Print general help information.
+    caller->println(F("--------------------------------------------------"));
+    caller->println(F("Bulk Dispense System Command Help:"));
+    caller->println(F("--------------------------------------------------"));
+
+    commander.printHelp(&Serial, true, false);
+
+    caller->println(F("--------------------------------------------------"));
+  }
+}
+  
+  
 
 
 // ============================================================
@@ -809,6 +1073,10 @@ Commander::systemCommand_t API_tree[] = {
   systemCommand("DT", "Drain trough: DT <1-4>", cmd_drain_trough),
   systemCommand("SDT", "Stop draining trough: SDT <1-4> or SDT all", cmd_stop_drain_trough),
   systemCommand("LOGHELP", "Displays detailed log field definitions and diagnostic info", cmd_log_help),
-  systemCommand("STANDBY", "Aborts all automated operations and resets the system to a safe, idle state", cmd_standby)
+  systemCommand("STANDBY", "Aborts all automated operations and resets the system to a safe, idle state", cmd_standby),
+  systemCommand("SS", "System state: SS (get system state)", cmd_get_system_state),
+  systemCommand("help", "Print available commands and usage: help", cmd_print_help),
+  systemCommand("h", "Print available commands and usage: help", cmd_print_help),
+  systemCommand("H", "Print available commands and usage: help", cmd_print_help)
 
 };
