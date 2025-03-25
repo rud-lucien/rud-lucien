@@ -659,6 +659,130 @@ void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
   // Note: The completion of the stop-drain operation is determined by the vacuum release.
 }
 
+void cmd_log_help(char* args, CommandCaller* caller) {
+  // Create a local copy of args (even if not used, for consistency)
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  caller->println(F("Bulk Dispense System Log Field Definitions:"));
+  caller->println(F("--------------------------------------------------"));
+  
+  // Hardware Status
+  caller->println(F("[LOG]  : Log entry prefix indicating the start of a new status record."));
+  caller->println(F("F      : Fan state (F1 = ON, F0 = OFF)."));
+  caller->println(F("RVxxxx : Reagent Valve states. 4-digit binary (1 = OPEN, 0 = CLOSED)."));
+  caller->println(F("         e.g., RV1000 means only valve 1 is open."));
+  caller->println(F("MVxxxx : Media Valve states (same format as RV)."));
+  caller->println(F("WVxxxx : Waste Valve states (same format as RV)."));
+  
+  // Proportional Valve
+  caller->println(F("PV, V, PV%, P : Proportional Valve feedback."));
+  caller->println(F("         V = measured voltage (e.g., 9.7)"));
+  caller->println(F("         P = calculated percentage (e.g., 99.9%)."));
+  
+  // Sensor Readings
+  caller->println(F("WSLxx  : Waste Line Sensor readings (binary; e.g., WSL00 means no detection)."));
+  caller->println(F("WBLxx  : Waste Bottle Sensor readings (binary)."));
+  caller->println(F("WVSxx  : Waste Vacuum Sensor readings (binary)."));
+  caller->println(F("ELSx   : Enclosure Liquid Sensor (0 = no liquid, 1 = liquid detected)."));
+  caller->println(F("BSxxxx : Bubble Sensor readings (4-digit binary)."));
+  caller->println(F("OSxxxx : Overflow Sensor readings (4-digit binary)."));
+  caller->println(F("PS, P  : Pressure sensor reading (in psi)."));
+  caller->println(F("T, T   : Temperature (°C)."));
+  caller->println(F("H, H   : Humidity (percentage)."));
+  
+  // Flow Sensor Data
+  caller->println(F("FSn,...: Flow Sensor n data including:"));
+  caller->println(F("         - Flow rate"));
+  caller->println(F("         - Sensor temperature"));
+  caller->println(F("         - Dispensed volume"));
+  caller->println(F("         - Total volume"));
+  caller->println(F("         - Sensor status flag (e.g., -1 for an invalid reading)"));
+  
+  // Operational States
+  caller->println(F("DSxxxx : Dispensing state for each trough (4-digit binary; 1 = active, 0 = inactive)."));
+  caller->println(F("TV, V1,V2,V3,V4 : Target Volume for each trough (in mL)."));
+  caller->println(F("PRxxxx : Priming state for each trough (4-digit binary)."));
+  caller->println(F("FMxxxx : Fill mode state for each trough (4-digit binary)."));
+  caller->println(F("TDSxxxx: Trough Draining State for each trough (4-digit binary)."));
+  
+  // Diagnostic Summary
+  caller->println(F("DIAG   : Diagnostic summary appended to each log entry, including:"));
+  caller->println(F("         FAM   = Fan Auto Mode (ON/OFF)."));
+  caller->println(F("         EERR  = Enclosure Liquid Error (TRUE/FALSE)."));
+  caller->println(F("         GVM1  = Global Vacuum Monitoring for waste bottle 1 (TRUE/FALSE)."));
+  caller->println(F("         GVM2  = Global Vacuum Monitoring for waste bottle 2 (TRUE/FALSE)."));
+  caller->println(F("         MC1–MC4 = Manual Control flags for troughs (ON = manual override, OFF = automated)."));
+  caller->println(F("         LF    = Logging frequency (in milliseconds)."));
+  caller->println(F("         CS    = Command Session status (ACTIVE/INACTIVE)."));
+  caller->println(F("--------------------------------------------------"));
+}
+
+void cmd_standby(char* args, CommandCaller* caller) {
+  char localArgs[COMMAND_SIZE];
+  // Copy and null-terminate the command arguments (if any)
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  caller->println(F("[MESSAGE] Executing STANDBY command. Shutting down system to safe state..."));
+
+  // Iterate over all troughs (using 0-based index for valveControls and flowSensors)
+  for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
+    // Stop flow sensor measurement (and reset dispense volume) for each trough.
+    stopFlowSensorMeasurement(*flowSensors[i]);
+    resetFlowSensorDispenseVolume(*flowSensors[i]);
+
+    // Directly enforce a safe state by resetting flags for this trough:
+    valveControls[i].isDispensing   = false;
+    valveControls[i].isPriming      = false;
+    valveControls[i].fillMode       = false;
+    valveControls[i].isDraining     = false;
+    valveControls[i].manualControl  = false;
+    valveControls[i].targetVolume   = -1;
+    valveControls[i].lastFlowCheckTime  = 0;
+    valveControls[i].lastFlowChangeTime = 0;
+  }
+
+  // Close all reagent and media valves for each trough
+  // Trough 1:
+  reagentValve1 = closeValve(reagentValve1);
+  mediaValve1   = closeValve(mediaValve1);
+  // Trough 2:
+  reagentValve2 = closeValve(reagentValve2);
+  mediaValve2   = closeValve(mediaValve2);
+  // Trough 3:
+  reagentValve3 = closeValve(reagentValve3);
+  mediaValve3   = closeValve(mediaValve3);
+  // Trough 4:
+  reagentValve4 = closeValve(reagentValve4);
+  mediaValve4   = closeValve(mediaValve4);
+
+  // Close the main waste valves (attached to waste bottles)
+  wasteValve1 = closeValve(wasteValve1);
+  wasteValve2 = closeValve(wasteValve2);
+
+  // Close the individual trough waste valves (if applicable)
+  wasteValve3 = closeValve(wasteValve3);
+  wasteValve4 = closeValve(wasteValve4);
+
+  // Close the pressure valve by setting it to 0% open.
+  proportionalValve = setValvePosition(proportionalValve, 0.0);
+
+  // Reset global vacuum monitoring flags.
+  globalVacuumMonitoring[0] = false;
+  globalVacuumMonitoring[1] = false;
+
+  // End any active asynchronous command session so that an [ACTION END] tag is printed.
+  if (commandSessionActive) {
+    endCommandSession(&Serial);
+  }
+
+  caller->println(F("[MESSAGE] All automated operations aborted. System is now in STANDBY mode."));
+}
+
+
+
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
@@ -683,5 +807,8 @@ Commander::systemCommand_t API_tree[] = {
   systemCommand("P", "Prime valves: P <1-4>", cmd_prime_valves),
   systemCommand("F", "Fill reagent: F <1-4>", cmd_fill_reagent),
   systemCommand("DT", "Drain trough: DT <1-4>", cmd_drain_trough),
-  systemCommand("SDT", "Stop draining trough: SDT <1-4> or SDT all", cmd_stop_drain_trough)
+  systemCommand("SDT", "Stop draining trough: SDT <1-4> or SDT all", cmd_stop_drain_trough),
+  systemCommand("LOGHELP", "Displays detailed log field definitions and diagnostic info", cmd_log_help),
+  systemCommand("STANDBY", "Aborts all automated operations and resets the system to a safe, idle state", cmd_standby)
+
 };

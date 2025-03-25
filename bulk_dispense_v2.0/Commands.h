@@ -33,6 +33,7 @@
  *   F     - Fill reagent (1-4)
  *   DT    - Drain trough (1-4)
  *   SDT   - Stop draining trough (1-4 or all)
+ *   LOGHELP- Displays detailed log field definitions and diagnostic information.
  *
  * Author: Your Name
  * Date: YYYY-MM-DD
@@ -61,11 +62,13 @@ void cmd_prime_valves(char* args, CommandCaller* caller);
 void cmd_fill_reagent(char* args, CommandCaller* caller);
 void cmd_drain_trough(char* args, CommandCaller* caller);
 void cmd_stop_drain_trough(char* args, CommandCaller* caller);
+void cmd_log_help(char* args, CommandCaller* caller);
+void cmd_standby(char* args, CommandCaller* caller);
 
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
-extern Commander::systemCommand_t API_tree[19];
+extern Commander::systemCommand_t API_tree[21];
 extern Commander commander;
 
 #endif // COMMANDS_H

@@ -3,6 +3,7 @@
 #include "Sensors.h"   // For sensor reading functions
 #include "Utils.h"     // For any helper functions
 #include <stdio.h>
+#include "CommandSession.h"
 
 /************************************************************
  * Logging.cpp
@@ -173,7 +174,7 @@ void logSystemState() {
           "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, PV,%s, PV%%,%s, "
           "WSL%c%c, WBL%c%c, WVS%c%c, ELS%c, BS%c%c%c%c, OS%c%c%c%c, "
           "PS,%s, T,%s, H,%s, FS1,%s,%s,%s,%s,%s; FS2,%s,%s,%s,%s,%s; "
-          "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s, ,DS%c%c%c%c, TV,%s,%s,%s,%s, "
+          "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s, DS%c%c%c%c, TV,%s,%s,%s,%s, "
           "PR%c%c%c%c, FM%c%c%c%c, TDS%c%c%c%c",
           // Fan state
           fanState,
@@ -217,5 +218,34 @@ void logSystemState() {
           fm1, fm2, fm3, fm4,
           // Trough Drain Status (TDS)
           tds1, tds2, tds3, tds4);
+
+  // --- Build Diagnostic Information ---
+  char diagBuffer[128];
+  sprintf(diagBuffer,
+          ", DIAG: FAM:%s, EERR:%s, GVM1:%s, GVM2:%s, MC1:%s, MC2:%s, MC3:%s, MC4:%s, LF:%lu ms, CS:%s",
+          fanAutoMode ? "ON" : "OFF",                                 // Fan Auto Mode
+          globalEnclosureLiquidError ? "TRUE" : "FALSE",               // Enclosure Liquid Error
+          globalVacuumMonitoring[0] ? "TRUE" : "FALSE",                // Vacuum Monitoring for bottle 1
+          globalVacuumMonitoring[1] ? "TRUE" : "FALSE",                // Vacuum Monitoring for bottle 2
+          valveControls[0].manualControl ? "ON" : "OFF",               // Manual Control for Trough 1
+          valveControls[1].manualControl ? "ON" : "OFF",               // Manual Control for Trough 2
+          valveControls[2].manualControl ? "ON" : "OFF",               // Manual Control for Trough 3
+          valveControls[3].manualControl ? "ON" : "OFF",               // Manual Control for Trough 4
+          logging.logInterval,                                         // Logging frequency
+          (commandSessionActive ? "ACTIVE" : "INACTIVE"));             // Command session status
+
+  char flowDiag[128];
+  sprintf(flowDiag,
+          ", FLOW_DIAG: FS1:%s, FS2:%s, FS3:%s, FS4:%s",
+          (flow1.isValidReading ? "Valid" : "Invalid"),
+          (flow2.isValidReading ? "Valid" : "Invalid"),
+          (flow3.isValidReading ? "Valid" : "Invalid"),
+          (flow4.isValidReading ? "Valid" : "Invalid"));
+
+  // Append diagnostic info to the main log message
+  strncat(buffer, diagBuffer, sizeof(buffer) - strlen(buffer) - 1);
+  strncat(buffer, flowDiag, sizeof(buffer) - strlen(buffer) - 1);
+
+  // --- Print the complete log message ---
   Serial.println(buffer);
 }
