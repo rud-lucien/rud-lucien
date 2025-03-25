@@ -269,23 +269,23 @@ bool areDispenseValvesOpen(int troughNumber) {
 // Manual & Fill Mode Control Utilities
 // ============================================================
 
-void enableManualControl(int index, CommandCaller* caller) {
+void enableManualControl(int index, Stream* stream) {
   valveControls[index].manualControl = true;
-  caller->print(F("[MESSAGE] Manual control enabled for trough "));
-  caller->println(index + 1);
+  stream->print(F("[MESSAGE] Manual control enabled for trough "));
+  stream->println(index + 1);
 }
 
-void disableManualControl(int index, CommandCaller* caller) {
+void disableManualControl(int index, Stream* stream) {
   valveControls[index].manualControl = false;
-  caller->print(F("[MESSAGE] Manual control disabled for trough "));
-  caller->println(index + 1);
+  stream->print(F("[MESSAGE] Manual control disabled for trough "));
+  stream->println(index + 1);
 }
 
-void enableFillMode(int troughNumber, CommandCaller* caller) {
+void enableFillMode(int troughNumber, Stream* stream) {
   if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return;
   valveControls[troughNumber - 1].fillMode = true;
-  caller->print(F("[MESSAGE] Fill mode enabled for trough "));
-  caller->println(troughNumber);
+  stream->print(F("[MESSAGE] Fill mode enabled for trough "));
+  stream->println(troughNumber);
 }
 
 void disableFillMode(int troughNumber, Stream* stream) {
@@ -297,10 +297,9 @@ void disableFillMode(int troughNumber, Stream* stream) {
   }
 }
 
-
-void disableFillModeForAll(CommandCaller* caller) {
+void disableFillModeForAll(Stream* stream) {
   for (int i = 1; i <= NUM_OVERFLOW_SENSORS; i++) {
-    disableFillMode(i, caller);
+    disableFillMode(i, stream);
   }
 }
 
@@ -321,35 +320,34 @@ void stopDispensingIfActive(int troughNumber, Stream* stream) {
   }
 }
 
-
-bool isWasteBottleFullForTrough(int troughNumber, CommandCaller* caller) {
+bool isWasteBottleFullForTrough(int troughNumber, Stream* stream) {
   int bottleIndex = (troughNumber <= 2) ? 0 : 1;
   if (readBinarySensor(wasteBottleSensors[bottleIndex])) {
-    caller->print(F("[ERROR] Waste bottle "));
-    caller->print(bottleIndex + 1);
-    caller->println(F(" is full. Cannot start drainage."));
+    stream->print(F("[ERROR] Waste bottle "));
+    stream->print(bottleIndex + 1);
+    stream->println(F(" is full. Cannot start drainage."));
     return true;
   }
   return false;
 }
 
-bool hasIncompatibleDrainage(int troughNumber, CommandCaller* caller) {
+bool hasIncompatibleDrainage(int troughNumber, Stream* stream) {
   if ((troughNumber == 1 && valveControls[1].isDraining) ||
       (troughNumber == 2 && valveControls[0].isDraining)) {
-    caller->println(F("[ERROR] Troughs 1 and 2 cannot be drained simultaneously."));
+    stream->println(F("[ERROR] Troughs 1 and 2 cannot be drained simultaneously."));
     return true;
   }
   if ((troughNumber == 3 && valveControls[3].isDraining) ||
       (troughNumber == 4 && valveControls[2].isDraining)) {
-    caller->println(F("[ERROR] Troughs 3 and 4 cannot be drained simultaneously."));
+    stream->println(F("[ERROR] Troughs 3 and 4 cannot be drained simultaneously."));
     return true;
   }
   return false;
 }
 
-bool validateTroughNumber(int troughNumber, CommandCaller* caller) {
+bool validateTroughNumber(int troughNumber, Stream* stream) {
   if (troughNumber < 1 || troughNumber > 4) {
-    caller->println(F("[ERROR] Invalid trough number. Use 1-4."));
+    stream->println(F("[ERROR] Invalid trough number. Use 1-4."));
     return false;
   }
   return true;
@@ -364,7 +362,6 @@ void stopDispensingForFill(int troughNumber, Stream* stream) {
   }
 }
 
-
 void stopPrimingForFill(int troughNumber, Stream* stream) {
   if (valveControls[troughNumber - 1].isPriming) {
     valveControls[troughNumber - 1].isPriming = false;
@@ -375,26 +372,25 @@ void stopPrimingForFill(int troughNumber, Stream* stream) {
   }
 }
 
-
-bool isValveAlreadyPrimed(int valveNumber, CommandCaller* caller) {
+bool isValveAlreadyPrimed(int valveNumber, Stream* stream) {
   if (readBinarySensor(reagentBubbleSensors[valveNumber - 1])) {
-    caller->print(F("[MESSAGE] Valve "));
-    caller->print(valveNumber);
-    caller->println(F(" already primed."));
+    stream->print(F("[MESSAGE] Valve "));
+    stream->print(valveNumber);
+    stream->println(F(" already primed."));
     return true;
   }
   return false;
 }
 
-bool validateValveNumber(int valveNumber, CommandCaller* caller) {
+bool validateValveNumber(int valveNumber, Stream* stream) {
   if (valveNumber < 1 || valveNumber > 4) {
-    caller->println(F("[ERROR] Invalid valve number. Use 1-4."));
+    stream->println(F("[ERROR] Invalid valve number. Use 1-4."));
     return false;
   }
   return true;
 }
 
-void setVacuumMonitoringAndCloseMainValve(int troughNumber, CommandCaller* caller) {
+void setVacuumMonitoringAndCloseMainValve(int troughNumber, Stream* stream) {
   if (troughNumber <= 2) {
     globalVacuumMonitoring[0] = true;
     wasteValve1 = closeValve(wasteValve1);
@@ -407,30 +403,24 @@ void setVacuumMonitoringAndCloseMainValve(int troughNumber, CommandCaller* calle
 void abortAllAutomatedOperations(Stream* stream) {
   // Abort operations on each trough.
   for (int trough = 1; trough <= NUM_OVERFLOW_SENSORS; trough++) {
-    // Abort dispensing if active.
     if (valveControls[trough - 1].isDispensing) {
       stopDispenseOperation(trough, stream);
     }
-    // Abort priming if active.
     if (valveControls[trough - 1].isPriming) {
       stopPrimingForFill(trough, stream);
     }
-    // Disable fill mode if active.
     if (valveControls[trough - 1].fillMode) {
       disableFillMode(trough, stream);
     }
-    // Abort draining if active.
     if (valveControls[trough - 1].isDraining) {
       valveControls[trough - 1].isDraining = false;
       // Optionally, close any associated waste valves here.
     }
   }
   
-  // Print the final error and abort messages.
   stream->println(F("[ERROR] Enclosure liquid detected. Automated operations halted. Resolve the leak before proceeding."));
   stream->println(F("[MESSAGE] All automated operations aborted due to enclosure leak."));
   
-  // End the asynchronous command session so that the [ACTION END] tag is printed now.
   if (commandSessionActive) {
     endCommandSession(stream);
   }

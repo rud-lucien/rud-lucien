@@ -45,6 +45,7 @@ void cmd_set_log_frequency(char* args, CommandCaller* caller) {
   int newInterval = -1;
   if (sscanf(localArgs, "%d", &newInterval) == 1 && newInterval > 0) {
     logging.logInterval = newInterval;
+    logging.previousLogTime = millis();  // <-- Reset timer to start from now
     caller->print(F("[MESSAGE] Log frequency set to "));
     caller->print(newInterval);
     caller->println(F(" ms"));
@@ -52,6 +53,7 @@ void cmd_set_log_frequency(char* args, CommandCaller* caller) {
     caller->println(F("[ERROR] Invalid log frequency. Use: LF <positive number>"));
   }
 }
+
 
 void cmd_fan(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];

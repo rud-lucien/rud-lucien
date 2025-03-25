@@ -8,9 +8,9 @@
 #include "Commander-API.hpp"  // For CommandCaller and commander
 #include "Commander-IO.hpp"
 
-// ------------------------------------------------------------
-// Command Session Utilities
-// ------------------------------------------------------------
+/**
+ * Command Session Utilities
+ */
 void executeCommandWithActionTags(const char* command, Stream* stream);
 
 /**
@@ -118,27 +118,27 @@ bool areDispenseValvesOpen(int troughNumber);
  * -----------------------
  * Enables manual control for the given trough (index) and prints a message.
  * @param index The trough index (0-based).
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream (e.g., Serial) for logging.
  */
-void enableManualControl(int index, CommandCaller* caller);
+void enableManualControl(int index, Stream* stream);
 
 /**
  * disableManualControl()
  * ------------------------
  * Disables manual control for the given trough (index) and prints a message.
  * @param index The trough index (0-based).
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  */
-void disableManualControl(int index, CommandCaller* caller);
+void disableManualControl(int index, Stream* stream);
 
 /**
  * enableFillMode()
  * ----------------
  * Enables fill mode for a specific trough.
  * @param troughNumber Trough number (1-based).
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  */
-void enableFillMode(int troughNumber, CommandCaller* caller);
+void enableFillMode(int troughNumber, Stream* stream);
 
 /**
  * disableFillMode()
@@ -153,9 +153,9 @@ void disableFillMode(int troughNumber, Stream* stream);
  * disableFillModeForAll()
  * -----------------------
  * Disables fill mode for all troughs.
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  */
-void disableFillModeForAll(CommandCaller* caller);
+void disableFillModeForAll(Stream* stream);
 
 /**
  * isFillModeActive()
@@ -196,7 +196,7 @@ void setPressureValve(int valvePosition);
  * --------------------------
  * Checks if dispensing is active on a trough and stops it if so.
  * @param troughNumber Trough number.
- * @param stream Pointer to the Stream for logging.
+ * @param stream Pointer to a Stream for logging.
  */
 void stopDispensingIfActive(int troughNumber, Stream* stream);
 
@@ -205,37 +205,37 @@ void stopDispensingIfActive(int troughNumber, Stream* stream);
  * -----------------------------
  * Checks if the waste bottle for a given trough is full.
  * @param troughNumber Trough number.
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  * @return true if the waste bottle is full, false otherwise.
  */
-bool isWasteBottleFullForTrough(int troughNumber, CommandCaller* caller);
+bool isWasteBottleFullForTrough(int troughNumber, Stream* stream);
 
 /**
  * hasIncompatibleDrainage()
  * --------------------------
  * Checks for incompatible drainage conditions for a given trough.
  * @param troughNumber Trough number.
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  * @return true if incompatible drainage is detected, false otherwise.
  */
-bool hasIncompatibleDrainage(int troughNumber, CommandCaller* caller);
+bool hasIncompatibleDrainage(int troughNumber, Stream* stream);
 
 /**
  * validateTroughNumber()
  * -----------------------
  * Validates that the trough number is within range.
  * @param troughNumber Trough number.
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  * @return true if valid, false otherwise.
  */
-bool validateTroughNumber(int troughNumber, CommandCaller* caller);
+bool validateTroughNumber(int troughNumber, Stream* stream);
 
 /**
  * stopDispensingForFill()
  * -------------------------
  * Stops dispensing on a trough when a fill command is issued.
  * @param troughNumber Trough number.
- * @param stream Pointer to the Stream for logging.
+ * @param stream Pointer to a Stream for logging.
  */
 void stopDispensingForFill(int troughNumber, Stream* stream);
 
@@ -244,7 +244,7 @@ void stopDispensingForFill(int troughNumber, Stream* stream);
  * ----------------------
  * Stops priming on a trough when a fill command is issued.
  * @param troughNumber Trough number.
- * @param stream Pointer to the Stream for logging.
+ * @param stream Pointer to a Stream for logging.
  */
 void stopPrimingForFill(int troughNumber, Stream* stream);
 
@@ -253,29 +253,29 @@ void stopPrimingForFill(int troughNumber, Stream* stream);
  * ------------------------
  * Checks if a valve is already primed.
  * @param valveNumber Valve number (1-based).
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  * @return true if already primed, false otherwise.
  */
-bool isValveAlreadyPrimed(int valveNumber, CommandCaller* caller);
+bool isValveAlreadyPrimed(int valveNumber, Stream* stream);
 
 /**
  * validateValveNumber()
  * -----------------------
  * Validates that the valve number is between 1 and 4.
  * @param valveNumber Valve number.
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  * @return true if valid, false otherwise.
  */
-bool validateValveNumber(int valveNumber, CommandCaller* caller);
+bool validateValveNumber(int valveNumber, Stream* stream);
 
 /**
  * setVacuumMonitoringAndCloseMainValve()
  * ----------------------------------------
  * Sets vacuum monitoring for the given trough and closes the main waste valve.
  * @param troughNumber Trough number.
- * @param caller Pointer to the CommandCaller for logging.
+ * @param stream Pointer to a Stream for logging.
  */
-void setVacuumMonitoringAndCloseMainValve(int troughNumber, CommandCaller* caller);
+void setVacuumMonitoringAndCloseMainValve(int troughNumber, Stream* stream);
 
 /**
  * abortAllAutomatedOperations()
@@ -291,11 +291,12 @@ void setVacuumMonitoringAndCloseMainValve(int troughNumber, CommandCaller* calle
  *   - Cancels draining by clearing isDraining flags.
  *   - Ends any active asynchronous command session.
  * 
- * @param stream Pointer to the Stream for logging.
+ * @param stream Pointer to a Stream for logging.
  */
 void abortAllAutomatedOperations(Stream* stream);
 
 #endif // UTILS_H
+
 
 
 
