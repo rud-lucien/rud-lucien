@@ -16,22 +16,36 @@
  * here.
  *
  * Commands include:
- *   LF: Set log frequency
- *   FN: Manual fan control (on/off)
- *   FNAUTO: Enable fan auto control
- *   R, M, W: Set valve states
- *   PV, CALPV: Pressure valve operations
- *   STARTFSM, STOPFSM, RFS, RTF, RESETI2C: Flow sensor & I2C operations
- *   D, STOPD: Dispense operations
- *   P: Prime valves
- *   F: Fill reagent
- *   DT: Drain trough
- *   SDT: Stop drain trough
+ *   LF      - Set log frequency: LF <ms>
+ *   FN      - Fan manual control: FN <0/1> (0 = off, 1 = on)
+ *   FNAUTO  - Enable fan auto control
+ *   R       - Reagent valve control: R <1-4> <0/1>
+ *   M       - Media valve control: M <1-4> <0/1>
+ *   W       - Waste valve control: W <1-4> <0/1>
+ *   PV      - Set pressure valve: PV <percentage>
+ *   CALPV   - Calibrate pressure valve
+ *   STARTFSM- Start flow sensor measurement: STARTFSM <1-4>
+ *   STOPFSM - Stop flow sensor measurement: STOPFSM <1-4>
+ *   RF      - Reset flow sensor dispense volume: RFS <1-4>
+ *   RTF     - Reset total volume for flow sensor: RTF <1-4>
+ *   RESETI2C- Reset the I2C bus
+ *   D       - Dispense reagent: D <1-4> [volume] (continuous if omitted)
+ *   STOPD   - Stop dispensing: STOPD <1-4> or STOPD all
+ *   P       - Prime valves: P <1-4>
+ *   F       - Fill reagent: F <1-4>
+ *   DT      - Drain trough: DT <1-4>
+ *   SDT     - Stop draining trough: SDT <1-4> or SDT all
+ *   LOGHELP - Display detailed log field definitions and diagnostic info
+ *   STANDBY - Abort all automated operations and set the system to a 
+ *             safe, idle state (standby mode)
+ *   SS      - Display overall system state summary
+ *   help/h/H- Display general command help and usage information
  *
  * Author: Your Name
  * Date: YYYY-MM-DD
  * Version: 2.0
  ************************************************************/
+
 
 // ============================================================
 // Command Function Definitions
@@ -1044,8 +1058,6 @@ void cmd_print_help(char* args, CommandCaller* caller) {
   }
 }
   
-  
-
 
 // ============================================================
 // Global Command Tree and Commander Object
@@ -1053,30 +1065,29 @@ void cmd_print_help(char* args, CommandCaller* caller) {
 Commander commander;
 
 Commander::systemCommand_t API_tree[] = {
-  systemCommand("LF", "Set log frequency: LF <ms>", cmd_set_log_frequency),
-  systemCommand("FN", "Fan: FN <0/1> (0 = off, 1 = on)", cmd_fan),
-  systemCommand("FNAUTO", "Enable fan auto control", cmd_fan_auto),
-  systemCommand("R", "Reagent valve: R <1-4> <0/1>", cmd_set_reagent_valve),
-  systemCommand("M", "Media valve: M <1-4> <0/1>", cmd_set_media_valve),
-  systemCommand("W", "Waste valve: W <1-4> <0/1>", cmd_set_waste_valve),
-  systemCommand("PV", "Pressure valve: PV <percentage>", cmd_set_pressure_valve),
-  systemCommand("CALPV", "Calibrate pressure valve", cmd_calibrate_pressure_valve),
-  systemCommand("STARTFSM", "Manually start flow sensor measurement: STARTFSM <1-4>", cmd_start_flow_sensor_manually),
-  systemCommand("STOPFSM", "Manually stop flow sensor measurement: STOPFSM <1-4>", cmd_stop_flow_sensor_manually),
-  systemCommand("RF", "Reset flow sensor dispense volume: RFS <0-3>", cmd_reset_flow_dispense),
-  systemCommand("RTF", "Reset total volume for Flow Sensor: RTF <0-3>", cmd_reset_flow_total),
-  systemCommand("RESETI2C", "Manually reset the I2C bus", cmd_reset_i2c),
-  systemCommand("D", "Dispense reagent: D <1-4> [volume] (continuous if omitted)", cmd_dispense_reagent),
-  systemCommand("STOPD", "Stop dispensing: STOPD <1-4> or STOPD all", cmd_stop_dispense),
-  systemCommand("P", "Prime valves: P <1-4>", cmd_prime_valves),
-  systemCommand("F", "Fill reagent: F <1-4>", cmd_fill_reagent),
-  systemCommand("DT", "Drain trough: DT <1-4>", cmd_drain_trough),
-  systemCommand("SDT", "Stop draining trough: SDT <1-4> or SDT all", cmd_stop_drain_trough),
-  systemCommand("LOGHELP", "Displays detailed log field definitions and diagnostic info", cmd_log_help),
-  systemCommand("STANDBY", "Aborts all automated operations and resets the system to a safe, idle state", cmd_standby),
-  systemCommand("SS", "System state: SS (get system state)", cmd_get_system_state),
-  systemCommand("help", "Print available commands and usage: help", cmd_print_help),
-  systemCommand("h", "Print available commands and usage: help", cmd_print_help),
-  systemCommand("H", "Print available commands and usage: help", cmd_print_help)
-
+  systemCommand("LF", "Set logging interval (ms). Usage: LF <ms>", cmd_set_log_frequency),
+  systemCommand("FN", "Manually control fan state. Usage: FN <0/1> (0 = off, 1 = on)", cmd_fan),
+  systemCommand("FNAUTO", "Re-enable automatic fan control", cmd_fan_auto),
+  systemCommand("R", "Control reagent valve. Usage: R <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_reagent_valve),
+  systemCommand("M", "Control media valve. Usage: M <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_media_valve),
+  systemCommand("W", "Control waste valve. Usage: W <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_waste_valve),
+  systemCommand("PV", "Set pressure valve position as a percentage. Usage: PV <percentage> (0 = close, 100 = open)", cmd_set_pressure_valve),
+  systemCommand("CALPV", "Calibrate pressure valve (auto-detect max feedback voltage)", cmd_calibrate_pressure_valve),
+  systemCommand("STARTFSM", "Manually start flow sensor measurement. Usage: STARTFSM <sensor 1-4>", cmd_start_flow_sensor_manually),
+  systemCommand("STOPFSM", "Manually stop flow sensor measurement. Usage: STOPFSM <sensor 1-4>", cmd_stop_flow_sensor_manually),
+  systemCommand("RF", "Reset flow sensor dispense volume. Usage: RFS <sensor index 1-3>", cmd_reset_flow_dispense),
+  systemCommand("RTF", "Reset total volume for a flow sensor. Usage: RTF <sensor index 1-4>", cmd_reset_flow_total),
+  systemCommand("RESETI2C", "Reset the I2C bus (for communication issues)", cmd_reset_i2c),
+  systemCommand("D", "Dispense reagent. Usage: D <trough 1-4> [volume in mL] (omitting volume enables continuous mode)", cmd_dispense_reagent),
+  systemCommand("STOPD", "Stop dispensing. Usage: STOPD <trough 1-4> or STOPD all", cmd_stop_dispense),
+  systemCommand("P", "Prime valves. Usage: P <trough 1-4> to prime specified trough(s)", cmd_prime_valves),
+  systemCommand("F", "Fill reagent. Usage: F <trough 1-4> to fill the specified trough", cmd_fill_reagent),
+  systemCommand("DT", "Drain trough. Usage: DT <trough 1-4> to initiate drainage", cmd_drain_trough),
+  systemCommand("SDT", "Stop draining trough. Usage: SDT <trough 1-4> or SDT all", cmd_stop_drain_trough),
+  systemCommand("LOGHELP", "Display detailed logging field definitions and diagnostic information", cmd_log_help),
+  systemCommand("STANDBY", "Abort all automated operations and set the system to a safe idle (standby) state", cmd_standby),
+  systemCommand("SS", "Display current system state summary", cmd_get_system_state),
+  systemCommand("help", "Display help information for all commands", cmd_print_help),
+  systemCommand("h", "Display help information for all commands", cmd_print_help),
+  systemCommand("H", "Display help information for all commands", cmd_print_help)
 };
