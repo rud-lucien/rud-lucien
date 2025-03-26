@@ -70,45 +70,86 @@ bool isCommandPrefix(const char* token) {
   return false;
 }
 
-void processMultipleCommands(char* commandLine, Stream* stream) {
-  char* start = commandLine;
-  char commandCopy[COMMAND_SIZE];
+// void processMultipleCommands(char* commandLine, Stream* stream) {
+//   char* start = commandLine;
+//   char commandCopy[COMMAND_SIZE];
 
-  // Start a new asynchronous command session.
-  startCommandSession(stream);
+//   // Start a new asynchronous command session.
+//   startCommandSession(stream);
 
-  while (*start) {
-    char* comma = strchr(start, ',');
-    size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
-    if (len >= COMMAND_SIZE) {
-      len = COMMAND_SIZE - 1;
-    }
-    strncpy(commandCopy, start, len);
-    commandCopy[len] = '\0';  // Null-terminate the substring
-    char* trimmed = trimLeadingSpaces(commandCopy);
-    if (strlen(trimmed) > 0) {
-      Serial.print(F("[DEBUG] Token extracted: '"));
-      Serial.print(trimmed);
-      Serial.println(F("'"));
+//   while (*start) {
+//     char* comma = strchr(start, ',');
+//     size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
+//     if (len >= COMMAND_SIZE) {
+//       len = COMMAND_SIZE - 1;
+//     }
+//     strncpy(commandCopy, start, len);
+//     commandCopy[len] = '\0';  // Null-terminate the substring
+//     char* trimmed = trimLeadingSpaces(commandCopy);
+//     if (strlen(trimmed) > 0) {
+//       Serial.print(F("[DEBUG] Token extracted: '"));
+//       Serial.print(trimmed);
+//       Serial.println(F("'"));
       
-      // If the command is asynchronous, register it.
-      if (isAsyncCommand(trimmed)) {
-        registerAsyncCommand();
-      }
+//       // If the command is asynchronous, register it.
+//       if (isAsyncCommand(trimmed)) {
+//         registerAsyncCommand();
+//       }
       
-      // Execute the command.
-      commander.execute(trimmed, stream);
-    }
+//       // Execute the command.
+//       commander.execute(trimmed, stream);
+//     }
     
-    if (comma == NULL) break;
-    start = comma + 1;
-  }
+//     if (comma == NULL) break;
+//     start = comma + 1;
+//   }
 
-  // End session if no asynchronous commands are pending.
-  if (pendingAsyncCommands == 0) {
-    endCommandSession(stream);
-  }
+//   // End session if no asynchronous commands are pending.
+//   if (pendingAsyncCommands == 0) {
+//     endCommandSession(stream);
+//   }
+// }
+
+void processMultipleCommands(char* commandLine, Stream* stream) {
+    char* start = commandLine;
+    char commandCopy[COMMAND_SIZE];
+
+    startCommandSession(stream);  // This prints [ACTION START]
+
+    while (*start) {
+        char* comma = strchr(start, ',');
+        size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
+        if (len >= COMMAND_SIZE) {
+            len = COMMAND_SIZE - 1;
+        }
+        strncpy(commandCopy, start, len);
+        commandCopy[len] = '\0';  // Null-terminate
+        char* trimmed = trimLeadingSpaces(commandCopy);
+        if (strlen(trimmed) > 0) {
+            Serial.print(F("[DEBUG] Token extracted: '"));
+            Serial.print(trimmed);
+            Serial.println(F("'"));
+
+            // Reset async flags only if the trough is not already busy.
+            resetAsyncFlagsForCommand(trimmed);
+
+            if (isAsyncCommand(trimmed)) {
+                registerAsyncCommand();
+            }
+
+            // Execute the command.
+            commander.execute(trimmed, stream);
+        }
+        if (comma == NULL)
+            break;
+        start = comma + 1;
+    }
+
+    if (pendingAsyncCommands == 0) {
+        endCommandSession(stream);
+    }
 }
+
 
 void handleSerialCommands() {
   static char commandBuffer[COMMAND_SIZE];
@@ -493,6 +534,40 @@ String getOpenValvesString(bool v1, bool v2, bool v3, bool v4) {
   }
   return openList;
 }
+
+// In your Utils.cpp (or the file where you defined resetAsyncFlagsForTrough)
+void resetAsyncFlagsForTrough(int troughNumber) {
+    if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+        return;
+    
+    // If the trough is busy with any asynchronous operation, do not reset its flags.
+    // (Assuming valveControls is a global array and that these booleans indicate active operations.)
+    if (valveControls[troughNumber - 1].isDispensing ||
+        valveControls[troughNumber - 1].isPriming ||
+        valveControls[troughNumber - 1].fillMode ||
+        valveControls[troughNumber - 1].isDraining) {
+        // Trough is busy – do not reset its async flags.
+        return;
+    }
+    
+    // Otherwise, reset only this trough’s async flags.
+    dispenseAsyncCompleted[troughNumber - 1] = false;
+    drainAsyncCompleted[troughNumber - 1] = false;
+    primeAsyncCompleted[troughNumber - 1] = false;
+}
+
+
+// You can also add a helper that parses the trough number from a token.
+// For example, if your token is "D 2 10", this will extract the 2.
+void resetAsyncFlagsForCommand(const char* token) {
+    int troughNumber = 0;
+    // This assumes the command format starts with a letter followed by the trough number,
+    // e.g. "D 1" or "P 2" etc.
+    if (sscanf(token, "%*c %d", &troughNumber) == 1) {
+        resetAsyncFlagsForTrough(troughNumber);
+    }
+}
+
 
 
 

@@ -203,7 +203,7 @@ static unsigned long additionalPrimeStartTime[NUM_OVERFLOW_SENSORS] = {0, 0, 0, 
 static unsigned long lowFlowStartTime[NUM_OVERFLOW_SENSORS] = {0, 0, 0, 0};
 static bool primingFailed[NUM_OVERFLOW_SENSORS] = {false, false, false, false};
 static bool primingSuccess[NUM_OVERFLOW_SENSORS] = {false, false, false, false};
-static bool primeAsyncCompleted[NUM_OVERFLOW_SENSORS] = {false, false, false, false};
+// static bool primeAsyncCompleted[NUM_OVERFLOW_SENSORS] = {false, false, false, false};
 
 void monitorPrimeSensors(unsigned long currentTime) {
   for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {

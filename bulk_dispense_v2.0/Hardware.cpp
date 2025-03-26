@@ -137,6 +137,7 @@ float proportionalValveMaxFeedback = 0.0;
 // Async command flags.
 bool dispenseAsyncCompleted[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
 bool drainAsyncCompleted[NUM_OVERFLOW_SENSORS] = { false, false, false, false };
+bool primeAsyncCompleted[NUM_OVERFLOW_SENSORS]    = { false, false, false, false };
 
 // ============================================================
 // Hardware Functions

@@ -120,7 +120,7 @@ bool initializeFlowSensor(FlowSensor &sensor) {
     }
     return false;
   }
-  delay(100);
+  delay(200);
 
   // Step 5: Mark sensor as initialized and reset volume.
   sensor.sensorInitialized = true;

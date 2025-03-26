@@ -210,6 +210,7 @@ extern bool globalEnclosureLiquidError;
 // Async command flags for dispensing and draining.
 extern bool dispenseAsyncCompleted[NUM_OVERFLOW_SENSORS];
 extern bool drainAsyncCompleted[NUM_OVERFLOW_SENSORS];
+extern bool primeAsyncCompleted[NUM_OVERFLOW_SENSORS];
 
 // ============================================================
 // Function Prototypes (Hardware Functions)

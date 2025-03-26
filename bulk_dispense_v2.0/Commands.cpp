@@ -106,7 +106,7 @@ void cmd_fan_auto(char* args, CommandCaller* caller) {
     if (th.temperature > ENCLOSURE_TEMP_SETPOINT) {
       setFanState(fan, true);  // Prints: "[MESSAGE] Fan state set to ON"
     } else {
-      setFanState(fan, false); // Prints: "[MESSAGE] Fan state set to OFF"
+      setFanState(fan, false);  // Prints: "[MESSAGE] Fan state set to OFF"
     }
   } else {
     caller->println(F("[ERROR] Failed to read enclosure temperature for fan auto update."));
@@ -121,9 +121,7 @@ void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int valveNumber = -1, valveState = -1;
-  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
-      valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES && (valveState == 0 || valveState == 1)) {
     disableFillMode(valveNumber, caller);
     bool state = (valveState == 1);
     if (state) {
@@ -150,9 +148,7 @@ void cmd_set_media_valve(char* args, CommandCaller* caller) {
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int valveNumber = -1, valveState = -1;
-  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
-      valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES && (valveState == 0 || valveState == 1)) {
     disableFillMode(valveNumber, caller);
     bool state = (valveState == 1);
     if (state) {
@@ -179,9 +175,7 @@ void cmd_set_waste_valve(char* args, CommandCaller* caller) {
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int valveNumber = -1, valveState = -1;
-  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
-      valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+  if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 && valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES && (valveState == 0 || valveState == 1)) {
     disableFillMode(valveNumber, caller);
     bool state = (valveState == 1);
     if (state) {
@@ -202,11 +196,51 @@ void cmd_set_waste_valve(char* args, CommandCaller* caller) {
   }
 }
 
+// void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
+//   char localArgs[COMMAND_SIZE];
+//   strncpy(localArgs, args, COMMAND_SIZE);
+//   localArgs[COMMAND_SIZE - 1] = '\0';
+
+//   int percentage = -1;
+//   if (sscanf(localArgs, "%d", &percentage) == 1 && percentage >= 0 && percentage <= 100) {
+//     proportionalValve = setValvePosition(proportionalValve, (float)percentage);
+//     caller->print(F("[MESSAGE] Pressure valve set to "));
+//     caller->print(percentage);
+//     caller->println(F("%."));
+//   } else {
+//     caller->println(F("[ERROR] Invalid value for pressure valve. Use a percentage between 0 and 100."));
+//   }
+// }
+
+// void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
+//   char localArgs[COMMAND_SIZE];
+//   strncpy(localArgs, args, COMMAND_SIZE);
+//   localArgs[COMMAND_SIZE - 1] = '\0';
+
+//   int percentage = -1;
+//   if (sscanf(localArgs, "%d", &percentage) == 1 && percentage >= 0 && percentage <= 100) {
+//     proportionalValve = setValvePosition(proportionalValve, (float)percentage);
+//     caller->print(F("[MESSAGE] Pressure valve set to "));
+//     caller->print(percentage);
+//     caller->println(F("%."));
+
+//     // Explicitly end the asynchronous command session.
+//     // (Only do this if you’re sure no async operations are running.)
+//     if (!commandSessionActive) {  // If no session is active, nothing to do.
+//       // Optionally, you could start and immediately end a session here.
+//     } else if (pendingAsyncCommands <= 0) {
+//       endCommandSession(&Serial); // Ends the session and prints the [ACTION END] tag.
+//     }
+//   } else {
+//     caller->println(F("[ERROR] Invalid value for pressure valve. Use a percentage between 0 and 100."));
+//   }
+// }
+
 void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
-  
+
   int percentage = -1;
   if (sscanf(localArgs, "%d", &percentage) == 1 && percentage >= 0 && percentage <= 100) {
     proportionalValve = setValvePosition(proportionalValve, (float)percentage);
@@ -216,13 +250,22 @@ void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
   } else {
     caller->println(F("[ERROR] Invalid value for pressure valve. Use a percentage between 0 and 100."));
   }
+
+  // Force the end of the command session for this synchronous command.
+  if (commandSessionActive) {
+    endCommandSession(&Serial);
+  }
 }
+
+
+
+
 
 void cmd_calibrate_pressure_valve(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
-  
+
   caller->println(F("[MESSAGE] Calibrating pressure valve, please wait..."));
   calibrateProportionalValve();
   caller->println(F("[MESSAGE] Pressure valve calibration complete."));
@@ -232,12 +275,12 @@ void cmd_start_flow_sensor_manually(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
-  
+
   int sensorNumber = -1;
   if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
     disableFillMode(sensorNumber, caller);
     enableManualControl(sensorNumber - 1, caller);
-    
+
     FlowSensor* sensor = flowSensors[sensorNumber - 1];
     if (!sensor) {
       caller->print(F("[ERROR] Flow Sensor "));
@@ -261,12 +304,12 @@ void cmd_stop_flow_sensor_manually(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
-  
+
   int sensorNumber = -1;
   if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
     disableFillMode(sensorNumber - 1, caller);
     disableManualControl(sensorNumber - 1, caller);
-    
+
     FlowSensor* sensor = flowSensors[sensorNumber - 1];
     if (!sensor) {
       caller->print(F("[ERROR] Flow Sensor "));
@@ -290,7 +333,7 @@ void cmd_reset_flow_dispense(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
-  
+
   int sensorNumber = -1;
   if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
     disableFillMode(sensorNumber, caller);
@@ -309,7 +352,7 @@ void cmd_reset_flow_total(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
-  
+
   int sensorNumber = -1;
   if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
     disableFillMode(sensorNumber, caller);
@@ -333,7 +376,7 @@ void cmd_reset_i2c(char* args, CommandCaller* caller) {
     disableFillMode(i + 1, caller);
     enableManualControl(i, caller);
   }
-  
+
   caller->println(F("[MESSAGE] Manual I2C bus reset initiated."));
   resetI2CBus();
   caller->println(F("[MESSAGE] I2C bus reset complete."));
@@ -408,7 +451,9 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
 
   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
-    return;
+    // Signal asynchronous command completion for this trough.
+    asyncCommandCompleted(&Serial);
+    return;  // Abort further processing for this command.
   }
 
   if (readBinarySensor(overflowSensors[troughNumber - 1])) {
@@ -443,6 +488,7 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   // Mark this dispensing operation as asynchronous.
   dispenseAsyncCompleted[troughNumber - 1] = false;
 }
+
 
 void cmd_stop_dispense(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
@@ -490,7 +536,7 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
     caller->println(F("[ERROR] Invalid arguments for prime command. Use: P <valve number>"));
     return;
   }
-  
+
   if (!validateValveNumber(localValveNumber, caller)) {
     return;
   }
@@ -502,8 +548,10 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
 
   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
-    caller->println(F("[ERROR] Pressure check failed. Prime aborted."));
-    return;
+    caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
+    // Signal asynchronous command completion for this trough.
+    asyncCommandCompleted(&Serial);
+    return;  // Abort further processing for this command.
   }
 
   if (isValveAlreadyPrimed(localValveNumber, caller)) {
@@ -532,11 +580,11 @@ void cmd_fill_reagent(char* args, CommandCaller* caller) {
     caller->println(F("[ERROR] Invalid arguments for fill command. Use: F <valve number>"));
     return;
   }
-  
+
   if (!validateTroughNumber(troughNumber, caller)) {
     return;
   }
-  
+
   stopDispensingForFill(troughNumber, caller);
   stopPrimingForFill(troughNumber, caller);
 
@@ -544,10 +592,12 @@ void cmd_fill_reagent(char* args, CommandCaller* caller) {
   const int VALVE_POSITION = 100;
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
-    caller->println(F("[ERROR] Pressure check failed. Fill aborted."));
-    return;
+    caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
+    // Signal asynchronous command completion for this trough.
+    asyncCommandCompleted(&Serial);
+    return;  // Abort further processing for this command.
   }
-  
+
   resetFlowSensorDispenseVolume(*flowSensors[troughNumber - 1]);
   openDispenseValves(troughNumber);
   enableFillMode(troughNumber, caller);
@@ -574,24 +624,24 @@ void cmd_drain_trough(char* args, CommandCaller* caller) {
     caller->println(F("[ERROR] Invalid arguments for drain command. Use: DT <trough number>"));
     return;
   }
-  
+
   if (!validateTroughNumber(troughNumber, caller)) {
     return;
   }
-  
+
   if (isWasteBottleFullForTrough(troughNumber, caller)) {
     return;
   }
-    
+
   if (hasIncompatibleDrainage(troughNumber, caller)) {
     return;
   }
-  
+
   stopDispensingIfActive(troughNumber, caller);
   disableFillMode(troughNumber, caller);
   valveControls[troughNumber - 1].isDraining = true;
   drainAsyncCompleted[troughNumber - 1] = false;
-  
+
   switch (troughNumber) {
     case 1:
       wasteValve1 = openValve(wasteValve1);
@@ -648,7 +698,7 @@ void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
   }
   valveControls[troughNumber - 1].isDraining = false;
   setVacuumMonitoringAndCloseMainValve(troughNumber, caller);
-  
+
   switch (troughNumber) {
     case 1:
       wasteValve3 = openValve(wasteValve3);
@@ -681,7 +731,7 @@ void cmd_log_help(char* args, CommandCaller* caller) {
 
   caller->println(F("Bulk Dispense System Log Field Definitions:"));
   caller->println(F("--------------------------------------------------"));
-  
+
   // Hardware Status
   caller->println(F("[LOG]  : Log entry prefix indicating the start of a new status record."));
   caller->println(F("F      : Fan state (F1 = ON, F0 = OFF)."));
@@ -689,12 +739,12 @@ void cmd_log_help(char* args, CommandCaller* caller) {
   caller->println(F("         e.g., RV1000 means only valve 1 is open."));
   caller->println(F("MVxxxx : Media Valve states (same format as RV)."));
   caller->println(F("WVxxxx : Waste Valve states (same format as RV)."));
-  
+
   // Proportional Valve
   caller->println(F("PV, V, PV%, P : Proportional Valve feedback."));
   caller->println(F("         V = measured voltage (e.g., 9.7)"));
   caller->println(F("         P = calculated percentage (e.g., 99.9%)."));
-  
+
   // Sensor Readings
   caller->println(F("WSLxx  : Waste Line Sensor readings (binary; e.g., WSL00 means no detection)."));
   caller->println(F("WBLxx  : Waste Bottle Sensor readings (binary)."));
@@ -705,7 +755,7 @@ void cmd_log_help(char* args, CommandCaller* caller) {
   caller->println(F("PS, P  : Pressure sensor reading (in psi)."));
   caller->println(F("T, T   : Temperature (°C)."));
   caller->println(F("H, H   : Humidity (percentage)."));
-  
+
   // Flow Sensor Data
   caller->println(F("FSn,...: Flow Sensor n data including:"));
   caller->println(F("         - Flow rate"));
@@ -713,14 +763,14 @@ void cmd_log_help(char* args, CommandCaller* caller) {
   caller->println(F("         - Dispensed volume"));
   caller->println(F("         - Total volume"));
   caller->println(F("         - Sensor status flag (e.g., -1 for an invalid reading)"));
-  
+
   // Operational States
   caller->println(F("DSxxxx : Dispensing state for each trough (4-digit binary; 1 = active, 0 = inactive)."));
   caller->println(F("TV, V1,V2,V3,V4 : Target Volume for each trough (in mL)."));
   caller->println(F("PRxxxx : Priming state for each trough (4-digit binary)."));
   caller->println(F("FMxxxx : Fill mode state for each trough (4-digit binary)."));
   caller->println(F("TDSxxxx: Trough Draining State for each trough (4-digit binary)."));
-  
+
   // Diagnostic Summary
   caller->println(F("DIAG   : Diagnostic summary appended to each log entry, including:"));
   caller->println(F("         FAM   = Fan Auto Mode (ON/OFF)."));
@@ -748,29 +798,29 @@ void cmd_standby(char* args, CommandCaller* caller) {
     resetFlowSensorDispenseVolume(*flowSensors[i]);
 
     // Directly enforce a safe state by resetting flags for this trough:
-    valveControls[i].isDispensing   = false;
-    valveControls[i].isPriming      = false;
-    valveControls[i].fillMode       = false;
-    valveControls[i].isDraining     = false;
-    valveControls[i].manualControl  = false;
-    valveControls[i].targetVolume   = -1;
-    valveControls[i].lastFlowCheckTime  = 0;
+    valveControls[i].isDispensing = false;
+    valveControls[i].isPriming = false;
+    valveControls[i].fillMode = false;
+    valveControls[i].isDraining = false;
+    valveControls[i].manualControl = false;
+    valveControls[i].targetVolume = -1;
+    valveControls[i].lastFlowCheckTime = 0;
     valveControls[i].lastFlowChangeTime = 0;
   }
 
   // Close all reagent and media valves for each trough
   // Trough 1:
   reagentValve1 = closeValve(reagentValve1);
-  mediaValve1   = closeValve(mediaValve1);
+  mediaValve1 = closeValve(mediaValve1);
   // Trough 2:
   reagentValve2 = closeValve(reagentValve2);
-  mediaValve2   = closeValve(mediaValve2);
+  mediaValve2 = closeValve(mediaValve2);
   // Trough 3:
   reagentValve3 = closeValve(reagentValve3);
-  mediaValve3   = closeValve(mediaValve3);
+  mediaValve3 = closeValve(mediaValve3);
   // Trough 4:
   reagentValve4 = closeValve(reagentValve4);
-  mediaValve4   = closeValve(mediaValve4);
+  mediaValve4 = closeValve(mediaValve4);
 
   // Close the main waste valves (attached to waste bottles)
   wasteValve1 = closeValve(wasteValve1);
@@ -1016,7 +1066,7 @@ void cmd_get_system_state(char* args, CommandCaller* caller) {
   caller->print(logFreqStr);
   caller->println(F(" ms"));
   caller->println();
-  
+
   // Separator
   caller->println(F("--------------------------------------------------"));
   // Diagnostic Flags section
@@ -1038,8 +1088,8 @@ void cmd_print_help(char* args, CommandCaller* caller) {
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   char* trimmed = trimLeadingSpaces(localArgs);
-  
-  // If the user requested help for a specific command, 
+
+  // If the user requested help for a specific command,
   // we currently do not have detailed help implemented.
   if (strlen(trimmed) > 0) {
     caller->println(F("[ERROR] Detailed help for specific commands is not implemented."));
@@ -1057,7 +1107,7 @@ void cmd_print_help(char* args, CommandCaller* caller) {
     caller->println(F("--------------------------------------------------"));
   }
 }
-  
+
 
 // ============================================================
 // Global Command Tree and Commander Object

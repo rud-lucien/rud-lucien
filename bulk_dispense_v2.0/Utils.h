@@ -322,6 +322,11 @@ String getOverallTroughState();
  */
 String getOpenValvesString(bool v1, bool v2, bool v3, bool v4);
 
+void resetAsyncFlagsForTrough(int troughNumber);
+
+void resetAsyncFlagsForCommand(const char* token);
+
+
 
 #endif // UTILS_H
 
