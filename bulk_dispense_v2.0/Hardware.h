@@ -142,6 +142,7 @@ struct ValveControl {
   bool isPriming;
   bool fillMode;
   bool isDraining;
+  unsigned long drainStartTime;  // NEW: records when the drain started
   float targetVolume;
   float lastFlowValue;
   unsigned long lastFlowCheckTime;
@@ -149,6 +150,8 @@ struct ValveControl {
   unsigned long fillCheckTime;
   int dispensingValveNumber;
 };
+
+
 
 // Binary Sensor Structure
 struct BinarySensor {

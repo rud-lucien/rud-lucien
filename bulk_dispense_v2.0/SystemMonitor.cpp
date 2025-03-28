@@ -398,82 +398,465 @@ void monitorFillSensors(unsigned long currentTime) {
   }
 }
 
-// ============================================================
+// // ============================================================
+// // Monitor Waste Sensors (Drainage Monitoring)
+// // ============================================================
+// void monitorWasteSensors(unsigned long currentTime)
+// {
+//   const unsigned long DRAIN_COMPLETE_DELAY = 3000; // Delay after liquid stops for drain to be considered complete
+//   const unsigned long MAX_DRAIN_TIME = 60000;      // 30 seconds timeout
+//   const unsigned long DRAIN_INITIATE_TIMEOUT = 25000;
+//   static unsigned long lastDrainCompleteTime[2] = {0, 0};
+//   static bool liquidInitiallyDetected[2] = {false, false};
+//   static bool vacuumReleased[2] = {false, false};
+
+//   // First, check if any trough has been draining too long (timeout).
+//   for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
+//   {
+//     for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++)
+//     {
+//       // NEW: If draining is active but no start time has been recorded, set it now.
+//       if (valveControls[i].isDraining && valveControls[i].drainStartTime == 0)
+//       {
+//         valveControls[i].drainStartTime = currentTime;
+//         Serial.print(F("[DEBUG] Trough "));
+//         Serial.print(i + 1);
+//         Serial.print(F(" drainStartTime set to: "));
+//         Serial.println(currentTime);
+//       }
+
+//       // Check if the drain has timed out.
+//       if (valveControls[i].isDraining &&
+//           (currentTime - valveControls[i].drainStartTime >= MAX_DRAIN_TIME))
+//       {
+//         // Calculate how long the drain has been active.
+//         unsigned long drainDuration = currentTime - valveControls[i].drainStartTime;
+
+//         // Reset draining state.
+//         valveControls[i].isDraining = false;
+//         valveControls[i].drainStartTime = 0; // clear the start time
+
+//         // Update waste valve states and print a more specific error message.
+//         if (sensorIdx == 0)
+//         {
+//           if (i == 0)
+//           { // Trough 1
+//             wasteValve1 = closeValve(wasteValve1);
+//             wasteValve3 = openValve(wasteValve3);
+//             Serial.print(F("[ERROR] Draining timeout for trough 1 after "));
+//             Serial.print(drainDuration);
+//             Serial.println(F(" ms (maximum drain time reached)."));
+//           }
+//           else if (i == 1)
+//           { // Trough 2
+//             wasteValve1 = closeValve(wasteValve1);
+//             wasteValve3 = closeValve(wasteValve3);
+//             Serial.print(F("[ERROR] Draining timeout for trough 2 after "));
+//             Serial.print(drainDuration);
+//             Serial.println(F(" ms (maximum drain time reached)."));
+//           }
+//         }
+//         else if (sensorIdx == 1)
+//         {
+//           if (i == 2)
+//           { // Trough 3
+//             wasteValve2 = closeValve(wasteValve2);
+//             wasteValve4 = openValve(wasteValve4);
+//             Serial.print(F("[ERROR] Draining timeout for trough 3 after "));
+//             Serial.print(drainDuration);
+//             Serial.println(F(" ms (maximum drain time reached)."));
+//           }
+//           else if (i == 3)
+//           { // Trough 4
+//             wasteValve2 = closeValve(wasteValve2);
+//             wasteValve4 = closeValve(wasteValve4);
+//             Serial.print(F("[ERROR] Draining timeout for trough 4 after "));
+//             Serial.print(drainDuration);
+//             Serial.println(F(" ms (maximum drain time reached)."));
+//           }
+//         }
+//         if (!drainAsyncCompleted[i])
+//         {
+//           asyncCommandCompleted(&Serial);
+//           drainAsyncCompleted[i] = true;
+//         }
+//       }
+//     }
+//   }
+
+//   // Second loop: Check for drain initiation (no liquid detected) and completion.
+//   for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
+//   {
+//     // NEW: If no liquid is detected by the waste line sensor for this group
+//     // and we haven’t yet seen any liquid, check each trough in the group to see if
+//     // it has been draining for longer than DRAIN_INITIATE_TIMEOUT.
+//     if (!readBinarySensor(wasteLineSensors[sensorIdx]) && !liquidInitiallyDetected[sensorIdx])
+//     {
+//       for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++)
+//       {
+//         if (valveControls[i].isDraining &&
+//             (currentTime - valveControls[i].drainStartTime >= DRAIN_INITIATE_TIMEOUT))
+//         {
+//           // Abort the drain due to no liquid detected.
+//           valveControls[i].isDraining = false;
+//           valveControls[i].drainStartTime = 0;
+//           // Close/open the valves similar to the timeout handling above.
+//           if (i == 0)
+//           { // Trough 1
+//             wasteValve1 = closeValve(wasteValve1);
+//             wasteValve3 = openValve(wasteValve3);
+//           }
+//           else if (i == 1)
+//           { // Trough 2
+//             wasteValve1 = closeValve(wasteValve1);
+//             wasteValve3 = closeValve(wasteValve3);
+//           }
+//           else if (i == 2)
+//           { // Trough 3
+//             wasteValve2 = closeValve(wasteValve2);
+//             wasteValve4 = openValve(wasteValve4);
+//           }
+//           else if (i == 3)
+//           { // Trough 4
+//             wasteValve2 = closeValve(wasteValve2);
+//             wasteValve4 = closeValve(wasteValve4);
+//           }
+//           Serial.print(F("[ERROR] Draining initiation timeout for trough "));
+//           Serial.print(i + 1);
+//           Serial.println(F(" (no liquid detected in drain line)."));
+//           if (!drainAsyncCompleted[i])
+//           {
+//             asyncCommandCompleted(&Serial);
+//             drainAsyncCompleted[i] = true;
+//           }
+//         }
+//       }
+//     }
+
+//     // Continue with the rest of the sensor monitoring logic...
+//     for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
+//     {
+//       if (readBinarySensor(wasteBottleSensors[sensorIdx]))
+//       {
+//         for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++)
+//         {
+//           if (valveControls[i].isDraining)
+//           {
+//             valveControls[i].isDraining = false;
+//             valveControls[i].drainStartTime = 0;
+//             if (sensorIdx == 0)
+//             {
+//               wasteValve1 = closeValve(wasteValve1);
+//             }
+//             else
+//             {
+//               wasteValve2 = closeValve(wasteValve2);
+//             }
+//             Serial.print(F("[ERROR] Draining halted for trough "));
+//             Serial.print(i + 1);
+//             Serial.println(F(" because the waste bottle is full."));
+//             if (!drainAsyncCompleted[i])
+//             {
+//               asyncCommandCompleted(&Serial);
+//               drainAsyncCompleted[i] = true;
+//             }
+//           }
+//         }
+//         continue;
+//       }
+
+//       if (readBinarySensor(wasteLineSensors[sensorIdx]))
+//       {
+//         lastDrainCompleteTime[sensorIdx] = currentTime;
+//         liquidInitiallyDetected[sensorIdx] = true;
+//       }
+//       else if (liquidInitiallyDetected[sensorIdx] &&
+//                (currentTime - lastDrainCompleteTime[sensorIdx] >= DRAIN_COMPLETE_DELAY))
+//       {
+//         if (sensorIdx == 0)
+//         {
+//           if (valveControls[0].isDraining)
+//           {
+//             valveControls[0].isDraining = false;
+//             valveControls[0].drainStartTime = 0;
+//             wasteValve1 = closeValve(wasteValve1);
+//             wasteValve3 = openValve(wasteValve3);
+//             Serial.println(F("[MESSAGE] Draining complete for trough 1"));
+//             if (!drainAsyncCompleted[0])
+//             {
+//               asyncCommandCompleted(&Serial);
+//               drainAsyncCompleted[0] = true;
+//             }
+//           }
+//           if (valveControls[1].isDraining)
+//           {
+//             valveControls[1].isDraining = false;
+//             valveControls[1].drainStartTime = 0;
+//             wasteValve1 = closeValve(wasteValve1);
+//             wasteValve3 = closeValve(wasteValve3);
+//             Serial.println(F("[MESSAGE] Draining complete for trough 2"));
+//             if (!drainAsyncCompleted[1])
+//             {
+//               asyncCommandCompleted(&Serial);
+//               drainAsyncCompleted[1] = true;
+//             }
+//           }
+//         }
+//         else if (sensorIdx == 1)
+//         {
+//           if (valveControls[2].isDraining)
+//           {
+//             valveControls[2].isDraining = false;
+//             valveControls[2].drainStartTime = 0;
+//             wasteValve2 = closeValve(wasteValve2);
+//             wasteValve4 = openValve(wasteValve4);
+//             Serial.println(F("[MESSAGE] Draining complete for trough 3"));
+//             if (!drainAsyncCompleted[2])
+//             {
+//               asyncCommandCompleted(&Serial);
+//               drainAsyncCompleted[2] = true;
+//             }
+//           }
+//           if (valveControls[3].isDraining)
+//           {
+//             valveControls[3].isDraining = false;
+//             valveControls[3].drainStartTime = 0;
+//             wasteValve2 = closeValve(wasteValve2);
+//             wasteValve4 = closeValve(wasteValve4);
+//             Serial.println(F("[MESSAGE] Draining complete for trough 4"));
+//             if (!drainAsyncCompleted[3])
+//             {
+//               asyncCommandCompleted(&Serial);
+//               drainAsyncCompleted[3] = true;
+//             }
+//           }
+//         }
+//         lastDrainCompleteTime[sensorIdx] = 0;
+//         liquidInitiallyDetected[sensorIdx] = false;
+//         vacuumReleased[sensorIdx] = false;
+//       }
+
+//       if (!vacuumReleased[sensorIdx] && !readBinarySensor(wasteVacuumSensors[sensorIdx]))
+//       {
+//         if (sensorIdx == 0)
+//         {
+//           wasteValve3 = closeValve(wasteValve3);
+//           Serial.println(F("[MESSAGE] Vacuum released. Waste valve 3 closed."));
+//         }
+//         else if (sensorIdx == 1)
+//         {
+//           wasteValve4 = closeValve(wasteValve4);
+//           Serial.println(F("[MESSAGE] Vacuum released. Waste valve 4 closed."));
+//         }
+//         vacuumReleased[sensorIdx] = true;
+//       }
+//     }
+//   }
+// }
+
+ // ============================================================
 // Monitor Waste Sensors (Drainage Monitoring)
 // ============================================================
-void monitorWasteSensors(unsigned long currentTime) {
-  const unsigned long DRAIN_COMPLETE_DELAY = 3000;
+void monitorWasteSensors(unsigned long currentTime)
+{
+  const unsigned long DRAIN_COMPLETE_DELAY = 3000; // Delay after liquid stops for drain to be considered complete
+  const unsigned long MAX_DRAIN_TIME = 60000;      // 60 seconds timeout
+  const unsigned long DRAIN_INITIATE_TIMEOUT = 25000;
   static unsigned long lastDrainCompleteTime[2] = {0, 0};
   static bool liquidInitiallyDetected[2] = {false, false};
   static bool vacuumReleased[2] = {false, false};
-  
-  for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++) {
-    if (readBinarySensor(wasteBottleSensors[sensorIdx])) {
-      for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++) {
-        if (valveControls[i].isDraining) {
-          valveControls[i].isDraining = false;
-          if (sensorIdx == 0) {
+
+  // ---------- 1. Drain Timeout Check ----------
+  for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
+  {
+    for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++)
+    {
+      // If draining is active but no start time recorded, set it now.
+      if (valveControls[i].isDraining && valveControls[i].drainStartTime == 0)
+      {
+        valveControls[i].drainStartTime = currentTime;
+        Serial.print(F("[DEBUG] Trough "));
+        Serial.print(i + 1);
+        Serial.print(F(" drainStartTime set to: "));
+        Serial.println(currentTime);
+      }
+
+      // Check if drain has timed out.
+      if (valveControls[i].isDraining &&
+          (currentTime - valveControls[i].drainStartTime >= MAX_DRAIN_TIME))
+      {
+        unsigned long drainDuration = currentTime - valveControls[i].drainStartTime;
+        valveControls[i].isDraining = false;
+        valveControls[i].drainStartTime = 0; // clear start time
+
+        int trough = i + 1;
+        switch (trough)
+        {
+          case 1:
             wasteValve1 = closeValve(wasteValve1);
-          } else {
+            wasteValve3 = openValve(wasteValve3);
+            Serial.print(F("[ERROR] Draining timeout for trough 1 after "));
+            Serial.print(drainDuration);
+            Serial.println(F(" ms (maximum drain time reached)."));
+            break;
+          case 2:
+            wasteValve1 = closeValve(wasteValve1);
+            wasteValve3 = closeValve(wasteValve3);
+            Serial.print(F("[ERROR] Draining timeout for trough 2 after "));
+            Serial.print(drainDuration);
+            Serial.println(F(" ms (maximum drain time reached)."));
+            break;
+          case 3:
             wasteValve2 = closeValve(wasteValve2);
+            wasteValve4 = openValve(wasteValve4);
+            Serial.print(F("[ERROR] Draining timeout for trough 3 after "));
+            Serial.print(drainDuration);
+            Serial.println(F(" ms (maximum drain time reached)."));
+            break;
+          case 4:
+            wasteValve2 = closeValve(wasteValve2);
+            wasteValve4 = closeValve(wasteValve4);
+            Serial.print(F("[ERROR] Draining timeout for trough 4 after "));
+            Serial.print(drainDuration);
+            Serial.println(F(" ms (maximum drain time reached)."));
+            break;
+        }
+        if (!drainAsyncCompleted[i])
+        {
+          asyncCommandCompleted(&Serial);
+          drainAsyncCompleted[i] = true;
+        }
+      }
+    }
+  }
+
+  // ---------- 2. Drain Initiation Timeout Check ----------
+  for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
+  {
+    if (!readBinarySensor(wasteLineSensors[sensorIdx]) && !liquidInitiallyDetected[sensorIdx])
+    {
+      for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++)
+      {
+        if (valveControls[i].isDraining &&
+            (currentTime - valveControls[i].drainStartTime >= DRAIN_INITIATE_TIMEOUT))
+        {
+          valveControls[i].isDraining = false;
+          valveControls[i].drainStartTime = 0;
+          int trough = i + 1;
+          switch (trough)
+          {
+            case 1:
+              wasteValve1 = closeValve(wasteValve1);
+              wasteValve3 = openValve(wasteValve3);
+              break;
+            case 2:
+              wasteValve1 = closeValve(wasteValve1);
+              wasteValve3 = closeValve(wasteValve3);
+              break;
+            case 3:
+              wasteValve2 = closeValve(wasteValve2);
+              wasteValve4 = openValve(wasteValve4);
+              break;
+            case 4:
+              wasteValve2 = closeValve(wasteValve2);
+              wasteValve4 = closeValve(wasteValve4);
+              break;
           }
-          Serial.print(F("[ERROR] Draining halted for trough "));
-          Serial.print(i + 1);
-          Serial.println(F(" because the waste bottle is full."));
-          if (!drainAsyncCompleted[i]) {
+          Serial.print(F("[ERROR] Draining initiation timeout for trough "));
+          Serial.print(trough);
+          Serial.println(F(" (no liquid detected in drain line)."));
+          if (!drainAsyncCompleted[i])
+          {
             asyncCommandCompleted(&Serial);
             drainAsyncCompleted[i] = true;
           }
         }
       }
-      continue;
     }
-    
-    if (readBinarySensor(wasteLineSensors[sensorIdx])) {
+  }
+
+  // ---------- 3. Waste Bottle and Drain Completion Check ----------
+  for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
+  {
+    // If waste bottle is full, halt draining.
+    if (readBinarySensor(wasteBottleSensors[sensorIdx]))
+    {
+      for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++)
+      {
+        if (valveControls[i].isDraining)
+        {
+          valveControls[i].isDraining = false;
+          valveControls[i].drainStartTime = 0;
+          int trough = i + 1;
+          // For troughs 1 & 2 use wasteValve1, for 3 & 4 use wasteValve2.
+          switch (trough)
+          {
+            case 1:
+            case 2:
+              wasteValve1 = closeValve(wasteValve1);
+              break;
+            case 3:
+            case 4:
+              wasteValve2 = closeValve(wasteValve2);
+              break;
+          }
+          Serial.print(F("[ERROR] Draining halted for trough "));
+          Serial.print(trough);
+          Serial.println(F(" because the waste bottle is full."));
+          if (!drainAsyncCompleted[i])
+          {
+            asyncCommandCompleted(&Serial);
+            drainAsyncCompleted[i] = true;
+          }
+        }
+      }
+      continue; // Skip remaining checks for this sensor group.
+    }
+
+    // If liquid is detected, update timing variables.
+    if (readBinarySensor(wasteLineSensors[sensorIdx]))
+    {
       lastDrainCompleteTime[sensorIdx] = currentTime;
       liquidInitiallyDetected[sensorIdx] = true;
-    } else if (liquidInitiallyDetected[sensorIdx] &&
-               (currentTime - lastDrainCompleteTime[sensorIdx] >= DRAIN_COMPLETE_DELAY)) {
-      if (sensorIdx == 0) {
-        if (valveControls[0].isDraining) {
-          valveControls[0].isDraining = false;
-          wasteValve1 = closeValve(wasteValve1);
-          wasteValve3 = openValve(wasteValve3);
-          Serial.println(F("[MESSAGE] Draining complete for trough 1"));
-          if (!drainAsyncCompleted[0]) {
-            asyncCommandCompleted(&Serial);
-            drainAsyncCompleted[0] = true;
+    }
+    else if (liquidInitiallyDetected[sensorIdx] &&
+             (currentTime - lastDrainCompleteTime[sensorIdx] >= DRAIN_COMPLETE_DELAY))
+    {
+      // For each trough in this sensor group, mark the drain as complete.
+      for (int i = sensorIdx * 2; i < sensorIdx * 2 + 2; i++)
+      {
+        if (valveControls[i].isDraining)
+        {
+          valveControls[i].isDraining = false;
+          valveControls[i].drainStartTime = 0;
+          int trough = i + 1;
+          switch (trough)
+          {
+            case 1:
+              wasteValve1 = closeValve(wasteValve1);
+              wasteValve3 = openValve(wasteValve3);
+              Serial.println(F("[MESSAGE] Draining complete for trough 1"));
+              break;
+            case 2:
+              wasteValve1 = closeValve(wasteValve1);
+              wasteValve3 = closeValve(wasteValve3);
+              Serial.println(F("[MESSAGE] Draining complete for trough 2"));
+              break;
+            case 3:
+              wasteValve2 = closeValve(wasteValve2);
+              wasteValve4 = openValve(wasteValve4);
+              Serial.println(F("[MESSAGE] Draining complete for trough 3"));
+              break;
+            case 4:
+              wasteValve2 = closeValve(wasteValve2);
+              wasteValve4 = closeValve(wasteValve4);
+              Serial.println(F("[MESSAGE] Draining complete for trough 4"));
+              break;
           }
-        }
-        if (valveControls[1].isDraining) {
-          valveControls[1].isDraining = false;
-          wasteValve1 = closeValve(wasteValve1);
-          wasteValve3 = closeValve(wasteValve3);
-          Serial.println(F("[MESSAGE] Draining complete for trough 2"));
-          if (!drainAsyncCompleted[1]) {
+          if (!drainAsyncCompleted[i])
+          {
             asyncCommandCompleted(&Serial);
-            drainAsyncCompleted[1] = true;
-          }
-        }
-      } else if (sensorIdx == 1) {
-        if (valveControls[2].isDraining) {
-          valveControls[2].isDraining = false;
-          wasteValve2 = closeValve(wasteValve2);
-          wasteValve4 = openValve(wasteValve4);
-          Serial.println(F("[MESSAGE] Draining complete for trough 3"));
-          if (!drainAsyncCompleted[2]) {
-            asyncCommandCompleted(&Serial);
-            drainAsyncCompleted[2] = true;
-          }
-        }
-        if (valveControls[3].isDraining) {
-          valveControls[3].isDraining = false;
-          wasteValve2 = closeValve(wasteValve2);
-          wasteValve4 = closeValve(wasteValve4);
-          Serial.println(F("[MESSAGE] Draining complete for trough 4"));
-          if (!drainAsyncCompleted[3]) {
-            asyncCommandCompleted(&Serial);
-            drainAsyncCompleted[3] = true;
+            drainAsyncCompleted[i] = true;
           }
         }
       }
@@ -481,33 +864,48 @@ void monitorWasteSensors(unsigned long currentTime) {
       liquidInitiallyDetected[sensorIdx] = false;
       vacuumReleased[sensorIdx] = false;
     }
-    
-    if (!vacuumReleased[sensorIdx] && !readBinarySensor(wasteVacuumSensors[sensorIdx])) {
-      if (sensorIdx == 0) {
-        wasteValve3 = closeValve(wasteValve3);
-        Serial.println(F("[MESSAGE] Vacuum released. Waste valve 3 closed."));
-      } else if (sensorIdx == 1) {
-        wasteValve4 = closeValve(wasteValve4);
-        Serial.println(F("[MESSAGE] Vacuum released. Waste valve 4 closed."));
-      }
-      vacuumReleased[sensorIdx] = true;
+
+    // ---------- 4. Vacuum Release Check using switch-case on sensorIdx ----------
+    switch (sensorIdx)
+    {
+      case 0:
+        if (!vacuumReleased[sensorIdx] && !readBinarySensor(wasteVacuumSensors[sensorIdx]))
+        {
+          wasteValve3 = closeValve(wasteValve3);
+          Serial.println(F("[MESSAGE] Vacuum released. Waste valve 3 closed."));
+          vacuumReleased[sensorIdx] = true;
+        }
+        break;
+      case 1:
+        if (!vacuumReleased[sensorIdx] && !readBinarySensor(wasteVacuumSensors[sensorIdx]))
+        {
+          wasteValve4 = closeValve(wasteValve4);
+          Serial.println(F("[MESSAGE] Vacuum released. Waste valve 4 closed."));
+          vacuumReleased[sensorIdx] = true;
+        }
+        break;
     }
   }
 }
 
-// ============================================================
-// Monitor Vacuum Release (Stop-Drain Completion)
-// ============================================================
-void monitorVacuumRelease(unsigned long currentTime) {
-  for (int bottleIdx = 0; bottleIdx < 2; bottleIdx++) {
-    if (!globalVacuumMonitoring[bottleIdx])
-      continue;
-    
-    if (!readBinarySensor(wasteVacuumSensors[bottleIdx])) {
-      if (bottleIdx == 0) {
-        wasteValve3 = closeValve(wasteValve3);
-        Serial.println(F("[MESSAGE] Vacuum released. Waste valve 3 closed."));
-      } else if (bottleIdx == 1) {
+
+  // ============================================================
+  // Monitor Vacuum Release (Stop-Drain Completion)
+  // ============================================================
+  void monitorVacuumRelease(unsigned long currentTime)
+  {
+    for (int bottleIdx = 0; bottleIdx < 2; bottleIdx++)
+    {
+      if (!globalVacuumMonitoring[bottleIdx])
+        continue;
+
+      if (!readBinarySensor(wasteVacuumSensors[bottleIdx]))
+      {
+        if (bottleIdx == 0)
+        {
+          wasteValve3 = closeValve(wasteValve3);
+          Serial.println(F("[MESSAGE] Vacuum released. Waste valve 3 closed."));
+        } else if (bottleIdx == 1) {
         wasteValve4 = closeValve(wasteValve4);
         Serial.println(F("[MESSAGE] Vacuum released. Waste valve 4 closed."));
       }

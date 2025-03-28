@@ -569,7 +569,55 @@ void resetAsyncFlagsForCommand(const char* token) {
 }
 
 
+// Example implementation: assumes OnOffValve has a bool member "isOpen"
+// (if your valve type is defined differently, adjust accordingly)
+bool isValveClosed(const OnOffValve &valve) {
+  return !valve.isOpen;  
+}
 
+bool areAllValvesClosedForTrough(int troughNumber) {
+  // Adjust the mapping if your trough-to-valve assignment is different.
+  switch(troughNumber) {
+    case 1: 
+      return (isValveClosed(reagentValve1) &&
+              isValveClosed(mediaValve1) &&
+              isValveClosed(wasteValve1));
+    case 2:
+      return (isValveClosed(reagentValve2) &&
+              isValveClosed(mediaValve2) &&
+              isValveClosed(wasteValve2));
+    case 3:
+      return (isValveClosed(reagentValve3) &&
+              isValveClosed(mediaValve3) &&
+              isValveClosed(wasteValve3));
+    case 4:
+      return (isValveClosed(reagentValve4) &&
+              isValveClosed(mediaValve4) &&
+              isValveClosed(wasteValve4));
+    default:
+      return true;
+  }
+}
 
+void set_valve_state(OnOffValve &valveVar, bool state, int valveNumber, ValveType type, CommandCaller *caller) {
+  if (state) {
+    valveVar = openValve(valveVar);  // openValve() returns an OnOffValve
+    // When opening a valve manually, enable manual control for that trough.
+    enableManualControl(valveNumber - 1, caller);  
+  } else {
+    valveVar = closeValve(valveVar); // closeValve() returns an OnOffValve
+    // When closing, check if all valves in that trough are closed; if so, clear the manual flag.
+    updateTroughManualControlFlag(type, valveNumber, caller);
+  }
+}
+
+void updateTroughManualControlFlag(ValveType type, int valveNumber, CommandCaller *caller) {
+  // Here we assume that the "valveNumber" maps directly to the trough number.
+  int troughNumber = valveNumber;  // Adjust if your mapping is different.
+  if (areAllValvesClosedForTrough(troughNumber)) {
+    // All valves for this trough are closed—disable manual control.
+    disableManualControl(troughNumber - 1, caller);
+  }
+}
 
 

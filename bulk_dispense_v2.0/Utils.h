@@ -326,7 +326,30 @@ void resetAsyncFlagsForTrough(int troughNumber);
 
 void resetAsyncFlagsForCommand(const char* token);
 
+bool areAllValvesClosedForTrough(int troughIndex);
 
+// Enumeration to distinguish valve types.
+enum ValveType {
+    REAGENT,
+    MEDIA,
+    WASTE
+  };
+  
+  // Returns true if the valve is closed.
+  // (Adjust the implementation based on your OnOffValve definition.)
+  bool isValveClosed(const OnOffValve &valve);
+  
+  // Returns true if all valves for a given trough are closed.
+  // (Here we assume trough 1 uses reagentValve1, mediaValve1, wasteValve1, etc.)
+  bool areAllValvesClosedForTrough(int troughNumber);
+  
+  // Sets the valve state (open or closed) for a given valve variable,
+  // and then updates manual control for the trough accordingly.
+  void set_valve_state(OnOffValve &valveVar, bool state, int valveNumber, ValveType type, CommandCaller *caller);
+  
+  // Checks if all valves for the given trough are closed, and if so,
+  // disables manual control for that trough.
+  void updateTroughManualControlFlag(ValveType type, int valveNumber, CommandCaller *caller);
 
 #endif // UTILS_H
 
