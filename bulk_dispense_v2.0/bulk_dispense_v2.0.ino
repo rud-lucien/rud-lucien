@@ -148,7 +148,7 @@ void loop() {
   monitorWasteSensors(currentTime);
   monitorVacuumRelease(currentTime); 
   monitorEnclosureLiquidSensor(currentTime);
-  monitorEnclosureTemp();
+  monitorEnclosureTemp(currentTime);
   monitorFlowSensorConnections();
 
   // Read flow sensor data.

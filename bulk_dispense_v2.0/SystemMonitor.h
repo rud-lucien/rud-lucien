@@ -33,7 +33,7 @@ void monitorWasteLineSensors(unsigned long currentTime);
 void monitorWasteBottleSensors(unsigned long currentTime);
 void monitorWasteVacuumSensors(unsigned long currentTime);
 void monitorEnclosureLiquidSensor(unsigned long currentTime);
-void monitorEnclosureTemp();
+void monitorEnclosureTemp(unsigned long currentTime);
 void monitorFlowSensorConnections();
 void monitorPrimeSensors(unsigned long currentTime);
 void monitorFillSensors(unsigned long currentTime);

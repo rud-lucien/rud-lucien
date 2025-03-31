@@ -949,20 +949,66 @@ void monitorEnclosureLiquidSensor(unsigned long currentTime) {
 // ============================================================
 // Monitor Enclosure Temperature (Fan Control)
 // ============================================================
-void monitorEnclosureTemp() {
+// void monitorEnclosureTemp() {
+//   if (!fanAutoMode) return;
+//   TempHumidity th = readTempHumidity();
+//   if (th.valid) {
+//     if (th.temperature > ENCLOSURE_TEMP_SETPOINT) {
+//       Serial.println(F("[WARNING] Enclosure temperature exceeded setpoint! Activating fan."));
+//       setFanState(fan, true);
+//     } else {
+//       setFanState(fan, false);
+//     }
+//   } else {
+//     Serial.println(F("[ERROR] Failed to read enclosure temperature!"));
+//   }
+// }
+
+void monitorEnclosureTemp(unsigned long currentTime) {
+  // Do nothing if manual mode is active.
   if (!fanAutoMode) return;
+
+  // Static variables preserve state between calls.
+  static bool fanOnDueToAutoMode = false;
+  static unsigned long lastWarningTime = 0;
+
   TempHumidity th = readTempHumidity();
-  if (th.valid) {
-    if (th.temperature > ENCLOSURE_TEMP_SETPOINT) {
-      Serial.println(F("[WARNING] Enclosure temperature exceeded setpoint! Activating fan."));
-      setFanState(fan, true);
-    } else {
-      setFanState(fan, false);
-    }
-  } else {
+  if (!th.valid) {
     Serial.println(F("[ERROR] Failed to read enclosure temperature!"));
+    return;
+  }
+  
+  float currentTemp = th.temperature;
+  // unsigned long currentTime = millis();
+
+  // If temperature exceeds the setpoint (e.g., 30°C), lock the fan on.
+  if (currentTemp > ENCLOSURE_TEMP_SETPOINT) {
+    if (!fanOnDueToAutoMode) {
+      fanOnDueToAutoMode = true;
+      setFanState(fan, true);
+    }
+  }
+  
+  // Once the fan is locked on, keep it on until temperature falls to 25°C or below.
+  if (fanOnDueToAutoMode && currentTemp <= 25) {
+    fanOnDueToAutoMode = false;
+    setFanState(fan, false);
+  }
+
+  // If the fan is on due to auto mode, print a warning message once every minute.
+  if (fanOnDueToAutoMode && (currentTime - lastWarningTime >= 60000)) {
+    Serial.print(F("[WARNING] Enclosure temperature "));
+    Serial.print(currentTemp);
+    Serial.println(F("C exceeds threshold. Fan will remain on until temp <= 25C."));
+    lastWarningTime = currentTime;
+  }
+  
+  // Ensure the fan is off if not locked on.
+  if (!fanOnDueToAutoMode) {
+    setFanState(fan, false);
   }
 }
+
 
 // ============================================================
 // Monitor Flow Sensor Connections

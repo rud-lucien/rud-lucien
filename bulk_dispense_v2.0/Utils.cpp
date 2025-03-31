@@ -376,11 +376,13 @@ bool hasIncompatibleDrainage(int troughNumber, Stream* stream) {
   if ((troughNumber == 1 && valveControls[1].isDraining) ||
       (troughNumber == 2 && valveControls[0].isDraining)) {
     stream->println(F("[ERROR] Troughs 1 and 2 cannot be drained simultaneously."));
+    asyncCommandCompleted(&Serial);
     return true;
   }
   if ((troughNumber == 3 && valveControls[3].isDraining) ||
       (troughNumber == 4 && valveControls[2].isDraining)) {
     stream->println(F("[ERROR] Troughs 3 and 4 cannot be drained simultaneously."));
+    asyncCommandCompleted(&Serial);
     return true;
   }
   return false;
@@ -388,7 +390,7 @@ bool hasIncompatibleDrainage(int troughNumber, Stream* stream) {
 
 bool validateTroughNumber(int troughNumber, Stream* stream) {
   if (troughNumber < 1 || troughNumber > 4) {
-    stream->println(F("[ERROR] Invalid trough number. Use 1-4."));
+    stream->println(F("[ERROR] Invalid trough number."));
     return false;
   }
   return true;
@@ -425,7 +427,7 @@ bool isValveAlreadyPrimed(int valveNumber, Stream* stream) {
 
 bool validateValveNumber(int valveNumber, Stream* stream) {
   if (valveNumber < 1 || valveNumber > 4) {
-    stream->println(F("[ERROR] Invalid valve number. Use 1-4."));
+    stream->println(F("[ERROR] Invalid valve number."));
     return false;
   }
   return true;
