@@ -8,6 +8,8 @@
 #include <Wire.h>
 #include <string.h>
 #include <ctype.h>
+#include "CommandManager.h"
+#include "SystemMonitor.h"
 
 /************************************************************
  * Utils.cpp
@@ -70,84 +72,60 @@ bool isCommandPrefix(const char* token) {
   return false;
 }
 
-// void processMultipleCommands(char* commandLine, Stream* stream) {
-//   char* start = commandLine;
-//   char commandCopy[COMMAND_SIZE];
-
-//   // Start a new asynchronous command session.
-//   startCommandSession(stream);
-
-//   while (*start) {
-//     char* comma = strchr(start, ',');
-//     size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
-//     if (len >= COMMAND_SIZE) {
-//       len = COMMAND_SIZE - 1;
-//     }
-//     strncpy(commandCopy, start, len);
-//     commandCopy[len] = '\0';  // Null-terminate the substring
-//     char* trimmed = trimLeadingSpaces(commandCopy);
-//     if (strlen(trimmed) > 0) {
-//       Serial.print(F("[DEBUG] Token extracted: '"));
-//       Serial.print(trimmed);
-//       Serial.println(F("'"));
-      
-//       // If the command is asynchronous, register it.
-//       if (isAsyncCommand(trimmed)) {
-//         registerAsyncCommand();
-//       }
-      
-//       // Execute the command.
-//       commander.execute(trimmed, stream);
-//     }
-    
-//     if (comma == NULL) break;
-//     start = comma + 1;
-//   }
-
-//   // End session if no asynchronous commands are pending.
-//   if (pendingAsyncCommands == 0) {
-//     endCommandSession(stream);
-//   }
-// }
 
 void processMultipleCommands(char* commandLine, Stream* stream) {
-    char* start = commandLine;
-    char commandCopy[COMMAND_SIZE];
-
-    startCommandSession(stream);  // This prints [ACTION START]
-
-    while (*start) {
-        char* comma = strchr(start, ',');
-        size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
-        if (len >= COMMAND_SIZE) {
-            len = COMMAND_SIZE - 1;
-        }
-        strncpy(commandCopy, start, len);
-        commandCopy[len] = '\0';  // Null-terminate
-        char* trimmed = trimLeadingSpaces(commandCopy);
-        if (strlen(trimmed) > 0) {
-            Serial.print(F("[DEBUG] Token extracted: '"));
-            Serial.print(trimmed);
-            Serial.println(F("'"));
-
-            // Reset async flags only if the trough is not already busy.
-            resetAsyncFlagsForCommand(trimmed);
-
-            if (isAsyncCommand(trimmed)) {
-                registerAsyncCommand();
-            }
-
-            // Execute the command.
-            commander.execute(trimmed, stream);
-        }
-        if (comma == NULL)
-            break;
-        start = comma + 1;
+  char* start = commandLine;
+  char commandCopy[COMMAND_SIZE];
+  
+  // Set flag to indicate we are processing the command line.
+  commandLineBeingProcessed = true;
+  
+  // Start the session using our command manager.
+  cm_startSession(stream);  // This prints "[ACTION START]"
+  
+  while (*start) {
+    char* comma = strchr(start, ',');
+    size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
+    if (len >= COMMAND_SIZE) {
+      len = COMMAND_SIZE - 1;
     }
-
-    if (pendingAsyncCommands == 0) {
-        endCommandSession(stream);
+    strncpy(commandCopy, start, len);
+    commandCopy[len] = '\0';  // Null-terminate
+    char* trimmed = trimLeadingSpaces(commandCopy);
+    if (strlen(trimmed) > 0) {
+      Serial.print(F("[DEBUG] Token extracted: '"));
+      Serial.print(trimmed);
+      Serial.println(F("'"));
+      
+      resetAsyncFlagsForCommand(trimmed);
+      
+      if (isAsyncCommand(trimmed)) {
+        cm_registerCommand();
+        // Dispatch asynchronous command.
+        // Its callback must call cm_commandCompleted(stream) when done.
+        commander.execute(trimmed, stream);
+      } else {
+        // For synchronous commands, register and execute.
+        cm_registerCommand();
+        commander.execute(trimmed, stream);
+        // Synchronous commands finish immediately (even if error),
+        // so complete them here.
+        cm_commandCompleted(stream);
+      }
     }
+    if (comma == NULL)
+      break;
+    start = comma + 1;
+  }
+  
+  // Finished processing the command line.
+  commandLineBeingProcessed = false;
+  
+  // If there are no pending commands after processing, end the session.
+  if (cm_getPendingCommands() <= 0 && cm_isSessionActive()) {
+    cm_endSession(stream);
+  }
+  
 }
 
 
@@ -443,31 +421,104 @@ void setVacuumMonitoringAndCloseMainValve(int troughNumber, Stream* stream) {
   }
 }
 
+
+// Helper function to force-stop a drain operation for a given trough.
+// In the event of an enclosure leak, we want to immediately close
+// both the primary and secondary drain valves.
+void stopDrainOperation(int trough, Stream* stream) {
+  stream->print(F("[MESSAGE] Stopping drain operation for trough "));
+  stream->println(trough);
+
+  // Force-close the primary drain valve(s) for this trough.
+  // (Adjust these based on your hardware mapping.)
+  switch(trough) {
+    case 1:
+      wasteValve1 = closeValve(wasteValve1);
+      break;
+    case 2:
+      wasteValve2 = closeValve(wasteValve2);
+      break;
+    case 3:
+      wasteValve3 = closeValve(wasteValve3);
+      break;
+    case 4:
+      wasteValve4 = closeValve(wasteValve4);
+      break;
+    default:
+      stream->println(F("[ERROR] Invalid trough number in stopDrainOperation."));
+      return;
+  }
+  
+  // Also, force-close any secondary drain valve(s) that might be used.
+  // For example, if troughs 1 and 2 share a secondary valve, and 3 and 4 share another:
+  if (trough == 1 || trough == 2) {
+    // Force close the secondary valve for troughs 1 and 2.
+    // (Even if under normal circumstances you might open it to equalize pressure.)
+    wasteValve3 = closeValve(wasteValve3);
+  }
+  else if (trough == 3 || trough == 4) {
+    wasteValve4 = closeValve(wasteValve4);
+  }
+  
+  // Reset the drain timer.
+  valveControls[trough - 1].drainStartTime = 0;
+}
+
+
 void abortAllAutomatedOperations(Stream* stream) {
   // Abort operations on each trough.
   for (int trough = 1; trough <= NUM_OVERFLOW_SENSORS; trough++) {
-    if (valveControls[trough - 1].isDispensing) {
+    int index = trough - 1;
+    // If dispensing, stop it.
+    if (valveControls[index].isDispensing) {
       stopDispenseOperation(trough, stream);
     }
-    if (valveControls[trough - 1].isPriming) {
+    // If priming, stop it.
+    if (valveControls[index].isPriming) {
       stopPrimingForFill(trough, stream);
     }
-    if (valveControls[trough - 1].fillMode) {
+    // If in fill mode, disable it.
+    if (valveControls[index].fillMode) {
       disableFillMode(trough, stream);
     }
-    if (valveControls[trough - 1].isDraining) {
-      valveControls[trough - 1].isDraining = false;
-      // Optionally, close any associated waste valves here.
+    // If draining, stop the drain process.
+    if (valveControls[index].isDraining) {
+      stopDrainOperation(trough, stream);
     }
+    // Stop asynchronous sensor operations.
+    stopFlowSensorMeasurement(*flowSensors[index]);
+    resetFlowSensorDispenseVolume(*flowSensors[index]);
+
+    // Reset the trough control flags.
+    valveControls[index].isDispensing = false;
+    valveControls[index].isPriming = false;
+    valveControls[index].fillMode = false;
+    valveControls[index].isDraining = false;
+    valveControls[index].manualControl = false;
+    valveControls[index].targetVolume = -1;
+    valveControls[index].lastFlowCheckTime = 0;
+    valveControls[index].lastFlowChangeTime = 0;
+    
+    // Reset any asynchronous timers associated with this trough.
+    valveControls[index].drainStartTime = 0;
   }
+
+  // Also reset monitor-specific state (prime, fill, waste, enclosure leak) to get a clean slate.
+  resetPrimeMonitorState();
+  resetFillMonitorState();
+  resetWasteMonitorState();
+  resetEnclosureLeakMonitorState();
   
   stream->println(F("[ERROR] Enclosure liquid detected. Automated operations halted. Resolve the leak before proceeding."));
   stream->println(F("[MESSAGE] All automated operations aborted due to enclosure leak."));
   
-  if (commandSessionActive) {
-    endCommandSession(stream);
+  // Abort the command session so that an [ACTION END] message is printed.
+  if (cm_isSessionActive()) {
+    cm_abortSession(stream);
   }
 }
+
+
 
 String getOverallTroughState() {
   bool allIdle = true;
@@ -536,6 +587,7 @@ String getOpenValvesString(bool v1, bool v2, bool v3, bool v4) {
   }
   return openList;
 }
+
 
 // In your Utils.cpp (or the file where you defined resetAsyncFlagsForTrough)
 void resetAsyncFlagsForTrough(int troughNumber) {

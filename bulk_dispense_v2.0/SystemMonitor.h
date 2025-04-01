@@ -43,6 +43,10 @@ void monitorVacuumRelease(unsigned long currentTime);
 // ==================== Helper Function Prototypes ====================
 void handleOverflowCondition(int triggeredTrough);
 void handleTimeoutCondition(int troughNumber);
+void resetPrimeMonitorState();
+void resetFillMonitorState();
+void resetWasteMonitorState();
+void resetEnclosureLeakMonitorState();
 
 #endif // SYSTEMMONITOR_H
 

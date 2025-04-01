@@ -5,6 +5,8 @@
 #include "Utils.h"
 #include <Controllino.h>
 #include "CommandSession.h"
+#include "CommandManager.h"
+#include "SystemMonitor.h"
 
 /************************************************************
  * Commands.cpp
@@ -485,124 +487,17 @@ void cmd_reset_i2c(char* args, CommandCaller* caller) {
   caller->println(F("[MESSAGE] I2C bus reset complete."));
 }
 
-// void cmd_dispense_reagent(char* args, CommandCaller* caller) {
-//   char localArgs[COMMAND_SIZE];
-//   strncpy(localArgs, args, COMMAND_SIZE);
-//   localArgs[COMMAND_SIZE - 1] = '\0';
-
-//   if (globalEnclosureLiquidError) {
-//     caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
-//     return;
-//   }
-
-//   int troughNumber = -1;
-//   float requestedVolume = -1.0;
-//   const float MIN_VOLUME = 1.0;
-//   const float MAX_VOLUME = 200.0;
-
-//   caller->print(F("[MESSAGE] Received command: D "));
-//   caller->println(localArgs);
-
-//   char* token = strtok(localArgs, " ");
-//   if (token != NULL) {
-//     troughNumber = atoi(token);
-//     token = strtok(NULL, " ");
-//     if (token != NULL) {
-//       requestedVolume = atof(token);
-//     } else {
-//       requestedVolume = -1.0;  // Continuous mode if no volume provided.
-//     }
-//   } else {
-//     caller->println(F("[ERROR] Invalid command format. Use: D <1-4> [volume]"));
-//     return;
-//   }
-
-//   caller->print(F("[MESSAGE] Dispense command received for Trough "));
-//   caller->print(troughNumber);
-//   caller->print(F(" with requested volume "));
-//   caller->println(requestedVolume);
-
-//   if (!validateTroughNumber(troughNumber, caller)) {
-//     return;
-//   }
-
-//   disableFillMode(troughNumber, caller);
-
-//   if (valveControls[troughNumber - 1].isDispensing) {
-//     caller->print(F("[WARNING] A dispense is already in progress for Trough "));
-//     caller->println(troughNumber);
-//     caller->println(F("Use STOPD <trough number> to stop it first."));
-//     return;
-//   }
-//   if (requestedVolume > 0) {
-//     if (requestedVolume < MIN_VOLUME) {
-//       caller->print(F("[ERROR] Requested volume too low. Minimum: "));
-//       caller->print(MIN_VOLUME);
-//       caller->println(F(" mL."));
-//       return;
-//     } else if (requestedVolume > MAX_VOLUME) {
-//       caller->print(F("[ERROR] Requested volume too high. Maximum: "));
-//       caller->print(MAX_VOLUME);
-//       caller->println(F(" mL."));
-//       return;
-//     }
-//   }
-
-//   const float PRESSURE_THRESHOLD_PSI = 15.0;
-//   const int VALVE_POSITION = 100;
-//   const unsigned long PRESSURE_TIMEOUT_MS = 500;
-
-//   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
-//     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
-//     // Signal asynchronous command completion for this trough.
-//     asyncCommandCompleted(&Serial);
-//     return;  // Abort further processing for this command.
-//   }
-
-//   if (readBinarySensor(overflowSensors[troughNumber - 1])) {
-//     caller->print(F("[ERROR] Cannot dispense: Overflow detected for Trough "));
-//     caller->println(troughNumber);
-//     // Signal asynchronous completion so that CS transitions from active to inactive.
-//     asyncCommandCompleted(&Serial);
-//     dispenseAsyncCompleted[troughNumber - 1] = true;
-//     return;
-//   }
-
-
-//   FlowSensor* sensor = flowSensors[troughNumber - 1];
-//   if (!sensor) {
-//     caller->print(F("[ERROR] No flow sensor found for Trough "));
-//     caller->println(troughNumber);
-//     return;
-//   }
-
-//   if (!startFlowSensorMeasurement(*sensor)) {
-//     caller->print(F("[ERROR] Failed to start flow sensor for Trough "));
-//     caller->println(troughNumber);
-//     return;
-//   }
-
-//   caller->print(F("[MESSAGE] Flow sensor measurement started for Trough "));
-//   caller->println(troughNumber);
-
-//   openDispenseValves(troughNumber);
-//   caller->print(F("[MESSAGE] Dispensing started for Trough "));
-//   caller->println(troughNumber);
-
-//   valveControls[troughNumber - 1].isDispensing = true;
-//   valveControls[troughNumber - 1].targetVolume = requestedVolume;
-
-//   // Mark this dispensing operation as asynchronous.
-//   dispenseAsyncCompleted[troughNumber - 1] = false;
-// }
 
 void cmd_dispense_reagent(char* args, CommandCaller* caller) {
+
+
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   if (globalEnclosureLiquidError) {
     caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
+    cm_commandCompleted(&Serial); // call completion on error path
     return;
   }
 
@@ -625,8 +520,9 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
       requestedVolume = -1.0;  // Continuous mode if no volume provided.
     }
   } else {
-    // caller->println(F("[ERROR] Invalid command format. Use: D <1-4> [volume]"));
-    // asyncCommandCompleted(&Serial);
+    // Invalid format.
+    caller->println(F("[ERROR] Invalid command format. Use: D <1-4> [volume]"));
+    cm_commandCompleted(&Serial);  // finish command
     return;
   }
 
@@ -637,7 +533,7 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
 
   if (!validateTroughNumber(troughNumber, caller)) {
     caller->println(F("[ERROR] Invalid command format. Use: D <1-4> [volume]"));
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -647,7 +543,7 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
     caller->print(F("[WARNING] A dispense is already in progress for Trough "));
     caller->println(troughNumber);
     caller->println(F("Use STOPD <trough number> to stop it first."));
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -656,13 +552,13 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
       caller->print(F("[ERROR] Requested volume too low. Minimum: "));
       caller->print(MIN_VOLUME);
       caller->println(F(" mL."));
-      asyncCommandCompleted(&Serial);
+      cm_commandCompleted(&Serial);
       return;
     } else if (requestedVolume > MAX_VOLUME) {
       caller->print(F("[ERROR] Requested volume too high. Maximum: "));
       caller->print(MAX_VOLUME);
       caller->println(F(" mL."));
-      asyncCommandCompleted(&Serial);
+      cm_commandCompleted(&Serial);
       return;
     }
   }
@@ -673,7 +569,7 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -681,7 +577,7 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   if (readBinarySensor(overflowSensors[troughNumber - 1])) {
     caller->print(F("[ERROR] Cannot dispense: Overflow detected for Trough "));
     caller->println(troughNumber);
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -689,14 +585,14 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   if (!sensor) {
     caller->print(F("[ERROR] No flow sensor found for Trough "));
     caller->println(troughNumber);
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
   if (!startFlowSensorMeasurement(*sensor)) {
     caller->print(F("[ERROR] Failed to start flow sensor for Trough "));
     caller->println(troughNumber);
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -712,6 +608,10 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
 
   // Mark this dispensing operation as asynchronous.
   dispenseAsyncCompleted[troughNumber - 1] = false;
+
+  // *** IMPORTANT: Do NOT call cm_commandCompleted() here.
+  // For an asynchronous command, the completion function should be called
+  // later by the async callback when the dispense finishes (or times out).
 }
 
 
@@ -745,49 +645,6 @@ void cmd_stop_dispense(char* args, CommandCaller* caller) {
   }
 }
 
-// void cmd_prime_valves(char* args, CommandCaller* caller) {
-//   char localArgs[COMMAND_SIZE];
-//   strncpy(localArgs, args, COMMAND_SIZE);
-//   localArgs[COMMAND_SIZE - 1] = '\0';
-
-//   if (globalEnclosureLiquidError) {
-//     caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
-//     return;
-//   }
-
-//   int localValveNumber = -1;
-//   char extra;
-//   if (sscanf(localArgs, "%d %c", &localValveNumber, &extra) != 1) {
-//     caller->println(F("[ERROR] Invalid arguments for prime command. Use: P <valve number>"));
-//     return;
-//   }
-
-//   if (!validateValveNumber(localValveNumber, caller)) {
-//     return;
-//   }
-
-//   disableFillMode(localValveNumber, caller);
-
-//   const float PRESSURE_THRESHOLD_PSI = 15.0;
-//   const int VALVE_POSITION = 100;
-//   const unsigned long PRESSURE_TIMEOUT_MS = 500;
-
-//   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
-//     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
-//     // Signal asynchronous command completion for this trough.
-//     asyncCommandCompleted(&Serial);
-//     return;  // Abort further processing for this command.
-//   }
-
-//   if (isValveAlreadyPrimed(localValveNumber, caller)) {
-//     return;
-//   }
-
-//   openDispenseValves(localValveNumber);
-//   valveControls[localValveNumber - 1].isPriming = true;
-//   caller->print(F("[MESSAGE] Priming started for valve "));
-//   caller->println(localValveNumber);
-// }
 
 void cmd_prime_valves(char* args, CommandCaller* caller) {
   char localArgs[COMMAND_SIZE];
@@ -809,7 +666,7 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
 
   if (!validateValveNumber(localValveNumber, caller)) {
     caller->println(F("[ERROR] Invalid arguments for prime command. Use: P <1-4>"));
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -820,7 +677,7 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
     caller->println(F("[ERROR] Pressure check failed. Prime aborted."));
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -828,7 +685,7 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
     caller->print(F("[WARNING] Valve "));
     caller->print(localValveNumber);
     caller->println(F(" is already primed."));
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -870,18 +727,14 @@ void cmd_fill_reagent(char* args, CommandCaller* caller) {
   if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
     // Signal asynchronous command completion for this trough.
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;  // Abort further processing for this command.
   }
 
   resetFlowSensorDispenseVolume(*flowSensors[troughNumber - 1]);
   openDispenseValves(troughNumber);
   enableFillMode(troughNumber, caller);
-  caller->print(F("[MESSAGE] Fill mode enabled for trough "));
-  caller->println(troughNumber);
-
-  // For fill mode, immediately complete the command.
-  asyncCommandCompleted(&Serial);
+  
 }
 
 void cmd_drain_trough(char* args, CommandCaller* caller) {
@@ -904,15 +757,17 @@ void cmd_drain_trough(char* args, CommandCaller* caller) {
 
   if (!validateTroughNumber(troughNumber, caller)) {
     caller->println(F("[ERROR] Invalid arguments for drain command. Use: DT <1-4>"));
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     return;
   }
 
   if (isWasteBottleFullForTrough(troughNumber, caller)) {
+    cm_commandCompleted(&Serial);
     return;
   }
 
   if (hasIncompatibleDrainage(troughNumber, caller)) {
+    cm_commandCompleted(&Serial);
     return;
   }
 
@@ -976,7 +831,7 @@ void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
         valveControls[i].drainStartTime = 0;
         // Mark the drain async task for this trough as complete if not already.
         if (!drainAsyncCompleted[i]) {
-          asyncCommandCompleted(&Serial);
+          cm_commandCompleted(&Serial);
           drainAsyncCompleted[i] = true;
         }
       }
@@ -1028,7 +883,7 @@ void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
   }
   // Mark this trough's drain async as complete if it wasn’t already.
   if (!drainAsyncCompleted[index]) {
-    asyncCommandCompleted(&Serial);
+    cm_commandCompleted(&Serial);
     drainAsyncCompleted[index] = true;
   }
 }
@@ -1106,13 +961,13 @@ void cmd_standby(char* args, CommandCaller* caller) {
 
   caller->println(F("[MESSAGE] Executing STANDBY command. Shutting down system to safe state..."));
 
-  // Iterate over all troughs (using 0-based index for valveControls and flowSensors)
+  // Abort all running operations for each trough.
   for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
-    // Stop flow sensor measurement (and reset dispense volume) for each trough.
+    // Stop asynchronous sensor operations.
     stopFlowSensorMeasurement(*flowSensors[i]);
     resetFlowSensorDispenseVolume(*flowSensors[i]);
 
-    // Directly enforce a safe state by resetting flags for this trough:
+    // Reset the trough control flags.
     valveControls[i].isDispensing = false;
     valveControls[i].isPriming = false;
     valveControls[i].fillMode = false;
@@ -1121,31 +976,36 @@ void cmd_standby(char* args, CommandCaller* caller) {
     valveControls[i].targetVolume = -1;
     valveControls[i].lastFlowCheckTime = 0;
     valveControls[i].lastFlowChangeTime = 0;
+    
+    // Reset any asynchronous timers associated with this trough.
+    valveControls[i].drainStartTime = 0;
+    // (If you have other timers such as fillStartTime, reset them here as well.)
+
   }
 
-  // Close all reagent and media valves for each trough
-  // Trough 1:
-  reagentValve1 = closeValve(reagentValve1);
-  mediaValve1 = closeValve(mediaValve1);
-  // Trough 2:
-  reagentValve2 = closeValve(reagentValve2);
-  mediaValve2 = closeValve(mediaValve2);
-  // Trough 3:
-  reagentValve3 = closeValve(reagentValve3);
-  mediaValve3 = closeValve(mediaValve3);
-  // Trough 4:
-  reagentValve4 = closeValve(reagentValve4);
-  mediaValve4 = closeValve(mediaValve4);
+  // Call the monitor reset helpers to clear any stale timers/flags
+  resetPrimeMonitorState();
+  resetFillMonitorState();
+  resetWasteMonitorState();
+  resetEnclosureLeakMonitorState();
 
-  // Close the main waste valves (attached to waste bottles)
+  // Close all reagent and media valves.
+  reagentValve1 = closeValve(reagentValve1);
+  mediaValve1   = closeValve(mediaValve1);
+  reagentValve2 = closeValve(reagentValve2);
+  mediaValve2   = closeValve(mediaValve2);
+  reagentValve3 = closeValve(reagentValve3);
+  mediaValve3   = closeValve(mediaValve3);
+  reagentValve4 = closeValve(reagentValve4);
+  mediaValve4   = closeValve(mediaValve4);
+
+  // Close all waste valves.
   wasteValve1 = closeValve(wasteValve1);
   wasteValve2 = closeValve(wasteValve2);
-
-  // Close the individual trough waste valves (if applicable)
   wasteValve3 = closeValve(wasteValve3);
   wasteValve4 = closeValve(wasteValve4);
 
-  // Close the pressure valve by setting it to 0% open.
+  // Close the pressure valve by setting its position to 0%.
   proportionalValve = setValvePosition(proportionalValve, 0.0);
 
   // Reset global vacuum monitoring flags.
@@ -1154,11 +1014,14 @@ void cmd_standby(char* args, CommandCaller* caller) {
 
   caller->println(F("[MESSAGE] All automated operations aborted. System is now in STANDBY mode."));
 
-  // End any active asynchronous command session so that an [ACTION END] tag is printed.
-  if (commandSessionActive) {
-    endCommandSession(&Serial);
+  // Abort the command session so that an [ACTION END] message is printed.
+  if (cm_isSessionActive()) {
+    cm_abortSession(&Serial);
   }
 }
+
+
+
 
 
 

@@ -4,6 +4,7 @@
 #include "Utils.h"     // For any helper functions
 #include <stdio.h>
 #include "CommandSession.h"
+#include "CommandManager.h"
 
 /************************************************************
  * Logging.cpp
@@ -36,7 +37,7 @@ void logData(const char* module, const char* message) {
 // logSystemState()
 // ============================================================
 void logSystemState() {
-  char buffer[400];
+  char buffer[500];
 
   // --- Fan State ---
   char fanState = (digitalRead(fan.relayPin) == HIGH ? '1' : '0');
@@ -169,6 +170,8 @@ void logSystemState() {
   char tds3 = (wasteValve2.isOpen && wasteValve4.isOpen) ? '1' : '0';
   char tds4 = (wasteValve2.isOpen && !wasteValve4.isOpen) ? '1' : '0';
 
+ 
+
   // --- Format and Print Log Message ---
   sprintf(buffer,
           "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, PV,%s, PV%%,%s, "
@@ -222,7 +225,7 @@ void logSystemState() {
   // --- Build Diagnostic Information ---
   char diagBuffer[128];
   sprintf(diagBuffer,
-          ", DIAG: FAM:%s, EERR:%s, GVM1:%s, GVM2:%s, MC1:%s, MC2:%s, MC3:%s, MC4:%s, LF:%lu ms, CS:%s",
+          ", DIAG: FAM:%s, EERR:%s, GVM1:%s, GVM2:%s, MC1:%s, MC2:%s, MC3:%s, MC4:%s, LF:%lu ms, RC:%d",
           fanAutoMode ? "ON" : "OFF",                                 // Fan Auto Mode
           globalEnclosureLiquidError ? "TRUE" : "FALSE",               // Enclosure Liquid Error
           globalVacuumMonitoring[0] ? "TRUE" : "FALSE",                // Vacuum Monitoring for bottle 1
@@ -232,7 +235,7 @@ void logSystemState() {
           valveControls[2].manualControl ? "ON" : "OFF",               // Manual Control for Trough 3
           valveControls[3].manualControl ? "ON" : "OFF",               // Manual Control for Trough 4
           logging.logInterval,                                         // Logging frequency
-          (commandSessionActive ? "ACTIVE" : "INACTIVE"));             // Command session status
+          cm_getPendingCommands());                                    // get number of pending commands
 
   char flowDiag[128];
   sprintf(flowDiag,

@@ -323,9 +323,8 @@ String getOverallTroughState();
  */
 String getOpenValvesString(bool v1, bool v2, bool v3, bool v4);
 
-void resetAsyncFlagsForTrough(int troughNumber);
 
-void resetAsyncFlagsForCommand(const char* token);
+
 
 bool areAllValvesClosedForTrough(int troughIndex);
 
@@ -351,6 +350,12 @@ enum ValveType {
   // Checks if all valves for the given trough are closed, and if so,
   // disables manual control for that trough.
   void updateTroughManualControlFlag(ValveType type, int valveNumber, CommandCaller *caller);
+
+  void stopDrainOperation(int trough, Stream* stream);
+
+
+
+  void resetAsyncFlagsForCommand(const char* token);
 
 #endif // UTILS_H
 
