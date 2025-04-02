@@ -2,6 +2,7 @@
 #define LOGGING_H
 
 #include <Controllino.h>
+#include "Sensors.h"
 
 /************************************************************
  * Logging.h
@@ -44,12 +45,17 @@ extern LoggingManagement logging;
  */
 void logData(const char* module, const char* message);
 
+
+const char* getFlowDiagString(const FlowSensor &sensor, bool isDispensing);
+
 /**
  * logSystemState()
  * ----------------
  * Gathers current system state (fan, valves, sensors, etc.) and prints a formatted log message.
  */
 void logSystemState();
+
+
 
 #endif // LOGGING_H
 

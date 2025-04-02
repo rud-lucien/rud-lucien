@@ -33,6 +33,17 @@ void logData(const char* module, const char* message) {
   Serial.println(message);
 }
 
+
+// Returns a diagnostic string based on whether the sensor is dispensing or not.
+// If not dispensing, it returns "Not Dispensing". Otherwise, it uses getFlowState().
+const char* getFlowDiagString(const FlowSensor &sensor, bool isDispensing) {
+  if (!isDispensing) {
+    return "Not Dispensing";
+  }
+  return sensor.isValidReading ? "Valid" : "Invalid";
+}
+
+
 // ============================================================
 // logSystemState()
 // ============================================================
@@ -226,7 +237,7 @@ void logSystemState() {
   char diagBuffer[128];
   sprintf(diagBuffer,
           ", DIAG: FAM:%s, EERR:%s, GVM1:%s, GVM2:%s, MC1:%s, MC2:%s, MC3:%s, MC4:%s, LF:%lu ms, RC:%d",
-          fanAutoMode ? "ON" : "OFF",                                 // Fan Auto Mode
+          fanAutoMode ? "ON" : "OFF",                                  // Fan Auto Mode
           globalEnclosureLiquidError ? "TRUE" : "FALSE",               // Enclosure Liquid Error
           globalVacuumMonitoring[0] ? "TRUE" : "FALSE",                // Vacuum Monitoring for bottle 1
           globalVacuumMonitoring[1] ? "TRUE" : "FALSE",                // Vacuum Monitoring for bottle 2
@@ -239,11 +250,11 @@ void logSystemState() {
 
   char flowDiag[128];
   sprintf(flowDiag,
-          ", FLOW_DIAG: FS1:%s, FS2:%s, FS3:%s, FS4:%s",
-          (flow1.isValidReading ? "Valid" : "Invalid"),
-          (flow2.isValidReading ? "Valid" : "Invalid"),
-          (flow3.isValidReading ? "Valid" : "Invalid"),
-          (flow4.isValidReading ? "Valid" : "Invalid"));
+    ", FLOW_DIAG: FS1:%s, FS2:%s, FS3:%s, FS4:%s",
+    getFlowDiagString(flow1, valveControls[0].isDispensing),
+    getFlowDiagString(flow2, valveControls[1].isDispensing),
+    getFlowDiagString(flow3, valveControls[2].isDispensing),
+    getFlowDiagString(flow4, valveControls[3].isDispensing));
 
   // Append diagnostic info to the main log message
   strncat(buffer, diagBuffer, sizeof(buffer) - strlen(buffer) - 1);
@@ -252,3 +263,4 @@ void logSystemState() {
   // --- Print the complete log message ---
   Serial.println(buffer);
 }
+

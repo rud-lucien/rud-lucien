@@ -37,8 +37,8 @@ void cm_commandCompleted(Stream* stream) {
     }
     if (pendingCommands > 0) {
       pendingCommands--;
-      Serial.print(F("[DEBUG] Command completed. Pending: "));
-      Serial.println(pendingCommands);
+      stream->print(F("[DEBUG] Command completed. Pending: "));
+      stream->println(pendingCommands);
     }
     if (pendingCommands <= 0 && !commandLineBeingProcessed && sessionActive) {
       cm_endSession(stream);
