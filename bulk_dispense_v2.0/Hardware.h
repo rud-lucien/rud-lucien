@@ -236,4 +236,3 @@ void selectMultiplexerChannel(uint8_t multiplexerAddr, uint8_t channel);
 bool readBinarySensor(const BinarySensor &sensor);
 
 #endif  // HARDWARE_H
-

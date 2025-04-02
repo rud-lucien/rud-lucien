@@ -35,6 +35,7 @@ bool isFlowSensorConnected(FlowSensor &sensor) {
   }
 }
 
+
 // ============================================================
 // Temperature & Humidity Sensor Functions
 // ============================================================
@@ -79,6 +80,8 @@ bool initializeFlowSensor(FlowSensor &sensor) {
 
   // Step 1: Select the multiplexer channel.
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+  delay(10); // Add delay after channel selection
+
 
   // Step 2: Check sensor connection.
   if (!isFlowSensorConnected(sensor)) {
@@ -87,6 +90,8 @@ bool initializeFlowSensor(FlowSensor &sensor) {
     Serial.println(F(" is not connected. Aborting initialization."));
     return false;
   }
+  delay(10); // Add delay after channel selection
+
 
   // Step 3: On retry, attempt a soft reset.
   if (resetAttempt > 0) {
@@ -99,7 +104,7 @@ bool initializeFlowSensor(FlowSensor &sensor) {
       Serial.println(F("[WARNING] Soft reset command was not acknowledged."));
       return false;
     }
-    delay(25);
+    delay(50);
     if (!isFlowSensorConnected(sensor)) {
       Serial.println(F("[ERROR] Sensor did not respond after soft reset."));
       return false;
@@ -223,6 +228,7 @@ bool startFlowSensorMeasurement(FlowSensor &sensor) {
   Serial.println(sensor.channel);
   return false;
 }
+
 
 bool stopFlowSensorMeasurement(FlowSensor &sensor) {
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
