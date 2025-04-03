@@ -23,18 +23,37 @@
  * @param sensor The flow sensor to check.
  * @return true if the sensor is connected, false otherwise.
  */
-bool isFlowSensorConnected(FlowSensor &sensor) {
-  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
-  Wire.beginTransmission(sensor.sensorAddr);
-  if (Wire.endTransmission() == 0) {
-    sensor.sensorConnected = 1;
-    return true;
-  } else {
-    sensor.sensorConnected = 0;
-    return false;
-  }
-}
+// bool isFlowSensorConnected(FlowSensor &sensor) {
+//   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+//   Wire.beginTransmission(sensor.sensorAddr);
+//   if (Wire.endTransmission() == 0) {
+//     sensor.sensorConnected = 1;
+//     return true;
+//   } else {
+//     sensor.sensorConnected = 0;
+//     return false;
+//   }
+// }
 
+bool isFlowSensorConnected(FlowSensor &sensor) {
+  // Try multiple times with delays
+  for (int attempt = 0; attempt < 3; attempt++) {
+      selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+      delay(20);
+      
+      Wire.beginTransmission(sensor.sensorAddr);
+      uint8_t error = Wire.endTransmission();
+      
+      if (error == 0) {
+          sensor.sensorConnected = 1;
+          return true;
+      }
+      delay(20);
+  }
+  
+  sensor.sensorConnected = 0;
+  return false;
+}
 
 // ============================================================
 // Temperature & Humidity Sensor Functions
