@@ -23,6 +23,7 @@
 #include "Commands.h"      // Commander API and command functions
 #include "Utils.h"         // Utility functions
 #include "SystemMonitor.h" // System monitor functions
+#include "NetworkConfig.h" // Network configuration and functions
 
 //=================================================================
 // Setup Function: System Initialization
@@ -32,6 +33,9 @@ void setup()
   // --- Serial and Global Flags Initialization ---
   Serial.begin(115200);
   Serial.println(F("[MESSAGE] System starting..."));
+
+  // Initialize network communication
+  initializeNetwork();
 
   // Reset key global flags
   globalVacuumMonitoring[0] = false;
@@ -78,31 +82,17 @@ void setup()
   proportionalValve = setValvePosition(proportionalValve, 0.0);
 
   // --- Initialize Flow Sensors ---
-  // Serial.println(F("[MESSAGE] Setting up Flow Sensors..."));
-  // for (int i = 0; i < NUM_FLOW_SENSORS; i++)
-  // {
-  //   // Just set initial states without trying to communicate
-  //   flowSensors[i]->sensorInitialized = false;
-  //   flowSensors[i]->sensorStopped = false;
-  //   flowSensors[i]->sensorConnected = 0;
-  //   flowSensors[i]->dispenseVolume = 0.0;
-  //   flowSensors[i]->totalVolume = 0.0;
-  //   flowSensors[i]->lastUpdateTime = 0;
-  //   flowSensors[i]->isValidReading = false;
-  // }
-  // Serial.println(F("[MESSAGE] Flow Sensors ready for initialization on demand."));
+  Serial.println(F("[MESSAGE] Setting up Flow Sensors..."));
 
-  // --- Initialize Flow Sensors ---
-Serial.println(F("[MESSAGE] Setting up Flow Sensors..."));
+  // First, reset I2C bus
+  Wire.end();
+  delay(100);
+  Wire.begin();
+  delay(100);
+  Serial.println(F("[MESSAGE] I2C bus reset complete."));
 
-// First, reset I2C bus
-Wire.end();
-delay(100);
-Wire.begin();
-delay(100);
-Serial.println(F("[MESSAGE] I2C bus reset complete."));
-
-for (int i = 0; i < NUM_FLOW_SENSORS; i++) {
+  for (int i = 0; i < NUM_FLOW_SENSORS; i++)
+  {
     // Set initial states
     flowSensors[i]->sensorInitialized = false;
     flowSensors[i]->sensorStopped = false;
@@ -115,24 +105,27 @@ for (int i = 0; i < NUM_FLOW_SENSORS; i++) {
     // Test basic communication without full initialization
     selectMultiplexerChannel(flowSensors[i]->multiplexerAddr, flowSensors[i]->channel);
     delay(50);
-    
+
     Wire.beginTransmission(flowSensors[i]->sensorAddr);
     uint8_t error = Wire.endTransmission();
-    
-    if (error == 0) {
-        Serial.print(F("[MESSAGE] Flow sensor "));
-        Serial.print(i);
-        Serial.println(F(" detected."));
-        flowSensors[i]->sensorConnected = 1;
-    } else {
-        Serial.print(F("[WARNING] Flow sensor "));
-        Serial.print(i);
-        Serial.println(F(" not detected."));
+
+    if (error == 0)
+    {
+      Serial.print(F("[MESSAGE] Flow sensor "));
+      Serial.print(i);
+      Serial.println(F(" detected."));
+      flowSensors[i]->sensorConnected = 1;
+    }
+    else
+    {
+      Serial.print(F("[WARNING] Flow sensor "));
+      Serial.print(i);
+      Serial.println(F(" not detected."));
     }
     delay(50);
-}
+  }
 
-Serial.println(F("[MESSAGE] Flow Sensors ready for initialization on demand."));
+  Serial.println(F("[MESSAGE] Flow Sensors ready for initialization on demand."));
 
   // --- Initialize Temperature/Humidity Sensor ---
   if (!tempHumSensorInit())
@@ -154,13 +147,17 @@ Serial.println(F("[MESSAGE] Flow Sensors ready for initialization on demand."));
 //=================================================================
 // Loop Function: Main Program Execution
 //=================================================================
+
 void loop()
 {
   unsigned long currentTime = millis();
 
   // Process incoming serial commands.
   handleSerialCommands();
+  handleTcpConnections();    // Check for new TCP connections
+  handleNetworkCommands();   // Process TCP commands if available
 
+  
   // Monitor various system parameters.
   monitorOverflowSensors(currentTime);
   monitorFlowSensors(currentTime);
@@ -170,7 +167,7 @@ void loop()
   monitorVacuumRelease(currentTime);
   monitorEnclosureLiquidSensor(currentTime);
   monitorEnclosureTemp(currentTime);
-  monitorFlowSensorConnections();
+  monitorFlowSensorConnections(currentTime);
 
   // Read flow sensor data.
   readFlowSensorData(flow1);
@@ -184,4 +181,7 @@ void loop()
     logging.previousLogTime = currentTime;
     logSystemState();
   }
+
+  // Check for disconnected clients
+  disconnectClient();
 }

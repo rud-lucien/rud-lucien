@@ -31,26 +31,29 @@
 // Command Session Utilities
 // ============================================================
 
-void executeCommandWithActionTags(const char* command, Stream* stream) {
+void executeCommandWithActionTags(const char *command, Stream *stream)
+{
   unsigned long actionStartTime = millis();
-  stream->println(F("[ACTION START]"));
-  
+  sendMessage(F("[ACTION START]"), stream, currentClient);
+
   // Execute the command.
   commander.execute(command, stream);
-  
+
   // Calculate and print elapsed time.
   unsigned long actionDuration = millis() - actionStartTime;
-  stream->print(F("[ACTION END] Duration: "));
-  stream->print(actionDuration);
-  stream->println(F(" ms"));
+  sendMessage(F("[ACTION END] Duration: "), stream, currentClient, false);
+  sendMessage(String(actionDuration).c_str(), stream, currentClient, false);
+  sendMessage(F(" ms"), stream, currentClient);
 }
 
 // ============================================================
 // String Utilities
 // ============================================================
 
-char* trimLeadingSpaces(char* str) {
-  while (*str && isspace(*str)) {
+char *trimLeadingSpaces(char *str)
+{
+  while (*str && isspace(*str))
+  {
     str++;
   }
   return str;
@@ -60,51 +63,174 @@ char* trimLeadingSpaces(char* str) {
 // Command Processing
 // ============================================================
 
-bool isCommandPrefix(const char* token) {
+bool isCommandPrefix(const char *token)
+{
   const int numCommands = sizeof(API_tree) / sizeof(API_tree[0]);
-  for (int i = 0; i < numCommands; i++) {
-    const char* cmdName = API_tree[i].name;
+  for (int i = 0; i < numCommands; i++)
+  {
+    const char *cmdName = API_tree[i].name;
     size_t len = strlen(cmdName);
-    if (strncmp(token, cmdName, len) == 0) {
+    if (strncmp(token, cmdName, len) == 0)
+    {
       return true;
     }
   }
   return false;
 }
 
+// void processMultipleCommands(char *commandLine, Stream *stream, CommandSource source)
+// {
+//   char *start = commandLine;
+//   char commandCopy[COMMAND_SIZE];
 
-void processMultipleCommands(char* commandLine, Stream* stream) {
-  char* start = commandLine;
+//   // Set flag to indicate we are processing the command line.
+//   commandLineBeingProcessed = true;
+
+//   if (source == SOURCE_SERIAL)
+//   {
+//     // Print receipt of serial command
+//     Serial.print(F("[SERIAL COMMAND] Received: "));
+//     Serial.println(commandLine);
+
+//     // Start session on Serial
+//     cm_startSession(&Serial);
+
+//     // If network client connected, echo to it
+//     if (hasActiveClient)
+//     {
+//       currentClient.print(F("[SERIAL COMMAND] Received: "));
+//       currentClient.println(commandLine);
+//       cm_startSession(&currentClient);
+//     }
+//   }
+//   else
+//   {
+//     // Print receipt of network command to both streams
+//     Serial.print(F("[NETWORK COMMAND] Received: "));
+//     Serial.println(commandLine);
+
+//     if (hasActiveClient)
+//     {
+//       currentClient.print(F("[NETWORK COMMAND] Received: "));
+//       currentClient.println(commandLine);
+//       cm_startSession(&currentClient);
+//     }
+
+//     // Always start Serial session for network commands
+//     cm_startSession(&Serial);
+//   }
+
+//   while (*start)
+//   {
+//     char *comma = strchr(start, ',');
+//     size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
+//     if (len >= COMMAND_SIZE)
+//     {
+//       len = COMMAND_SIZE - 1;
+//     }
+//     strncpy(commandCopy, start, len);
+//     commandCopy[len] = '\0'; // Null-terminate
+//     char *trimmed = trimLeadingSpaces(commandCopy);
+//     if (strlen(trimmed) > 0)
+//     {
+//       Serial.print(F("[DEBUG] Token extracted: '"));
+//       Serial.print(trimmed);
+//       Serial.println(F("'"));
+
+//       resetAsyncFlagsForCommand(trimmed);
+
+//       if (isAsyncCommand(trimmed))
+//       {
+//         cm_registerCommand();
+//         // Dispatch asynchronous command.
+//         // Its callback must call cm_commandCompleted(stream) when done.
+//         commander.execute(trimmed, stream);
+//       }
+//       else
+//       {
+//         // For synchronous commands, register and execute.
+//         cm_registerCommand();
+//         commander.execute(trimmed, stream);
+//         // Synchronous commands finish immediately (even if error),
+//         // so complete them here.
+//         cm_commandCompleted(stream);
+//       }
+//     }
+//     if (comma == NULL)
+//       break;
+//     start = comma + 1;
+//   }
+
+//   // Finished processing the command line.
+//   commandLineBeingProcessed = false;
+
+//   // If there are no pending commands after processing, end the session.
+//   if (cm_getPendingCommands() <= 0 && cm_isSessionActive())
+//   {
+//     cm_endSession(stream);
+//   }
+// }
+
+void processMultipleCommands(char *commandLine, Stream *stream, CommandSource source)
+{
+  char *start = commandLine;
   char commandCopy[COMMAND_SIZE];
-  
-  // Set flag to indicate we are processing the command line.
+
   commandLineBeingProcessed = true;
-  
-  // Start the session using our command manager.
-  cm_startSession(stream);  // This prints "[ACTION START]"
-  
-  while (*start) {
-    char* comma = strchr(start, ',');
+
+  if (source == SOURCE_SERIAL)
+    {
+        // For serial commands, print to Serial and echo to network if connected
+        sendMessage(F("[SERIAL COMMAND] Received: "), &Serial, currentClient, false);
+        sendMessage(commandLine, &Serial, currentClient);
+        cm_startSession(&Serial);
+
+        if (hasActiveClient)
+        {
+            cm_startSession(&currentClient);
+        }
+    }
+    else
+    {
+        // For network commands, print only once since sendMessage handles both outputs
+        sendMessage(F("[NETWORK COMMAND] Received: "), stream, currentClient, false);
+        sendMessage(commandLine, stream, currentClient);
+        
+        cm_startSession(&Serial);
+        if (hasActiveClient)
+        {
+            cm_startSession(&currentClient);
+        }
+    }
+
+  while (*start)
+  {
+    char *comma = strchr(start, ',');
     size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
-    if (len >= COMMAND_SIZE) {
+    if (len >= COMMAND_SIZE)
+    {
       len = COMMAND_SIZE - 1;
     }
     strncpy(commandCopy, start, len);
-    commandCopy[len] = '\0';  // Null-terminate
-    char* trimmed = trimLeadingSpaces(commandCopy);
-    if (strlen(trimmed) > 0) {
-      Serial.print(F("[DEBUG] Token extracted: '"));
-      Serial.print(trimmed);
-      Serial.println(F("'"));
-      
+    commandCopy[len] = '\0'; // Null-terminate
+    char *trimmed = trimLeadingSpaces(commandCopy);
+    if (strlen(trimmed) > 0)
+    {
+      sendMessage(F("[DEBUG] Token extracted: '"), &Serial, currentClient, false);
+      sendMessage(trimmed, &Serial, currentClient, false);
+      sendMessage(F("'"), &Serial, currentClient);
+
       resetAsyncFlagsForCommand(trimmed);
-      
-      if (isAsyncCommand(trimmed)) {
+
+      if (isAsyncCommand(trimmed))
+      {
         cm_registerCommand();
         // Dispatch asynchronous command.
         // Its callback must call cm_commandCompleted(stream) when done.
         commander.execute(trimmed, stream);
-      } else {
+      }
+      else
+      {
         // For synchronous commands, register and execute.
         cm_registerCommand();
         commander.execute(trimmed, stream);
@@ -117,35 +243,133 @@ void processMultipleCommands(char* commandLine, Stream* stream) {
       break;
     start = comma + 1;
   }
-  
-  // Finished processing the command line.
+
   commandLineBeingProcessed = false;
-  
-  // If there are no pending commands after processing, end the session.
-  if (cm_getPendingCommands() <= 0 && cm_isSessionActive()) {
+
+  if (cm_getPendingCommands() <= 0 && cm_isSessionActive())
+  {
     cm_endSession(stream);
   }
-  
 }
 
-
-void handleSerialCommands() {
+void handleSerialCommands()
+{
   static char commandBuffer[COMMAND_SIZE];
   static uint8_t commandIndex = 0;
 
-  while (Serial.available() > 0) {
+  while (Serial.available() > 0)
+  {
     char c = Serial.read();
-    if (c == '\n') {
-      commandBuffer[commandIndex] = '\0';  // Null-terminate the command
-      Serial.print(F("[COMMAND] Received: "));
-      Serial.println(commandBuffer);
-      processMultipleCommands(commandBuffer, &Serial);
-      commandIndex = 0;  // Reset buffer index
-    } else if (c != '\r') {  // Ignore carriage returns
-      if (commandIndex < (COMMAND_SIZE - 1)) {
+    if (c == '\n')
+    {
+      commandBuffer[commandIndex] = '\0';                             // Null-terminate the command
+      processMultipleCommands(commandBuffer, &Serial, SOURCE_SERIAL); // Add source parameter
+      commandIndex = 0;                                               // Reset buffer index
+    }
+    else if (c != '\r')
+    { // Ignore carriage returns
+      if (commandIndex < (COMMAND_SIZE - 1))
+      {
         commandBuffer[commandIndex++] = c;
       }
     }
+  }
+}
+
+String processClientData()
+{
+  String command = "";
+
+  if (hasActiveClient && currentClient.connected())
+  {
+    while (currentClient.available())
+    {
+      char c = currentClient.read();
+      if (c == '\n')
+      {
+        return command; // Remove debug print since processMultipleCommands handles it
+      }
+      else if (c != '\r')
+      {
+        command += c;
+      }
+    }
+  }
+  return "";
+}
+
+void handleNetworkCommands()
+{
+  String command = processClientData();
+  if (command.length() > 0)
+  {
+    char commandBuffer[32];
+    command.toCharArray(commandBuffer, sizeof(commandBuffer));
+
+    if (hasActiveClient)
+    {
+      processMultipleCommands(commandBuffer, &currentClient, SOURCE_NETWORK);
+    }
+  }
+}
+
+void sendMessage(const char *message, Stream *response, EthernetClient client, bool addNewline)
+{
+  // Send to Serial if available
+  if (response && response == &Serial)
+  {
+    if (addNewline)
+    {
+      response->println(message);
+    }
+    else
+    {
+      response->print(message);
+    }
+  }
+
+  // Send to TCP client if connected
+  if (client && client.connected())
+  {
+    if (addNewline)
+    {
+      client.println(message);
+    }
+    else
+    {
+      client.print(message);
+    }
+    client.flush();
+  }
+}
+
+void sendMessage(const __FlashStringHelper *message, Stream *response, EthernetClient client, bool addNewline)
+{
+  // Send to Serial if available
+  if (response && response == &Serial)
+  {
+    if (addNewline)
+    {
+      response->println(message);
+    }
+    else
+    {
+      response->print(message);
+    }
+  }
+
+  // Send to TCP client if connected
+  if (client && client.connected())
+  {
+    if (addNewline)
+    {
+      client.println(message);
+    }
+    else
+    {
+      client.print(message);
+    }
+    client.flush();
   }
 }
 
@@ -153,40 +377,47 @@ void handleSerialCommands() {
 // Pressure & I2C Utilities
 // ============================================================
 
-bool isPressureOK(float thresholdPressure) {
+bool isPressureOK(float thresholdPressure)
+{
   float currentPressure = readPressure(pressureSensor);
   return (currentPressure >= thresholdPressure);
 }
 
-void setPressureValve(int valvePosition) {
+void setPressureValve(int valvePosition)
+{
   proportionalValve = setValvePosition(proportionalValve, valvePosition);
-  Serial.print(F("[MESSAGE] Pressure valve set to "));
-  Serial.print(valvePosition);
-  Serial.println(F("%. Waiting for pressure stabilization..."));
+  sendMessage(F("[MESSAGE] Pressure valve set to "), &Serial, currentClient, false);
+  sendMessage(String(valvePosition).c_str(), &Serial, currentClient, false);
+  sendMessage(F("%. Waiting for pressure stabilization..."), &Serial, currentClient);
 }
 
-bool checkAndSetPressure(float thresholdPressure, int valvePosition, unsigned long timeout) {
+bool checkAndSetPressure(float thresholdPressure, int valvePosition, unsigned long timeout)
+{
   unsigned long startTime = millis();
-  if (isPressureOK(thresholdPressure)) {
-    Serial.println(F("[MESSAGE] System is already pressurized."));
+  if (isPressureOK(thresholdPressure))
+  {
+    sendMessage(F("[MESSAGE] System is already pressurized."), &Serial, currentClient);
     return true;
   }
   setPressureValve(valvePosition);
-  while (millis() - startTime < timeout) {
-    if (isPressureOK(thresholdPressure)) {
-      Serial.println(F("[MESSAGE] Pressure threshold reached."));
+  while (millis() - startTime < timeout)
+  {
+    if (isPressureOK(thresholdPressure))
+    {
+      sendMessage(F("[MESSAGE] Pressure threshold reached."), &Serial, currentClient);
       return true;
     }
     delay(100);
   }
-  Serial.print(F("[ERROR] Pressure threshold not reached. Current pressure: "));
-  Serial.print(readPressure(pressureSensor));
-  Serial.println(F(" psi. Operation aborted."));
+  sendMessage(F("[ERROR] Pressure threshold not reached. Current pressure: "), &Serial, currentClient, false);
+  sendMessage(String(readPressure(pressureSensor)).c_str(), &Serial, currentClient, false);
+  sendMessage(F(" psi. Operation aborted."), &Serial, currentClient);
   return false;
 }
 
-void resetI2CBus() {
-  Serial.println(F("[MESSAGE] Resetting I2C bus..."));
+void resetI2CBus()
+{
+  sendMessage(F("[MESSAGE] Resetting I2C bus..."), &Serial, currentClient);
   Wire.end();
   delay(100);
   Wire.begin();
@@ -196,91 +427,107 @@ void resetI2CBus() {
 // Valve Control Utilities
 // ============================================================
 
-void openDispenseValves(int troughNumber) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
-    Serial.println(F("[ERROR] Invalid trough number provided to openDispenseValves()"));
+void openDispenseValves(int troughNumber)
+{
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+  {
+    sendMessage(F("[ERROR] Invalid trough number provided to openDispenseValves()"), &Serial, currentClient);
     return;
   }
-  switch (troughNumber) {
-    case 1:
-      reagentValve1 = openValve(reagentValve1);
-      mediaValve1 = openValve(mediaValve1);
-      break;
-    case 2:
-      reagentValve2 = openValve(reagentValve2);
-      mediaValve2 = openValve(mediaValve2);
-      break;
-    case 3:
-      reagentValve3 = openValve(reagentValve3);
-      mediaValve3 = openValve(mediaValve3);
-      break;
-    case 4:
-      reagentValve4 = openValve(reagentValve4);
-      mediaValve4 = openValve(mediaValve4);
-      break;
+  switch (troughNumber)
+  {
+  case 1:
+    reagentValve1 = openValve(reagentValve1);
+    mediaValve1 = openValve(mediaValve1);
+    break;
+  case 2:
+    reagentValve2 = openValve(reagentValve2);
+    mediaValve2 = openValve(mediaValve2);
+    break;
+  case 3:
+    reagentValve3 = openValve(reagentValve3);
+    mediaValve3 = openValve(mediaValve3);
+    break;
+  case 4:
+    reagentValve4 = openValve(reagentValve4);
+    mediaValve4 = openValve(mediaValve4);
+    break;
   }
-  Serial.print(F("[MESSAGE] Opened reagent and media valves for Trough "));
-  Serial.println(troughNumber);
+  sendMessage(F("[MESSAGE] Opened reagent and media valves for Trough "), &Serial, currentClient, false);
+  sendMessage(String(troughNumber).c_str(), &Serial, currentClient);
 }
 
-void closeDispenseValves(int troughNumber) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
-    Serial.println(F("[ERROR] Invalid trough number provided to closeDispenseValves()"));
+void closeDispenseValves(int troughNumber)
+{
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+  {
+    sendMessage(F("[ERROR] Invalid trough number provided to closeDispenseValves()"), &Serial, currentClient);
     return;
   }
-  switch (troughNumber) {
-    case 1:
-      reagentValve1 = closeValve(reagentValve1);
-      mediaValve1 = closeValve(mediaValve1);
-      break;
-    case 2:
-      reagentValve2 = closeValve(reagentValve2);
-      mediaValve2 = closeValve(mediaValve2);
-      break;
-    case 3:
-      reagentValve3 = closeValve(reagentValve3);
-      mediaValve3 = closeValve(mediaValve3);
-      break;
-    case 4:
-      reagentValve4 = closeValve(reagentValve4);
-      mediaValve4 = closeValve(mediaValve4);
-      break;
+  switch (troughNumber)
+  {
+  case 1:
+    reagentValve1 = closeValve(reagentValve1);
+    mediaValve1 = closeValve(mediaValve1);
+    break;
+  case 2:
+    reagentValve2 = closeValve(reagentValve2);
+    mediaValve2 = closeValve(mediaValve2);
+    break;
+  case 3:
+    reagentValve3 = closeValve(reagentValve3);
+    mediaValve3 = closeValve(mediaValve3);
+    break;
+  case 4:
+    reagentValve4 = closeValve(reagentValve4);
+    mediaValve4 = closeValve(mediaValve4);
+    break;
   }
-  Serial.print(F("[MESSAGE] Closed reagent and media valves for Trough "));
-  Serial.println(troughNumber);
+  sendMessage(F("[MESSAGE] Closed reagent and media valves for Trough "), &Serial, currentClient, false);
+  sendMessage(String(troughNumber).c_str(), &Serial, currentClient);
 }
 
-void stopDispenseOperation(int troughNumber, Stream* stream) {
-  if (valveControls[troughNumber - 1].isPriming) {
-    stream->print(F("[MESSAGE] Priming stopped for Trough "));
-    stream->println(troughNumber);
+void stopDispenseOperation(int troughNumber, Stream *stream)
+{
+  if (valveControls[troughNumber - 1].isPriming)
+  {
+    sendMessage(F("[MESSAGE] Priming stopped for Trough "), stream, currentClient, false);
+    sendMessage(String(troughNumber).c_str(), stream, currentClient);
     closeDispenseValves(troughNumber);
     valveControls[troughNumber - 1].isPriming = false;
     valveControls[troughNumber - 1].manualControl = false;
   }
   closeDispenseValves(troughNumber);
-  FlowSensor* sensor = flowSensors[troughNumber - 1];
-  if (sensor) {
-    stream->print(F("[MESSAGE] Trough "));
-    stream->print(troughNumber);
-    stream->print(F(" Dispense Stopped. Total Volume: "));
-    stream->print(sensor->dispenseVolume, 1);
-    stream->println(F(" mL."));
+  FlowSensor *sensor = flowSensors[troughNumber - 1];
+  if (sensor)
+  {
+    sendMessage(F("[MESSAGE] Trough "), stream, currentClient, false);
+    sendMessage(String(troughNumber).c_str(), stream, currentClient, false);
+    sendMessage(F(" Dispense Stopped. Total Volume: "), stream, currentClient, false);
+    sendMessage(String(sensor->dispenseVolume, 1).c_str(), stream, currentClient, false);
+    sendMessage(F(" mL."), stream, currentClient);
     stopFlowSensorMeasurement(*sensor);
     resetFlowSensorDispenseVolume(*sensor);
   }
   valveControls[troughNumber - 1].isDispensing = false;
 }
 
-
-bool areDispenseValvesOpen(int troughNumber) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return false;
-  switch (troughNumber) {
-    case 1: return reagentValve1.isOpen && mediaValve1.isOpen;
-    case 2: return reagentValve2.isOpen && mediaValve2.isOpen;
-    case 3: return reagentValve3.isOpen && mediaValve3.isOpen;
-    case 4: return reagentValve4.isOpen && mediaValve4.isOpen;
-    default: return false;
+bool areDispenseValvesOpen(int troughNumber)
+{
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+    return false;
+  switch (troughNumber)
+  {
+  case 1:
+    return reagentValve1.isOpen && mediaValve1.isOpen;
+  case 2:
+    return reagentValve2.isOpen && mediaValve2.isOpen;
+  case 3:
+    return reagentValve3.isOpen && mediaValve3.isOpen;
+  case 4:
+    return reagentValve4.isOpen && mediaValve4.isOpen;
+  default:
+    return false;
   }
 }
 
@@ -288,42 +535,53 @@ bool areDispenseValvesOpen(int troughNumber) {
 // Manual & Fill Mode Control Utilities
 // ============================================================
 
-void enableManualControl(int index, Stream* stream) {
+void enableManualControl(int index, Stream *stream)
+{
   valveControls[index].manualControl = true;
-  stream->print(F("[MESSAGE] Manual control enabled for trough "));
-  stream->println(index + 1);
+  sendMessage(F("[MESSAGE] Manual control enabled for trough "), stream, currentClient, false);
+  sendMessage(String(index + 1).c_str(), stream, currentClient);
 }
 
-void disableManualControl(int index, Stream* stream) {
+void disableManualControl(int index, Stream *stream)
+{
   valveControls[index].manualControl = false;
-  stream->print(F("[MESSAGE] Manual control disabled for trough "));
-  stream->println(index + 1);
+  sendMessage(F("[MESSAGE] Manual control disabled for trough "), stream, currentClient, false);
+  sendMessage(String(index + 1).c_str(), stream, currentClient);
 }
 
-void enableFillMode(int troughNumber, Stream* stream) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return;
+void enableFillMode(int troughNumber, Stream *stream)
+{
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+    return;
   valveControls[troughNumber - 1].fillMode = true;
-  stream->print(F("[MESSAGE] Fill mode enabled for trough "));
-  stream->println(troughNumber);
+  sendMessage(F("[MESSAGE] Fill mode enabled for trough "), stream, currentClient, false);
+  sendMessage(String(troughNumber).c_str(), stream, currentClient);
 }
 
-void disableFillMode(int troughNumber, Stream* stream) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return;
-  if (valveControls[troughNumber - 1].fillMode) {
+void disableFillMode(int troughNumber, Stream *stream)
+{
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+    return;
+  if (valveControls[troughNumber - 1].fillMode)
+  {
     valveControls[troughNumber - 1].fillMode = false;
-    stream->print(F("[MESSAGE] Fill mode disabled for trough "));
-    stream->println(troughNumber);
+    sendMessage(F("[MESSAGE] Fill mode disabled for trough "), stream, currentClient, false);
+    sendMessage(String(troughNumber).c_str(), stream, currentClient);
   }
 }
 
-void disableFillModeForAll(Stream* stream) {
-  for (int i = 1; i <= NUM_OVERFLOW_SENSORS; i++) {
+void disableFillModeForAll(Stream *stream)
+{
+  for (int i = 1; i <= NUM_OVERFLOW_SENSORS; i++)
+  {
     disableFillMode(i, stream);
   }
 }
 
-bool isFillModeActive(int troughNumber) {
-  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) return false;
+bool isFillModeActive(int troughNumber)
+{
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+    return false;
   return valveControls[troughNumber - 1].fillMode;
 }
 
@@ -331,158 +589,182 @@ bool isFillModeActive(int troughNumber) {
 // Helper Functions for Dispensing, Draining, and Priming
 // ============================================================
 
-void stopDispensingIfActive(int troughNumber, Stream* stream) {
-  if (valveControls[troughNumber - 1].isDispensing) {
+void stopDispensingIfActive(int troughNumber, Stream *stream)
+{
+  if (valveControls[troughNumber - 1].isDispensing)
+  {
     stopDispenseOperation(troughNumber, stream);
-    stream->print(F("[MESSAGE] Dispensing stopped for trough "));
-    stream->println(troughNumber);
+    sendMessage(F("[MESSAGE] Dispensing stopped for trough "), stream, currentClient, false);
+    sendMessage(String(troughNumber).c_str(), stream, currentClient);
   }
 }
 
-bool isWasteBottleFullForTrough(int troughNumber, Stream* stream) {
+bool isWasteBottleFullForTrough(int troughNumber, Stream *stream)
+{
   int bottleIndex = (troughNumber <= 2) ? 0 : 1;
-  if (readBinarySensor(wasteBottleSensors[bottleIndex])) {
-    stream->print(F("[ERROR] Waste bottle "));
-    stream->print(bottleIndex + 1);
-    stream->println(F(" is full. Cannot start drainage."));
+  if (readBinarySensor(wasteBottleSensors[bottleIndex]))
+  {
+    sendMessage(F("[ERROR] Waste bottle "), stream, currentClient, false);
+    sendMessage(String(bottleIndex + 1).c_str(), stream, currentClient, false);
+    sendMessage(F(" is full. Cannot start drainage."), stream, currentClient);
     return true;
   }
   return false;
 }
 
-bool hasIncompatibleDrainage(int troughNumber, Stream* stream) {
+bool hasIncompatibleDrainage(int troughNumber, Stream *stream)
+{
   if ((troughNumber == 1 && valveControls[1].isDraining) ||
-      (troughNumber == 2 && valveControls[0].isDraining)) {
-    stream->println(F("[ERROR] Troughs 1 and 2 cannot be drained simultaneously."));
+      (troughNumber == 2 && valveControls[0].isDraining))
+  {
+    sendMessage(F("[ERROR] Troughs 1 and 2 cannot be drained simultaneously."), stream, currentClient);
     asyncCommandCompleted(&Serial);
     return true;
   }
   if ((troughNumber == 3 && valveControls[3].isDraining) ||
-      (troughNumber == 4 && valveControls[2].isDraining)) {
-    stream->println(F("[ERROR] Troughs 3 and 4 cannot be drained simultaneously."));
+      (troughNumber == 4 && valveControls[2].isDraining))
+  {
+    sendMessage(F("[ERROR] Troughs 3 and 4 cannot be drained simultaneously."), stream, currentClient);
     asyncCommandCompleted(&Serial);
     return true;
   }
   return false;
 }
 
-bool validateTroughNumber(int troughNumber, Stream* stream) {
-  if (troughNumber < 1 || troughNumber > 4) {
-    stream->println(F("[ERROR] Invalid trough number."));
+bool validateTroughNumber(int troughNumber, Stream *stream)
+{
+  if (troughNumber < 1 || troughNumber > 4)
+  {
+    sendMessage(F("[ERROR] Invalid trough number."), stream, currentClient);
     return false;
   }
   return true;
 }
 
-void stopDispensingForFill(int troughNumber, Stream* stream) {
-  if (valveControls[troughNumber - 1].isDispensing) {
+void stopDispensingForFill(int troughNumber, Stream *stream)
+{
+  if (valveControls[troughNumber - 1].isDispensing)
+  {
     stopDispenseOperation(troughNumber, stream);
-    stream->print(F("[MESSAGE] Dispense operation for trough "));
-    stream->print(troughNumber);
-    stream->println(F(" stopped prematurely due to fill command."));
+    sendMessage(F("[MESSAGE] Dispense operation for trough "), stream, currentClient, false);
+    sendMessage(String(troughNumber).c_str(), stream, currentClient, false);
+    sendMessage(F(" stopped prematurely due to fill command."), stream, currentClient);
   }
 }
 
-void stopPrimingForFill(int troughNumber, Stream* stream) {
-  if (valveControls[troughNumber - 1].isPriming) {
+void stopPrimingForFill(int troughNumber, Stream *stream)
+{
+  if (valveControls[troughNumber - 1].isPriming)
+  {
     valveControls[troughNumber - 1].isPriming = false;
     closeDispenseValves(troughNumber);
-    stream->print(F("[MESSAGE] Priming operation for trough "));
-    stream->print(troughNumber);
-    stream->println(F(" stopped prematurely due to fill command."));
+    sendMessage(F("[MESSAGE] Priming operation for trough "), stream, currentClient, false);
+    sendMessage(String(troughNumber).c_str(), stream, currentClient, false);
+    sendMessage(F(" stopped prematurely due to fill command."), stream, currentClient);
   }
 }
 
-bool isValveAlreadyPrimed(int valveNumber, Stream* stream) {
-  if (readBinarySensor(reagentBubbleSensors[valveNumber - 1])) {
-    stream->print(F("[MESSAGE] Valve "));
-    stream->print(valveNumber);
-    stream->println(F(" already primed."));
+bool isValveAlreadyPrimed(int valveNumber, Stream *stream)
+{
+  if (readBinarySensor(reagentBubbleSensors[valveNumber - 1]))
+  {
+    sendMessage(F("[MESSAGE] Valve "), stream, currentClient, false);
+    sendMessage(String(valveNumber).c_str(), stream, currentClient, false);
+    sendMessage(F(" already primed."), stream, currentClient);
     return true;
   }
   return false;
 }
 
-bool validateValveNumber(int valveNumber, Stream* stream) {
-  if (valveNumber < 1 || valveNumber > 4) {
-    stream->println(F("[ERROR] Invalid valve number."));
+bool validateValveNumber(int valveNumber, Stream *stream)
+{
+  if (valveNumber < 1 || valveNumber > 4)
+  {
+    sendMessage(F("[ERROR] Invalid valve number."), stream, currentClient);
     return false;
   }
   return true;
 }
 
-void setVacuumMonitoringAndCloseMainValve(int troughNumber, Stream* stream) {
-  if (troughNumber <= 2) {
+void setVacuumMonitoringAndCloseMainValve(int troughNumber, Stream *stream)
+{
+  if (troughNumber <= 2)
+  {
     globalVacuumMonitoring[0] = true;
     wasteValve1 = closeValve(wasteValve1);
-  } else {
+  }
+  else
+  {
     globalVacuumMonitoring[1] = true;
     wasteValve2 = closeValve(wasteValve2);
   }
 }
 
-
 // Helper function to force-stop a drain operation for a given trough.
 // In the event of an enclosure leak, we want to immediately close
 // both the primary and secondary drain valves.
-void stopDrainOperation(int trough, Stream* stream) {
-  stream->print(F("[MESSAGE] Stopping drain operation for trough "));
-  stream->println(trough);
+void stopDrainOperation(int trough, Stream *stream)
+{
+  sendMessage(F("[MESSAGE] Stopping drain operation for trough "), stream, currentClient, false);
+  sendMessage(String(trough).c_str(), stream, currentClient);
 
-  // Force-close the primary drain valve(s) for this trough.
-  // (Adjust these based on your hardware mapping.)
-  switch(trough) {
-    case 1:
-      wasteValve1 = closeValve(wasteValve1);
-      break;
-    case 2:
-      wasteValve2 = closeValve(wasteValve2);
-      break;
-    case 3:
-      wasteValve3 = closeValve(wasteValve3);
-      break;
-    case 4:
-      wasteValve4 = closeValve(wasteValve4);
-      break;
-    default:
-      stream->println(F("[ERROR] Invalid trough number in stopDrainOperation."));
-      return;
+  // Force-close the primary drain valve(s) for this trough
+  switch (trough)
+  {
+  case 1:
+    wasteValve1 = closeValve(wasteValve1);
+    break;
+  case 2:
+    wasteValve2 = closeValve(wasteValve2);
+    break;
+  case 3:
+    wasteValve3 = closeValve(wasteValve3);
+    break;
+  case 4:
+    wasteValve4 = closeValve(wasteValve4);
+    break;
+  default:
+    sendMessage(F("[ERROR] Invalid trough number in stopDrainOperation."), stream, currentClient);
+    return;
   }
-  
-  // Also, force-close any secondary drain valve(s) that might be used.
-  // For example, if troughs 1 and 2 share a secondary valve, and 3 and 4 share another:
-  if (trough == 1 || trough == 2) {
-    // Force close the secondary valve for troughs 1 and 2.
-    // (Even if under normal circumstances you might open it to equalize pressure.)
+
+  // Handle secondary valves
+  if (trough == 1 || trough == 2)
+  {
     wasteValve3 = closeValve(wasteValve3);
   }
-  else if (trough == 3 || trough == 4) {
+  else if (trough == 3 || trough == 4)
+  {
     wasteValve4 = closeValve(wasteValve4);
   }
-  
-  // Reset the drain timer.
+
   valveControls[trough - 1].drainStartTime = 0;
 }
 
-
-void abortAllAutomatedOperations(Stream* stream) {
+void abortAllAutomatedOperations(Stream *stream)
+{
   // Abort operations on each trough.
-  for (int trough = 1; trough <= NUM_OVERFLOW_SENSORS; trough++) {
+  for (int trough = 1; trough <= NUM_OVERFLOW_SENSORS; trough++)
+  {
     int index = trough - 1;
     // If dispensing, stop it.
-    if (valveControls[index].isDispensing) {
+    if (valveControls[index].isDispensing)
+    {
       stopDispenseOperation(trough, stream);
     }
     // If priming, stop it.
-    if (valveControls[index].isPriming) {
+    if (valveControls[index].isPriming)
+    {
       stopPrimingForFill(trough, stream);
     }
     // If in fill mode, disable it.
-    if (valveControls[index].fillMode) {
+    if (valveControls[index].fillMode)
+    {
       disableFillMode(trough, stream);
     }
     // If draining, stop the drain process.
-    if (valveControls[index].isDraining) {
+    if (valveControls[index].isDraining)
+    {
       stopDrainOperation(trough, stream);
     }
     // Stop asynchronous sensor operations.
@@ -498,7 +780,7 @@ void abortAllAutomatedOperations(Stream* stream) {
     valveControls[index].targetVolume = -1;
     valveControls[index].lastFlowCheckTime = 0;
     valveControls[index].lastFlowChangeTime = 0;
-    
+
     // Reset any asynchronous timers associated with this trough.
     valveControls[index].drainStartTime = 0;
   }
@@ -508,170 +790,209 @@ void abortAllAutomatedOperations(Stream* stream) {
   resetFillMonitorState();
   resetWasteMonitorState();
   resetEnclosureLeakMonitorState();
-  
-  stream->println(F("[ERROR] Enclosure liquid detected. Automated operations halted. Resolve the leak before proceeding."));
-  stream->println(F("[MESSAGE] All automated operations aborted due to enclosure leak."));
-  
+  resetFillMonitorState();
+
+  sendMessage(F("[ERROR] Enclosure liquid detected. Automated operations halted. Resolve the leak before proceeding."), stream, currentClient);
+  sendMessage(F("[MESSAGE] All automated operations aborted due to enclosure leak."), stream, currentClient);
   // Abort the command session so that an [ACTION END] message is printed.
-  if (cm_isSessionActive()) {
+  if (cm_isSessionActive())
+  {
     cm_abortSession(stream);
   }
 }
 
-
-
-String getOverallTroughState() {
+String getOverallTroughState()
+{
   bool allIdle = true;
   String stateSummary = "";
-  for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
+  for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++)
+  {
     String troughState = "";
     // If none of the operations are active, mark as "Idle".
-    if (!valveControls[i].isDispensing && 
-        !valveControls[i].isPriming && 
-        !valveControls[i].fillMode && 
-        !valveControls[i].isDraining) {
+    if (!valveControls[i].isDispensing &&
+        !valveControls[i].isPriming &&
+        !valveControls[i].fillMode &&
+        !valveControls[i].isDraining)
+    {
       troughState = "Idle";
-    } else {
+    }
+    else
+    {
       allIdle = false;
       bool first = true;
       // If multiple operations are active, list them separated by commas.
-      if (valveControls[i].isDispensing) {
+      if (valveControls[i].isDispensing)
+      {
         troughState += "Dispensing";
         first = false;
       }
-      if (valveControls[i].isDraining) {
-        if (!first) troughState += ", ";
+      if (valveControls[i].isDraining)
+      {
+        if (!first)
+          troughState += ", ";
         troughState += "Draining";
         first = false;
       }
-      if (valveControls[i].fillMode) {
-        if (!first) troughState += ", ";
+      if (valveControls[i].fillMode)
+      {
+        if (!first)
+          troughState += ", ";
         troughState += "Filling";
         first = false;
       }
-      if (valveControls[i].isPriming) {
-        if (!first) troughState += ", ";
+      if (valveControls[i].isPriming)
+      {
+        if (!first)
+          troughState += ", ";
         troughState += "Priming";
       }
     }
     stateSummary += "T" + String(i + 1) + ": " + troughState;
-    if (i < NUM_OVERFLOW_SENSORS - 1) {
+    if (i < NUM_OVERFLOW_SENSORS - 1)
+    {
       stateSummary += " | ";
     }
   }
-  if (allIdle) {
+  if (allIdle)
+  {
     return "Idle";
-  } else {
+  }
+  else
+  {
     return "Active - " + stateSummary;
   }
 }
 
-
-String getOpenValvesString(bool v1, bool v2, bool v3, bool v4) {
+String getOpenValvesString(bool v1, bool v2, bool v3, bool v4)
+{
   String openList = "";
-  if (v1) { openList += "Valve 1"; }
-  if (v2) { 
-    if (openList.length() > 0) { openList += " & "; }
-    openList += "Valve 2"; 
+  if (v1)
+  {
+    openList += "Valve 1";
   }
-  if (v3) { 
-    if (openList.length() > 0) { openList += " & "; }
-    openList += "Valve 3"; 
+  if (v2)
+  {
+    if (openList.length() > 0)
+    {
+      openList += " & ";
+    }
+    openList += "Valve 2";
   }
-  if (v4) { 
-    if (openList.length() > 0) { openList += " & "; }
-    openList += "Valve 4"; 
+  if (v3)
+  {
+    if (openList.length() > 0)
+    {
+      openList += " & ";
+    }
+    openList += "Valve 3";
   }
-  if (openList.length() == 0) {
+  if (v4)
+  {
+    if (openList.length() > 0)
+    {
+      openList += " & ";
+    }
+    openList += "Valve 4";
+  }
+  if (openList.length() == 0)
+  {
     openList = "None open";
   }
   return openList;
 }
 
-
 // In your Utils.cpp (or the file where you defined resetAsyncFlagsForTrough)
-void resetAsyncFlagsForTrough(int troughNumber) {
-    if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
-        return;
-    
-    // If the trough is busy with any asynchronous operation, do not reset its flags.
-    // (Assuming valveControls is a global array and that these booleans indicate active operations.)
-    if (valveControls[troughNumber - 1].isDispensing ||
-        valveControls[troughNumber - 1].isPriming ||
-        valveControls[troughNumber - 1].fillMode ||
-        valveControls[troughNumber - 1].isDraining) {
-        // Trough is busy – do not reset its async flags.
-        return;
-    }
-    
-    // Otherwise, reset only this trough’s async flags.
-    dispenseAsyncCompleted[troughNumber - 1] = false;
-    drainAsyncCompleted[troughNumber - 1] = false;
-    primeAsyncCompleted[troughNumber - 1] = false;
-}
+void resetAsyncFlagsForTrough(int troughNumber)
+{
+  if (troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+    return;
 
+  // If the trough is busy with any asynchronous operation, do not reset its flags.
+  // (Assuming valveControls is a global array and that these booleans indicate active operations.)
+  if (valveControls[troughNumber - 1].isDispensing ||
+      valveControls[troughNumber - 1].isPriming ||
+      valveControls[troughNumber - 1].fillMode ||
+      valveControls[troughNumber - 1].isDraining)
+  {
+    // Trough is busy – do not reset its async flags.
+    return;
+  }
+
+  // Otherwise, reset only this trough’s async flags.
+  dispenseAsyncCompleted[troughNumber - 1] = false;
+  drainAsyncCompleted[troughNumber - 1] = false;
+  primeAsyncCompleted[troughNumber - 1] = false;
+}
 
 // You can also add a helper that parses the trough number from a token.
 // For example, if your token is "D 2 10", this will extract the 2.
-void resetAsyncFlagsForCommand(const char* token) {
-    int troughNumber = 0;
-    // This assumes the command format starts with a letter followed by the trough number,
-    // e.g. "D 1" or "P 2" etc.
-    if (sscanf(token, "%*c %d", &troughNumber) == 1) {
-        resetAsyncFlagsForTrough(troughNumber);
-    }
-}
-
-
-// Example implementation: assumes OnOffValve has a bool member "isOpen"
-// (if your valve type is defined differently, adjust accordingly)
-bool isValveClosed(const OnOffValve &valve) {
-  return !valve.isOpen;  
-}
-
-bool areAllValvesClosedForTrough(int troughNumber) {
-  // Adjust the mapping if your trough-to-valve assignment is different.
-  switch(troughNumber) {
-    case 1: 
-      return (isValveClosed(reagentValve1) &&
-              isValveClosed(mediaValve1) &&
-              isValveClosed(wasteValve1));
-    case 2:
-      return (isValveClosed(reagentValve2) &&
-              isValveClosed(mediaValve2) &&
-              isValveClosed(wasteValve2));
-    case 3:
-      return (isValveClosed(reagentValve3) &&
-              isValveClosed(mediaValve3) &&
-              isValveClosed(wasteValve3));
-    case 4:
-      return (isValveClosed(reagentValve4) &&
-              isValveClosed(mediaValve4) &&
-              isValveClosed(wasteValve4));
-    default:
-      return true;
+void resetAsyncFlagsForCommand(const char *token)
+{
+  int troughNumber = 0;
+  // This assumes the command format starts with a letter followed by the trough number,
+  // e.g. "D 1" or "P 2" etc.
+  if (sscanf(token, "%*c %d", &troughNumber) == 1)
+  {
+    resetAsyncFlagsForTrough(troughNumber);
   }
 }
 
-void set_valve_state(OnOffValve &valveVar, bool state, int valveNumber, ValveType type, CommandCaller *caller) {
-  if (state) {
-    valveVar = openValve(valveVar);  // openValve() returns an OnOffValve
+// Example implementation: assumes OnOffValve has a bool member "isOpen"
+// (if your valve type is defined differently, adjust accordingly)
+bool isValveClosed(const OnOffValve &valve)
+{
+  return !valve.isOpen;
+}
+
+bool areAllValvesClosedForTrough(int troughNumber)
+{
+  // Adjust the mapping if your trough-to-valve assignment is different.
+  switch (troughNumber)
+  {
+  case 1:
+    return (isValveClosed(reagentValve1) &&
+            isValveClosed(mediaValve1) &&
+            isValveClosed(wasteValve1));
+  case 2:
+    return (isValveClosed(reagentValve2) &&
+            isValveClosed(mediaValve2) &&
+            isValveClosed(wasteValve2));
+  case 3:
+    return (isValveClosed(reagentValve3) &&
+            isValveClosed(mediaValve3) &&
+            isValveClosed(wasteValve3));
+  case 4:
+    return (isValveClosed(reagentValve4) &&
+            isValveClosed(mediaValve4) &&
+            isValveClosed(wasteValve4));
+  default:
+    return true;
+  }
+}
+
+void set_valve_state(OnOffValve &valveVar, bool state, int valveNumber, ValveType type, CommandCaller *caller)
+{
+  if (state)
+  {
+    valveVar = openValve(valveVar); // openValve() returns an OnOffValve
     // When opening a valve manually, enable manual control for that trough.
-    enableManualControl(valveNumber - 1, caller);  
-  } else {
+    enableManualControl(valveNumber - 1, caller);
+  }
+  else
+  {
     valveVar = closeValve(valveVar); // closeValve() returns an OnOffValve
     // When closing, check if all valves in that trough are closed; if so, clear the manual flag.
     updateTroughManualControlFlag(type, valveNumber, caller);
   }
 }
 
-void updateTroughManualControlFlag(ValveType type, int valveNumber, CommandCaller *caller) {
+void updateTroughManualControlFlag(ValveType type, int valveNumber, CommandCaller *caller)
+{
   // Here we assume that the "valveNumber" maps directly to the trough number.
-  int troughNumber = valveNumber;  // Adjust if your mapping is different.
-  if (areAllValvesClosedForTrough(troughNumber)) {
+  int troughNumber = valveNumber; // Adjust if your mapping is different.
+  if (areAllValvesClosedForTrough(troughNumber))
+  {
     // All valves for this trough are closed—disable manual control.
     disableManualControl(troughNumber - 1, caller);
   }
 }
-
-

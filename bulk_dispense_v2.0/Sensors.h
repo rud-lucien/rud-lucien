@@ -116,7 +116,7 @@ float readPressureVoltage(const PressureSensor &sensor);
  */
 float readPressure(const PressureSensor &sensor);
 
-bool diagnoseSensor(FlowSensor &sensor);
+
 
 #endif // SENSORS_H
 

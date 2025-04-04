@@ -23,17 +23,6 @@
  * @param sensor The flow sensor to check.
  * @return true if the sensor is connected, false otherwise.
  */
-// bool isFlowSensorConnected(FlowSensor &sensor) {
-//   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
-//   Wire.beginTransmission(sensor.sensorAddr);
-//   if (Wire.endTransmission() == 0) {
-//     sensor.sensorConnected = 1;
-//     return true;
-//   } else {
-//     sensor.sensorConnected = 0;
-//     return false;
-//   }
-// }
 
 bool isFlowSensorConnected(FlowSensor &sensor) {
   // Try multiple times with delays

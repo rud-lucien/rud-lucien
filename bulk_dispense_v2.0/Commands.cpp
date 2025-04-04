@@ -816,6 +816,7 @@ void cmd_log_help(char* args, CommandCaller* caller) {
   caller->println(F("         MC1–MC4 = Manual Control flags for troughs (ON = manual override, OFF = automated)."));
   caller->println(F("         LF    = Logging frequency (in milliseconds)."));
   caller->println(F("         RC    = Registered commands (number of pending commands, >= 0)."));
+  caller->println(F("         NET   = Network status (connected/disconnected)."));
   caller->println(F("         FSn   = Flow Sensor status for each trough (n = 1-4)"));
   caller->println(F("                 States: Not Dispensing, Valid, Invalid"));
   caller->println(F("--------------------------------------------------"));
@@ -856,6 +857,7 @@ void cmd_standby(char* args, CommandCaller* caller) {
   resetFillMonitorState();
   resetWasteMonitorState();
   resetEnclosureLeakMonitorState();
+  resetFillMonitorState();
 
   // Close all reagent and media valves.
   reagentValve1 = closeValve(reagentValve1);
@@ -1127,6 +1129,8 @@ void cmd_get_system_state(char* args, CommandCaller* caller) {
   caller->println(globalVacuumMonitoring[1] ? F("TRUE") : F("FALSE"));
   caller->print(F("  • Registered Commands      : "));
   caller->println(cm_getPendingCommands());
+  caller->print(F("  • Network Connection     : "));
+  caller->println(hasActiveClient ? F("CONNECTED") : F("DISCONNECTED"));
   caller->println(F("--------------------------------------------------"));
 }
 

@@ -236,7 +236,7 @@ void logSystemState() {
   // --- Build Diagnostic Information ---
   char diagBuffer[128];
   sprintf(diagBuffer,
-          ", DIAG: FAM:%s, EERR:%s, GVM1:%s, GVM2:%s, MC1:%s, MC2:%s, MC3:%s, MC4:%s, LF:%lu ms, RC:%d",
+          ", DIAG: FAM:%s, EERR:%s, GVM1:%s, GVM2:%s, MC1:%s, MC2:%s, MC3:%s, MC4:%s, LF:%lu ms, RC:%d, NET:%s",
           fanAutoMode ? "ON" : "OFF",                                  // Fan Auto Mode
           globalEnclosureLiquidError ? "TRUE" : "FALSE",               // Enclosure Liquid Error
           globalVacuumMonitoring[0] ? "TRUE" : "FALSE",                // Vacuum Monitoring for bottle 1
@@ -246,7 +246,8 @@ void logSystemState() {
           valveControls[2].manualControl ? "ON" : "OFF",               // Manual Control for Trough 3
           valveControls[3].manualControl ? "ON" : "OFF",               // Manual Control for Trough 4
           logging.logInterval,                                         // Logging frequency
-          cm_getPendingCommands());                                    // get number of pending commands
+          cm_getPendingCommands(),                                     // Get number of pending commands
+          hasActiveClient ? "CONNECTED" : "NONE");                     // Network connection status      
 
   char flowDiag[128];
   sprintf(flowDiag,
