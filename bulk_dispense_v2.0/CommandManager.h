@@ -33,6 +33,7 @@ struct StreamSession {
     bool active;
     unsigned long startTime;
     Stream* stream;
+    int pendingCommands;
 };
 
 // Function declarations

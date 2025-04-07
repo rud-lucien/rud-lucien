@@ -426,6 +426,7 @@ bool handleLowFlowCondition(int i, unsigned long currentTime)
     closeDispenseValves(i + 1);
     valveControls[i].isPriming = false;
     primeAsyncCompleted[i] = true;
+    
 
     if (hasActiveClient)
     {
@@ -444,6 +445,8 @@ bool handleLowFlowCondition(int i, unsigned long currentTime)
   }
   return false;
 }
+
+
 
 void handleBubbleDetected(int i, unsigned long currentTime)
 {
