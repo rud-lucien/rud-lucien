@@ -422,4 +422,5 @@ bool areAllValvesClosedForTrough(int troughNumber);
 void set_valve_state(OnOffValve& valveVar, bool state, int valveNumber, ValveType type, CommandCaller* caller);
 void updateTroughManualControlFlag(ValveType type, int valveNumber, CommandCaller* caller);
 
+
 #endif // UTILS_H

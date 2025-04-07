@@ -46,6 +46,6 @@ int cm_getPendingCommands(void);
 void cm_abortSession(Stream* stream);
 
 extern volatile bool commandLineBeingProcessed;
-
+void resetCommandTimers();
 
 #endif // COMMAND_MANAGER_H

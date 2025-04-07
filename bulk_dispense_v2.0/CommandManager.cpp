@@ -99,6 +99,26 @@ static StreamSession* getSessionForStream(Stream* stream) {
 //     }
 // }
 
+// void cm_startSession(Stream* stream) {
+//     StreamSession* session = getSessionForStream(stream);
+//     if (!session) return;
+    
+//     if (!session->active) {
+//         session->active = true;
+//         session->startTime = millis();
+        
+//         // Set the appropriate command start time based on stream type
+//         if (stream == &Serial) {
+//             serialCommandStartTime = millis();
+//         }
+//         else if (stream == &currentClient) {
+//             networkCommandStartTime = millis();
+//         }
+        
+//         stream->println(F("[ACTION START]"));
+//     }
+// }
+
 void cm_startSession(Stream* stream) {
     StreamSession* session = getSessionForStream(stream);
     if (!session) return;
@@ -110,12 +130,15 @@ void cm_startSession(Stream* stream) {
         // Set the appropriate command start time based on stream type
         if (stream == &Serial) {
             serialCommandStartTime = millis();
+            stream->println(F("[ACTION START]"));
         }
         else if (stream == &currentClient) {
             networkCommandStartTime = millis();
+            // Send to network client
+            stream->println(F("[ACTION START]"));
+            // Also mirror to serial console for monitoring
+            Serial.println(F("[ACTION START]"));
         }
-        
-        stream->println(F("[ACTION START]"));
     }
 }
 
@@ -188,7 +211,18 @@ void cm_endSession(Stream* stream) {
     // Normal session ending logic
     session->active = false;
     
-    sendMessage(F("[SESSION ENDED]"), stream, currentClient);
+    // sendMessage(F("[SESSION ENDED]"), stream, currentClient);
+
+    // For network commands, make sure "[SESSION ENDED]" appears in both streams
+    if (stream == &currentClient) {
+        Serial.println(F("[SESSION ENDED]"));
+        if (hasActiveClient && currentClient.connected()) {
+            currentClient.println(F("[SESSION ENDED]"));
+        }
+    } else {
+        // For serial commands, use sendMessage for normal behavior
+        sendMessage(F("[SESSION ENDED]"), stream, currentClient);
+    }
 }
 
 void cm_registerCommand(void) {
@@ -380,13 +414,104 @@ int cm_getPendingCommands(void) {
     return pendingCommands;
 }
 
+// void cm_abortSession(Stream* stream) {
+//     StreamSession* session = getSessionForStream(stream);
+//     if (!session) return;
+    
+//     cm_endSession(stream);
+//     session->active = false;
+//     pendingCommands = 0;
+// } 
+
+// void cm_abortSession(Stream* stream) {
+//     StreamSession* session = getSessionForStream(stream);
+//     if (!session) return;
+    
+//     // Reset all pending commands
+//     pendingCommands = 0;
+    
+//     // Make sure to reset the timing variables
+//     if (stream == &currentClient) {
+//       // For network client, ensure we reset the network timing
+//       networkCommandStartTime = 0;
+//     }
+//     else if (stream == &Serial) {
+//       // For serial commands, reset the serial timing
+//       serialCommandStartTime = 0;
+//     }
+    
+//     // Print a special ACTION END message for aborted commands
+//     if (session->active) {
+//       unsigned long duration = millis() - session->startTime;
+//       stream->print(F("[ACTION END] ABORTED after "));
+//       stream->print(duration);
+//       stream->println(F(" ms"));
+//       session->active = false;
+//     }
+    
+//     sendMessage(F("[SESSION ENDED]"), stream, currentClient);
+//   }
+
 void cm_abortSession(Stream* stream) {
     StreamSession* session = getSessionForStream(stream);
     if (!session) return;
     
-    cm_endSession(stream);
-    session->active = false;
+    // Reset all pending commands
     pendingCommands = 0;
-} 
+    
+    // Make sure to reset the timing variables
+    if (stream == &currentClient) {
+        // For network client, ensure we reset the network timing
+        networkCommandStartTime = 0;
+        
+        // Print a special ACTION END message for aborted commands
+        if (session->active) {
+            unsigned long duration = millis() - session->startTime;
+            
+            // Send to network client
+            stream->print(F("[ACTION END] ABORTED after "));
+            stream->print(duration);
+            stream->println(F(" ms"));
+            
+            // Also mirror to Serial console for monitoring
+            Serial.print(F("[ACTION END] ABORTED after "));
+            Serial.print(duration);
+            Serial.println(F(" ms"));
+            
+            session->active = false;
+        }
+        
+        // Send session ended to both streams
+        if (hasActiveClient && currentClient.connected()) {
+            currentClient.println(F("[SESSION ENDED]"));
+        }
+        Serial.println(F("[SESSION ENDED]"));
+        
+        // Skip the sendMessage at the end for network client
+        return;
+    }
+    else if (stream == &Serial) {
+        // For serial commands, reset the serial timing
+        serialCommandStartTime = 0;
+        
+        // Print a special ACTION END message for aborted commands
+        if (session->active) {
+            unsigned long duration = millis() - session->startTime;
+            stream->print(F("[ACTION END] ABORTED after "));
+            stream->print(duration);
+            stream->println(F(" ms"));
+            session->active = false;
+        }
+    }
+    
+    // Only call sendMessage for Serial stream
+    sendMessage(F("[SESSION ENDED]"), stream, currentClient);
+}
+
+  // Add this function:
+void resetCommandTimers() {
+    networkCommandStartTime = 0;
+    serialCommandStartTime = 0;
+  }
   
   

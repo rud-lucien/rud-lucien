@@ -993,6 +993,8 @@ void abortAllAutomatedOperations(Stream *stream)
   {
     cm_abortSession(stream);
   }
+
+  resetCommandTimers();
 }
 
 String getOverallTroughState()
@@ -1190,3 +1192,4 @@ void updateTroughManualControlFlag(ValveType type, int valveNumber, CommandCalle
     disableManualControl(troughNumber - 1, caller);
   }
 }
+
