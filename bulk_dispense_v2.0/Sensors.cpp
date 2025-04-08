@@ -1,11 +1,11 @@
 #include "Sensors.h"
 #include <Wire.h>
-#include <math.h>  // For isnan()
+#include <math.h> // For isnan()
 #include "Utils.h"
 
 /************************************************************
  * Sensors.cpp
- * 
+ *
  * This file implements functions declared in Sensors.h.
  * It handles initialization and data acquisition for the SHT31
  * Temperature/Humidity sensor and the flow sensors.
@@ -19,23 +19,25 @@
 // Internal Helper Functions
 // ============================================================
 
-
-bool isFlowSensorConnected(FlowSensor &sensor) {
+bool isFlowSensorConnected(FlowSensor &sensor)
+{
   // Try multiple times with delays
-  for (int attempt = 0; attempt < 3; attempt++) {
-      selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
-      delay(20);
-      
-      Wire.beginTransmission(sensor.sensorAddr);
-      uint8_t error = Wire.endTransmission();
-      
-      if (error == 0) {
-          sensor.sensorConnected = 1;
-          return true;
-      }
-      delay(20);
+  for (int attempt = 0; attempt < 3; attempt++)
+  {
+    selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+    delay(20);
+
+    Wire.beginTransmission(sensor.sensorAddr);
+    uint8_t error = Wire.endTransmission();
+
+    if (error == 0)
+    {
+      sensor.sensorConnected = 1;
+      return true;
+    }
+    delay(20);
   }
-  
+
   sensor.sensorConnected = 0;
   return false;
 }
@@ -43,12 +45,14 @@ bool isFlowSensorConnected(FlowSensor &sensor) {
 // ============================================================
 // Temperature & Humidity Sensor Functions
 // ============================================================
-bool tempHumSensorInit() {
+bool tempHumSensorInit()
+{
   selectMultiplexerChannel(MULTIPLEXER_ADDR, TEMP_HUM_SENSOR_CHANNEL);
   return sht31.begin(TEMP_HUM_SENSOR_ADDR);
 }
 
-TempHumidity readTempHumidity() {
+TempHumidity readTempHumidity()
+{
   TempHumidity data;
   selectMultiplexerChannel(MULTIPLEXER_ADDR, TEMP_HUM_SENSOR_CHANNEL);
   data.temperature = sht31.readTemperature();
@@ -60,7 +64,8 @@ TempHumidity readTempHumidity() {
 // ============================================================
 // Flow Sensor Functions
 // ============================================================
-FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_t cmd) {
+FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_t cmd)
+{
   FlowSensor sensor;
   sensor.multiplexerAddr = muxAddr;
   sensor.sensorAddr = addr;
@@ -76,19 +81,21 @@ FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_
   sensor.dispenseVolume = 0.0;
   sensor.totalVolume = 0.0;
   sensor.isValidReading = false;
+  sensor.fluidType = WATER; // Add default fluid type initialization
   return sensor;
 }
 
-bool initializeFlowSensor(FlowSensor &sensor) {
+bool initializeFlowSensor(FlowSensor &sensor)
+{
   static int resetAttempt = 0;
 
   // Step 1: Select the multiplexer channel.
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
   delay(10); // Add delay after channel selection
 
-
   // Step 2: Check sensor connection.
-  if (!isFlowSensorConnected(sensor)) {
+  if (!isFlowSensorConnected(sensor))
+  {
     sendMessage(F("[ERROR] Flow sensor on channel "), &Serial, currentClient, false);
     sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
     sendMessage(F(" is not connected. Aborting initialization."), &Serial, currentClient);
@@ -96,20 +103,22 @@ bool initializeFlowSensor(FlowSensor &sensor) {
   }
   delay(10); // Add delay after channel selection
 
-
   // Step 3: On retry, attempt a soft reset.
-  if (resetAttempt > 0) {
+  if (resetAttempt > 0)
+  {
     sendMessage(F("[DEBUG] Sending soft reset to sensor on channel "), &Serial, currentClient, false);
     sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
     Wire.beginTransmission(sensor.sensorAddr);
     Wire.write(0x00);
     Wire.write(0x06);
-    if (Wire.endTransmission() != 0) {
+    if (Wire.endTransmission() != 0)
+    {
       sendMessage(F("[WARNING] Soft reset command was not acknowledged."), &Serial, currentClient);
       return false;
     }
     delay(50);
-    if (!isFlowSensorConnected(sensor)) {
+    if (!isFlowSensorConnected(sensor))
+    {
       sendMessage(F("[ERROR] Sensor did not respond after soft reset."), &Serial, currentClient);
       return false;
     }
@@ -121,9 +130,11 @@ bool initializeFlowSensor(FlowSensor &sensor) {
   Wire.beginTransmission(sensor.sensorAddr);
   Wire.write(sensor.measurementCmd >> 8);
   Wire.write(sensor.measurementCmd & 0xFF);
-  if (Wire.endTransmission() != 0) {
+  if (Wire.endTransmission() != 0)
+  {
     sendMessage(F("[ERROR] Failed to start measurement mode."), &Serial, currentClient);
-    if (resetAttempt == 0) {
+    if (resetAttempt == 0)
+    {
       resetAttempt++;
       return initializeFlowSensor(sensor);
     }
@@ -143,10 +154,12 @@ bool initializeFlowSensor(FlowSensor &sensor) {
   return true;
 }
 
-bool readFlowSensorData(FlowSensor &sensor) {
+bool readFlowSensorData(FlowSensor &sensor)
+{
   static int softResetAttempt = 0;
 
-  if (!sensor.sensorInitialized || sensor.sensorStopped) {
+  if (!sensor.sensorInitialized || sensor.sensorStopped)
+  {
     sensor.flowRate = -1;
     sensor.temperature = -1;
     sensor.highFlowFlag = -1;
@@ -157,15 +170,18 @@ bool readFlowSensorData(FlowSensor &sensor) {
 
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
   Wire.requestFrom(sensor.sensorAddr, (uint8_t)9);
-  if (Wire.available() < 9) {
+  if (Wire.available() < 9)
+  {
     sendMessage(F("[ERROR] Not enough bytes received from flow sensor on channel "), &Serial, currentClient, false);
     sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
-    if (softResetAttempt < 2) {
+    if (softResetAttempt < 2)
+    {
       sendMessage(F("[WARNING] Attempting soft reset to recover..."), &Serial, currentClient);
       Wire.beginTransmission(sensor.sensorAddr);
       Wire.write(0x00);
       Wire.write(0x06);
-      if (Wire.endTransmission() == 0) {
+      if (Wire.endTransmission() == 0)
+      {
         delay(25);
         softResetAttempt++;
         return false;
@@ -181,11 +197,11 @@ bool readFlowSensorData(FlowSensor &sensor) {
   softResetAttempt = 0;
 
   uint16_t flowRaw = (Wire.read() << 8) | Wire.read();
-  Wire.read();  // Skip CRC
+  Wire.read(); // Skip CRC
   uint16_t tempRaw = (Wire.read() << 8) | Wire.read();
-  Wire.read();  // Skip CRC
+  Wire.read(); // Skip CRC
   uint16_t auxRaw = (Wire.read() << 8) | Wire.read();
-  Wire.read();  // Skip CRC
+  Wire.read(); // Skip CRC
 
   sensor.flowRate = ((int16_t)flowRaw) / 32.0;
   sensor.temperature = ((int16_t)tempRaw) / 200.0;
@@ -195,7 +211,8 @@ bool readFlowSensorData(FlowSensor &sensor) {
     sensor.flowRate = 0.0;
 
   unsigned long currentTime = millis();
-  if (sensor.lastUpdateTime > 0) {
+  if (sensor.lastUpdateTime > 0)
+  {
     float elapsedMinutes = (currentTime - sensor.lastUpdateTime) / 60000.0;
     float increment = sensor.flowRate * elapsedMinutes;
     sensor.dispenseVolume += increment;
@@ -206,62 +223,159 @@ bool readFlowSensorData(FlowSensor &sensor) {
   return true;
 }
 
-bool startFlowSensorMeasurement(FlowSensor &sensor) {
+bool startFlowSensorMeasurement(FlowSensor &sensor)
+{
   sendMessage(F("[DEBUG] Attempting to start flow measurement for sensor on channel "), &Serial, currentClient, false);
   sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
-  if (!isFlowSensorConnected(sensor)) {
+
+  // Check connection first
+  if (!isFlowSensorConnected(sensor))
+  {
     sendMessage(F("[ERROR] Cannot start measurement for flow sensor on channel "), &Serial, currentClient, false);
     sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
     sendMessage(F(" because it is disconnected."), &Serial, currentClient);
     return false;
   }
+
+  // If sensor was already in measurement mode, stop it first for a clean start
+  if (sensor.sensorInitialized && !sensor.sensorStopped)
+  {
+    stopFlowSensorMeasurement(sensor);
+    delay(50);
+  }
+
   sensor.sensorStopped = false;
-  for (int i = 0; i < 3; i++) {
+
+  // Try to initialize multiple times
+  for (int i = 0; i < 3; i++)
+  {
     sendMessage(F("[DEBUG] Attempt "), &Serial, currentClient, false);
     sendMessage(String(i + 1).c_str(), &Serial, currentClient, false);
     sendMessage(F(" to initialize sensor."), &Serial, currentClient);
-    if (initializeFlowSensor(sensor)) {
+
+    if (initializeFlowSensor(sensor))
+    {
+      // Reset volume counters when starting a new measurement session
+      sensor.dispenseVolume = 0.0;
+      sensor.lastUpdateTime = millis();
+
       sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
       sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
       sendMessage(F(" started measurement mode."), &Serial, currentClient);
       return true;
     }
-    delay(50);
   }
+
   sendMessage(F("[ERROR] Failed to start measurement for flow sensor on channel "), &Serial, currentClient, false);
   sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
   return false;
 }
 
-
-bool stopFlowSensorMeasurement(FlowSensor &sensor) {
-  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
-  Wire.beginTransmission(sensor.sensorAddr);
-  Wire.write(0x3F);  // Stop command MSB
-  Wire.write(0xF9);  // Stop command LSB
-  if (Wire.endTransmission() == 0) {
-    sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
+bool stopFlowSensorMeasurement(FlowSensor &sensor)
+{
+  if (sensor.sensorStopped)
+  {
+    sendMessage(F("[INFO] Flow sensor on channel "), &Serial, currentClient, false);
     sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
-    sendMessage(F(" stopped measurement mode."), &Serial, currentClient);
-    sensor.sensorInitialized = false;
-    sensor.sensorStopped = true;
+    sendMessage(F(" already stopped."), &Serial, currentClient);
     return true;
-  } else {
-    sendMessage(F("[ERROR] Failed to stop measurement for flow sensor on channel "), &Serial, currentClient, false);
-    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
+  }
+
+  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+
+  // Try multiple times if needed
+  for (int attempt = 0; attempt < 3; attempt++)
+  {
+    Wire.beginTransmission(sensor.sensorAddr);
+    Wire.write(0x3F); // Stop command MSB
+    Wire.write(0xF9); // Stop command LSB
+    byte result = Wire.endTransmission();
+
+    if (result == 0)
+    {
+      sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
+      sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
+      sendMessage(F(" stopped measurement mode."), &Serial, currentClient);
+      sensor.sensorInitialized = false;
+      sensor.sensorStopped = true;
+      return true;
+    }
+  }
+
+  sendMessage(F("[ERROR] Failed to stop measurement for flow sensor on channel "), &Serial, currentClient, false);
+  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
+  return false;
+}
+
+bool setFlowSensorFluidType(FlowSensor &sensor, FluidType fluidType)
+{
+  // First stop measurement if running
+  if (sensor.sensorInitialized && !sensor.sensorStopped)
+  {
+    if (!stopFlowSensorMeasurement(sensor))
+    {
+      sendMessage(F("[ERROR] Cannot set fluid type - failed to stop sensor."), &Serial, currentClient);
+      return false;
+    }
+  }
+
+  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+
+  uint16_t new_measurement_cmd;
+  const char *fluidName;
+
+  // Select appropriate command and name based on fluidType
+  switch (fluidType)
+  {
+  case WATER:
+    new_measurement_cmd = FLOW_SENSOR_CMD_WATER;
+    fluidName = "Water";
+    break;
+  case IPA:
+    new_measurement_cmd = FLOW_SENSOR_CMD_IPA;
+    fluidName = "IPA";
+    break;
+  default:
+    sendMessage(F("[ERROR] Unsupported fluid type specified."), &Serial, currentClient);
     return false;
+  }
+
+  // Update the sensor's measurement command and fluid type
+  sensor.measurementCmd = new_measurement_cmd;
+  sensor.fluidType = fluidType;
+
+  sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
+  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
+  sendMessage(F(" configured for "), &Serial, currentClient, false);
+  sendMessage(fluidName, &Serial, currentClient);
+
+  return true;
+}
+
+const char *getFluidTypeString(FluidType type)
+{
+  switch (type)
+  {
+  case WATER:
+    return "Water";
+  case IPA:
+    return "IPA";
+  default:
+    return "Unknown";
   }
 }
 
 // ============================================================
 // Pressure Sensor Functions
 // ============================================================
-float readPressureVoltage(const PressureSensor &sensor) {
+float readPressureVoltage(const PressureSensor &sensor)
+{
   int analogValue = analogRead(sensor.analogPin);
   return (analogValue / 1023.0) * 10.0;
 }
 
-float readPressure(const PressureSensor &sensor) {
+float readPressure(const PressureSensor &sensor)
+{
   float voltage = readPressureVoltage(sensor);
   return (voltage / 10.0) * sensor.maxPressure;
 }
@@ -269,19 +383,18 @@ float readPressure(const PressureSensor &sensor) {
 // ============================================================
 // Flow Sensor Volume Reset Helper Functions
 // ============================================================
-void resetFlowSensorDispenseVolume(FlowSensor &sensor) {
+void resetFlowSensorDispenseVolume(FlowSensor &sensor)
+{
   sensor.dispenseVolume = 0.0;
   sensor.lastUpdateTime = millis();
-  sensor.sensorStopped = true;  // Ensure sensor is stopped
+  sensor.sensorStopped = true; // Ensure sensor is stopped
   sendMessage(F("[MESSAGE] Dispense volume reset for flow sensor on channel "), &Serial, currentClient, false);
   sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
 }
 
-void resetFlowSensorTotalVolume(FlowSensor &sensor) {
+void resetFlowSensorTotalVolume(FlowSensor &sensor)
+{
   sensor.totalVolume = 0.0;
   sendMessage(F("[MESSAGE] Total volume reset for flow sensor on channel "), &Serial, currentClient, false);
   sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
 }
-
-
-

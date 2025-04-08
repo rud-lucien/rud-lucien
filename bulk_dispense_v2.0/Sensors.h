@@ -35,6 +35,8 @@ bool initializeFlowSensor(FlowSensor &sensor);
 bool readFlowSensorData(FlowSensor &sensor);
 bool startFlowSensorMeasurement(FlowSensor &sensor);
 bool stopFlowSensorMeasurement(FlowSensor &sensor);
+bool setFlowSensorFluidType(FlowSensor &sensor, FluidType fluidType);
+const char* getFluidTypeString(FluidType type);
 
 // ============================================================
 // Flow Sensor Volume Management Functions

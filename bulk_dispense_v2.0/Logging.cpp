@@ -50,7 +50,7 @@ const char *getFlowDiagString(const FlowSensor &sensor, bool isDispensing)
 // ============================================================
 void logSystemState()
 {
-  char buffer[500];
+  char buffer[600];
 
   // --- Fan State ---
   char fanState = (digitalRead(fan.relayPin) == HIGH ? '1' : '0');
@@ -151,6 +151,12 @@ void logSystemState()
   dtostrf(flow4.totalVolume, 4, 1, f4Total);
   snprintf(f4Flag, sizeof(f4Flag), "%d", flow4.isValidReading ? flow4.highFlowFlag : -1);
 
+  // --- Flow Sensor Fluid Types ---
+  const char *f1Type = getFluidTypeString(flow1.fluidType);
+  const char *f2Type = getFluidTypeString(flow2.fluidType);
+  const char *f3Type = getFluidTypeString(flow3.fluidType);
+  const char *f4Type = getFluidTypeString(flow4.fluidType);
+
   // --- Dispensing State (DS) ---
   char ds1 = (valveControls[0].isDispensing ? '1' : '0');
   char ds2 = (valveControls[1].isDispensing ? '1' : '0');
@@ -190,8 +196,8 @@ void logSystemState()
   sprintf(buffer,
           "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, PV,%s, PV%%,%s, "
           "WSL%c%c, WBL%c%c, WVS%c%c, ELS%c, BS%c%c%c%c, OS%c%c%c%c, "
-          "PS,%s, T,%s, H,%s, FS1,%s,%s,%s,%s,%s; FS2,%s,%s,%s,%s,%s; "
-          "FS3,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s, DS%c%c%c%c, TV,%s,%s,%s,%s, "
+          "PS,%s, T,%s, H,%s, FS1,%s,%s,%s,%s,%s,%s; FS2,%s,%s,%s,%s,%s,%s; "
+          "FS3,%s,%s,%s,%s,%s,%s; FS4,%s,%s,%s,%s,%s,%s, DS%c%c%c%c, TV,%s,%s,%s,%s, "
           "PR%c%c%c%c, FM%c%c%c%c, TDS%c%c%c%c",
           // Fan state
           fanState,
@@ -218,13 +224,13 @@ void logSystemState()
           // Pressure, Temperature, Humidity
           pressureStr, tempStr, humStr,
           // Flow Sensor 1 data
-          f1Rate, f1Temp, f1Disp, f1Total, f1Flag,
+          f1Rate, f1Temp, f1Disp, f1Total, f1Flag, f1Type,
           // Flow Sensor 2 data
-          f2Rate, f2Temp, f2Disp, f2Total, f2Flag,
+          f2Rate, f2Temp, f2Disp, f2Total, f2Flag, f2Type,
           // Flow Sensor 3 data
-          f3Rate, f3Temp, f3Disp, f3Total, f3Flag,
+          f3Rate, f3Temp, f3Disp, f3Total, f3Flag, f3Type,
           // Flow Sensor 4 data
-          f4Rate, f4Temp, f4Disp, f4Total, f4Flag,
+          f4Rate, f4Temp, f4Disp, f4Total, f4Flag, f4Type,
           // Dispensing state for valves (DS)
           ds1, ds2, ds3, ds4,
           // Target volume for valves (TV)

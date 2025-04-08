@@ -33,6 +33,7 @@
  *   F       - Fill reagent: F <1-4>
  *   DT      - Drain trough: DT <1-4>
  *   SDT     - Stop draining trough: SDT <1-4> or SDT all
+ *   SETFS   - Set flow sensor fluid type: SETFS <1-4> <W/I>
  *   LOGHELP - Display detailed log field definitions and diagnostic info
  *   STANDBY - Abort all automated operations and set the system to a
  *             safe, idle state (standby mode)
@@ -71,11 +72,12 @@ void cmd_log_help(char *args, CommandCaller *caller);
 void cmd_standby(char *args, CommandCaller *caller);
 void cmd_print_help(char *args, CommandCaller *caller);
 void cmd_device_info(char *args, CommandCaller *caller);
+void cmd_set_flow_sensor_fluid(char *args, CommandCaller *caller);
 
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
-extern Commander::systemCommand_t API_tree[26];
+extern Commander::systemCommand_t API_tree[27];
 extern Commander commander;
 
 #endif // COMMANDS_H

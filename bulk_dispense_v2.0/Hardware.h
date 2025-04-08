@@ -79,7 +79,8 @@ extern const uint8_t WASTE_VACUUM_SENSORS[NUM_WASTE_VACUUM_SENSORS];
 #define TEMP_HUM_SENSOR_ADDR 0x44
 #define TEMP_HUM_SENSOR_CHANNEL 4
 #define NUM_FLOW_SENSORS 4
-#define FLOW_SENSOR_CMD 0x3608
+#define FLOW_SENSOR_CMD_WATER 0x3608
+#define FLOW_SENSOR_CMD_IPA 0x3615
 
 // ============================================================
 // Structure Definitions
@@ -117,6 +118,12 @@ struct TempHumidity {
   bool valid;
 };
 
+// Fluid type enum for flow sensors
+enum FluidType {
+  WATER,
+  IPA
+};
+
 // Flow Sensor Structure
 struct FlowSensor {
   uint8_t multiplexerAddr;
@@ -133,6 +140,8 @@ struct FlowSensor {
   float dispenseVolume;
   float totalVolume;
   bool isValidReading;
+  FluidType fluidType;         // Added: tracks current fluid calibration type
+  bool isIPA;
 };
 
 // Valve Control Structure (for dispense operations)

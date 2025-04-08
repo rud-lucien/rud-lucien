@@ -101,6 +101,7 @@ void setup()
     flowSensors[i]->totalVolume = 0.0;
     flowSensors[i]->lastUpdateTime = 0;
     flowSensors[i]->isValidReading = false;
+    flowSensors[i]->isIPA = false; // Default to water
 
     // Test basic communication without full initialization
     selectMultiplexerChannel(flowSensors[i]->multiplexerAddr, flowSensors[i]->channel);

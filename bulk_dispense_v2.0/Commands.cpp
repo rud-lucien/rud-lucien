@@ -1046,6 +1046,7 @@ void cmd_log_help(char *args, CommandCaller *caller)
   caller->println(F("         - Dispensed volume"));
   caller->println(F("         - Total volume"));
   caller->println(F("         - Sensor status flag (e.g., -1 for an invalid reading)"));
+  caller->println(F("         - Currently set Fluid type (Water or IPA)"));
 
   // Operational States
   caller->println(F("DSxxxx : Dispensing state for each trough (4-digit binary; 1 = active, 0 = inactive)."));
@@ -1224,6 +1225,8 @@ void cmd_get_system_state(char *args, CommandCaller *caller)
     {
       caller->print(flowSensors[i]->isValidReading ? F("VALID") : F("INVALID"));
     }
+    caller->print(F(", Fluid Type: "));
+    caller->print(flowSensors[i]->isIPA ? F("IPA") : F("Water"));
     caller->print(F(", Current Dispense Volume: "));
     dtostrf(flowSensors[i]->dispenseVolume, 4, 1, buf);
     caller->print(buf);
@@ -1499,6 +1502,47 @@ void cmd_device_info(char *args, CommandCaller *caller)
   }
 }
 
+void cmd_set_flow_sensor_fluid(char *args, CommandCaller *caller)
+{
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  int sensorNumber = -1;
+  char fluidType;
+
+  if (sscanf(localArgs, "%d %c", &sensorNumber, &fluidType) == 2 &&
+      sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS &&
+      (toupper(fluidType) == 'W' || toupper(fluidType) == 'I'))
+  {
+    FlowSensor *sensor = flowSensors[sensorNumber - 1];
+    if (!sensor)
+    {
+      caller->print(F("[ERROR] Flow Sensor "));
+      caller->print(sensorNumber);
+      caller->println(F(" not found."));
+      return;
+    }
+
+    bool isIPA = (toupper(fluidType) == 'I');
+    sensor->isIPA = isIPA;
+
+    // Update the fluidType enum as well
+    sensor->fluidType = isIPA ? IPA : WATER;
+
+    // Use the proper API to set the fluid type if available
+    setFlowSensorFluidType(*sensor, sensor->fluidType);
+
+    caller->print(F("[MESSAGE] Flow Sensor "));
+    caller->print(sensorNumber);
+    caller->print(F(" fluid type set to "));
+    caller->println(isIPA ? F("IPA") : F("Water"));
+  }
+  else
+  {
+    caller->println(F("[ERROR] Invalid arguments. Usage: SETFS <sensor 1-4> <W/I> (W=Water, I=IPA)"));
+  }
+}
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
@@ -1530,4 +1574,5 @@ Commander::systemCommand_t API_tree[] = {
     systemCommand("help", "Display help information for all commands", cmd_print_help),
     systemCommand("h", "Display help information for all commands", cmd_print_help),
     systemCommand("H", "Display help information for all commands", cmd_print_help),
-    systemCommand("DI", "Display device network information (Serial only)", cmd_device_info)};
+    systemCommand("DI", "Display device network information (Serial only)", cmd_device_info),
+    systemCommand("SETFS", "Set flow sensor fluid type. Usage: SETFS <sensor 1-4> <W/I> (W=Water, I=IPA)", cmd_set_flow_sensor_fluid)};

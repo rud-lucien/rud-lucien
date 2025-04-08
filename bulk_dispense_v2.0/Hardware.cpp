@@ -68,10 +68,10 @@ PressureSensor pressureSensor = { PRESSURE_SENSOR_PIN, 0, 87 };
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 // Flow Sensors (channels 0-3)
-FlowSensor flow1 = { MULTIPLEXER_ADDR, 0x08, 0, FLOW_SENSOR_CMD, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false };
-FlowSensor flow2 = { MULTIPLEXER_ADDR, 0x08, 1, FLOW_SENSOR_CMD, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false };
-FlowSensor flow3 = { MULTIPLEXER_ADDR, 0x08, 2, FLOW_SENSOR_CMD, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false };
-FlowSensor flow4 = { MULTIPLEXER_ADDR, 0x08, 3, FLOW_SENSOR_CMD, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false };
+FlowSensor flow1 = { MULTIPLEXER_ADDR, 0x08, 0, FLOW_SENSOR_CMD_WATER, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false, WATER };
+FlowSensor flow2 = { MULTIPLEXER_ADDR, 0x08, 1, FLOW_SENSOR_CMD_WATER, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false, WATER };
+FlowSensor flow3 = { MULTIPLEXER_ADDR, 0x08, 2, FLOW_SENSOR_CMD_WATER, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false, WATER };
+FlowSensor flow4 = { MULTIPLEXER_ADDR, 0x08, 3, FLOW_SENSOR_CMD_WATER, false, true, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, false, WATER };
 
 FlowSensor *flowSensors[NUM_FLOW_SENSORS] = { &flow1, &flow2, &flow3, &flow4 };
 
@@ -221,3 +221,4 @@ bool readBinarySensor(const BinarySensor &sensor) {
   int reading = digitalRead(sensor.inputPin);
   return sensor.activeHigh ? (reading == HIGH) : (reading == LOW);
 }
+
