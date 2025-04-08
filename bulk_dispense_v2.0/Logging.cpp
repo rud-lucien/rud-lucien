@@ -1,53 +1,55 @@
 #include "Logging.h"
-#include "Hardware.h"  // For global hardware objects and hardware functions
-#include "Sensors.h"   // For sensor reading functions
-#include "Utils.h"     // For any helper functions
+#include "Hardware.h" // For global hardware objects and hardware functions
+#include "Sensors.h"  // For sensor reading functions
+#include "Utils.h"    // For any helper functions
 #include <stdio.h>
 #include "CommandSession.h"
 #include "CommandManager.h"
 
 /************************************************************
  * Logging.cpp
- * 
+ *
  * This file implements functions declared in Logging.h.
- * It provides functions for logging generic messages and 
+ * It provides functions for logging generic messages and
  * detailed system state.
  *
- * Author: Your Name
- * Date: YYYY-MM-DD
+ * Author: Rud Lucien
+ * Date: 2025-04-08
  * Version: 2.0
  ************************************************************/
 
 // ============================================================
 // Global Logging Instance
 // ============================================================
-LoggingManagement logging = { 0, 250 };  // Default log interval: 250 ms
+LoggingManagement logging = {0, 250}; // Default log interval: 250 ms
 
 // ============================================================
 // logData()
 // ============================================================
-void logData(const char* module, const char* message) {
+void logData(const char *module, const char *message)
+{
   Serial.print(F("[LOG] "));
   Serial.print(module);
   Serial.print(F(" - "));
   Serial.println(message);
 }
 
-
 // Returns a diagnostic string based on whether the sensor is dispensing or not.
 // If not dispensing, it returns "Not Dispensing". Otherwise, it uses getFlowState().
-const char* getFlowDiagString(const FlowSensor &sensor, bool isDispensing) {
-  if (!isDispensing) {
+const char *getFlowDiagString(const FlowSensor &sensor, bool isDispensing)
+{
+  if (!isDispensing)
+  {
     return "Not Dispensing";
   }
   return sensor.isValidReading ? "Valid" : "Invalid";
 }
 
-
 // ============================================================
 // logSystemState()
 // ============================================================
-void logSystemState() {
+void logSystemState()
+{
   char buffer[500];
 
   // --- Fan State ---
@@ -109,10 +111,13 @@ void logSystemState() {
   // --- Temperature & Humidity ---
   TempHumidity th = readTempHumidity();
   char tempStr[8], humStr[8];
-  if (th.valid) {
+  if (th.valid)
+  {
     dtostrf(th.temperature, 4, 1, tempStr);
     dtostrf(th.humidity, 4, 1, humStr);
-  } else {
+  }
+  else
+  {
     strcpy(tempStr, "-1");
     strcpy(humStr, "-1");
   }
@@ -181,8 +186,6 @@ void logSystemState() {
   char tds3 = (wasteValve2.isOpen && wasteValve4.isOpen) ? '1' : '0';
   char tds4 = (wasteValve2.isOpen && !wasteValve4.isOpen) ? '1' : '0';
 
- 
-
   // --- Format and Print Log Message ---
   sprintf(buffer,
           "[LOG] F%c, RV%c%c%c%c, MV%c%c%c%c, WV%c%c%c%c, PV,%s, PV%%,%s, "
@@ -237,25 +240,25 @@ void logSystemState() {
   char diagBuffer[128];
   sprintf(diagBuffer,
           ", DIAG: FAM:%s, EERR:%s, GVM1:%s, GVM2:%s, MC1:%s, MC2:%s, MC3:%s, MC4:%s, LF:%lu ms, RC:%d, NET:%s",
-          fanAutoMode ? "ON" : "OFF",                                  // Fan Auto Mode
-          globalEnclosureLiquidError ? "TRUE" : "FALSE",               // Enclosure Liquid Error
-          globalVacuumMonitoring[0] ? "TRUE" : "FALSE",                // Vacuum Monitoring for bottle 1
-          globalVacuumMonitoring[1] ? "TRUE" : "FALSE",                // Vacuum Monitoring for bottle 2
-          valveControls[0].manualControl ? "ON" : "OFF",               // Manual Control for Trough 1
-          valveControls[1].manualControl ? "ON" : "OFF",               // Manual Control for Trough 2
-          valveControls[2].manualControl ? "ON" : "OFF",               // Manual Control for Trough 3
-          valveControls[3].manualControl ? "ON" : "OFF",               // Manual Control for Trough 4
-          logging.logInterval,                                         // Logging frequency
-          cm_getPendingCommands(),                                     // Get number of pending commands
-          hasActiveClient ? "CONNECTED" : "NONE");                     // Network connection status      
+          fanAutoMode ? "ON" : "OFF",                    // Fan Auto Mode
+          globalEnclosureLiquidError ? "TRUE" : "FALSE", // Enclosure Liquid Error
+          globalVacuumMonitoring[0] ? "TRUE" : "FALSE",  // Vacuum Monitoring for bottle 1
+          globalVacuumMonitoring[1] ? "TRUE" : "FALSE",  // Vacuum Monitoring for bottle 2
+          valveControls[0].manualControl ? "ON" : "OFF", // Manual Control for Trough 1
+          valveControls[1].manualControl ? "ON" : "OFF", // Manual Control for Trough 2
+          valveControls[2].manualControl ? "ON" : "OFF", // Manual Control for Trough 3
+          valveControls[3].manualControl ? "ON" : "OFF", // Manual Control for Trough 4
+          logging.logInterval,                           // Logging frequency
+          cm_getPendingCommands(),                       // Get number of pending commands
+          hasActiveClient ? "CONNECTED" : "NONE");       // Network connection status
 
   char flowDiag[128];
   sprintf(flowDiag,
-    ", FLOW_DIAG: FS1:%s, FS2:%s, FS3:%s, FS4:%s",
-    getFlowDiagString(flow1, valveControls[0].isDispensing),
-    getFlowDiagString(flow2, valveControls[1].isDispensing),
-    getFlowDiagString(flow3, valveControls[2].isDispensing),
-    getFlowDiagString(flow4, valveControls[3].isDispensing));
+          ", FLOW_DIAG: FS1:%s, FS2:%s, FS3:%s, FS4:%s",
+          getFlowDiagString(flow1, valveControls[0].isDispensing),
+          getFlowDiagString(flow2, valveControls[1].isDispensing),
+          getFlowDiagString(flow3, valveControls[2].isDispensing),
+          getFlowDiagString(flow4, valveControls[3].isDispensing));
 
   // Append diagnostic info to the main log message
   strncat(buffer, diagBuffer, sizeof(buffer) - strlen(buffer) - 1);
@@ -264,4 +267,3 @@ void logSystemState() {
   // --- Print the complete log message ---
   Serial.println(buffer);
 }
-

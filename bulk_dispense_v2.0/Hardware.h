@@ -16,8 +16,8 @@
  * - Extern declarations for global arrays and objects.
  * - Function prototypes for hardware-related functions.
  *
- * Author: Your Name
- * Date: YYYY-MM-DD
+ * Author: Rud Lucien
+ * Date: 2025-04-08
  * Version: 2.0
  ************************************************************/
 

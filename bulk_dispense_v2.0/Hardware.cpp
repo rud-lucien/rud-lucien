@@ -1,5 +1,6 @@
 #include "Hardware.h"
 #include <Wire.h>
+#include "Utils.h"
 
 /************************************************************
  * Hardware.cpp
@@ -9,8 +10,8 @@
  * - Global object definitions for hardware components.
  * - Hardware functions for initializing and controlling devices.
  *
- * Author: Your Name
- * Date: YYYY-MM-DD
+ * Author: Rud Lucien
+ * Date: 2025-04-08
  * Version: 2.0
  ************************************************************/
 
@@ -146,7 +147,7 @@ bool primeAsyncCompleted[NUM_OVERFLOW_SENSORS]    = { false, false, false, false
 void fanSetup(const FanControl &fc) {
   pinMode(fc.relayPin, OUTPUT);
   digitalWrite(fc.relayPin, LOW);
-  Serial.println(F("[MESSAGE] Fan initialized and set to OFF"));
+  sendMessage(F("[MESSAGE] Fan initialized and set to OFF"), &Serial, currentClient);
 }
 
 void setFanState(const FanControl &config, bool state) {
@@ -154,14 +155,14 @@ void setFanState(const FanControl &config, bool state) {
   bool currentState = digitalRead(config.relayPin) == HIGH;
   if (currentState != state) {
     digitalWrite(config.relayPin, state ? HIGH : LOW);
-    Serial.print(F("[MESSAGE] Fan state set to "));
-    Serial.println(state ? F("ON") : F("OFF"));
+    sendMessage(F("[MESSAGE] Fan state set to "), &Serial, currentClient, false);
+    sendMessage(state ? F("ON") : F("OFF"), &Serial, currentClient);
   }
 }
 
 void printFanState(bool state) {
-  Serial.print(F("[MESSAGE] Fan is "));
-  Serial.println(state ? F("ON") : F("OFF"));
+  sendMessage(F("[MESSAGE] Fan is "), &Serial, currentClient, false);
+  sendMessage(state ? F("ON") : F("OFF"), &Serial, currentClient);
 }
 
 OnOffValve openValve(OnOffValve valve) {
@@ -198,13 +199,16 @@ float getValveFeedback(const ProportionalValve &valve) {
 }
 
 void calibrateProportionalValve() {
-  Serial.println(F("[MESSAGE] Starting proportional valve calibration..."));
+  sendMessage(F("[MESSAGE] Starting proportional valve calibration..."), &Serial, currentClient);
   // Set valve to fully open (100%).
   proportionalValve = setValvePosition(proportionalValve, 100.0);
   delay(1000);  // Wait for stabilization.
   proportionalValveMaxFeedback = getValveFeedback(proportionalValve);
-  Serial.print(F("[MESSAGE] Calibrated max feedback voltage: "));
-  Serial.println(proportionalValveMaxFeedback);
+  
+  sendMessage(F("[MESSAGE] Calibrated max feedback voltage: "), &Serial, currentClient, false);
+  char voltageStr[10];
+  dtostrf(proportionalValveMaxFeedback, 4, 2, voltageStr);
+  sendMessage(voltageStr, &Serial, currentClient);
 }
 
 void selectMultiplexerChannel(uint8_t multiplexerAddr, uint8_t channel) {

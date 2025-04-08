@@ -31,7 +31,6 @@
 unsigned long networkCommandStartTime = 0;
 unsigned long serialCommandStartTime = 0;
 
-
 // ============================================================
 // Command Session Utilities
 // ============================================================
@@ -83,177 +82,6 @@ bool isCommandPrefix(const char *token)
   return false;
 }
 
-// void processMultipleCommands(char *commandLine, Stream *stream, CommandSource source)
-// {
-//   char *start = commandLine;
-//   char commandCopy[COMMAND_SIZE];
-
-//   // Set flag to indicate we are processing the command line.
-//   commandLineBeingProcessed = true;
-
-//   if (source == SOURCE_SERIAL)
-//   {
-//     // Print receipt of serial command
-//     Serial.print(F("[SERIAL COMMAND] Received: "));
-//     Serial.println(commandLine);
-
-//     // Start session on Serial
-//     cm_startSession(&Serial);
-
-//     // If network client connected, echo to it
-//     if (hasActiveClient)
-//     {
-//       currentClient.print(F("[SERIAL COMMAND] Received: "));
-//       currentClient.println(commandLine);
-//       cm_startSession(&currentClient);
-//     }
-//   }
-//   else
-//   {
-//     // Print receipt of network command to both streams
-//     Serial.print(F("[NETWORK COMMAND] Received: "));
-//     Serial.println(commandLine);
-
-//     if (hasActiveClient)
-//     {
-//       currentClient.print(F("[NETWORK COMMAND] Received: "));
-//       currentClient.println(commandLine);
-//       cm_startSession(&currentClient);
-//     }
-
-//     // Always start Serial session for network commands
-//     cm_startSession(&Serial);
-//   }
-
-//   while (*start)
-//   {
-//     char *comma = strchr(start, ',');
-//     size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
-//     if (len >= COMMAND_SIZE)
-//     {
-//       len = COMMAND_SIZE - 1;
-//     }
-//     strncpy(commandCopy, start, len);
-//     commandCopy[len] = '\0'; // Null-terminate
-//     char *trimmed = trimLeadingSpaces(commandCopy);
-//     if (strlen(trimmed) > 0)
-//     {
-//       Serial.print(F("[DEBUG] Token extracted: '"));
-//       Serial.print(trimmed);
-//       Serial.println(F("'"));
-
-//       resetAsyncFlagsForCommand(trimmed);
-
-//       if (isAsyncCommand(trimmed))
-//       {
-//         cm_registerCommand();
-//         // Dispatch asynchronous command.
-//         // Its callback must call cm_commandCompleted(stream) when done.
-//         commander.execute(trimmed, stream);
-//       }
-//       else
-//       {
-//         // For synchronous commands, register and execute.
-//         cm_registerCommand();
-//         commander.execute(trimmed, stream);
-//         // Synchronous commands finish immediately (even if error),
-//         // so complete them here.
-//         cm_commandCompleted(stream);
-//       }
-//     }
-//     if (comma == NULL)
-//       break;
-//     start = comma + 1;
-//   }
-
-//   // Finished processing the command line.
-//   commandLineBeingProcessed = false;
-
-//   // If there are no pending commands after processing, end the session.
-//   if (cm_getPendingCommands() <= 0 && cm_isSessionActive())
-//   {
-//     cm_endSession(stream);
-//   }
-// }
-
-// void processMultipleCommands(char *commandLine, Stream *stream, CommandSource source)
-// {
-//   char *start = commandLine;
-//   char commandCopy[COMMAND_SIZE];
-
-//   commandLineBeingProcessed = true;
-
-//   if (source == SOURCE_SERIAL)
-//     {
-//         // For serial commands, print to Serial and echo to network if connected
-//         sendMessage(F("[SERIAL COMMAND] Received: "), &Serial, currentClient, false);
-//         sendMessage(commandLine, &Serial, currentClient);
-//         cm_startSession(&Serial);
-
-        
-//     }
-//     else
-//     {
-//         // For network commands, print only once since sendMessage handles both outputs
-//         sendMessage(F("[NETWORK COMMAND] Received: "), stream, currentClient, false);
-//         sendMessage(commandLine, stream, currentClient);
-        
-        
-//         if (hasActiveClient)
-//         {
-//             cm_startSession(&currentClient);
-//         }
-//     }
-
-//   while (*start)
-//   {
-//     char *comma = strchr(start, ',');
-//     size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
-//     if (len >= COMMAND_SIZE)
-//     {
-//       len = COMMAND_SIZE - 1;
-//     }
-//     strncpy(commandCopy, start, len);
-//     commandCopy[len] = '\0'; // Null-terminate
-//     char *trimmed = trimLeadingSpaces(commandCopy);
-//     if (strlen(trimmed) > 0)
-//     {
-//       sendMessage(F("[DEBUG] Token extracted: '"), &Serial, currentClient, false);
-//       sendMessage(trimmed, &Serial, currentClient, false);
-//       sendMessage(F("'"), &Serial, currentClient);
-
-//       resetAsyncFlagsForCommand(trimmed);
-
-//       if (isAsyncCommand(trimmed))
-//       {
-//         cm_registerCommand();
-//         // Dispatch asynchronous command.
-//         // Its callback must call cm_commandCompleted(stream) when done.
-//         commander.execute(trimmed, stream);
-//       }
-//       else
-//       {
-//         // For synchronous commands, register and execute.
-//         cm_registerCommand();
-//         commander.execute(trimmed, stream);
-//         // Synchronous commands finish immediately (even if error),
-//         // so complete them here.
-//         cm_commandCompleted(stream);
-//       }
-//     }
-//     if (comma == NULL)
-//       break;
-//     start = comma + 1;
-//   }
-
-//   commandLineBeingProcessed = false;
-
-//   if (cm_getPendingCommands() <= 0 && cm_isSessionActive())
-//   {
-//     cm_endSession(stream);
-//   }
-// }
-
 void processMultipleCommands(char *commandLine, Stream *stream, CommandSource source)
 {
   char *start = commandLine;
@@ -261,41 +89,49 @@ void processMultipleCommands(char *commandLine, Stream *stream, CommandSource so
 
   commandLineBeingProcessed = true;
 
-  if (source == SOURCE_SERIAL) {
+  if (source == SOURCE_SERIAL)
+  {
     // For serial commands, start the session
     cm_startSession(&Serial);
-  } 
-  else {
+  }
+  else
+  {
     // For network commands, start the session
-    if (hasActiveClient) {
+    if (hasActiveClient)
+    {
       cm_startSession(&currentClient);
     }
   }
 
-  while (*start) {
+  while (*start)
+  {
     // Rest of function remains unchanged
     char *comma = strchr(start, ',');
     size_t len = (comma != NULL) ? (size_t)(comma - start) : strlen(start);
-    if (len >= COMMAND_SIZE) {
+    if (len >= COMMAND_SIZE)
+    {
       len = COMMAND_SIZE - 1;
     }
     strncpy(commandCopy, start, len);
     commandCopy[len] = '\0'; // Null-terminate
     char *trimmed = trimLeadingSpaces(commandCopy);
-    if (strlen(trimmed) > 0) {
+    if (strlen(trimmed) > 0)
+    {
       sendMessage(F("[DEBUG] Token extracted: '"), &Serial, currentClient, false);
       sendMessage(trimmed, &Serial, currentClient, false);
       sendMessage(F("'"), &Serial, currentClient);
 
       resetAsyncFlagsForCommand(trimmed);
 
-      if (isAsyncCommand(trimmed)) {
+      if (isAsyncCommand(trimmed))
+      {
         cm_registerCommand();
         // Dispatch asynchronous command.
         // Its callback must call cm_commandCompleted(stream) when done.
         commander.execute(trimmed, stream);
       }
-      else {
+      else
+      {
         // For synchronous commands, register and execute.
         cm_registerCommand();
         commander.execute(trimmed, stream);
@@ -311,34 +147,11 @@ void processMultipleCommands(char *commandLine, Stream *stream, CommandSource so
 
   commandLineBeingProcessed = false;
 
-  if (cm_getPendingCommands() <= 0 && cm_isSessionActive()) {
+  if (cm_getPendingCommands() <= 0 && cm_isSessionActive())
+  {
     cm_endSession(stream);
   }
 }
-
-// void handleSerialCommands()
-// {
-//   static char commandBuffer[COMMAND_SIZE];
-//   static uint8_t commandIndex = 0;
-
-//   while (Serial.available() > 0)
-//   {
-//     char c = Serial.read();
-//     if (c == '\n')
-//     {
-//       commandBuffer[commandIndex] = '\0';                             // Null-terminate the command
-//       processMultipleCommands(commandBuffer, &Serial, SOURCE_SERIAL); // Add source parameter
-//       commandIndex = 0;                                               // Reset buffer index
-//     }
-//     else if (c != '\r')
-//     { // Ignore carriage returns
-//       if (commandIndex < (COMMAND_SIZE - 1))
-//       {
-//         commandBuffer[commandIndex++] = c;
-//       }
-//     }
-//   }
-// }
 
 void handleSerialCommands()
 {
@@ -351,17 +164,18 @@ void handleSerialCommands()
     if (c == '\n')
     {
       commandBuffer[commandIndex] = '\0'; // Null-terminate the command
-      
+
       // Print the received command to Serial
       Serial.print(F("[SERIAL COMMAND] Received: "));
       Serial.println(commandBuffer);
-      
+
       // Echo to network client if connected
-      if (hasActiveClient && currentClient.connected()) {
+      if (hasActiveClient && currentClient.connected())
+      {
         currentClient.print(F("[SERIAL COMMAND] Received: "));
         currentClient.println(commandBuffer);
       }
-      
+
       // Process the command line
       processMultipleCommands(commandBuffer, &Serial, SOURCE_SERIAL);
       commandIndex = 0; // Reset buffer index
@@ -398,109 +212,42 @@ String processClientData()
   return "";
 }
 
-// void handleNetworkCommands()
-// {
-//   String command = processClientData();
-//   if (command.length() > 0)
-//   {
-//     char commandBuffer[32];
-//     command.toCharArray(commandBuffer, sizeof(commandBuffer));
-
-//     if (hasActiveClient)
-//     {
-//       processMultipleCommands(commandBuffer, &currentClient, SOURCE_NETWORK);
-//     }
-//   }
-// }
-
-// void handleNetworkCommands()
-// {
-//   if (!hasActiveClient || !currentClient.connected()) {
-//     return;
-//   }
-
-//   while (currentClient.available()) {
-//     // Get the command from network
-//     String command = currentClient.readStringUntil('\n');
-//     command.trim();
-
-//     if (command.length() > 0) {
-//       // Convert to char array for processing
-//       char commandBuffer[COMMAND_SIZE];
-//       command.toCharArray(commandBuffer, COMMAND_SIZE);
-      
-//       // Only process one command line at a time
-//       processMultipleCommands(commandBuffer, &currentClient, SOURCE_NETWORK);
-      
-//       // Make sure all messages are sent before processing another command
-//       currentClient.flush();
-//     }
-//   }
-// }
-
-
-// void handleNetworkCommands()
-// {
-//   if (!hasActiveClient || !currentClient.connected()) {
-//     return;
-//   }
-
-//   while (currentClient.available()) {
-//     // Get the command from network
-//     String command = currentClient.readStringUntil('\n');
-//     command.trim();
-
-//     if (command.length() > 0) {
-//       // Start recording action duration and show ACTION START on Serial
-//       networkCommandStartTime = millis();
-//       Serial.println(F("[ACTION START]"));
-      
-//       // Convert to char array for processing
-//       char commandBuffer[COMMAND_SIZE];
-//       command.toCharArray(commandBuffer, COMMAND_SIZE);
-      
-//       // Only process one command line at a time
-//       processMultipleCommands(commandBuffer, &currentClient, SOURCE_NETWORK);
-      
-//       // Make sure all messages are sent before processing another command
-//       currentClient.flush();
-      
-//     }
-//   }
-// }
-
 void handleNetworkCommands()
 {
-  if (!hasActiveClient || !currentClient.connected()) {
+  if (!hasActiveClient || !currentClient.connected())
+  {
     return;
   }
 
-  while (currentClient.available()) {
+  while (currentClient.available())
+  {
     // Get the command from network
     String command = currentClient.readStringUntil('\n');
     command.trim();
 
-    if (command.length() > 0) {
+    if (command.length() > 0)
+    {
       // Print the received command to both streams
       Serial.print(F("[NETWORK COMMAND] Received: "));
       Serial.println(command);
-      
-      if (hasActiveClient && currentClient.connected()) {
+
+      if (hasActiveClient && currentClient.connected())
+      {
         currentClient.print(F("[NETWORK COMMAND] Received: "));
         currentClient.println(command);
       }
-      
+
       // Start recording action duration but don't print ACTION START here
       // since it will be handled by cm_startSession
       networkCommandStartTime = millis();
-      
+
       // Convert to char array for processing
       char commandBuffer[COMMAND_SIZE];
       command.toCharArray(commandBuffer, COMMAND_SIZE);
-      
+
       // Process the command line
       processMultipleCommands(commandBuffer, &currentClient, SOURCE_NETWORK);
-      
+
       // Make sure all messages are sent before processing another command
       currentClient.flush();
     }
@@ -1192,4 +939,3 @@ void updateTroughManualControlFlag(ValveType type, int valveNumber, CommandCalle
     disableManualControl(troughNumber - 1, caller);
   }
 }
-

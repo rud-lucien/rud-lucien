@@ -165,7 +165,6 @@ void monitorFlowSensors(unsigned long currentTime)
         if (hasActiveClient)
         {
           cm_commandCompleted(&currentClient);
-          cm_commandCompleted(&Serial);
         }
         else
         {
@@ -199,7 +198,6 @@ void monitorFlowSensors(unsigned long currentTime)
           if (hasActiveClient)
           {
             cm_commandCompleted(&currentClient);
-            cm_commandCompleted(&Serial);
           }
           else
           {
@@ -225,7 +223,6 @@ void monitorFlowSensors(unsigned long currentTime)
         if (hasActiveClient)
         {
           cm_commandCompleted(&currentClient);
-          cm_commandCompleted(&Serial);
         }
         else
         {
@@ -245,7 +242,6 @@ void monitorFlowSensors(unsigned long currentTime)
         if (hasActiveClient)
         {
           cm_commandCompleted(&currentClient);
-          cm_commandCompleted(&Serial);
         }
         else
         {
@@ -398,7 +394,6 @@ void handlePrimingOverflow(int i)
   if (hasActiveClient)
   {
     cm_commandCompleted(&currentClient);
-    cm_commandCompleted(&Serial);
   }
   else
   {
@@ -426,13 +421,10 @@ bool handleLowFlowCondition(int i, unsigned long currentTime)
     closeDispenseValves(i + 1);
     valveControls[i].isPriming = false;
     primeAsyncCompleted[i] = true;
-    
 
     if (hasActiveClient)
     {
       cm_commandCompleted(&currentClient);
-      cm_commandCompleted(&Serial);
-      
     }
     else
     {
@@ -445,8 +437,6 @@ bool handleLowFlowCondition(int i, unsigned long currentTime)
   }
   return false;
 }
-
-
 
 void handleBubbleDetected(int i, unsigned long currentTime)
 {
@@ -480,7 +470,6 @@ bool handleNoBubbleDetected(int i, unsigned long currentTime)
     if (hasActiveClient)
     {
       cm_commandCompleted(&currentClient);
-      cm_commandCompleted(&Serial);
     }
     else
     {
@@ -508,7 +497,6 @@ void handlePrimingComplete(int i)
   if (hasActiveClient)
   {
     cm_commandCompleted(&currentClient);
-    cm_commandCompleted(&Serial);
   }
   else
   {
@@ -688,7 +676,6 @@ void monitorWasteSensors(unsigned long currentTime)
           if (hasActiveClient)
           {
             cm_commandCompleted(&currentClient);
-            cm_commandCompleted(&Serial);
           }
           else
           {
@@ -709,7 +696,6 @@ void monitorWasteSensors(unsigned long currentTime)
           if (hasActiveClient)
           {
             cm_commandCompleted(&currentClient);
-            cm_commandCompleted(&Serial);
           }
           else
           {
@@ -733,7 +719,6 @@ void monitorWasteSensors(unsigned long currentTime)
             if (hasActiveClient)
             {
               cm_commandCompleted(&currentClient);
-              cm_commandCompleted(&Serial);
             }
             else
             {
@@ -765,7 +750,6 @@ void monitorWasteSensors(unsigned long currentTime)
             if (hasActiveClient)
             {
               cm_commandCompleted(&currentClient);
-              cm_commandCompleted(&Serial);
             }
             else
             {
@@ -1026,7 +1010,6 @@ void enclosure_handleLeakDetected(unsigned long currentTime, unsigned long &encl
     if (hasActiveClient)
     {
       abortAllAutomatedOperations(&currentClient);
-      abortAllAutomatedOperations(&Serial);
     }
     else
     {
@@ -1187,11 +1170,3 @@ void resetEnclosureLeakMonitorState()
   enclosureLeakErrorTime = 0;
   enclosureLeakAbortCalled = false;
 }
-
-// ============================================================
-// Monitor Enclosure Temperature (Fan Control)
-// ============================================================
-
-// ============================================================
-// Monitor Flow Sensor Connections
-// ============================================================

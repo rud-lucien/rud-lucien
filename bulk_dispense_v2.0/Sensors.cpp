@@ -1,6 +1,7 @@
 #include "Sensors.h"
 #include <Wire.h>
 #include <math.h>  // For isnan()
+#include "Utils.h"
 
 /************************************************************
  * Sensors.cpp
@@ -9,20 +10,15 @@
  * It handles initialization and data acquisition for the SHT31
  * Temperature/Humidity sensor and the flow sensors.
  *
- * Author: Your Name
- * Date: YYYY-MM-DD
+ * Author: Rud Lucien
+ * Date: 2025-04-08
  * Version: 2.0
  ************************************************************/
 
 // ============================================================
 // Internal Helper Functions
 // ============================================================
-/**
- * Checks if a flow sensor is connected.
- * Selects the appropriate multiplexer channel and attempts a transmission.
- * @param sensor The flow sensor to check.
- * @return true if the sensor is connected, false otherwise.
- */
+
 
 bool isFlowSensorConnected(FlowSensor &sensor) {
   // Try multiple times with delays
@@ -93,9 +89,9 @@ bool initializeFlowSensor(FlowSensor &sensor) {
 
   // Step 2: Check sensor connection.
   if (!isFlowSensorConnected(sensor)) {
-    Serial.print(F("[ERROR] Flow sensor on channel "));
-    Serial.print(sensor.channel);
-    Serial.println(F(" is not connected. Aborting initialization."));
+    sendMessage(F("[ERROR] Flow sensor on channel "), &Serial, currentClient, false);
+    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
+    sendMessage(F(" is not connected. Aborting initialization."), &Serial, currentClient);
     return false;
   }
   delay(10); // Add delay after channel selection
@@ -103,30 +99,30 @@ bool initializeFlowSensor(FlowSensor &sensor) {
 
   // Step 3: On retry, attempt a soft reset.
   if (resetAttempt > 0) {
-    Serial.print(F("[DEBUG] Sending soft reset to sensor on channel "));
-    Serial.println(sensor.channel);
+    sendMessage(F("[DEBUG] Sending soft reset to sensor on channel "), &Serial, currentClient, false);
+    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
     Wire.beginTransmission(sensor.sensorAddr);
     Wire.write(0x00);
     Wire.write(0x06);
     if (Wire.endTransmission() != 0) {
-      Serial.println(F("[WARNING] Soft reset command was not acknowledged."));
+      sendMessage(F("[WARNING] Soft reset command was not acknowledged."), &Serial, currentClient);
       return false;
     }
     delay(50);
     if (!isFlowSensorConnected(sensor)) {
-      Serial.println(F("[ERROR] Sensor did not respond after soft reset."));
+      sendMessage(F("[ERROR] Sensor did not respond after soft reset."), &Serial, currentClient);
       return false;
     }
   }
 
   // Step 4: Start continuous measurement mode.
-  Serial.print(F("[DEBUG] Sending start measurement command to sensor on channel "));
-  Serial.println(sensor.channel);
+  sendMessage(F("[DEBUG] Sending start measurement command to sensor on channel "), &Serial, currentClient, false);
+  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
   Wire.beginTransmission(sensor.sensorAddr);
   Wire.write(sensor.measurementCmd >> 8);
   Wire.write(sensor.measurementCmd & 0xFF);
   if (Wire.endTransmission() != 0) {
-    Serial.println(F("[ERROR] Failed to start measurement mode."));
+    sendMessage(F("[ERROR] Failed to start measurement mode."), &Serial, currentClient);
     if (resetAttempt == 0) {
       resetAttempt++;
       return initializeFlowSensor(sensor);
@@ -141,9 +137,9 @@ bool initializeFlowSensor(FlowSensor &sensor) {
   sensor.lastUpdateTime = millis();
   sensor.dispenseVolume = 0.0;
   resetAttempt = 0;
-  Serial.print(F("[MESSAGE] Flow sensor on channel "));
-  Serial.print(sensor.channel);
-  Serial.println(F(" successfully initialized."));
+  sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
+  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
+  sendMessage(F(" successfully initialized."), &Serial, currentClient);
   return true;
 }
 
@@ -162,10 +158,10 @@ bool readFlowSensorData(FlowSensor &sensor) {
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
   Wire.requestFrom(sensor.sensorAddr, (uint8_t)9);
   if (Wire.available() < 9) {
-    Serial.print(F("[ERROR] Not enough bytes received from flow sensor on channel "));
-    Serial.println(sensor.channel);
+    sendMessage(F("[ERROR] Not enough bytes received from flow sensor on channel "), &Serial, currentClient, false);
+    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
     if (softResetAttempt < 2) {
-      Serial.println(F("[WARNING] Attempting soft reset to recover..."));
+      sendMessage(F("[WARNING] Attempting soft reset to recover..."), &Serial, currentClient);
       Wire.beginTransmission(sensor.sensorAddr);
       Wire.write(0x00);
       Wire.write(0x06);
@@ -175,7 +171,7 @@ bool readFlowSensorData(FlowSensor &sensor) {
         return false;
       }
     }
-    Serial.println(F("[ERROR] Multiple failures. Sensor will remain in error state."));
+    sendMessage(F("[ERROR] Multiple failures. Sensor will remain in error state."), &Serial, currentClient);
     sensor.sensorInitialized = false;
     sensor.sensorStopped = true;
     sensor.sensorConnected = 0;
@@ -211,29 +207,29 @@ bool readFlowSensorData(FlowSensor &sensor) {
 }
 
 bool startFlowSensorMeasurement(FlowSensor &sensor) {
-  Serial.print(F("[DEBUG] Attempting to start flow measurement for sensor on channel "));
-  Serial.println(sensor.channel);
+  sendMessage(F("[DEBUG] Attempting to start flow measurement for sensor on channel "), &Serial, currentClient, false);
+  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
   if (!isFlowSensorConnected(sensor)) {
-    Serial.print(F("[ERROR] Cannot start measurement for flow sensor on channel "));
-    Serial.print(sensor.channel);
-    Serial.println(F(" because it is disconnected."));
+    sendMessage(F("[ERROR] Cannot start measurement for flow sensor on channel "), &Serial, currentClient, false);
+    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
+    sendMessage(F(" because it is disconnected."), &Serial, currentClient);
     return false;
   }
   sensor.sensorStopped = false;
   for (int i = 0; i < 3; i++) {
-    Serial.print(F("[DEBUG] Attempt "));
-    Serial.print(i + 1);
-    Serial.println(F(" to initialize sensor."));
+    sendMessage(F("[DEBUG] Attempt "), &Serial, currentClient, false);
+    sendMessage(String(i + 1).c_str(), &Serial, currentClient, false);
+    sendMessage(F(" to initialize sensor."), &Serial, currentClient);
     if (initializeFlowSensor(sensor)) {
-      Serial.print(F("[MESSAGE] Flow sensor on channel "));
-      Serial.print(sensor.channel);
-      Serial.println(F(" started measurement mode."));
+      sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
+      sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
+      sendMessage(F(" started measurement mode."), &Serial, currentClient);
       return true;
     }
     delay(50);
   }
-  Serial.print(F("[ERROR] Failed to start measurement for flow sensor on channel "));
-  Serial.println(sensor.channel);
+  sendMessage(F("[ERROR] Failed to start measurement for flow sensor on channel "), &Serial, currentClient, false);
+  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
   return false;
 }
 
@@ -244,15 +240,15 @@ bool stopFlowSensorMeasurement(FlowSensor &sensor) {
   Wire.write(0x3F);  // Stop command MSB
   Wire.write(0xF9);  // Stop command LSB
   if (Wire.endTransmission() == 0) {
-    Serial.print(F("[MESSAGE] Flow sensor on channel "));
-    Serial.print(sensor.channel);
-    Serial.println(F(" stopped measurement mode."));
+    sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
+    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
+    sendMessage(F(" stopped measurement mode."), &Serial, currentClient);
     sensor.sensorInitialized = false;
     sensor.sensorStopped = true;
     return true;
   } else {
-    Serial.print(F("[ERROR] Failed to stop measurement for flow sensor on channel "));
-    Serial.println(sensor.channel);
+    sendMessage(F("[ERROR] Failed to stop measurement for flow sensor on channel "), &Serial, currentClient, false);
+    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
     return false;
   }
 }
@@ -277,14 +273,14 @@ void resetFlowSensorDispenseVolume(FlowSensor &sensor) {
   sensor.dispenseVolume = 0.0;
   sensor.lastUpdateTime = millis();
   sensor.sensorStopped = true;  // Ensure sensor is stopped
-  Serial.print(F("[MESSAGE] Dispense volume reset for flow sensor on channel "));
-  Serial.println(sensor.channel);
+  sendMessage(F("[MESSAGE] Dispense volume reset for flow sensor on channel "), &Serial, currentClient, false);
+  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
 }
 
 void resetFlowSensorTotalVolume(FlowSensor &sensor) {
   sensor.totalVolume = 0.0;
-  Serial.print(F("[MESSAGE] Total volume reset for flow sensor on channel "));
-  Serial.println(sensor.channel);
+  sendMessage(F("[MESSAGE] Total volume reset for flow sensor on channel "), &Serial, currentClient, false);
+  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
 }
 
 

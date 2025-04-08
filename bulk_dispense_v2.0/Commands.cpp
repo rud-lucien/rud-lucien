@@ -7,118 +7,93 @@
 #include "CommandSession.h"
 #include "CommandManager.h"
 #include "SystemMonitor.h"
-
-/************************************************************
- * Commands.cpp
- * 
- * This file implements all command functions for the Bulk 
- * Dispense system. Each command function processes its 
- * arguments, interacts with hardware and sensors, and logs 
- * messages accordingly. The global command tree is also defined
- * here.
- *
- * Commands include:
- *   LF      - Set log frequency: LF <ms>
- *   FN      - Fan manual control: FN <0/1> (0 = off, 1 = on)
- *   FNAUTO  - Enable fan auto control
- *   R       - Reagent valve control: R <1-4> <0/1>
- *   M       - Media valve control: M <1-4> <0/1>
- *   W       - Waste valve control: W <1-4> <0/1>
- *   PV      - Set pressure valve: PV <percentage>
- *   CALPV   - Calibrate pressure valve
- *   STARTFSM- Start flow sensor measurement: STARTFSM <1-4>
- *   STOPFSM - Stop flow sensor measurement: STOPFSM <1-4>
- *   RF      - Reset flow sensor dispense volume: RFS <1-4>
- *   RTF     - Reset total volume for flow sensor: RTF <1-4>
- *   RESETI2C- Reset the I2C bus
- *   D       - Dispense reagent: D <1-4> [volume] (continuous if omitted)
- *   STOPD   - Stop dispensing: STOPD <1-4> or STOPD all
- *   P       - Prime valves: P <1-4>
- *   F       - Fill reagent: F <1-4>
- *   DT      - Drain trough: DT <1-4>
- *   SDT     - Stop draining trough: SDT <1-4> or SDT all
- *   LOGHELP - Display detailed log field definitions and diagnostic info
- *   STANDBY - Abort all automated operations and set the system to a 
- *             safe, idle state (standby mode)
- *   SS      - Display overall system state summary
- *   help/h/H- Display general command help and usage information
- *
- * Author: Your Name
- * Date: YYYY-MM-DD
- * Version: 2.0
- ************************************************************/
-
+#include "NetworkConfig.h"
 
 // ============================================================
 // Command Function Definitions
 // ============================================================
 
-void cmd_set_log_frequency(char* args, CommandCaller* caller) {
+void cmd_set_log_frequency(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int newInterval = -1;
-  if (sscanf(localArgs, "%d", &newInterval) == 1 && newInterval > 0) {
+  if (sscanf(localArgs, "%d", &newInterval) == 1 && newInterval > 0)
+  {
     logging.logInterval = newInterval;
-    logging.previousLogTime = millis();  // <-- Reset timer to start from now
+    logging.previousLogTime = millis(); // <-- Reset timer to start from now
     caller->print(F("[MESSAGE] Log frequency set to "));
     caller->print(newInterval);
     caller->println(F(" ms"));
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid log frequency. Use: LF <positive number>"));
   }
 }
 
-
-void cmd_fan(char* args, CommandCaller* caller) {
+void cmd_fan(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int stateInt = -1;
-  if (sscanf(localArgs, "%d", &stateInt) == 1 && (stateInt == 0 || stateInt == 1)) {
+  if (sscanf(localArgs, "%d", &stateInt) == 1 && (stateInt == 0 || stateInt == 1))
+  {
     bool state = (stateInt == 1);
     digitalWrite(fan.relayPin, state ? HIGH : LOW);
     Serial.print(F("[MESSAGE] Fan turned "));
     Serial.println(state ? F("ON") : F("OFF"));
     fanAutoMode = false;
     caller->println(F("[MESSAGE] Fan manual override active. Use FNAUTO to re-enable auto control."));
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid fan command. Use: FN <0/1>"));
   }
 }
 
-void cmd_fan_auto(char* args, CommandCaller* caller) {
+void cmd_fan_auto(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   // Check if fan auto mode is already enabled.
-  if (fanAutoMode) {
+  if (fanAutoMode)
+  {
     caller->println(F("[MESSAGE] Fan auto control is already enabled."));
-  } else {
+  }
+  else
+  {
     caller->println(F("[MESSAGE] Fan auto control re-enabled."));
     fanAutoMode = true;
   }
 
   // Immediately update the fan state based on the current temperature:
   TempHumidity th = readTempHumidity();
-  if (th.valid) {
-    if (th.temperature > ENCLOSURE_TEMP_SETPOINT) {
-      setFanState(fan, true);  // Prints: "[MESSAGE] Fan state set to ON"
-    } else {
-      setFanState(fan, false);  // Prints: "[MESSAGE] Fan state set to OFF"
+  if (th.valid)
+  {
+    if (th.temperature > ENCLOSURE_TEMP_SETPOINT)
+    {
+      setFanState(fan, true); // Prints: "[MESSAGE] Fan state set to ON"
     }
-  } else {
+    else
+    {
+      setFanState(fan, false); // Prints: "[MESSAGE] Fan state set to OFF"
+    }
+  }
+  else
+  {
     caller->println(F("[ERROR] Failed to read enclosure temperature for fan auto update."));
   }
 }
 
-
-
-
-void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
+void cmd_set_reagent_valve(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
@@ -126,29 +101,40 @@ void cmd_set_reagent_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
   if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
       valveNumber >= 1 && valveNumber <= NUM_REAGENT_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+      (valveState == 0 || valveState == 1))
+  {
     disableFillMode(valveNumber, caller);
     bool state = (valveState == 1);
-    
+
     caller->print(F("[MESSAGE] Reagent valve "));
     caller->print(valveNumber);
     caller->print(F(" set to "));
     caller->println(state ? "OPEN" : "CLOSED");
 
-    switch (valveNumber) {
-      case 1: set_valve_state(reagentValve1, state, valveNumber, REAGENT, caller); break;
-      case 2: set_valve_state(reagentValve2, state, valveNumber, REAGENT, caller); break;
-      case 3: set_valve_state(reagentValve3, state, valveNumber, REAGENT, caller); break;
-      case 4: set_valve_state(reagentValve4, state, valveNumber, REAGENT, caller); break;
+    switch (valveNumber)
+    {
+    case 1:
+      set_valve_state(reagentValve1, state, valveNumber, REAGENT, caller);
+      break;
+    case 2:
+      set_valve_state(reagentValve2, state, valveNumber, REAGENT, caller);
+      break;
+    case 3:
+      set_valve_state(reagentValve3, state, valveNumber, REAGENT, caller);
+      break;
+    case 4:
+      set_valve_state(reagentValve4, state, valveNumber, REAGENT, caller);
+      break;
     }
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid reagent valve command. Use: R <1-4> <0/1>"));
   }
 }
 
-
-
-void cmd_set_media_valve(char* args, CommandCaller* caller) {
+void cmd_set_media_valve(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
@@ -156,30 +142,40 @@ void cmd_set_media_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
   if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
       valveNumber >= 1 && valveNumber <= NUM_MEDIA_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+      (valveState == 0 || valveState == 1))
+  {
     disableFillMode(valveNumber, caller);
     bool state = (valveState == 1);
-    
+
     caller->print(F("[MESSAGE] Media valve "));
     caller->print(valveNumber);
     caller->print(F(" set to "));
     caller->println(state ? "OPEN" : "CLOSED");
 
-    switch (valveNumber) {
-      case 1: set_valve_state(mediaValve1, state, valveNumber, MEDIA, caller); break;
-      case 2: set_valve_state(mediaValve2, state, valveNumber, MEDIA, caller); break;
-      case 3: set_valve_state(mediaValve3, state, valveNumber, MEDIA, caller); break;
-      case 4: set_valve_state(mediaValve4, state, valveNumber, MEDIA, caller); break;
+    switch (valveNumber)
+    {
+    case 1:
+      set_valve_state(mediaValve1, state, valveNumber, MEDIA, caller);
+      break;
+    case 2:
+      set_valve_state(mediaValve2, state, valveNumber, MEDIA, caller);
+      break;
+    case 3:
+      set_valve_state(mediaValve3, state, valveNumber, MEDIA, caller);
+      break;
+    case 4:
+      set_valve_state(mediaValve4, state, valveNumber, MEDIA, caller);
+      break;
     }
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid media valve command. Use: M <1-4> <0/1>"));
   }
 }
 
-
-
-
-void cmd_set_waste_valve(char* args, CommandCaller* caller) {
+void cmd_set_waste_valve(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
@@ -187,55 +183,74 @@ void cmd_set_waste_valve(char* args, CommandCaller* caller) {
   int valveNumber = -1, valveState = -1;
   if (sscanf(localArgs, "%d %d", &valveNumber, &valveState) == 2 &&
       valveNumber >= 1 && valveNumber <= NUM_WASTE_VALVES &&
-      (valveState == 0 || valveState == 1)) {
+      (valveState == 0 || valveState == 1))
+  {
     disableFillMode(valveNumber, caller);
     bool state = (valveState == 1);
-    
+
     caller->print(F("[MESSAGE] Waste valve "));
     caller->print(valveNumber);
     caller->print(F(" set to "));
     caller->println(state ? "OPEN" : "CLOSED");
 
-    switch (valveNumber) {
-      case 1: set_valve_state(wasteValve1, state, valveNumber, WASTE, caller); break;
-      case 2: set_valve_state(wasteValve2, state, valveNumber, WASTE, caller); break;
-      case 3: set_valve_state(wasteValve3, state, valveNumber, WASTE, caller); break;
-      case 4: set_valve_state(wasteValve4, state, valveNumber, WASTE, caller); break;
+    switch (valveNumber)
+    {
+    case 1:
+      set_valve_state(wasteValve1, state, valveNumber, WASTE, caller);
+      break;
+    case 2:
+      set_valve_state(wasteValve2, state, valveNumber, WASTE, caller);
+      break;
+    case 3:
+      set_valve_state(wasteValve3, state, valveNumber, WASTE, caller);
+      break;
+    case 4:
+      set_valve_state(wasteValve4, state, valveNumber, WASTE, caller);
+      break;
     }
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid waste valve command. Use: W <1-4> <0/1>"));
   }
 }
 
-
-
-
-void cmd_set_pressure_valve(char* args, CommandCaller* caller) {
+void cmd_set_pressure_valve(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
+  // Get both streams that might be in use
+  Stream *serialStream = &Serial;
+  Stream *networkStream = &currentClient;
+
+  // For completion notifications, check if the network client is active
+  bool useNetworkStream = hasActiveClient && currentClient.connected();
+
   int percentage = -1;
-  if (sscanf(localArgs, "%d", &percentage) == 1 && percentage >= 0 && percentage <= 100) {
+  if (sscanf(localArgs, "%d", &percentage) == 1 && percentage >= 0 && percentage <= 100)
+  {
     proportionalValve = setValvePosition(proportionalValve, (float)percentage);
     caller->print(F("[MESSAGE] Pressure valve set to "));
     caller->print(percentage);
     caller->println(F("%."));
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid value for pressure valve. Use a percentage between 0 and 100."));
   }
 
-  // Force the end of the command session for this synchronous command.
-  if (commandSessionActive) {
-    endCommandSession(&Serial);
+  // Complete the command on both streams if needed
+  cm_commandCompleted(serialStream);
+  if (useNetworkStream)
+  {
+    cm_commandCompleted(networkStream);
   }
 }
 
-
-
-
-
-void cmd_calibrate_pressure_valve(char* args, CommandCaller* caller) {
+void cmd_calibrate_pressure_valve(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
@@ -245,108 +260,134 @@ void cmd_calibrate_pressure_valve(char* args, CommandCaller* caller) {
   caller->println(F("[MESSAGE] Pressure valve calibration complete."));
 }
 
-void cmd_start_flow_sensor_manually(char* args, CommandCaller* caller) {
+void cmd_start_flow_sensor_manually(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int sensorNumber = -1;
-  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
+  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS)
+  {
     disableFillMode(sensorNumber, caller);
     enableManualControl(sensorNumber - 1, caller);
 
-    FlowSensor* sensor = flowSensors[sensorNumber - 1];
-    if (!sensor) {
+    FlowSensor *sensor = flowSensors[sensorNumber - 1];
+    if (!sensor)
+    {
       caller->print(F("[ERROR] Flow Sensor "));
       caller->print(sensorNumber);
       caller->println(F(" not found."));
       return;
     }
-    if (startFlowSensorMeasurement(*sensor)) {
+    if (startFlowSensorMeasurement(*sensor))
+    {
       caller->print(F("[MESSAGE] Manually started measurement for Flow Sensor "));
       caller->println(sensorNumber);
-    } else {
+    }
+    else
+    {
       caller->print(F("[ERROR] Failed to start Flow Sensor "));
       caller->println(sensorNumber);
     }
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid sensor number. Use: STARTFSM <1-4>"));
   }
 }
 
-void cmd_stop_flow_sensor_manually(char* args, CommandCaller* caller) {
+void cmd_stop_flow_sensor_manually(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int sensorNumber = -1;
-  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS) {
+  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 1 && sensorNumber <= NUM_FLOW_SENSORS)
+  {
     disableFillMode(sensorNumber - 1, caller);
     disableManualControl(sensorNumber - 1, caller);
 
-    FlowSensor* sensor = flowSensors[sensorNumber - 1];
-    if (!sensor) {
+    FlowSensor *sensor = flowSensors[sensorNumber - 1];
+    if (!sensor)
+    {
       caller->print(F("[ERROR] Flow Sensor "));
       caller->print(sensorNumber);
       caller->println(F(" not found."));
       return;
     }
-    if (stopFlowSensorMeasurement(*sensor)) {
+    if (stopFlowSensorMeasurement(*sensor))
+    {
       caller->print(F("[MESSAGE] Manually stopped Flow Sensor "));
       caller->println(sensorNumber);
-    } else {
+    }
+    else
+    {
       caller->print(F("[ERROR] Failed to stop Flow Sensor "));
       caller->println(sensorNumber);
     }
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid sensor number. Use: STOPFSM <1-4>"));
   }
 }
 
-void cmd_reset_flow_dispense(char* args, CommandCaller* caller) {
+void cmd_reset_flow_dispense(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int sensorNumber = -1;
-  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
+  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS)
+  {
     disableFillMode(sensorNumber, caller);
     enableManualControl(sensorNumber, caller);
 
-    FlowSensor* sensors[] = { &flow1, &flow2, &flow3, &flow4 };
+    FlowSensor *sensors[] = {&flow1, &flow2, &flow3, &flow4};
     resetFlowSensorDispenseVolume(*sensors[sensorNumber]);
     caller->print(F("[MESSAGE] Reset dispense volume for Flow Sensor "));
     caller->println(sensorNumber);
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid sensor number. Use: RFS <1-4>"));
   }
 }
 
-void cmd_reset_flow_total(char* args, CommandCaller* caller) {
+void cmd_reset_flow_total(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   int sensorNumber = -1;
-  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS) {
+  if (sscanf(localArgs, "%d", &sensorNumber) == 1 && sensorNumber >= 0 && sensorNumber < NUM_FLOW_SENSORS)
+  {
     disableFillMode(sensorNumber, caller);
     enableManualControl(sensorNumber, caller);
 
-    FlowSensor* sensors[] = { &flow1, &flow2, &flow3, &flow4 };
+    FlowSensor *sensors[] = {&flow1, &flow2, &flow3, &flow4};
     resetFlowSensorTotalVolume(*sensors[sensorNumber]);
     caller->print(F("[MESSAGE] Reset total volume for Flow Sensor "));
     caller->println(sensorNumber);
-  } else {
+  }
+  else
+  {
     caller->println(F("[ERROR] Invalid sensor number. Use: RTF <0-3>"));
   }
 }
 
-void cmd_reset_i2c(char* args, CommandCaller* caller) {
+void cmd_reset_i2c(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
-  for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
+  for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++)
+  {
     disableFillMode(i + 1, caller);
     enableManualControl(i, caller);
   }
@@ -356,17 +397,31 @@ void cmd_reset_i2c(char* args, CommandCaller* caller) {
   caller->println(F("[MESSAGE] I2C bus reset complete."));
 }
 
-
-void cmd_dispense_reagent(char* args, CommandCaller* caller) {
-
-
+void cmd_dispense_reagent(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
-  if (globalEnclosureLiquidError) {
+  // Get both streams that might be in use
+  Stream *serialStream = &Serial;
+  Stream *networkStream = &currentClient;
+
+  // For completion notifications, we need to use the right stream
+  // Check if the network client is active
+  bool useNetworkStream = hasActiveClient && currentClient.connected();
+
+  if (globalEnclosureLiquidError)
+  {
     caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
-    cm_commandCompleted(&Serial); // call completion on error path
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
@@ -379,19 +434,32 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   caller->println(localArgs);
 
   // Parse arguments.
-  char* token = strtok(localArgs, " ");
-  if (token != NULL) {
+  char *token = strtok(localArgs, " ");
+  if (token != NULL)
+  {
     troughNumber = atoi(token);
     token = strtok(NULL, " ");
-    if (token != NULL) {
+    if (token != NULL)
+    {
       requestedVolume = atof(token);
-    } else {
-      requestedVolume = -1.0;  // Continuous mode if no volume provided.
     }
-  } else {
+    else
+    {
+      requestedVolume = -1.0; // Continuous mode if no volume provided.
+    }
+  }
+  else
+  {
     // Invalid format.
     caller->println(F("[ERROR] Invalid command format. Use: D <1-4> [volume]"));
-    cm_commandCompleted(&Serial);  // finish command
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
@@ -400,34 +468,68 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   caller->print(F(" with requested volume "));
   caller->println(requestedVolume);
 
-  if (!validateTroughNumber(troughNumber, caller)) {
+  if (!validateTroughNumber(troughNumber, caller))
+  {
     caller->println(F("[ERROR] Invalid command format. Use: D <1-4> [volume]"));
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
   disableFillMode(troughNumber, caller);
 
-  if (valveControls[troughNumber - 1].isDispensing) {
+  if (valveControls[troughNumber - 1].isDispensing)
+  {
     caller->print(F("[WARNING] A dispense is already in progress for Trough "));
     caller->println(troughNumber);
     caller->println(F("Use STOPD <trough number> to stop it first."));
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
-  if (requestedVolume > 0) {
-    if (requestedVolume < MIN_VOLUME) {
+  if (requestedVolume > 0)
+  {
+    if (requestedVolume < MIN_VOLUME)
+    {
       caller->print(F("[ERROR] Requested volume too low. Minimum: "));
       caller->print(MIN_VOLUME);
       caller->println(F(" mL."));
-      cm_commandCompleted(&Serial);
+
+      // Signal asynchronous command completion for both streams if needed
+      cm_commandCompleted(serialStream);
+      if (useNetworkStream)
+      {
+        cm_commandCompleted(networkStream);
+      }
+
       return;
-    } else if (requestedVolume > MAX_VOLUME) {
+    }
+    else if (requestedVolume > MAX_VOLUME)
+    {
       caller->print(F("[ERROR] Requested volume too high. Maximum: "));
       caller->print(MAX_VOLUME);
       caller->println(F(" mL."));
-      cm_commandCompleted(&Serial);
+
+      // Signal asynchronous command completion for both streams if needed
+      cm_commandCompleted(serialStream);
+      if (useNetworkStream)
+      {
+        cm_commandCompleted(networkStream);
+      }
+
       return;
     }
   }
@@ -436,32 +538,64 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   const float PRESSURE_THRESHOLD_PSI = 15.0;
   const int VALVE_POSITION = 100;
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
-  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
+  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS))
+  {
     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
   // Check for overflow before starting dispense.
-  if (readBinarySensor(overflowSensors[troughNumber - 1])) {
+  if (readBinarySensor(overflowSensors[troughNumber - 1]))
+  {
     caller->print(F("[ERROR] Cannot dispense: Overflow detected for Trough "));
     caller->println(troughNumber);
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
-  FlowSensor* sensor = flowSensors[troughNumber - 1];
-  if (!sensor) {
+  FlowSensor *sensor = flowSensors[troughNumber - 1];
+  if (!sensor)
+  {
     caller->print(F("[ERROR] No flow sensor found for Trough "));
     caller->println(troughNumber);
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
-  if (!startFlowSensorMeasurement(*sensor)) {
+  if (!startFlowSensorMeasurement(*sensor))
+  {
     caller->print(F("[ERROR] Failed to start flow sensor for Trough "));
     caller->println(troughNumber);
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
@@ -483,8 +617,8 @@ void cmd_dispense_reagent(char* args, CommandCaller* caller) {
   // later by the async callback when the dispense finishes (or times out).
 }
 
-
-void cmd_stop_dispense(char* args, CommandCaller* caller) {
+void cmd_stop_dispense(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
@@ -492,21 +626,28 @@ void cmd_stop_dispense(char* args, CommandCaller* caller) {
   int troughNumber = -1;
   bool stopAll = false;
 
-  if (strncmp(localArgs, "all", 3) == 0) {
+  if (strncmp(localArgs, "all", 3) == 0)
+  {
     stopAll = true;
-  } else if (sscanf(localArgs, "%d", &troughNumber) != 1 || troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
+  }
+  else if (sscanf(localArgs, "%d", &troughNumber) != 1 || troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+  {
     caller->println(F("[ERROR] Invalid trough number. Use STOPD <1-4> or STOPD all."));
     return;
   }
 
-  if (stopAll) {
+  if (stopAll)
+  {
     caller->println(F("[MESSAGE] Stopping all dispensing operations..."));
     disableFillModeForAll(caller);
-    for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
+    for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++)
+    {
       stopDispenseOperation(i + 1, caller);
     }
     caller->println(F("[MESSAGE] All dispensing operations stopped."));
-  } else {
+  }
+  else
+  {
     disableFillMode(troughNumber, caller);
     stopDispenseOperation(troughNumber, caller);
     caller->print(F("[MESSAGE] Dispensing stopped for Trough "));
@@ -514,28 +655,46 @@ void cmd_stop_dispense(char* args, CommandCaller* caller) {
   }
 }
 
-
-void cmd_prime_valves(char* args, CommandCaller* caller) {
+void cmd_prime_valves(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
-  if (globalEnclosureLiquidError) {
+  // Get both streams that might be in use
+  Stream *serialStream = &Serial;
+  Stream *networkStream = &currentClient;
+
+  // For completion notifications, we need to use the right stream
+  // Check if the network client is active
+  bool useNetworkStream = hasActiveClient && currentClient.connected();
+
+  if (globalEnclosureLiquidError)
+  {
     caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
     return;
   }
 
   int localValveNumber = -1;
   char extra;
-  if (sscanf(localArgs, "%d %c", &localValveNumber, &extra) != 1) {
+  if (sscanf(localArgs, "%d %c", &localValveNumber, &extra) != 1)
+  {
     // caller->println(F("[ERROR] Invalid arguments for prime command. Use: P <valve number>"));
     // asyncCommandCompleted(&Serial);
     return;
   }
 
-  if (!validateValveNumber(localValveNumber, caller)) {
+  if (!validateValveNumber(localValveNumber, caller))
+  {
     caller->println(F("[ERROR] Invalid arguments for prime command. Use: P <1-4>"));
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
@@ -544,17 +703,33 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   const float PRESSURE_THRESHOLD_PSI = 15.0;
   const int VALVE_POSITION = 100;
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
-  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
+  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS))
+  {
     caller->println(F("[ERROR] Pressure check failed. Prime aborted."));
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
-  if (isValveAlreadyPrimed(localValveNumber, caller)) {
+  if (isValveAlreadyPrimed(localValveNumber, caller))
+  {
     caller->print(F("[WARNING] Valve "));
     caller->print(localValveNumber);
     caller->println(F(" is already primed."));
-    cm_commandCompleted(&Serial);
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
     return;
   }
 
@@ -564,25 +739,36 @@ void cmd_prime_valves(char* args, CommandCaller* caller) {
   caller->println(localValveNumber);
 }
 
-
-void cmd_fill_reagent(char* args, CommandCaller* caller) {
+void cmd_fill_reagent(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
-  if (globalEnclosureLiquidError) {
+  // Get both streams that might be in use
+  Stream *serialStream = &Serial;
+  Stream *networkStream = &currentClient;
+
+  // For completion notifications, we need to use the right stream
+  // Check if the network client is active
+  bool useNetworkStream = hasActiveClient && currentClient.connected();
+
+  if (globalEnclosureLiquidError)
+  {
     caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
     return;
   }
 
   int troughNumber = -1;
   char extra;
-  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1) {
+  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1)
+  {
     // caller->println(F("[ERROR] Invalid arguments for fill command. Use: F <valve number>"));
     return;
   }
 
-  if (!validateTroughNumber(troughNumber, caller)) {
+  if (!validateTroughNumber(troughNumber, caller))
+  {
     caller->println(F("[ERROR] Invalid arguments for fill command. Use: F <1-4>"));
     return;
   }
@@ -593,68 +779,83 @@ void cmd_fill_reagent(char* args, CommandCaller* caller) {
   const float PRESSURE_THRESHOLD_PSI = 15.0;
   const int VALVE_POSITION = 100;
   const unsigned long PRESSURE_TIMEOUT_MS = 500;
-  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS)) {
+  if (!checkAndSetPressure(PRESSURE_THRESHOLD_PSI, VALVE_POSITION, PRESSURE_TIMEOUT_MS))
+  {
     caller->println(F("[ERROR] Pressure check failed. Dispense aborted."));
-    // Signal asynchronous command completion for this trough.
-    cm_commandCompleted(&Serial);
-    return;  // Abort further processing for this command.
+
+    // Signal asynchronous command completion for both streams if needed
+    cm_commandCompleted(serialStream);
+    if (useNetworkStream)
+    {
+      cm_commandCompleted(networkStream);
+    }
+
+    return; // Abort further processing for this command.
   }
 
   resetFlowSensorDispenseVolume(*flowSensors[troughNumber - 1]);
   openDispenseValves(troughNumber);
   enableFillMode(troughNumber, caller);
-  
 }
 
-void cmd_drain_trough(char* args, CommandCaller* caller) {
+void cmd_drain_trough(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   // Get both streams that might be in use
-  Stream* serialStream = &Serial;
-  Stream* networkStream = &currentClient;
-  
+  Stream *serialStream = &Serial;
+  Stream *networkStream = &currentClient;
+
   // For completion notifications, we need to use the right stream
   // Check if the network client is active
   bool useNetworkStream = hasActiveClient && currentClient.connected();
 
   // If enclosure liquid is detected, abort the drain command.
-  if (globalEnclosureLiquidError) {
+  if (globalEnclosureLiquidError)
+  {
     caller->println(F("[ERROR] Enclosure liquid detected. Operation aborted. Resolve the leak before proceeding."));
     return;
   }
 
   int troughNumber = -1;
   char extra;
-  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1) {
+  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1)
+  {
     // caller->println(F("[ERROR] Invalid arguments for drain command. Use: DT <trough number>"));
     return;
   }
 
-  if (!validateTroughNumber(troughNumber, caller)) {
+  if (!validateTroughNumber(troughNumber, caller))
+  {
     caller->println(F("[ERROR] Invalid arguments for drain command. Use: DT <1-4>"));
     // Complete command on both streams if network client is active
     cm_commandCompleted(serialStream);
-    if (useNetworkStream) {
+    if (useNetworkStream)
+    {
       cm_commandCompleted(networkStream);
     }
     return;
   }
 
-  if (isWasteBottleFullForTrough(troughNumber, caller)) {
+  if (isWasteBottleFullForTrough(troughNumber, caller))
+  {
     // Complete command on both streams if network client is active
     cm_commandCompleted(serialStream);
-    if (useNetworkStream) {
+    if (useNetworkStream)
+    {
       cm_commandCompleted(networkStream);
     }
     return;
   }
 
-  if (hasIncompatibleDrainage(troughNumber, caller)) {
+  if (hasIncompatibleDrainage(troughNumber, caller))
+  {
     // Complete command on both streams if network client is active
     cm_commandCompleted(serialStream);
-    if (useNetworkStream) {
+    if (useNetworkStream)
+    {
       cm_commandCompleted(networkStream);
     }
     return;
@@ -664,73 +865,79 @@ void cmd_drain_trough(char* args, CommandCaller* caller) {
   disableFillMode(troughNumber, caller);
 
   int index = troughNumber - 1;
-  
+
   // Prevent re-starting a drain if one is already in progress.
-  if (valveControls[index].isDraining) {
+  if (valveControls[index].isDraining)
+  {
     caller->println(F("[ERROR] Drain already in progress for this trough."));
     return;
   }
-  
+
   // Start the draining process.
   valveControls[index].isDraining = true;
   drainAsyncCompleted[index] = false;
 
-  switch (troughNumber) {
-    case 1:
-      wasteValve1 = openValve(wasteValve1);
-      wasteValve3 = openValve(wasteValve3);
-      caller->println(F("[MESSAGE] Draining trough 1... Waste valve 1 opened, waste valve 3 opened."));
-      break;
-    case 2:
-      wasteValve1 = openValve(wasteValve1);
-      wasteValve3 = closeValve(wasteValve3);
-      caller->println(F("[MESSAGE] Draining trough 2... Waste valve 1 opened, waste valve 3 closed."));
-      break;
-    case 3:
-      wasteValve2 = openValve(wasteValve2);
-      wasteValve4 = openValve(wasteValve4);
-      caller->println(F("[MESSAGE] Draining trough 3... Waste valve 2 opened, waste valve 4 opened."));
-      break;
-    case 4:
-      wasteValve2 = openValve(wasteValve2);
-      wasteValve4 = closeValve(wasteValve4);
-      caller->println(F("[MESSAGE] Draining trough 4... Waste valve 2 opened, waste valve 4 closed."));
-      break;
-    default:
-      caller->println(F("[ERROR] Drain command received invalid trough number. Use 1-4."));
-      // Reset draining state in case of error.
-      valveControls[index].isDraining = false;
-      return;
+  switch (troughNumber)
+  {
+  case 1:
+    wasteValve1 = openValve(wasteValve1);
+    wasteValve3 = openValve(wasteValve3);
+    caller->println(F("[MESSAGE] Draining trough 1... Waste valve 1 opened, waste valve 3 opened."));
+    break;
+  case 2:
+    wasteValve1 = openValve(wasteValve1);
+    wasteValve3 = closeValve(wasteValve3);
+    caller->println(F("[MESSAGE] Draining trough 2... Waste valve 1 opened, waste valve 3 closed."));
+    break;
+  case 3:
+    wasteValve2 = openValve(wasteValve2);
+    wasteValve4 = openValve(wasteValve4);
+    caller->println(F("[MESSAGE] Draining trough 3... Waste valve 2 opened, waste valve 4 opened."));
+    break;
+  case 4:
+    wasteValve2 = openValve(wasteValve2);
+    wasteValve4 = closeValve(wasteValve4);
+    caller->println(F("[MESSAGE] Draining trough 4... Waste valve 2 opened, waste valve 4 closed."));
+    break;
+  default:
+    caller->println(F("[ERROR] Drain command received invalid trough number. Use 1-4."));
+    // Reset draining state in case of error.
+    valveControls[index].isDraining = false;
+    return;
   }
   // The asynchronous monitorWasteSensors() function will handle drain completion or timeout.
 }
 
-
-
-void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
+void cmd_stop_drain_trough(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
   // Get both streams that might be in use
-  Stream* serialStream = &Serial;
-  Stream* networkStream = &currentClient;
-  
+  Stream *serialStream = &Serial;
+  Stream *networkStream = &currentClient;
+
   // For completion notifications, we need to use the right stream
   // Check if the network client is active
   bool useNetworkStream = hasActiveClient && currentClient.connected();
 
   // If the argument is "all", stop draining for every trough.
-  if (strncmp(localArgs, "all", 3) == 0) {
-    for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++) {
-      if (valveControls[i].isDraining) {  // only if a drain is active
+  if (strncmp(localArgs, "all", 3) == 0)
+  {
+    for (int i = 0; i < NUM_OVERFLOW_SENSORS; i++)
+    {
+      if (valveControls[i].isDraining)
+      { // only if a drain is active
         valveControls[i].isDraining = false;
         valveControls[i].drainStartTime = 0;
         // Mark the drain async task for this trough as complete if not already.
-        if (!drainAsyncCompleted[i]) {
+        if (!drainAsyncCompleted[i])
+        {
           // Complete command on both streams if network client is active
           cm_commandCompleted(serialStream);
-          if (useNetworkStream) {
+          if (useNetworkStream)
+          {
             cm_commandCompleted(networkStream);
           }
           drainAsyncCompleted[i] = true;
@@ -747,55 +954,59 @@ void cmd_stop_drain_trough(char* args, CommandCaller* caller) {
 
   int troughNumber = -1;
   char extra;
-  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1 || troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS) {
+  if (sscanf(localArgs, "%d %c", &troughNumber, &extra) != 1 || troughNumber < 1 || troughNumber > NUM_OVERFLOW_SENSORS)
+  {
     caller->println(F("[ERROR] Invalid arguments. Use: SDT <trough number (1-4)> or SDT all."));
     return;
   }
-  if (!validateTroughNumber(troughNumber, caller)) {
+  if (!validateTroughNumber(troughNumber, caller))
+  {
     return;
   }
   int index = troughNumber - 1;
   // Stop the drain for this trough.
   valveControls[index].isDraining = false;
-  valveControls[index].drainStartTime = 0;  // clear recorded start time
+  valveControls[index].drainStartTime = 0; // clear recorded start time
   setVacuumMonitoringAndCloseMainValve(troughNumber, caller);
 
   // Change valve states as appropriate for the trough.
-  switch (troughNumber) {
-    case 1:
-      wasteValve3 = openValve(wasteValve3);
-      caller->println(F("[MESSAGE] Draining stopped for trough 1."));
-      break;
-    case 2:
-      wasteValve3 = closeValve(wasteValve3);
-      caller->println(F("[MESSAGE] Draining stopped for trough 2."));
-      break;
-    case 3:
-      wasteValve4 = openValve(wasteValve4);
-      caller->println(F("[MESSAGE] Draining stopped for trough 3."));
-      break;
-    case 4:
-      wasteValve4 = closeValve(wasteValve4);
-      caller->println(F("[MESSAGE] Draining stopped for trough 4."));
-      break;
-    default:
-      caller->println(F("[ERROR] Invalid trough number. Use: SDT <1-4> or SDT all."));
-      return;
+  switch (troughNumber)
+  {
+  case 1:
+    wasteValve3 = openValve(wasteValve3);
+    caller->println(F("[MESSAGE] Draining stopped for trough 1."));
+    break;
+  case 2:
+    wasteValve3 = closeValve(wasteValve3);
+    caller->println(F("[MESSAGE] Draining stopped for trough 2."));
+    break;
+  case 3:
+    wasteValve4 = openValve(wasteValve4);
+    caller->println(F("[MESSAGE] Draining stopped for trough 3."));
+    break;
+  case 4:
+    wasteValve4 = closeValve(wasteValve4);
+    caller->println(F("[MESSAGE] Draining stopped for trough 4."));
+    break;
+  default:
+    caller->println(F("[ERROR] Invalid trough number. Use: SDT <1-4> or SDT all."));
+    return;
   }
   // Mark this trough's drain async as complete if it wasn't already.
-  if (!drainAsyncCompleted[index]) {
+  if (!drainAsyncCompleted[index])
+  {
     // Complete command on both streams if network client is active
     cm_commandCompleted(serialStream);
-    if (useNetworkStream) {
+    if (useNetworkStream)
+    {
       cm_commandCompleted(networkStream);
     }
     drainAsyncCompleted[index] = true;
   }
 }
 
-
-
-void cmd_log_help(char* args, CommandCaller* caller) {
+void cmd_log_help(char *args, CommandCaller *caller)
+{
   // Create a local copy of args (even if not used, for consistency)
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
@@ -865,13 +1076,6 @@ void cmd_standby(char *args, CommandCaller *caller)
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
-  // // Get both streams that might be in use
-  // Stream* serialStream = &Serial;
-  // Stream* networkStream = &currentClient;
-  
-  // // For notifications, check if the network client is active
-  // bool useNetworkStream = hasActiveClient && currentClient.connected();
-
   caller->println(F("[MESSAGE] Executing STANDBY command. Shutting down system to safe state..."));
 
   // Abort all running operations for each trough.
@@ -931,23 +1135,18 @@ void cmd_standby(char *args, CommandCaller *caller)
   // Abort both sessions if active
   if (cm_isSessionActive())
   {
-    // // Since we can't directly access serialSession and networkSession,
-    // // use the CommandManager API to abort sessions
-    // cm_abortSession(&Serial);
-    
-    // if (hasActiveClient && currentClient.connected()) {
-    //   cm_abortSession(&currentClient);
-    // }
-
     // First check if we have any active network clients
-    if (hasActiveClient && currentClient.connected()) {
+    if (hasActiveClient && currentClient.connected())
+    {
       // For network commands, use the network stream
       cm_abortSession(&currentClient);
-    } else {
+    }
+    else
+    {
       // Otherwise, use the Serial stream
       cm_abortSession(&Serial);
     }
-    
+
     // These variables should be declared in CommandManager.h as extern
     // and we should include that header, but for now we'll just
     // call a function that will reset them
@@ -955,72 +1154,74 @@ void cmd_standby(char *args, CommandCaller *caller)
   }
 }
 
-  void cmd_get_system_state(char *args, CommandCaller *caller)
+void cmd_get_system_state(char *args, CommandCaller *caller)
+{
+  // Make a local copy of the arguments (though not used here)
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  // Header
+  caller->println(F("--------------------------------------------------"));
+  caller->println(F("SYSTEM STATE SUMMARY"));
+  caller->println(F("--------------------------------------------------"));
+
+  // Overall system state: If any trough is active (dispensing, priming, filling, or draining)
+  String overallState = "Overall System State: " + getOverallTroughState();
+  caller->println(overallState);
+
+  // Fan section
+  caller->println(F("Fan:"));
+  caller->print(F("  • Mode          : "));
+  caller->println(fanAutoMode ? F("Auto") : F("Manual"));
+  caller->print(F("  • Current State : "));
+  bool fanState = (digitalRead(fan.relayPin) == HIGH);
+  caller->println(fanState ? F("ON") : F("OFF"));
+  caller->println();
+
+  // Enclosure section
+  caller->println(F("Enclosure:"));
+  caller->print(F("  • Liquid Leak   : "));
+  caller->println(globalEnclosureLiquidError ? F("Detected") : F("NONE"));
+  caller->println();
+
+  // Vacuum Monitoring section
+  caller->println(F("Vacuum Monitoring:"));
+  caller->print(F("  • Waste Bottle 1: "));
+  caller->println(globalVacuumMonitoring[0] ? F("Active") : F("Inactive"));
+  caller->print(F("  • Waste Bottle 2: "));
+  caller->println(globalVacuumMonitoring[1] ? F("Active") : F("Inactive"));
+  caller->println();
+
+  // Manual Control per Trough
+  caller->println(F("Manual Control (per Trough):"));
+  for (int i = 0; i < 4; i++)
   {
-    // Make a local copy of the arguments (though not used here)
-    char localArgs[COMMAND_SIZE];
-    strncpy(localArgs, args, COMMAND_SIZE);
-    localArgs[COMMAND_SIZE - 1] = '\0';
+    caller->print(F("  • Trough "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+    caller->println(valveControls[i].manualControl ? F("ON") : F("OFF"));
+  }
+  caller->println();
 
-    // Header
-    caller->println(F("--------------------------------------------------"));
-    caller->println(F("SYSTEM STATE SUMMARY"));
-    caller->println(F("--------------------------------------------------"));
-
-    // Overall system state: If any trough is active (dispensing, priming, filling, or draining)
-    String overallState = "Overall System State: " + getOverallTroughState();
-    caller->println(overallState);
-
-    // Fan section
-    caller->println(F("Fan:"));
-    caller->print(F("  • Mode          : "));
-    caller->println(fanAutoMode ? F("Auto") : F("Manual"));
-    caller->print(F("  • Current State : "));
-    bool fanState = (digitalRead(fan.relayPin) == HIGH);
-    caller->println(fanState ? F("ON") : F("OFF"));
-    caller->println();
-
-    // Enclosure section
-    caller->println(F("Enclosure:"));
-    caller->print(F("  • Liquid Leak   : "));
-    caller->println(globalEnclosureLiquidError ? F("Detected") : F("NONE"));
-    caller->println();
-
-    // Vacuum Monitoring section
-    caller->println(F("Vacuum Monitoring:"));
-    caller->print(F("  • Waste Bottle 1: "));
-    caller->println(globalVacuumMonitoring[0] ? F("Active") : F("Inactive"));
-    caller->print(F("  • Waste Bottle 2: "));
-    caller->println(globalVacuumMonitoring[1] ? F("Active") : F("Inactive"));
-    caller->println();
-
-    // Manual Control per Trough
-    caller->println(F("Manual Control (per Trough):"));
-    for (int i = 0; i < 4; i++)
+  // Flow Sensors section
+  caller->println(F("Flow Sensors:"));
+  for (int i = 0; i < 4; i++)
+  {
+    caller->print(F("  • FS"));
+    caller->print(i + 1);
+    caller->print(F(": Flow Rate: "));
+    char buf[10];
+    dtostrf(flowSensors[i]->flowRate, 4, 1, buf);
+    caller->print(buf);
+    caller->print(F(" mL/s, Status: "));
+    // Three states: If not dispensing → IDLE; if dispensing and valid → VALID; otherwise → INVALID.
+    if (!valveControls[i].isDispensing)
     {
-      caller->print(F("  • Trough "));
-      caller->print(i + 1);
-      caller->print(F(": "));
-      caller->println(valveControls[i].manualControl ? F("ON") : F("OFF"));
+      caller->print(F("IDLE/NOT MEASURING"));
     }
-    caller->println();
-
-    // Flow Sensors section
-    caller->println(F("Flow Sensors:"));
-    for (int i = 0; i < 4; i++)
+    else
     {
-      caller->print(F("  • FS"));
-      caller->print(i + 1);
-      caller->print(F(": Flow Rate: "));
-      char buf[10];
-      dtostrf(flowSensors[i]->flowRate, 4, 1, buf);
-      caller->print(buf);
-      caller->print(F(" mL/s, Status: "));
-      // Three states: If not dispensing → IDLE; if dispensing and valid → VALID; otherwise → INVALID.
-      if (!valveControls[i].isDispensing)
-      {
-        caller->print(F("IDLE/NOT MEASURING"));
-      } else {
       caller->print(flowSensors[i]->isValidReading ? F("VALID") : F("INVALID"));
     }
     caller->print(F(", Current Dispense Volume: "));
@@ -1035,7 +1236,8 @@ void cmd_standby(char *args, CommandCaller *caller)
 
   // Priming, Dispensing, Filling, Draining Status
   caller->println(F("Priming Status:"));
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 4; i++)
+  {
     caller->print(F("  • Trough "));
     caller->print(i + 1);
     caller->print(F(": "));
@@ -1044,7 +1246,8 @@ void cmd_standby(char *args, CommandCaller *caller)
   caller->println();
 
   caller->println(F("Dispensing Status:"));
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 4; i++)
+  {
     caller->print(F("  • Trough "));
     caller->print(i + 1);
     caller->print(F(": "));
@@ -1053,7 +1256,8 @@ void cmd_standby(char *args, CommandCaller *caller)
   caller->println();
 
   caller->println(F("Filling Status:"));
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 4; i++)
+  {
     caller->print(F("  • Trough "));
     caller->print(i + 1);
     caller->print(F(": "));
@@ -1062,7 +1266,8 @@ void cmd_standby(char *args, CommandCaller *caller)
   caller->println();
 
   caller->println(F("Draining Status:"));
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 4; i++)
+  {
     caller->print(F("  • Trough "));
     caller->print(i + 1);
     caller->print(F(": "));
@@ -1100,7 +1305,8 @@ void cmd_standby(char *args, CommandCaller *caller)
   // Environment section
   TempHumidity th = readTempHumidity();
   caller->println(F("Environment:"));
-  if (th.valid) {
+  if (th.valid)
+  {
     caller->print(F("  • Temperature      : "));
     char tempStr[10];
     dtostrf(th.temperature, 4, 1, tempStr);
@@ -1111,7 +1317,9 @@ void cmd_standby(char *args, CommandCaller *caller)
     dtostrf(th.humidity, 4, 1, humStr);
     caller->print(humStr);
     caller->println(F(" %"));
-  } else {
+  }
+  else
+  {
     caller->println(F("  • Temperature      : Error reading sensor"));
     caller->println(F("  • Humidity         : Error reading sensor"));
   }
@@ -1163,9 +1371,12 @@ void cmd_standby(char *args, CommandCaller *caller)
   // Command Session section
   caller->println(F("Command Session:"));
   caller->print(F("  • Status           : "));
-  if (commandSessionActive) {
+  if (commandSessionActive)
+  {
     caller->println(F("ACTIVE (asynchronous operations still in progress)"));
-  } else {
+  }
+  else
+  {
     caller->println(F("INACTIVE (No asynchronous commands pending)"));
   }
   caller->println();
@@ -1198,18 +1409,22 @@ void cmd_standby(char *args, CommandCaller *caller)
   caller->println(F("--------------------------------------------------"));
 }
 
-void cmd_print_help(char* args, CommandCaller* caller) {
+void cmd_print_help(char *args, CommandCaller *caller)
+{
   char localArgs[COMMAND_SIZE];
   strncpy(localArgs, args, COMMAND_SIZE);
   localArgs[COMMAND_SIZE - 1] = '\0';
 
-  char* trimmed = trimLeadingSpaces(localArgs);
+  char *trimmed = trimLeadingSpaces(localArgs);
 
   // If the user requested help for a specific command,
   // we currently do not have detailed help implemented.
-  if (strlen(trimmed) > 0) {
+  if (strlen(trimmed) > 0)
+  {
     caller->println(F("[ERROR] Detailed help for specific commands is not implemented."));
-  } else {
+  }
+  else
+  {
     // No specific command requested; print general help.
     // Pass a pointer to the Serial stream.
 
@@ -1224,6 +1439,65 @@ void cmd_print_help(char* args, CommandCaller* caller) {
   }
 }
 
+void cmd_device_info(char *args, CommandCaller *caller)
+{
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  // Get both streams that might be in use
+  Stream *serialStream = &Serial;
+  Stream *networkStream = &currentClient;
+
+  // For completion notifications, check if the network client is active
+  bool useNetworkStream = hasActiveClient && currentClient.connected();
+
+  // Always show network info when command is received, but only to Serial
+  // Print to serial directly regardless of the caller
+  if (serialStream)
+  {
+    // Always print to Serial whether the command came from Serial or network
+    serialStream->println(F("---- Device Information (Serial Only) ----"));
+
+    IPAddress deviceIP = Ethernet.localIP();
+    serialStream->print(F("Ethernet IP Address: "));
+    serialStream->println(deviceIP);
+
+    serialStream->print(F("TCP Server Listening on: "));
+    serialStream->print(DEVICE_IP);
+    serialStream->print(F(":"));
+    serialStream->println(TCP_PORT);
+
+    serialStream->print(F("MAC Address: "));
+    for (int i = 0; i < 6; i++)
+    {
+      if (i > 0)
+        serialStream->print(F(":"));
+      if (MAC_ADDRESS[i] < 0x10)
+        serialStream->print(F("0"));
+      serialStream->print(MAC_ADDRESS[i], HEX);
+    }
+    serialStream->println();
+
+    serialStream->print(F("Active TCP Connections: "));
+    serialStream->println(hasActiveClient ? "YES" : "NO");
+
+    serialStream->println(F("----------------------------------------"));
+  }
+
+  // If command came from network client, tell them it's only for serial
+  if (useNetworkStream && caller != serialStream)
+  {
+    networkStream->println(F("[ERROR] Device information can only be accessed via Serial."));
+  }
+
+  // Complete the command on both streams if needed
+  cm_commandCompleted(serialStream);
+  if (useNetworkStream)
+  {
+    cm_commandCompleted(networkStream);
+  }
+}
 
 // ============================================================
 // Global Command Tree and Commander Object
@@ -1231,29 +1505,29 @@ void cmd_print_help(char* args, CommandCaller* caller) {
 Commander commander;
 
 Commander::systemCommand_t API_tree[] = {
-  systemCommand("LF", "Set logging interval (ms). Usage: LF <ms>", cmd_set_log_frequency),
-  systemCommand("FN", "Manually control fan state. Usage: FN <0/1> (0 = off, 1 = on)", cmd_fan),
-  systemCommand("FNAUTO", "Re-enable automatic fan control", cmd_fan_auto),
-  systemCommand("R", "Control reagent valve. Usage: R <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_reagent_valve),
-  systemCommand("M", "Control media valve. Usage: M <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_media_valve),
-  systemCommand("W", "Control waste valve. Usage: W <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_waste_valve),
-  systemCommand("PV", "Set pressure valve position as a percentage. Usage: PV <percentage> (0 = close, 100 = open)", cmd_set_pressure_valve),
-  systemCommand("CALPV", "Calibrate pressure valve (auto-detect max feedback voltage)", cmd_calibrate_pressure_valve),
-  systemCommand("STARTFSM", "Manually start flow sensor measurement. Usage: STARTFSM <sensor 1-4>", cmd_start_flow_sensor_manually),
-  systemCommand("STOPFSM", "Manually stop flow sensor measurement. Usage: STOPFSM <sensor 1-4>", cmd_stop_flow_sensor_manually),
-  systemCommand("RF", "Reset flow sensor dispense volume. Usage: RFS <sensor index 1-3>", cmd_reset_flow_dispense),
-  systemCommand("RTF", "Reset total volume for a flow sensor. Usage: RTF <sensor index 1-4>", cmd_reset_flow_total),
-  systemCommand("RESETI2C", "Reset the I2C bus (for communication issues)", cmd_reset_i2c),
-  systemCommand("D", "Dispense reagent. Usage: D <trough 1-4> [volume in mL] (omitting volume enables continuous mode)", cmd_dispense_reagent),
-  systemCommand("STOPD", "Stop dispensing. Usage: STOPD <trough 1-4> or STOPD all", cmd_stop_dispense),
-  systemCommand("P", "Prime valves. Usage: P <trough 1-4> to prime specified trough(s)", cmd_prime_valves),
-  systemCommand("F", "Fill reagent. Usage: F <trough 1-4> to fill the specified trough", cmd_fill_reagent),
-  systemCommand("DT", "Drain trough. Usage: DT <trough 1-4> to initiate drainage", cmd_drain_trough),
-  systemCommand("SDT", "Stop draining trough. Usage: SDT <trough 1-4> or SDT all", cmd_stop_drain_trough),
-  systemCommand("LOGHELP", "Display detailed logging field definitions and diagnostic information", cmd_log_help),
-  systemCommand("STANDBY", "Abort all automated operations and set the system to a safe idle (standby) state", cmd_standby),
-  systemCommand("SS", "Display current system state summary", cmd_get_system_state),
-  systemCommand("help", "Display help information for all commands", cmd_print_help),
-  systemCommand("h", "Display help information for all commands", cmd_print_help),
-  systemCommand("H", "Display help information for all commands", cmd_print_help)
-};
+    systemCommand("LF", "Set logging interval (ms). Usage: LF <ms>", cmd_set_log_frequency),
+    systemCommand("FN", "Manually control fan state. Usage: FN <0/1> (0 = off, 1 = on)", cmd_fan),
+    systemCommand("FNAUTO", "Re-enable automatic fan control", cmd_fan_auto),
+    systemCommand("R", "Control reagent valve. Usage: R <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_reagent_valve),
+    systemCommand("M", "Control media valve. Usage: M <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_media_valve),
+    systemCommand("W", "Control waste valve. Usage: W <trough 1-4> <0/1> (0 = close, 1 = open)", cmd_set_waste_valve),
+    systemCommand("PV", "Set pressure valve position as a percentage. Usage: PV <percentage> (0 = close, 100 = open)", cmd_set_pressure_valve),
+    systemCommand("CALPV", "Calibrate pressure valve (auto-detect max feedback voltage)", cmd_calibrate_pressure_valve),
+    systemCommand("STARTFSM", "Manually start flow sensor measurement. Usage: STARTFSM <sensor 1-4>", cmd_start_flow_sensor_manually),
+    systemCommand("STOPFSM", "Manually stop flow sensor measurement. Usage: STOPFSM <sensor 1-4>", cmd_stop_flow_sensor_manually),
+    systemCommand("RF", "Reset flow sensor dispense volume. Usage: RFS <sensor index 1-3>", cmd_reset_flow_dispense),
+    systemCommand("RTF", "Reset total volume for a flow sensor. Usage: RTF <sensor index 1-4>", cmd_reset_flow_total),
+    systemCommand("RESETI2C", "Reset the I2C bus (for communication issues)", cmd_reset_i2c),
+    systemCommand("D", "Dispense reagent. Usage: D <trough 1-4> [volume in mL] (omitting volume enables continuous mode)", cmd_dispense_reagent),
+    systemCommand("STOPD", "Stop dispensing. Usage: STOPD <trough 1-4> or STOPD all", cmd_stop_dispense),
+    systemCommand("P", "Prime valves. Usage: P <trough 1-4> to prime specified trough(s)", cmd_prime_valves),
+    systemCommand("F", "Fill reagent. Usage: F <trough 1-4> to fill the specified trough", cmd_fill_reagent),
+    systemCommand("DT", "Drain trough. Usage: DT <trough 1-4> to initiate drainage", cmd_drain_trough),
+    systemCommand("SDT", "Stop draining trough. Usage: SDT <trough 1-4> or SDT all", cmd_stop_drain_trough),
+    systemCommand("LOGHELP", "Display detailed logging field definitions and diagnostic information", cmd_log_help),
+    systemCommand("STANDBY", "Abort all automated operations and set the system to a safe idle (standby) state", cmd_standby),
+    systemCommand("SS", "Display current system state summary", cmd_get_system_state),
+    systemCommand("help", "Display help information for all commands", cmd_print_help),
+    systemCommand("h", "Display help information for all commands", cmd_print_help),
+    systemCommand("H", "Display help information for all commands", cmd_print_help),
+    systemCommand("DI", "Display device network information (Serial only)", cmd_device_info)};

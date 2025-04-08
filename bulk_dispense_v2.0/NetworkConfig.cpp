@@ -13,16 +13,17 @@ EthernetClient currentClient;
 bool hasActiveClient = false;
 String currentCommand = "";
 
-void initializeNetwork() {
+void initializeNetwork()
+{
     // Initialize Ethernet with MAC and IP
     Ethernet.begin(MAC_ADDRESS, DEVICE_IP);
-    
+
     // Print network information
     Serial.print(F("[MESSAGE] Device Ethernet IP Address: "));
     Serial.println(Ethernet.localIP());
-    
+
     delay(1000); // Allow time for Ethernet initialization
-    
+
     // Start TCP server
     tcpServer.begin();
     Serial.println(F("[MESSAGE] TCP server initialized."));
@@ -30,15 +31,18 @@ void initializeNetwork() {
     Serial.println(DEVICE_IP);
     Serial.print(F("[MESSAGE] TCP/IP Port: "));
     Serial.println(TCP_PORT);
-    
+
     delay(500);
 }
 
-void handleTcpConnections() {
+void handleTcpConnections()
+{
     // Check for new clients
-    if (!hasActiveClient) {
+    if (!hasActiveClient)
+    {
         EthernetClient newClient = tcpServer.available();
-        if (newClient) {
+        if (newClient)
+        {
             currentClient = newClient;
             hasActiveClient = true;
             Serial.println(F("[MESSAGE] New client connected"));
@@ -46,21 +50,17 @@ void handleTcpConnections() {
     }
 }
 
-
-
-void disconnectClient() {
-    if (hasActiveClient && !currentClient.connected()) {
+void disconnectClient()
+{
+    if (hasActiveClient && !currentClient.connected())
+    {
         currentClient.stop();
         hasActiveClient = false;
         Serial.println(F("[MESSAGE] Client disconnected"));
     }
 }
 
-bool isClientConnected() {
+bool isClientConnected()
+{
     return hasActiveClient && currentClient.connected();
 }
-
-
-
-
-

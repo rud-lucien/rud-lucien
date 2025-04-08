@@ -10,8 +10,8 @@
  *  - Enters the main loop to monitor system state (flow, temperature,
  *    enclosure, etc.) and process incoming commands.
  *
- * Author: Your Name
- * Date: YYYY-MM-DD
+ * Author: Rud Lucien
+ * Date: 2025-04-08
  * Version: 2.0
  ************************************************************/
 
