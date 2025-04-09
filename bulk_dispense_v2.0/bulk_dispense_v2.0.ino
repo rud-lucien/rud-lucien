@@ -59,7 +59,7 @@ void setup()
     valveControls[i].lastFlowChangeTime = 0;
     valveControls[i].fillCheckTime = 0;
     valveControls[i].dispensingValveNumber = -1;
-      // Initialize flow sensor correction parameters
+    // Initialize flow sensor correction parameters
     flowSensors[i]->slopeCorrection = 1.0f;
     flowSensors[i]->offsetCorrection = 0.0f;
     flowSensors[i]->useCorrection = false;
@@ -159,10 +159,9 @@ void loop()
 
   // Process incoming serial commands.
   handleSerialCommands();
-  handleTcpConnections();    // Check for new TCP connections
-  handleNetworkCommands();   // Process TCP commands if available
+  handleTcpConnections();  // Check for new TCP connections
+  handleNetworkCommands(); // Process TCP commands if available
 
-  
   // Monitor various system parameters.
   monitorOverflowSensors(currentTime);
   monitorFlowSensors(currentTime);

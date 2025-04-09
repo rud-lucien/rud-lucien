@@ -1067,6 +1067,10 @@ void cmd_log_help(char *args, CommandCaller *caller)
   caller->println(F("         NET   = Network status (connected/disconnected)."));
   caller->println(F("         FSn   = Flow Sensor status for each trough (n = 1-4)"));
   caller->println(F("                 States: Not Dispensing, Valid, Invalid"));
+  caller->println(F("         FCOR  = Flow Correction parameters for each sensor:"));
+  caller->println(F("                 ON/OFF = Correction enabled/disabled"));
+  caller->println(F("                 Slope  = Multiplier for volume measurements"));
+  caller->println(F("                 Offset = Additive offset for volume measurements"));
   caller->println(F("--------------------------------------------------"));
 }
 
@@ -1148,9 +1152,6 @@ void cmd_standby(char *args, CommandCaller *caller)
       cm_abortSession(&Serial);
     }
 
-    // These variables should be declared in CommandManager.h as extern
-    // and we should include that header, but for now we'll just
-    // call a function that will reset them
     resetCommandTimers();
   }
 }

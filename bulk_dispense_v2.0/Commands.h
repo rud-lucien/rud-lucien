@@ -80,7 +80,6 @@ void cmd_set_flow_sensor_correction(char *args, CommandCaller *caller);
 void cmd_enable_flow_sensor_correction(char *args, CommandCaller *caller);
 void cmd_show_flow_sensor_correction(char *args, CommandCaller *caller);
 
-
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
