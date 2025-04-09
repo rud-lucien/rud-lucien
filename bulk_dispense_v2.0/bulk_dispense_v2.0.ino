@@ -59,6 +59,10 @@ void setup()
     valveControls[i].lastFlowChangeTime = 0;
     valveControls[i].fillCheckTime = 0;
     valveControls[i].dispensingValveNumber = -1;
+      // Initialize flow sensor correction parameters
+    flowSensors[i]->slopeCorrection = 1.0f;
+    flowSensors[i]->offsetCorrection = 0.0f;
+    flowSensors[i]->useCorrection = false;
   }
 
   // --- Initialize Hardware ---

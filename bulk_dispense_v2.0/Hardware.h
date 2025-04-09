@@ -6,7 +6,7 @@
 
 /************************************************************
  * Hardware.h
- * 
+ *
  * This header defines all hardware-related constants,
  * pin assignments, structures, and global objects for the
  * Bulk Dispense system.
@@ -27,7 +27,7 @@
 
 // General
 #define COMMAND_SIZE 30
-#define ENCLOSURE_TEMP_SETPOINT 30.0  // °C for fan activation
+#define ENCLOSURE_TEMP_SETPOINT 30.0 // °C for fan activation
 
 // Fan
 #define FAN_CONTROL_PIN CONTROLLINO_R6
@@ -87,45 +87,52 @@ extern const uint8_t WASTE_VACUUM_SENSORS[NUM_WASTE_VACUUM_SENSORS];
 // ============================================================
 
 // On/Off Valve Structure
-struct OnOffValve {
+struct OnOffValve
+{
   uint8_t controlPin;
   bool isOpen;
 };
 
 // Fan Control Structure
-struct FanControl {
+struct FanControl
+{
   uint8_t relayPin;
 };
 
 // Proportional Valve Structure
-struct ProportionalValve {
+struct ProportionalValve
+{
   uint8_t controlPin;
   uint8_t feedbackPin;
   float controlVoltage;
 };
 
 // Pressure Sensor Structure
-struct PressureSensor {
+struct PressureSensor
+{
   uint8_t analogPin;
   float minPressure;
   float maxPressure;
 };
 
 // Temperature & Humidity Sensor Structure (SHT31)
-struct TempHumidity {
+struct TempHumidity
+{
   float temperature;
   float humidity;
   bool valid;
 };
 
 // Fluid type enum for flow sensors
-enum FluidType {
+enum FluidType
+{
   WATER,
   IPA
 };
 
 // Flow Sensor Structure
-struct FlowSensor {
+struct FlowSensor
+{
   uint8_t multiplexerAddr;
   uint8_t sensorAddr;
   uint8_t channel;
@@ -140,18 +147,22 @@ struct FlowSensor {
   float dispenseVolume;
   float totalVolume;
   bool isValidReading;
-  FluidType fluidType;         // Added: tracks current fluid calibration type
+  FluidType fluidType; // Added: tracks current fluid calibration type
   bool isIPA;
+  float slopeCorrection;  // Multiplier for volume correction (default 1.0)
+  float offsetCorrection; // Offset for volume correction (default 0.0)
+  bool useCorrection;     // Flag to enable/disable correction
 };
 
 // Valve Control Structure (for dispense operations)
-struct ValveControl {
+struct ValveControl
+{
   bool isDispensing;
   bool manualControl;
   bool isPriming;
   bool fillMode;
   bool isDraining;
-  unsigned long drainStartTime;  // NEW: records when the drain started
+  unsigned long drainStartTime; // NEW: records when the drain started
   float targetVolume;
   float lastFlowValue;
   unsigned long lastFlowCheckTime;
@@ -160,10 +171,9 @@ struct ValveControl {
   int dispensingValveNumber;
 };
 
-
-
 // Binary Sensor Structure
-struct BinarySensor {
+struct BinarySensor
+{
   uint8_t inputPin;
   bool activeHigh;
 };
@@ -188,7 +198,7 @@ extern bool fanAutoMode;
 
 extern ProportionalValve proportionalValve;
 extern PressureSensor pressureSensor;
-extern Adafruit_SHT31 sht31;  // SHT31 instance
+extern Adafruit_SHT31 sht31; // SHT31 instance
 
 // Flow Sensors (for channels 0-3)
 extern FlowSensor flow1, flow2, flow3, flow4;
@@ -244,4 +254,4 @@ void selectMultiplexerChannel(uint8_t multiplexerAddr, uint8_t channel);
 
 bool readBinarySensor(const BinarySensor &sensor);
 
-#endif  // HARDWARE_H
+#endif // HARDWARE_H

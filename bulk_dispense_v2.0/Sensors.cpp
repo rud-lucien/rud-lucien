@@ -215,6 +215,15 @@ bool readFlowSensorData(FlowSensor &sensor)
   {
     float elapsedMinutes = (currentTime - sensor.lastUpdateTime) / 60000.0;
     float increment = sensor.flowRate * elapsedMinutes;
+
+    // Apply calibration to the increment if enabled
+    if (sensor.useCorrection)
+    {
+      // Apply the linear calibration formula: y = mx + b
+      // Where m is slope, b is offset, x is measured increment
+      increment = sensor.slopeCorrection * increment + sensor.offsetCorrection * elapsedMinutes;
+    }
+
     sensor.dispenseVolume += increment;
     sensor.totalVolume += increment;
   }

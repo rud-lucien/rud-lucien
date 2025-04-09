@@ -1234,6 +1234,15 @@ void cmd_get_system_state(char *args, CommandCaller *caller)
     dtostrf(flowSensors[i]->totalVolume, 4, 1, buf);
     caller->print(buf);
     caller->println(F(" mL"));
+
+    caller->print(F("     Correction: "));
+    caller->print(flowSensors[i]->useCorrection ? F("ENABLED") : F("DISABLED"));
+    caller->print(F(", Slope: "));
+    dtostrf(flowSensors[i]->slopeCorrection, 4, 2, buf);
+    caller->print(buf);
+    caller->print(F(", Offset: "));
+    dtostrf(flowSensors[i]->offsetCorrection, 4, 2, buf);
+    caller->println(buf);
   }
   caller->println();
 
@@ -1543,6 +1552,166 @@ void cmd_set_flow_sensor_fluid(char *args, CommandCaller *caller)
     caller->println(F("[ERROR] Invalid arguments. Usage: SETFS <sensor 1-4> <W/I> (W=Water, I=IPA)"));
   }
 }
+
+void cmd_set_flow_sensor_correction(char *args, CommandCaller *caller)
+{
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  // Parse the arguments using strtok
+  char *token = strtok(localArgs, " ");
+  if (token == NULL)
+  {
+    caller->println(F("[ERROR] Missing sensor number. Use: SETFSCOR <sensor 1-4> <slope> <offset>"));
+    return;
+  }
+
+  // Parse sensor number
+  int sensorNumber = atoi(token);
+  if (sensorNumber < 1 || sensorNumber > NUM_FLOW_SENSORS)
+  {
+    caller->println(F("[ERROR] Invalid sensor number. Must be 1-4."));
+    return;
+  }
+
+  // Parse slope
+  token = strtok(NULL, " ");
+  if (token == NULL)
+  {
+    caller->println(F("[ERROR] Missing slope parameter. Use: SETFSCOR <sensor 1-4> <slope> <offset>"));
+    return;
+  }
+  float slope = atof(token);
+
+  // Parse offset
+  token = strtok(NULL, " ");
+  if (token == NULL)
+  {
+    caller->println(F("[ERROR] Missing offset parameter. Use: SETFSCOR <sensor 1-4> <slope> <offset>"));
+    return;
+  }
+  float offset = atof(token);
+
+  // Apply the correction values
+  FlowSensor *sensor = flowSensors[sensorNumber - 1];
+  if (!sensor)
+  {
+    caller->print(F("[ERROR] Flow Sensor "));
+    caller->print(sensorNumber);
+    caller->println(F(" not found."));
+    return;
+  }
+
+  sensor->slopeCorrection = slope;
+  sensor->offsetCorrection = offset;
+
+  caller->print(F("[MESSAGE] Flow sensor "));
+  caller->print(sensorNumber);
+  caller->println(F(" correction parameters set:"));
+  caller->print(F("  Slope: "));
+  caller->println(slope, 4);
+  caller->print(F("  Offset: "));
+  caller->println(offset, 4);
+}
+
+void cmd_enable_flow_sensor_correction(char *args, CommandCaller *caller)
+{
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  // Parse sensor number
+  char *token = strtok(localArgs, " ");
+  if (token == NULL)
+  {
+    caller->println(F("[ERROR] Missing sensor number. Use: ENFSCOR <sensor 1-4> <0/1>"));
+    return;
+  }
+  int sensorNumber = atoi(token);
+
+  // Parse enable flag
+  token = strtok(NULL, " ");
+  if (token == NULL)
+  {
+    caller->println(F("[ERROR] Missing enable flag. Use: ENFSCOR <sensor 1-4> <0/1>"));
+    return;
+  }
+  int enabled = atoi(token);
+
+  // Validate parameters
+  if (sensorNumber < 1 || sensorNumber > NUM_FLOW_SENSORS)
+  {
+    caller->println(F("[ERROR] Invalid sensor number. Must be 1-4."));
+    return;
+  }
+
+  if (enabled != 0 && enabled != 1)
+  {
+    caller->println(F("[ERROR] Invalid enable flag. Must be 0 or 1."));
+    return;
+  }
+
+  FlowSensor *sensor = flowSensors[sensorNumber - 1];
+  if (!sensor)
+  {
+    caller->print(F("[ERROR] Flow Sensor "));
+    caller->print(sensorNumber);
+    caller->println(F(" not found."));
+    return;
+  }
+
+  sensor->useCorrection = (enabled == 1);
+
+  caller->print(F("[MESSAGE] Flow correction for sensor "));
+  caller->print(sensorNumber);
+  caller->print(F(" is now "));
+  caller->println(sensor->useCorrection ? F("ENABLED") : F("DISABLED"));
+}
+
+void cmd_show_flow_sensor_correction(char *args, CommandCaller *caller)
+{
+  char localArgs[COMMAND_SIZE];
+  strncpy(localArgs, args, COMMAND_SIZE);
+  localArgs[COMMAND_SIZE - 1] = '\0';
+
+  // Parse sensor number
+  char *token = strtok(localArgs, " ");
+  if (token == NULL)
+  {
+    caller->println(F("[ERROR] Missing sensor number. Use: SHOWFSCOR <sensor 1-4>"));
+    return;
+  }
+  int sensorNumber = atoi(token);
+
+  // Validate parameter
+  if (sensorNumber < 1 || sensorNumber > NUM_FLOW_SENSORS)
+  {
+    caller->println(F("[ERROR] Invalid sensor number. Must be 1-4."));
+    return;
+  }
+
+  FlowSensor *sensor = flowSensors[sensorNumber - 1];
+  if (!sensor)
+  {
+    caller->print(F("[ERROR] Flow Sensor "));
+    caller->print(sensorNumber);
+    caller->println(F(" not found."));
+    return;
+  }
+
+  caller->print(F("[INFO] Flow correction settings for sensor "));
+  caller->println(sensorNumber);
+  caller->print(F("  Status: "));
+  caller->println(sensor->useCorrection ? F("ENABLED") : F("DISABLED"));
+  caller->print(F("  Slope: "));
+  caller->println(sensor->slopeCorrection, 4);
+  caller->print(F("  Offset: "));
+  caller->println(sensor->offsetCorrection, 4);
+  caller->print(F("  Fluid type: "));
+  caller->println(sensor->fluidType == WATER ? F("WATER") : F("IPA"));
+}
+
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
@@ -1575,4 +1744,7 @@ Commander::systemCommand_t API_tree[] = {
     systemCommand("h", "Display help information for all commands", cmd_print_help),
     systemCommand("H", "Display help information for all commands", cmd_print_help),
     systemCommand("DI", "Display device network information (Serial only)", cmd_device_info),
-    systemCommand("SETFS", "Set flow sensor fluid type. Usage: SETFS <sensor 1-4> <W/I> (W=Water, I=IPA)", cmd_set_flow_sensor_fluid)};
+    systemCommand("SETFS", "Set flow sensor fluid type. Usage: SETFS <sensor 1-4> <W/I> (W=Water, I=IPA)", cmd_set_flow_sensor_fluid),
+    systemCommand("SETFSCOR", "Set flow sensor correction parameters: SETFSCOR <sensor 1-4> <slope> <offset>", cmd_set_flow_sensor_correction),
+    systemCommand("ENFSCOR", "Enable/disable flow correction: ENFSCOR <sensor 1-4> <0/1>", cmd_enable_flow_sensor_correction),
+    systemCommand("SHOWFSCOR", "Show flow correction settings: SHOWFSCOR <sensor 1-4>", cmd_show_flow_sensor_correction)};

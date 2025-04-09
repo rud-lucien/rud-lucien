@@ -34,6 +34,9 @@
  *   DT      - Drain trough: DT <1-4>
  *   SDT     - Stop draining trough: SDT <1-4> or SDT all
  *   SETFS   - Set flow sensor fluid type: SETFS <1-4> <W/I>
+ *   SETFSCOR- Set flow sensor correction: SETFSCOR <1-4> <slope> <offset>
+ *   ENFSCOR - Enable/disable flow correction: ENFSCOR <1-4> <0/1>
+ *   SHOWFSCOR- Show flow correction settings: SHOWFSCOR <1-4>
  *   LOGHELP - Display detailed log field definitions and diagnostic info
  *   STANDBY - Abort all automated operations and set the system to a
  *             safe, idle state (standby mode)
@@ -73,11 +76,15 @@ void cmd_standby(char *args, CommandCaller *caller);
 void cmd_print_help(char *args, CommandCaller *caller);
 void cmd_device_info(char *args, CommandCaller *caller);
 void cmd_set_flow_sensor_fluid(char *args, CommandCaller *caller);
+void cmd_set_flow_sensor_correction(char *args, CommandCaller *caller);
+void cmd_enable_flow_sensor_correction(char *args, CommandCaller *caller);
+void cmd_show_flow_sensor_correction(char *args, CommandCaller *caller);
+
 
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
-extern Commander::systemCommand_t API_tree[27];
+extern Commander::systemCommand_t API_tree[30];
 extern Commander commander;
 
 #endif // COMMANDS_H

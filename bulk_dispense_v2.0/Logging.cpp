@@ -266,9 +266,32 @@ void logSystemState()
           getFlowDiagString(flow3, valveControls[2].isDispensing),
           getFlowDiagString(flow4, valveControls[3].isDispensing));
 
+  // Add correction parameters to log - using dtostrf for reliable float formatting
+char correctionDiag[160];
+char slope1[8], offset1[8], slope2[8], offset2[8];
+char slope3[8], offset3[8], slope4[8], offset4[8];
+
+dtostrf(flow1.slopeCorrection, 4, 2, slope1);
+dtostrf(flow1.offsetCorrection, 4, 2, offset1);
+dtostrf(flow2.slopeCorrection, 4, 2, slope2);
+dtostrf(flow2.offsetCorrection, 4, 2, offset2);
+dtostrf(flow3.slopeCorrection, 4, 2, slope3);
+dtostrf(flow3.offsetCorrection, 4, 2, offset3);
+dtostrf(flow4.slopeCorrection, 4, 2, slope4);
+dtostrf(flow4.offsetCorrection, 4, 2, offset4);
+
+sprintf(correctionDiag,
+        ", FCOR: FS1:%s,%s,%s, FS2:%s,%s,%s, FS3:%s,%s,%s, FS4:%s,%s,%s",
+        flow1.useCorrection ? "ON" : "OFF", slope1, offset1,
+        flow2.useCorrection ? "ON" : "OFF", slope2, offset2, 
+        flow3.useCorrection ? "ON" : "OFF", slope3, offset3,
+        flow4.useCorrection ? "ON" : "OFF", slope4, offset4);
+
   // Append diagnostic info to the main log message
   strncat(buffer, diagBuffer, sizeof(buffer) - strlen(buffer) - 1);
   strncat(buffer, flowDiag, sizeof(buffer) - strlen(buffer) - 1);
+  // Append correction info to the main log message
+  strncat(buffer, correctionDiag, sizeof(buffer) - strlen(buffer) - 1);
 
   // --- Print the complete log message ---
   Serial.println(buffer);
