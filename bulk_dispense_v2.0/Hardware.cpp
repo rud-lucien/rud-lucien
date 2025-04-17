@@ -27,7 +27,7 @@ const uint8_t MEDIA_VALVES[NUM_MEDIA_VALVES] = {
 };
 
 const uint8_t WASTE_VALVES[NUM_WASTE_VALVES] = {
-  CONTROLLINO_R4, CONTROLLINO_R5, CONTROLLINO_R8, CONTROLLINO_R9
+  CONTROLLINO_R9, CONTROLLINO_R8, CONTROLLINO_R5, CONTROLLINO_R4
 };
 
 const uint8_t OVERFLOW_SENSORS[NUM_OVERFLOW_SENSORS] = {
@@ -89,10 +89,10 @@ OnOffValve mediaValve2 = { MEDIA_VALVES[1], false };
 OnOffValve mediaValve3 = { MEDIA_VALVES[2], false };
 OnOffValve mediaValve4 = { MEDIA_VALVES[3], false };
 
-OnOffValve wasteValve1 = { WASTE_VALVES[0], false };
-OnOffValve wasteValve2 = { WASTE_VALVES[1], false };
-OnOffValve wasteValve3 = { WASTE_VALVES[2], false };
-OnOffValve wasteValve4 = { WASTE_VALVES[3], false };
+OnOffValve wasteValve1 = { WASTE_VALVES[3], false };
+OnOffValve wasteValve2 = { WASTE_VALVES[2], false };
+OnOffValve wasteValve3 = { WASTE_VALVES[1], false };
+OnOffValve wasteValve4 = { WASTE_VALVES[0], false };
 
 // Binary Sensors
 BinarySensor overflowSensors[NUM_OVERFLOW_SENSORS] = {

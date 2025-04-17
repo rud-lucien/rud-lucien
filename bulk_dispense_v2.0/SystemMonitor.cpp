@@ -23,7 +23,9 @@
 // Prime monitoring variables
 static unsigned long primeModeStartTime[NUM_OVERFLOW_SENSORS] = {0};
 static unsigned long primeStableDetectTime[NUM_OVERFLOW_SENSORS] = {0};
-static unsigned long primeAdditionalTime[NUM_OVERFLOW_SENSORS] = {0};
+static float primeVolumeTarget[NUM_OVERFLOW_SENSORS] = {0.0, 0.0, 0.0, 0.0};
+static const float PRIME_ADDITIONAL_VOLUME_ML[NUM_OVERFLOW_SENSORS] = {2.0, 2.0, 2.0, 2.0};
+
 static unsigned long primeLowFlowTime[NUM_OVERFLOW_SENSORS] = {0};
 static bool primeModeFailed[NUM_OVERFLOW_SENSORS] = {false};
 static bool primeModeSuccess[NUM_OVERFLOW_SENSORS] = {false};
@@ -45,10 +47,9 @@ static unsigned long enclosureLeakCheckTime = 0;
 static unsigned long enclosureLeakErrorTime = 0;
 
 // Constants
-const unsigned long PRIME_TIMEOUT_MS = 6000;
+const unsigned long PRIME_TIMEOUT_MS = 15000;
 const unsigned long STABLE_DETECTION_PERIOD_MS = 500;
-const unsigned long ADDITIONAL_PRIME_TIME_MS = 2000;
-const unsigned long PRIMING_FLOW_TIMEOUT_MS = 5000;
+const unsigned long PRIMING_FLOW_TIMEOUT_MS = 15000;
 const float MIN_FLOW_RATE_PRIME = 5.0;
 
 // ============================================================
@@ -319,6 +320,13 @@ void monitorPrimeSensors(unsigned long currentTime)
     if (primeModeStartTime[i] == 0)
     {
       primeModeStartTime[i] = currentTime;
+      // Reset flow sensor volume counter when starting prime
+      resetFlowSensorDispenseVolume(*sensor);
+      // Start measurement explicitly
+      startFlowSensorMeasurement(*sensor);
+      // Log that we're starting
+      sendMessage(F("[DEBUG] Started flow measurement for sensor "), &Serial, currentClient, false);
+      sendMessage(String(i + 1).c_str(), &Serial, currentClient);
     }
 
     // 1. Check overflow (highest priority)
@@ -357,19 +365,15 @@ void monitorPrimeSensors(unsigned long currentTime)
       }
     }
 
-    // 4. Additional Prime Time Check
-    if (primeAdditionalTime[i] != 0)
+    // 4. Volume-based check (replaces time-based check)
+    if (primeVolumeTarget[i] > 0.0 && sensor && sensor->dispenseVolume >= primeVolumeTarget[i])
     {
-      if (currentTime - primeAdditionalTime[i] >= ADDITIONAL_PRIME_TIME_MS)
-      {
-        handlePrimingComplete(i);
-      }
+      handlePrimingComplete(i);
     }
   }
 }
 
 // Helper functions to improve readability
-
 void resetPrimingStates(int i)
 {
   primeAsyncCompleted[i] = false;
@@ -377,8 +381,8 @@ void resetPrimingStates(int i)
   primeModeSuccess[i] = false;
   primeModeStartTime[i] = 0;
   primeStableDetectTime[i] = 0;
-  primeAdditionalTime[i] = 0;
   primeLowFlowTime[i] = 0;
+  primeVolumeTarget[i] = 0.0; // Reset volume target
 }
 
 void handlePrimingOverflow(int i)
@@ -440,23 +444,54 @@ bool handleLowFlowCondition(int i, unsigned long currentTime)
 
 void handleBubbleDetected(int i, unsigned long currentTime)
 {
+  FlowSensor *sensor = flowSensors[i];
+
   if (primeStableDetectTime[i] == 0)
   {
     primeStableDetectTime[i] = currentTime;
   }
   else if (currentTime - primeStableDetectTime[i] >= STABLE_DETECTION_PERIOD_MS)
   {
-    if (primeAdditionalTime[i] == 0)
+    // If we haven't set up volume tracking yet
+    if (primeVolumeTarget[i] == 0.0 && sensor)
     {
-      primeAdditionalTime[i] = currentTime;
-      primeModeStartTime[i] = 0;
+      // Make sure flow sensor is measuring
+      if (!sensor->sensorInitialized || sensor->sensorStopped)
+      {
+        resetFlowSensorDispenseVolume(*sensor);
+        startFlowSensorMeasurement(*sensor);
+      }
+
+      // Set target using line-specific additional volume
+      primeVolumeTarget[i] = sensor->dispenseVolume + PRIME_ADDITIONAL_VOLUME_ML[i];
+
+      sendMessage(F("[DEBUG] Fluid detected in reagent line "), &Serial, currentClient, false);
+      sendMessage(String(i + 1).c_str(), &Serial, currentClient, false);
+      sendMessage(F(". Will dispense "), &Serial, currentClient, false);
+      sendMessage(String(PRIME_ADDITIONAL_VOLUME_ML[i]).c_str(), &Serial, currentClient, false);
+      sendMessage(F(" mL more."), &Serial, currentClient);
+    }
+
+    // Check if we've reached the volume target
+    if (primeVolumeTarget[i] > 0.0 && sensor && sensor->dispenseVolume >= primeVolumeTarget[i])
+    {
+      handlePrimingComplete(i);
     }
   }
 }
 
 bool handleNoBubbleDetected(int i, unsigned long currentTime)
 {
+  // Reset the stable detection timer when no bubble is detected
   primeStableDetectTime[i] = 0;
+
+  // Critical fix: Don't abort if we've already set a volume target
+  if (primeVolumeTarget[i] > 0.0)
+  {
+    return false; // Volume target is set, so continue priming
+  }
+
+  // Only check timeout if we haven't detected liquid yet
   if (currentTime - primeModeStartTime[i] >= PRIME_TIMEOUT_MS)
   {
     sendMessage(F("[ERROR] Priming failed for valve "), &Serial, currentClient, false);
@@ -487,8 +522,21 @@ void handlePrimingComplete(int i)
 {
   closeDispenseValves(i + 1);
 
-  sendMessage(F("[MESSAGE] Priming complete for valve "), &Serial, currentClient, false);
-  sendMessage(String(i + 1).c_str(), &Serial, currentClient);
+  FlowSensor *sensor = flowSensors[i];
+  sendMessage(F("[MESSAGE] Priming complete for reagent line "), &Serial, currentClient, false);
+  sendMessage(String(i + 1).c_str(), &Serial, currentClient, false);
+
+  if (sensor)
+  {
+    sendMessage(F(". Dispensed "), &Serial, currentClient, false);
+    sendMessage(String(sensor->dispenseVolume, 1).c_str(), &Serial, currentClient, false);
+    sendMessage(F(" mL."), &Serial, currentClient);
+    stopFlowSensorMeasurement(*sensor);
+  }
+  else
+  {
+    sendMessage(F("."), &Serial, currentClient);
+  }
 
   valveControls[i].isPriming = false;
   primeModeSuccess[i] = true;
@@ -788,12 +836,17 @@ void waste_handleDrainTimeout(int trough, unsigned long drainDuration)
   valveControls[trough - 1].isDraining = false;
   valveControls[trough - 1].drainStartTime = 0;
 
+  // Determine the appropriate bottle index based on trough number
+  int bottleIdx = (trough <= 2) ? 0 : 1;
+
   // Handle valve control based on trough number
   switch (trough)
   {
   case 1:
     wasteValve1 = closeValve(wasteValve1);
     wasteValve3 = openValve(wasteValve3);
+    globalVacuumMonitoring[0] = true; // Enable vacuum monitoring
+    sendMessage(F("[DEBUG] Setting vacuum monitor for bottle 1 to ACTIVE (after drain timeout)"), &Serial, currentClient);
     break;
   case 2:
     wasteValve1 = closeValve(wasteValve1);
@@ -802,12 +855,17 @@ void waste_handleDrainTimeout(int trough, unsigned long drainDuration)
   case 3:
     wasteValve2 = closeValve(wasteValve2);
     wasteValve4 = openValve(wasteValve4);
+    globalVacuumMonitoring[1] = true; // Enable vacuum monitoring
+    sendMessage(F("[DEBUG] Setting vacuum monitor for bottle 2 to ACTIVE (after drain timeout)"), &Serial, currentClient);
     break;
   case 4:
     wasteValve2 = closeValve(wasteValve2);
     wasteValve4 = closeValve(wasteValve4);
     break;
   }
+
+  // Reset vacuum released flag to ensure we'll detect vacuum release
+  wasteVacuumReleased[bottleIdx] = false;
 
   sendMessage(F("[ERROR] Draining timeout for trough "), &Serial, currentClient, false);
   sendMessage(String(trough).c_str(), &Serial, currentClient, false);
@@ -821,14 +879,24 @@ void waste_handleBottleFull(int trough)
   valveControls[trough - 1].isDraining = false;
   valveControls[trough - 1].drainStartTime = 0;
 
+  // Determine the appropriate bottle index based on trough number
+  int bottleIdx = (trough <= 2) ? 0 : 1;
+
+  // Handle all relevant valves
   if (trough <= 2)
   {
     wasteValve1 = closeValve(wasteValve1);
+    wasteValve3 = closeValve(wasteValve3); // Also close secondary valve
   }
   else
   {
     wasteValve2 = closeValve(wasteValve2);
+    wasteValve4 = closeValve(wasteValve4); // Also close secondary valve
   }
+
+  // Since the bottle is full, we don't need to monitor vacuum
+  globalVacuumMonitoring[bottleIdx] = false;
+  wasteVacuumReleased[bottleIdx] = true; // Prevent further vacuum detection
 
   sendMessage(F("[ERROR] Draining halted for trough "), &Serial, currentClient, false);
   sendMessage(String(trough).c_str(), &Serial, currentClient, false);
@@ -840,11 +908,16 @@ void waste_handleDrainComplete(int trough)
   valveControls[trough - 1].isDraining = false;
   valveControls[trough - 1].drainStartTime = 0;
 
+  // Determine the appropriate bottle index based on trough number
+  int bottleIdx = (trough <= 2) ? 0 : 1;
+
   switch (trough)
   {
   case 1:
     wasteValve1 = closeValve(wasteValve1);
     wasteValve3 = openValve(wasteValve3);
+    globalVacuumMonitoring[0] = true;
+    sendMessage(F("[DEBUG] Setting vacuum monitor for bottle 1 to ACTIVE"), &Serial, currentClient);
     break;
   case 2:
     wasteValve1 = closeValve(wasteValve1);
@@ -853,12 +926,17 @@ void waste_handleDrainComplete(int trough)
   case 3:
     wasteValve2 = closeValve(wasteValve2);
     wasteValve4 = openValve(wasteValve4);
+    globalVacuumMonitoring[1] = true;
+    sendMessage(F("[DEBUG] Setting vacuum monitor for bottle 2 to ACTIVE"), &Serial, currentClient);
     break;
   case 4:
     wasteValve2 = closeValve(wasteValve2);
     wasteValve4 = closeValve(wasteValve4);
     break;
   }
+
+  // Ensure we'll detect vacuum release to close valves 3 and 4
+  wasteVacuumReleased[bottleIdx] = false;
 
   sendMessage(F("[MESSAGE] Draining complete for trough "), &Serial, currentClient, false);
   sendMessage(String(trough).c_str(), &Serial, currentClient);
@@ -869,12 +947,17 @@ void waste_handleMaxDrainTimeout(int trough, unsigned long drainDuration)
   valveControls[trough - 1].isDraining = false;
   valveControls[trough - 1].drainStartTime = 0;
 
+  // Determine the appropriate bottle index based on trough number
+  int bottleIdx = (trough <= 2) ? 0 : 1;
+
   // Handle valve controls
   switch (trough)
   {
   case 1:
     wasteValve1 = closeValve(wasteValve1);
     wasteValve3 = openValve(wasteValve3);
+    globalVacuumMonitoring[0] = true; // Enable vacuum monitoring
+    sendMessage(F("[DEBUG] Setting vacuum monitor for bottle 1 to ACTIVE (after max drain timeout)"), &Serial, currentClient);
     break;
   case 2:
     wasteValve1 = closeValve(wasteValve1);
@@ -883,12 +966,17 @@ void waste_handleMaxDrainTimeout(int trough, unsigned long drainDuration)
   case 3:
     wasteValve2 = closeValve(wasteValve2);
     wasteValve4 = openValve(wasteValve4);
+    globalVacuumMonitoring[1] = true; // Enable vacuum monitoring
+    sendMessage(F("[DEBUG] Setting vacuum monitor for bottle 2 to ACTIVE (after max drain timeout)"), &Serial, currentClient);
     break;
   case 4:
     wasteValve2 = closeValve(wasteValve2);
     wasteValve4 = closeValve(wasteValve4);
     break;
   }
+
+  // Reset vacuum released flag to ensure we'll detect vacuum release
+  wasteVacuumReleased[bottleIdx] = false;
 
   sendMessage(F("[ERROR] Draining timeout for trough "), &Serial, currentClient, false);
   sendMessage(String(trough).c_str(), &Serial, currentClient, false);
@@ -902,12 +990,16 @@ void waste_handleInitiationTimeout(int trough)
   valveControls[trough - 1].isDraining = false;
   valveControls[trough - 1].drainStartTime = 0;
 
-  // Handle valve controls
+  // Determine the appropriate bottle index based on trough number
+  int bottleIdx = (trough <= 2) ? 0 : 1;
+
   switch (trough)
   {
   case 1:
     wasteValve1 = closeValve(wasteValve1);
     wasteValve3 = openValve(wasteValve3);
+    globalVacuumMonitoring[0] = true; // Enable vacuum monitoring
+    sendMessage(F("[DEBUG] Setting vacuum monitor for bottle 1 to ACTIVE (after initiation timeout)"), &Serial, currentClient);
     break;
   case 2:
     wasteValve1 = closeValve(wasteValve1);
@@ -916,12 +1008,17 @@ void waste_handleInitiationTimeout(int trough)
   case 3:
     wasteValve2 = closeValve(wasteValve2);
     wasteValve4 = openValve(wasteValve4);
+    globalVacuumMonitoring[1] = true; // Enable vacuum monitoring
+    sendMessage(F("[DEBUG] Setting vacuum monitor for bottle 2 to ACTIVE (after initiation timeout)"), &Serial, currentClient);
     break;
   case 4:
     wasteValve2 = closeValve(wasteValve2);
     wasteValve4 = closeValve(wasteValve4);
     break;
   }
+
+  // Reset vacuum released flag to ensure we'll detect vacuum release
+  wasteVacuumReleased[bottleIdx] = false;
 
   sendMessage(F("[ERROR] Draining initiation timeout for trough "), &Serial, currentClient, false);
   sendMessage(String(trough).c_str(), &Serial, currentClient, false);
@@ -936,9 +1033,12 @@ void monitorVacuumRelease(unsigned long currentTime)
     if (!globalVacuumMonitoring[bottleIdx])
       continue;
 
-    // Check if vacuum has been released
-    if (!readBinarySensor(wasteVacuumSensors[bottleIdx]))
+    // Check if vacuum has been released - add debug output
+    bool vacuumPresent = readBinarySensor(wasteVacuumSensors[bottleIdx]);
+    if (!vacuumPresent)
     {
+      sendMessage(F("[DEBUG] Vacuum released detected for bottle "), &Serial, currentClient, false);
+      sendMessage(String(bottleIdx + 1).c_str(), &Serial, currentClient);
       vacuum_handleVacuumRelease(bottleIdx);
     }
   }
@@ -965,7 +1065,6 @@ void vacuum_handleVacuumRelease(int bottleIdx)
   if (hasActiveClient)
   {
     cm_commandCompleted(&currentClient);
-    cm_commandCompleted(&Serial);
   }
   else
   {
@@ -1136,8 +1235,8 @@ void resetPrimeMonitorState()
   {
     primeModeStartTime[i] = 0;
     primeStableDetectTime[i] = 0;
-    primeAdditionalTime[i] = 0;
     primeLowFlowTime[i] = 0;
+    primeVolumeTarget[i] = 0.0; // Reset volume target
     primeModeFailed[i] = false;
     primeModeSuccess[i] = false;
   }
