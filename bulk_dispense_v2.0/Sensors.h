@@ -50,4 +50,6 @@ void resetFlowSensorTotalVolume(FlowSensor &sensor);
 float readPressureVoltage(const PressureSensor &sensor);
 float readPressure(const PressureSensor &sensor);
 
+void initializeAllFlowSensors();
+
 #endif // SENSORS_H

@@ -85,72 +85,89 @@ FlowSensor createFlowSensor(uint8_t muxAddr, uint8_t addr, uint8_t chan, uint16_
   return sensor;
 }
 
+void initializeAllFlowSensors()
+{
+  sendMessage(F("[STATUS] Initializing all flow sensors..."), &Serial, currentClient);
+
+  for (int i = 0; i < NUM_FLOW_SENSORS; i++)
+  {
+    sendMessage(F("[STATUS] Initializing flow sensor "), &Serial, currentClient, false);
+    sendMessage(String(i + 1).c_str(), &Serial, currentClient);
+
+    // Try up to 3 times to initialize each sensor
+    bool success = false;
+    for (int attempt = 0; attempt < 3; attempt++)
+    {
+      // Add * to dereference the pointer
+      if (initializeFlowSensor(*flowSensors[i]))
+      {
+        success = true;
+        break;
+      }
+      delay(100);
+    }
+
+    if (success)
+    {
+      // Stop measurement until needed (but stay initialized)
+      // Add * to dereference the pointer
+      stopFlowSensorMeasurement(*flowSensors[i]);
+    }
+    else
+    {
+      sendMessage(F("[WARNING] Could not initialize flow sensor "), &Serial, currentClient, false);
+      sendMessage(String(i + 1).c_str(), &Serial, currentClient);
+    }
+  }
+
+  sendMessage(F("[STATUS] Flow sensor initialization complete"), &Serial, currentClient);
+}
+
 bool initializeFlowSensor(FlowSensor &sensor)
 {
-  static int resetAttempt = 0;
+  // Use local variable instead of static
+  int attempt = 0;
 
-  // Step 1: Select the multiplexer channel.
+  // Select multiplexer channel
   selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
-  delay(10); // Add delay after channel selection
+  delay(50);
 
-  // Step 2: Check sensor connection.
+  // First check if sensor is connected
   if (!isFlowSensorConnected(sensor))
   {
     sendMessage(F("[ERROR] Flow sensor on channel "), &Serial, currentClient, false);
     sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
-    sendMessage(F(" is not connected. Aborting initialization."), &Serial, currentClient);
+    sendMessage(F(" is not connected."), &Serial, currentClient);
     return false;
   }
-  delay(10); // Add delay after channel selection
 
-  // Step 3: On retry, attempt a soft reset.
-  if (resetAttempt > 0)
-  {
-    sendMessage(F("[DEBUG] Sending soft reset to sensor on channel "), &Serial, currentClient, false);
-    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
-    Wire.beginTransmission(sensor.sensorAddr);
-    Wire.write(0x00);
-    Wire.write(0x06);
-    if (Wire.endTransmission() != 0)
-    {
-      sendMessage(F("[WARNING] Soft reset command was not acknowledged."), &Serial, currentClient);
-      return false;
-    }
-    delay(50);
-    if (!isFlowSensorConnected(sensor))
-    {
-      sendMessage(F("[ERROR] Sensor did not respond after soft reset."), &Serial, currentClient);
-      return false;
-    }
-  }
+  // Try to reset sensor first
+  Wire.beginTransmission(sensor.sensorAddr);
+  Wire.write(0x00);
+  Wire.write(0x06);
+  Wire.endTransmission();
+  delay(100);
 
-  // Step 4: Start continuous measurement mode.
+  // Start measurement mode
   sendMessage(F("[DEBUG] Sending start measurement command to sensor on channel "), &Serial, currentClient, false);
   sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
+
   Wire.beginTransmission(sensor.sensorAddr);
   Wire.write(sensor.measurementCmd >> 8);
   Wire.write(sensor.measurementCmd & 0xFF);
   if (Wire.endTransmission() != 0)
   {
     sendMessage(F("[ERROR] Failed to start measurement mode."), &Serial, currentClient);
-    if (resetAttempt == 0)
-    {
-      resetAttempt++;
-      return initializeFlowSensor(sensor);
-    }
+    resetI2CBus(); // Reset the I2C bus if communication fails
     return false;
   }
-  delay(200);
 
-  // Step 5: Mark sensor as initialized and reset volume.
+  // Mark as initialized
   sensor.sensorInitialized = true;
-  sensor.sensorConnected = 1;
-  sensor.lastUpdateTime = millis();
+  sensor.sensorStopped = false;
   sensor.dispenseVolume = 0.0;
-  resetAttempt = 0;
-  sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
-  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
-  sendMessage(F(" successfully initialized."), &Serial, currentClient);
+  sensor.lastUpdateTime = millis();
+
   return true;
 }
 
@@ -234,85 +251,71 @@ bool readFlowSensorData(FlowSensor &sensor)
 
 bool startFlowSensorMeasurement(FlowSensor &sensor)
 {
-  sendMessage(F("[DEBUG] Attempting to start flow measurement for sensor on channel "), &Serial, currentClient, false);
+  sendMessage(F("[DEBUG] Starting flow measurement for sensor on channel "), &Serial, currentClient, false);
   sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
 
   // Check connection first
   if (!isFlowSensorConnected(sensor))
   {
-    sendMessage(F("[ERROR] Cannot start measurement for flow sensor on channel "), &Serial, currentClient, false);
-    sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
-    sendMessage(F(" because it is disconnected."), &Serial, currentClient);
+    sendMessage(F("[ERROR] Cannot start measurement - sensor not connected"), &Serial, currentClient);
+    sensor.sensorInitialized = false;
+    sensor.sensorStopped = true;
     return false;
   }
 
-  // If sensor was already in measurement mode, stop it first for a clean start
-  if (sensor.sensorInitialized && !sensor.sensorStopped)
-  {
-    stopFlowSensorMeasurement(sensor);
-    delay(50);
-  }
-
+  // ALWAYS mark as not stopped and do full initialization
   sensor.sensorStopped = false;
 
-  // Try to initialize multiple times
-  for (int i = 0; i < 3; i++)
+  // Simple approach: Always do full initialization
+  for (int attempt = 0; attempt < 3; attempt++)
   {
     sendMessage(F("[DEBUG] Attempt "), &Serial, currentClient, false);
-    sendMessage(String(i + 1).c_str(), &Serial, currentClient, false);
+    sendMessage(String(attempt + 1).c_str(), &Serial, currentClient, false);
     sendMessage(F(" to initialize sensor."), &Serial, currentClient);
 
     if (initializeFlowSensor(sensor))
     {
-      // Reset volume counters when starting a new measurement session
-      sensor.dispenseVolume = 0.0;
-      sensor.lastUpdateTime = millis();
-
-      sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
-      sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
-      sendMessage(F(" started measurement mode."), &Serial, currentClient);
+      sendMessage(F("[MESSAGE] Flow sensor started measurement mode."), &Serial, currentClient);
       return true;
     }
+
+    delay(100);
   }
 
-  sendMessage(F("[ERROR] Failed to start measurement for flow sensor on channel "), &Serial, currentClient, false);
-  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
+  // If all attempts fail, reset I2C bus
+  resetI2CBus();
   return false;
 }
 
 bool stopFlowSensorMeasurement(FlowSensor &sensor)
 {
-  if (sensor.sensorStopped)
+  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+  delay(50);
+
+  Wire.beginTransmission(sensor.sensorAddr);
+  Wire.write(0x3F);
+  Wire.write(0xF9);
+  int result = Wire.endTransmission();
+
+  if (result == 0)
   {
-    sendMessage(F("[INFO] Flow sensor on channel "), &Serial, currentClient, false);
+    sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
     sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
-    sendMessage(F(" already stopped."), &Serial, currentClient);
+    sendMessage(F(" stopped measurement mode."), &Serial, currentClient);
+
+    // ALWAYS mark as uninitialized when stopping - just like your prototype
+    sensor.sensorInitialized = false;
+    sensor.sensorStopped = true;
     return true;
   }
 
-  selectMultiplexerChannel(sensor.multiplexerAddr, sensor.channel);
+  // If failed, reset I2C bus
+  resetI2CBus();
 
-  // Try multiple times if needed
-  for (int attempt = 0; attempt < 3; attempt++)
-  {
-    Wire.beginTransmission(sensor.sensorAddr);
-    Wire.write(0x3F); // Stop command MSB
-    Wire.write(0xF9); // Stop command LSB
-    byte result = Wire.endTransmission();
+  // Still mark sensor as stopped even if command failed
+  sensor.sensorInitialized = false;
+  sensor.sensorStopped = true;
 
-    if (result == 0)
-    {
-      sendMessage(F("[MESSAGE] Flow sensor on channel "), &Serial, currentClient, false);
-      sendMessage(String(sensor.channel).c_str(), &Serial, currentClient, false);
-      sendMessage(F(" stopped measurement mode."), &Serial, currentClient);
-      sensor.sensorInitialized = false;
-      sensor.sensorStopped = true;
-      return true;
-    }
-  }
-
-  sendMessage(F("[ERROR] Failed to stop measurement for flow sensor on channel "), &Serial, currentClient, false);
-  sendMessage(String(sensor.channel).c_str(), &Serial, currentClient);
   return false;
 }
 

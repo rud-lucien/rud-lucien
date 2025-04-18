@@ -428,6 +428,31 @@ void closeDispenseValves(int troughNumber)
   sendMessage(String(troughNumber).c_str(), &Serial, currentClient);
 }
 
+// void stopDispenseOperation(int troughNumber, Stream *stream)
+// {
+//   if (valveControls[troughNumber - 1].isPriming)
+//   {
+//     sendMessage(F("[MESSAGE] Priming stopped for Trough "), stream, currentClient, false);
+//     sendMessage(String(troughNumber).c_str(), stream, currentClient);
+//     closeDispenseValves(troughNumber);
+//     valveControls[troughNumber - 1].isPriming = false;
+//     valveControls[troughNumber - 1].manualControl = false;
+//   }
+//   closeDispenseValves(troughNumber);
+//   FlowSensor *sensor = flowSensors[troughNumber - 1];
+//   if (sensor)
+//   {
+//     sendMessage(F("[MESSAGE] Trough "), stream, currentClient, false);
+//     sendMessage(String(troughNumber).c_str(), stream, currentClient, false);
+//     sendMessage(F(" Dispense Stopped. Total Volume: "), stream, currentClient, false);
+//     sendMessage(String(sensor->dispenseVolume, 1).c_str(), stream, currentClient, false);
+//     sendMessage(F(" mL."), stream, currentClient);
+//     stopFlowSensorMeasurement(*sensor);
+//     resetFlowSensorDispenseVolume(*sensor);
+//   }
+//   valveControls[troughNumber - 1].isDispensing = false;
+// }
+
 void stopDispenseOperation(int troughNumber, Stream *stream)
 {
   if (valveControls[troughNumber - 1].isPriming)
@@ -439,6 +464,7 @@ void stopDispenseOperation(int troughNumber, Stream *stream)
     valveControls[troughNumber - 1].manualControl = false;
   }
   closeDispenseValves(troughNumber);
+  
   FlowSensor *sensor = flowSensors[troughNumber - 1];
   if (sensor)
   {
@@ -447,9 +473,28 @@ void stopDispenseOperation(int troughNumber, Stream *stream)
     sendMessage(F(" Dispense Stopped. Total Volume: "), stream, currentClient, false);
     sendMessage(String(sensor->dispenseVolume, 1).c_str(), stream, currentClient, false);
     sendMessage(F(" mL."), stream, currentClient);
+    
+    // Only check I2C communication if the sensor was actually initialized
+    if (sensor->sensorInitialized) {
+      // First check if we can communicate with the sensor
+      selectMultiplexerChannel(sensor->multiplexerAddr, sensor->channel);
+      delay(20);
+      
+      Wire.beginTransmission(sensor->sensorAddr);
+      int commResult = Wire.endTransmission();
+      
+      // If communication failed, reset I2C bus before stopping measurement
+      if (commResult != 0) {
+        sendMessage(F("[WARNING] Flow sensor communication error, resetting I2C bus"), stream, currentClient);
+        resetI2CBus();
+      }
+    }
+    
+    // Stop measurement
     stopFlowSensorMeasurement(*sensor);
     resetFlowSensorDispenseVolume(*sensor);
   }
+  
   valveControls[troughNumber - 1].isDispensing = false;
 }
 

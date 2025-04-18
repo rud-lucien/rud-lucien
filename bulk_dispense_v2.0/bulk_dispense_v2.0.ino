@@ -106,31 +106,10 @@ void setup()
     flowSensors[i]->lastUpdateTime = 0;
     flowSensors[i]->isValidReading = false;
     flowSensors[i]->isIPA = false; // Default to water
-
-    // Test basic communication without full initialization
-    selectMultiplexerChannel(flowSensors[i]->multiplexerAddr, flowSensors[i]->channel);
-    delay(50);
-
-    Wire.beginTransmission(flowSensors[i]->sensorAddr);
-    uint8_t error = Wire.endTransmission();
-
-    if (error == 0)
-    {
-      Serial.print(F("[MESSAGE] Flow sensor "));
-      Serial.print(i);
-      Serial.println(F(" detected."));
-      flowSensors[i]->sensorConnected = 1;
-    }
-    else
-    {
-      Serial.print(F("[WARNING] Flow sensor "));
-      Serial.print(i);
-      Serial.println(F(" not detected."));
-    }
-    delay(50);
   }
 
-  Serial.println(F("[MESSAGE] Flow Sensors ready for initialization on demand."));
+  // Initialize all flow sensors at startup
+  initializeAllFlowSensors();
 
   // --- Initialize Temperature/Humidity Sensor ---
   if (!tempHumSensorInit())

@@ -47,9 +47,9 @@ static unsigned long enclosureLeakCheckTime = 0;
 static unsigned long enclosureLeakErrorTime = 0;
 
 // Constants
-const unsigned long PRIME_TIMEOUT_MS = 15000;
+const unsigned long PRIME_TIMEOUT_MS = 30000; // 30 seconds timeout
 const unsigned long STABLE_DETECTION_PERIOD_MS = 500;
-const unsigned long PRIMING_FLOW_TIMEOUT_MS = 15000;
+const unsigned long PRIMING_FLOW_TIMEOUT_MS = 30000; // 30 seconds timeout
 const float MIN_FLOW_RATE_PRIME = 5.0;
 
 // ============================================================
@@ -138,7 +138,7 @@ void monitorOverflowSensors(unsigned long currentTime)
 void monitorFlowSensors(unsigned long currentTime)
 {
   static unsigned long previousCheckTime = 0;
-  const unsigned long FLOW_TIMEOUT_MS = 5000;
+  const unsigned long FLOW_TIMEOUT_MS = 15000; // 15 seconds timeout
   const float MIN_FLOW_RATE_THRESHOLD = 1.0;
   const float MAX_TROUGH_VOLUME = 205.0;
 
@@ -561,8 +561,8 @@ void handlePrimingComplete(int i)
 void monitorFillSensors(unsigned long currentTime)
 {
   const float MAX_FILL_VOLUME_ML = 200.0;
-  const unsigned long MAX_FILL_TIME_MS = 60000;
-  const unsigned long FLOW_TIMEOUT_MS = 5000;
+  const unsigned long MAX_FILL_TIME_MS = 180000; // 3 minutes
+  const unsigned long FLOW_TIMEOUT_MS = 15000; // 15 seconds timeout
   const float MIN_FLOW_RATE_FILL = 1;
   const unsigned long SENSOR_CHECK_INTERVAL = 500;
 
@@ -692,9 +692,9 @@ void fill_handleOverflowCheck(int trough)
 
 void monitorWasteSensors(unsigned long currentTime)
 {
-  const unsigned long DRAIN_COMPLETE_DELAY = 3000;
-  const unsigned long MAX_DRAIN_TIME = 60000;
-  const unsigned long DRAIN_INITIATE_TIMEOUT = 25000;
+  const unsigned long DRAIN_COMPLETE_DELAY = 5000; // 5 seconds
+  const unsigned long MAX_DRAIN_TIME = 240000; // 4 minutes
+  const unsigned long DRAIN_INITIATE_TIMEOUT = 30000; // 30 seconds
 
   for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
   {
@@ -1201,13 +1201,37 @@ void temp_printWarning(float currentTemp, unsigned long currentTime, unsigned lo
 }
 
 // Flow Sensor Monitoring
+// void monitorFlowSensorConnections(unsigned long currentTime)
+// {
+//   static unsigned long flowSensorCheckTime = 0;
+//   const unsigned long PRINT_INTERVAL = 30000; // 30 seconds
+
+//   // Only check and print every 30 seconds
+//   if (currentTime - flowSensorCheckTime < PRINT_INTERVAL)
+//   {
+//     return;
+//   }
+//   flowSensorCheckTime = currentTime;
+
+//   FlowSensor *sensors[] = {&flow1, &flow2, &flow3, &flow4};
+//   for (int i = 0; i < NUM_FLOW_SENSORS; i++)
+//   {
+//     if (!isFlowSensorConnected(*sensors[i]))
+//     {
+//       sendMessage(F("[ERROR] Flow sensor on channel "), &Serial, currentClient, false);
+//       sendMessage(String(sensors[i]->channel).c_str(), &Serial, currentClient, false);
+//       sendMessage(F(" not connected."), &Serial, currentClient);
+//     }
+//   }
+// }
+
 void monitorFlowSensorConnections(unsigned long currentTime)
 {
   static unsigned long flowSensorCheckTime = 0;
-  const unsigned long PRINT_INTERVAL = 30000; // 30 seconds
+  const unsigned long CHECK_INTERVAL = 30000; // 30 seconds
 
-  // Only check and print every 30 seconds
-  if (currentTime - flowSensorCheckTime < PRINT_INTERVAL)
+  // Only check and attempt recovery every 30 seconds
+  if (currentTime - flowSensorCheckTime < CHECK_INTERVAL)
   {
     return;
   }
@@ -1216,11 +1240,32 @@ void monitorFlowSensorConnections(unsigned long currentTime)
   FlowSensor *sensors[] = {&flow1, &flow2, &flow3, &flow4};
   for (int i = 0; i < NUM_FLOW_SENSORS; i++)
   {
+    // Skip sensors that are actively dispensing
+    if (valveControls[i].isDispensing)
+    {
+      continue;
+    }
+    
     if (!isFlowSensorConnected(*sensors[i]))
     {
-      sendMessage(F("[ERROR] Flow sensor on channel "), &Serial, currentClient, false);
+      sendMessage(F("[WARNING] Flow sensor on channel "), &Serial, currentClient, false);
       sendMessage(String(sensors[i]->channel).c_str(), &Serial, currentClient, false);
-      sendMessage(F(" not connected."), &Serial, currentClient);
+      sendMessage(F(" not connected. Attempting to reinitialize..."), &Serial, currentClient);
+      
+      // Attempt to reinitialize the disconnected sensor
+      if (initializeFlowSensor(*sensors[i]))
+      {
+        // Success - make sure it's stopped but remains initialized
+        stopFlowSensorMeasurement(*sensors[i]);
+        sendMessage(F("[MESSAGE] Successfully reinitialized flow sensor on channel "), &Serial, currentClient, false);
+        sendMessage(String(sensors[i]->channel).c_str(), &Serial, currentClient);
+      }
+      else
+      {
+        // Report failure
+        sendMessage(F("[ERROR] Failed to reinitialize flow sensor on channel "), &Serial, currentClient, false);
+        sendMessage(String(sensors[i]->channel).c_str(), &Serial, currentClient);
+      }
     }
   }
 }
