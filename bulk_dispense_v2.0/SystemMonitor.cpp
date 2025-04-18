@@ -58,6 +58,11 @@ const float MIN_FLOW_RATE_PRIME = 5.0;
 
 void handleOverflowCondition(int triggeredTrough)
 {
+    // If in fill mode, let fill_handleOverflowCheck manage it instead
+    if (valveControls[triggeredTrough - 1].fillMode) {
+      return; // Exit early, don't interfere with fill mode
+    }
+  
   if (!valveControls[triggeredTrough - 1].isDispensing)
   {
     return;
@@ -90,6 +95,20 @@ void handleOverflowCondition(int triggeredTrough)
   valveControls[triggeredTrough - 1].lastFlowCheckTime = 0;
   valveControls[triggeredTrough - 1].lastFlowChangeTime = 0;
   valveControls[triggeredTrough - 1].dispensingValveNumber = -1;
+
+  // ADDED: Complete the command to reduce command count
+  if (!dispenseAsyncCompleted[triggeredTrough - 1])
+  {
+    if (hasActiveClient)
+    {
+      cm_commandCompleted(&currentClient);
+    }
+    else
+    {
+      cm_commandCompleted(&Serial);
+    }
+    dispenseAsyncCompleted[triggeredTrough - 1] = true;
+  }
 }
 
 void handleTimeoutCondition(int troughNumber)
