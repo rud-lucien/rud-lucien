@@ -58,11 +58,12 @@ const float MIN_FLOW_RATE_PRIME = 5.0;
 
 void handleOverflowCondition(int triggeredTrough)
 {
-    // If in fill mode, let fill_handleOverflowCheck manage it instead
-    if (valveControls[triggeredTrough - 1].fillMode) {
-      return; // Exit early, don't interfere with fill mode
-    }
-  
+  // If in fill mode, let fill_handleOverflowCheck manage it instead
+  if (valveControls[triggeredTrough - 1].fillMode)
+  {
+    return; // Exit early, don't interfere with fill mode
+  }
+
   if (!valveControls[triggeredTrough - 1].isDispensing)
   {
     return;
@@ -159,7 +160,7 @@ void monitorFlowSensors(unsigned long currentTime)
   static unsigned long previousCheckTime = 0;
   const unsigned long FLOW_TIMEOUT_MS = 30000; // 30 seconds timeout
   const float MIN_FLOW_RATE_THRESHOLD = 1.0;
-  const float MAX_TROUGH_VOLUME = 205.0;
+  const float MAX_TROUGH_VOLUME = 210.0;
 
   if (currentTime - previousCheckTime < 25)
   {
@@ -579,9 +580,9 @@ void handlePrimingComplete(int i)
 
 void monitorFillSensors(unsigned long currentTime)
 {
-  const float MAX_FILL_VOLUME_ML = 200.0;
+  const float MAX_FILL_VOLUME_ML = 230.0;
   const unsigned long MAX_FILL_TIME_MS = 240000; // 4 minutes
-  const unsigned long FLOW_TIMEOUT_MS = 30000; // 30 seconds timeout
+  const unsigned long FLOW_TIMEOUT_MS = 30000;   // 30 seconds timeout
   const float MIN_FLOW_RATE_FILL = 1;
   const unsigned long SENSOR_CHECK_INTERVAL = 500;
 
@@ -600,20 +601,20 @@ void monitorFillSensors(unsigned long currentTime)
     if (!sensor)
       continue;
 
-       // Initialize fill operation if needed
-       if (fillModeStartTime[i] == 0)
-       {
-         fillModeStartTime[i] = currentTime;
-         
-         // Start flow measurement explicitly - ADD THIS CODE
-         resetFlowSensorDispenseVolume(*sensor);
-         startFlowSensorMeasurement(*sensor);
-         sendMessage(F("[MESSAGE] Started flow measurement for fill mode on sensor "), &Serial, currentClient, false);
-         sendMessage(String(i + 1).c_str(), &Serial, currentClient);
-         
-         fillModeInitialVolume[i] = 0.0; // Reset to zero since we're starting fresh
-         fillModeLowFlowTime[i] = 0;
-       }
+    // Initialize fill operation if needed
+    if (fillModeStartTime[i] == 0)
+    {
+      fillModeStartTime[i] = currentTime;
+
+      // Start flow measurement explicitly - ADD THIS CODE
+      resetFlowSensorDispenseVolume(*sensor);
+      startFlowSensorMeasurement(*sensor);
+      sendMessage(F("[MESSAGE] Started flow measurement for fill mode on sensor "), &Serial, currentClient, false);
+      sendMessage(String(i + 1).c_str(), &Serial, currentClient);
+
+      fillModeInitialVolume[i] = 0.0; // Reset to zero since we're starting fresh
+      fillModeLowFlowTime[i] = 0;
+    }
 
     float addedVolume = sensor->dispenseVolume - fillModeInitialVolume[i];
 
@@ -688,20 +689,45 @@ void fill_handleFlowTimeout(int trough)
   fillModeStartTime[trough - 1] = 0;
 }
 
-
 void fill_handleOverflowCheck(int trough)
 {
   if (readBinarySensor(overflowSensors[trough - 1]))
   {
     // IMPORTANT: Reset flow timeout counter when we're purposely stopping flow
     fillModeLowFlowTime[trough - 1] = 0;
-    
+
     if (areDispenseValvesOpen(trough))
     {
       sendMessage(F("[MESSAGE] Overflow condition detected for trough "), &Serial, currentClient, false);
       sendMessage(String(trough).c_str(), &Serial, currentClient, false);
       sendMessage(F(" - temporarily closing valves to prevent overfill."), &Serial, currentClient);
       closeDispenseValves(trough);
+
+      // Reset volume counter when overflow occurs - this is important to prevent the
+      // system from eventually hitting the MAX_FILL_VOLUME_ML safety limit
+      FlowSensor *sensor = flowSensors[trough - 1];
+      if (sensor)
+      {
+        float previousVolume = sensor->dispenseVolume;
+        resetFlowSensorDispenseVolume(*sensor);
+        fillModeInitialVolume[trough - 1] = 0.0;
+
+        // Log the volume reset
+        sendMessage(F("[MESSAGE] Reset flow volume counter from "), &Serial, currentClient, false);
+        sendMessage(String(previousVolume, 1).c_str(), &Serial, currentClient, false);
+        sendMessage(F(" to 0.0 mL for trough "), &Serial, currentClient, false);
+        sendMessage(String(trough).c_str(), &Serial, currentClient);
+
+        // ALSO reset the time counter to prevent MAX_FILL_TIME_MS timeout
+        unsigned long previousTime = fillModeStartTime[trough - 1];
+        fillModeStartTime[trough - 1] = millis(); // Reset to current time
+
+        // Log the time reset
+        sendMessage(F("[MESSAGE] Reset fill time counter after "), &Serial, currentClient, false);
+        sendMessage(String((millis() - previousTime) / 1000).c_str(), &Serial, currentClient, false);
+        sendMessage(F(" seconds for trough "), &Serial, currentClient, false);
+        sendMessage(String(trough).c_str(), &Serial, currentClient);
+      }
     }
   }
   else
@@ -723,8 +749,8 @@ void fill_handleOverflowCheck(int trough)
 
 void monitorWasteSensors(unsigned long currentTime)
 {
-  const unsigned long DRAIN_COMPLETE_DELAY = 5000; // 5 seconds
-  const unsigned long MAX_DRAIN_TIME = 240000; // 4 minutes
+  const unsigned long DRAIN_COMPLETE_DELAY = 5000;    // 5 seconds
+  const unsigned long MAX_DRAIN_TIME = 240000;        // 4 minutes
   const unsigned long DRAIN_INITIATE_TIMEOUT = 30000; // 30 seconds
 
   for (int sensorIdx = 0; sensorIdx < 2; sensorIdx++)
@@ -1231,7 +1257,6 @@ void temp_printWarning(float currentTemp, unsigned long currentTime, unsigned lo
   }
 }
 
-
 void monitorFlowSensorConnections(unsigned long currentTime)
 {
   static unsigned long flowSensorCheckTime = 0;
@@ -1252,13 +1277,13 @@ void monitorFlowSensorConnections(unsigned long currentTime)
     {
       continue;
     }
-    
+
     if (!isFlowSensorConnected(*sensors[i]))
     {
       sendMessage(F("[WARNING] Flow sensor on channel "), &Serial, currentClient, false);
       sendMessage(String(sensors[i]->channel).c_str(), &Serial, currentClient, false);
       sendMessage(F(" not connected. Attempting to reinitialize..."), &Serial, currentClient);
-      
+
       // Attempt to reinitialize the disconnected sensor
       if (initializeFlowSensor(*sensors[i]))
       {

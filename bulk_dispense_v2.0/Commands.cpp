@@ -1248,7 +1248,7 @@ void cmd_get_system_state(char *args, CommandCaller *caller)
   caller->println();
 
   // Priming, Dispensing, Filling, Draining Status
-  caller->println(F("Priming Status:"));
+  caller->println(F("Priming Mode Status:"));
   for (int i = 0; i < 4; i++)
   {
     caller->print(F("  • Trough "));
@@ -1258,7 +1258,28 @@ void cmd_get_system_state(char *args, CommandCaller *caller)
   }
   caller->println();
 
-  caller->println(F("Dispensing Status:"));
+  // Bubble Sensor Status
+  caller->println(F("Bubble Sensor State (Line Primed):"));
+  for (int i = 0; i < 4; i++)
+  {
+    caller->print(F("  • Trough "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+
+    bool bubbleSensorState = readBinarySensor(reagentBubbleSensors[i]);
+
+    if (bubbleSensorState)
+    {
+      caller->println(F("PRIMED (Liquid present)"));
+    }
+    else
+    {
+      caller->println(F("NOT PRIMED (Air detected)"));
+    }
+  }
+  caller->println();
+
+  caller->println(F("Dispensing Mode Status:"));
   for (int i = 0; i < 4; i++)
   {
     caller->print(F("  • Trough "));
@@ -1268,23 +1289,65 @@ void cmd_get_system_state(char *args, CommandCaller *caller)
   }
   caller->println();
 
-  caller->println(F("Filling Status:"));
+  caller->println(F("Fill Mode Status:"));
   for (int i = 0; i < 4; i++)
   {
     caller->print(F("  • Trough "));
     caller->print(i + 1);
     caller->print(F(": "));
-    caller->println(valveControls[i].fillMode ? F("FILLING") : F("NOT FILLING"));
+    caller->println(valveControls[i].fillMode ? F("ENABLED") : F("DISABLED"));
   }
   caller->println();
 
-  caller->println(F("Draining Status:"));
+  // Trough fill level based on overflow sensors
+  caller->println(F("Trough Fill Level State:"));
+  for (int i = 0; i < 4; i++)
+  {
+    caller->print(F("  • Trough "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+
+    bool overflowSensorState = readBinarySensor(overflowSensors[i]);
+
+    if (overflowSensorState)
+    {
+      caller->println(F("FULL (Overflow detected)"));
+    }
+    else
+    {
+      caller->println(F("NOT FULL"));
+    }
+  }
+  caller->println();
+
+  caller->println(F("Drain Mode Status:"));
   for (int i = 0; i < 4; i++)
   {
     caller->print(F("  • Trough "));
     caller->print(i + 1);
     caller->print(F(": "));
     caller->println(valveControls[i].isDraining ? F("DRAINING") : F("NOT DRAINING"));
+  }
+  caller->println();
+
+  // Waste Bottle Status
+  caller->println(F("Waste Bottle State:"));
+  for (int i = 0; i < 2; i++)
+  {
+    caller->print(F("  • Waste Bottle "));
+    caller->print(i + 1);
+    caller->print(F(": "));
+
+    bool wasteBottleSensorState = readBinarySensor(wasteBottleSensors[i]);
+
+    if (wasteBottleSensorState)
+    {
+      caller->println(F("FULL (Attention needed)"));
+    }
+    else
+    {
+      caller->println(F("NOT FULL (OK)"));
+    }
   }
   caller->println();
 
