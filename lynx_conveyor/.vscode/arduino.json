@@ -1,0 +1,5 @@
+{
+    "board": "ClearCore:sam:clearcore",
+    "port": "COM7",
+    "sketch": "lynx_conveyor.ino"
+}

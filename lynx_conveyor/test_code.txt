@@ -1,0 +1,271 @@
+/*
+ Name:		lynx_linear_actuator.ino
+ Created:	4/14/2025 12:00:17 PM
+ Author:	rlucien
+*/
+
+#include "Arduino.h"
+#include "ClearCore.h"
+
+// Specify which ClearCore serial COM port is connected to the "COM IN" port
+// of the CCIO-8 board. COM-1 may also be used.
+#define CcioPort ConnectorCOM0
+
+uint8_t ccioBoardCount; // Store the number of connected CCIO-8 boards here.
+uint8_t ccioPinCount;   // Store the number of connected CCIO-8 pins here.
+
+// These will be used to format the text that is printed to the serial port.
+#define MAX_MSG_LEN 80
+char msg[MAX_MSG_LEN + 1];
+
+// Set this flag to true to use the CCIO-8 connectors as digital inputs.
+// Set it to false to use the CCIO-8 connectors as digital outputs.
+const bool inputMode = false;
+
+// Definition for IO1 and IO2 pins (ClearCore connectors)
+// These constants are needed to map ClearCore connectors to pins for Arduino API
+#define TRAY_1_LOCK_PIN 0     // IO-0 connector
+#define TRAY_1_UNLOCK_PIN 1   // IO-1 connector
+#define TRAY_2_LOCK_PIN 2     // IO-2 connector
+#define TRAY_2_UNLOCK_PIN 3   // IO-3 connector
+#define TRAY_3_LOCK_PIN 4     // IO-4 connector
+#define TRAY_3_UNLOCK_PIN 5   // IO-5 connector
+#define SHUTTLE_LOCK_PIN 64   // IO-6 connector
+#define SHUTTLE_UNLOCK_PIN 65 // IO-7 connector
+
+enum ValvePosition
+{
+    VALVE_POSITION_UNLOCK,
+    VALVE_POSITION_LOCK
+};
+
+struct DoubleSolenoidValve
+{
+    int unlockPin;
+    int lockPin;
+    ValvePosition position;
+};
+
+// Minimum recommended pulse duration in milliseconds
+const unsigned long PULSE_DURATION = 100;
+
+void valveInit(DoubleSolenoidValve &valve)
+{
+    // Set up pins
+    pinMode(valve.unlockPin, OUTPUT);
+    digitalWrite(valve.unlockPin, LOW);
+    pinMode(valve.lockPin, OUTPUT);
+    digitalWrite(valve.lockPin, LOW);
+
+    // Force physical position to unlocked
+    digitalWrite(valve.unlockPin, HIGH);
+    delay(PULSE_DURATION);
+    digitalWrite(valve.unlockPin, LOW);
+
+    // Set software state
+    valve.position = VALVE_POSITION_UNLOCK;
+}
+
+void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target)
+{
+    // Don't do anything if already in the requested position
+    if (valve.position == target)
+    {
+        return;
+    }
+
+    // Activate the appropriate coil based on the target position
+    if (target == VALVE_POSITION_UNLOCK)
+    {
+        digitalWrite(valve.unlockPin, HIGH);
+        delay(PULSE_DURATION);              // Hold for the minimum pulse time
+        digitalWrite(valve.unlockPin, LOW); // Turn off the coil after actuation
+    }
+    else
+    {
+        digitalWrite(valve.lockPin, HIGH);
+        delay(PULSE_DURATION);            // Hold for the minimum pulse time
+        digitalWrite(valve.lockPin, LOW); // Turn off the coil after actuation
+    }
+
+    // Update the position state
+    valve.position = target;
+}
+
+void valveDeactivate(DoubleSolenoidValve &valve)
+{
+    digitalWrite(valve.unlockPin, LOW);
+    digitalWrite(valve.lockPin, LOW);
+    // Note: This doesn't change the physical valve position,
+    // it just ensures no coil is energized
+}
+
+ValvePosition valveGetPosition(const DoubleSolenoidValve &valve)
+{
+    return valve.position;
+}
+
+DoubleSolenoidValve tray1Valve;
+DoubleSolenoidValve tray2Valve;
+DoubleSolenoidValve tray3Valve;
+DoubleSolenoidValve shuttleValve;
+
+// the setup function runs once when you press reset or power the board
+void setup()
+{
+    Serial.begin(115200); // Use Arduino's Serial instead of ConnectorUsb
+
+    // Set up the CCIO-8 COM port.
+    CcioPort.Mode(Connector::CCIO);
+    CcioPort.PortOpen();
+
+    // Initialize the CCIO-8 board.
+    ccioBoardCount = CcioMgr.CcioCount();
+    ccioPinCount = ccioBoardCount * CCIO_PINS_PER_BOARD;
+
+    // Wait for USB serial to connect (needed for native USB port only)
+    while (!Serial)
+    {
+        ; // wait for serial port to connect
+    }
+
+    Serial.println("Initializing valves...");
+
+    // Print the number of discovered CCIO-8 boards to the serial port.
+    snprintf(msg, MAX_MSG_LEN, "Discovered %d CCIO-8 board", ccioBoardCount);
+    Serial.print(msg);
+    if (ccioBoardCount != 1)
+    {
+        Serial.print("s");
+    }
+    Serial.println("...");
+
+    // Initialize main board valves
+    tray1Valve.unlockPin = TRAY_1_UNLOCK_PIN;
+    tray1Valve.lockPin = TRAY_1_LOCK_PIN;
+    tray2Valve.unlockPin = TRAY_2_UNLOCK_PIN;
+    tray2Valve.lockPin = TRAY_2_LOCK_PIN;
+    tray3Valve.unlockPin = TRAY_3_UNLOCK_PIN;
+    tray3Valve.lockPin = TRAY_3_LOCK_PIN;
+
+    // Initialize the tray valves
+    valveInit(tray1Valve);
+    valveInit(tray2Valve);
+    valveInit(tray3Valve);
+
+    // Configure CCIO pins - This is the critical part!
+    // Follow exactly like the example does
+    if (ccioBoardCount > 0)
+    {
+        Serial.println("Configuring CCIO pins...");
+        // Explicitly set each CCIO pin we need as an output, one by one
+        pinMode(SHUTTLE_LOCK_PIN, OUTPUT);
+        pinMode(SHUTTLE_UNLOCK_PIN, OUTPUT);
+
+        // Initialize shuttle valve only after configuring its pins
+        shuttleValve.unlockPin = SHUTTLE_UNLOCK_PIN;
+        shuttleValve.lockPin = SHUTTLE_LOCK_PIN;
+        valveInit(shuttleValve);
+    }
+    else
+    {
+        Serial.println("WARNING: No CCIO-8 boards detected! Shuttle valve will not function.");
+    }
+
+    Serial.println("5/2-way valve controller initialized");
+    Serial.println("Type 'help' for available commands");
+}
+
+// the loop function runs over and over again until power down or reset
+void loop()
+{
+    // Check if there's data available to read from Serial
+    if (Serial.available() > 0)
+    {
+        // Read the incoming command
+        String command = Serial.readStringUntil('\n');
+        command.trim(); // Remove any whitespace
+
+        // Convert to lowercase for case-insensitive comparison
+        command.toLowerCase();
+
+        // Process the command
+        if (command == "tray 1 l" || command == "t1l")
+        {
+            Serial.println("Command received: Locking tray 1");
+            valveSetPosition(tray1Valve, VALVE_POSITION_LOCK);
+        }
+        else if (command == "tray 1 ul" || command == "t1ul")
+        {
+            Serial.println("Command received: Unlocking tray 1");
+            valveSetPosition(tray1Valve, VALVE_POSITION_UNLOCK);
+        }
+        else if (command == "tray 2 l" || command == "t2l")
+        {
+            Serial.println("Command received: Locking tray 2");
+            valveSetPosition(tray2Valve, VALVE_POSITION_LOCK);
+        }
+        else if (command == "tray 2 ul" || command == "t2ul")
+        {
+            Serial.println("Command received: Unlocking tray 2");
+            valveSetPosition(tray2Valve, VALVE_POSITION_UNLOCK);
+        }
+        else if (command == "tray 3 l" || command == "t3l")
+        {
+            Serial.println("Command received: Locking tray 3");
+            valveSetPosition(tray3Valve, VALVE_POSITION_LOCK);
+        }
+        else if (command == "tray 3 ul" || command == "t3ul")
+        {
+            Serial.println("Command received: Unlocking tray 3");
+            valveSetPosition(tray3Valve, VALVE_POSITION_UNLOCK);
+        }
+        else if (command == "shuttle l" || command == "sl")
+        {
+            Serial.println("Command received: Locking shuttle");
+
+            valveSetPosition(shuttleValve, VALVE_POSITION_LOCK);
+        }
+        else if (command == "shuttle ul" || command == "sul")
+        {
+            Serial.println("Command received: Unlocking shuttle");
+
+            valveSetPosition(shuttleValve, VALVE_POSITION_UNLOCK);
+        }
+        else if (command == "status" || command == "s")
+        {
+            // Report the current status
+            Serial.println("Current valve positions:");
+            Serial.print("Tray 1: ");
+            Serial.println(valveGetPosition(tray1Valve) == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
+            Serial.print("Tray 2: ");
+            Serial.println(valveGetPosition(tray2Valve) == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
+            Serial.print("Tray 3: ");
+            Serial.println(valveGetPosition(tray3Valve) == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
+            Serial.print("Shuttle: ");
+            Serial.println(valveGetPosition(shuttleValve) == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
+        }
+        else if (command == "help" || command == "h")
+        {
+            // Display available commands
+            Serial.println("Available commands:");
+            Serial.println("Tray commands:");
+            Serial.println("  tray 1 l or t1l - Lock tray 1");
+            Serial.println("  tray 1 ul or t1ul - Unlock tray 1");
+            Serial.println("  tray 2 l or t2l - Lock tray 2");
+            Serial.println("  tray 2 ul or t2ul - Unlock tray 2");
+            Serial.println("  tray 3 l or t3l - Lock tray 3");
+            Serial.println("  tray 3 ul or t3ul - Unlock tray 3");
+            Serial.println("Shuttle commands:");
+            Serial.println("  shuttle l or sl - Lock shuttle");
+            Serial.println("  shuttle ul or sul - Unlock shuttle");
+            Serial.println("General commands:");
+            Serial.println("  status or s - Display current valve positions");
+            Serial.println("  help or h - Show this help message");
+        }
+        else
+        {
+            Serial.println("Unknown command. Type 'help' for available commands.");
+        }
+    }
+}
