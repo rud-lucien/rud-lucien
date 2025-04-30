@@ -6,237 +6,45 @@
 
 #include "Arduino.h"
 #include "ClearCore.h"
+#include "ValveController.h"
+#include "MotorController.h"
+#include "Logging.h"
 
-// Specify which ClearCore serial COM port is connected to the "COM IN" port
-// of the CCIO-8 board. COM-1 may also be used.
+// Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
 
-uint8_t ccioBoardCount; // Store the number of connected CCIO-8 boards here.
-uint8_t ccioPinCount;   // Store the number of connected CCIO-8 pins here.
+uint8_t ccioBoardCount; // Store the number of connected CCIO-8 boards here
+uint8_t ccioPinCount;   // Store the number of connected CCIO-8 pins here
 
-// These will be used to format the text that is printed to the serial port.
+// For formatting text printed to serial port
 #define MAX_MSG_LEN 80
 char msg[MAX_MSG_LEN + 1];
 
-// Set this flag to true to use the CCIO-8 connectors as digital inputs.
-// Set it to false to use the CCIO-8 connectors as digital outputs.
+// Set to true to use CCIO-8 connectors as digital inputs
 const bool inputMode = false;
 
-// Definition for IO1 and IO2 pins (ClearCore connectors)
-// These constants are needed to map ClearCore connectors to pins for Arduino API
-#define TRAY_1_LOCK_PIN 0     // IO-0 connector
-#define TRAY_1_UNLOCK_PIN 1   // IO-1 connector
-#define TRAY_2_LOCK_PIN 2     // IO-2 connector
-#define TRAY_2_UNLOCK_PIN 3   // IO-3 connector
-#define TRAY_3_LOCK_PIN 4     // IO-4 connector
-#define TRAY_3_UNLOCK_PIN 5   // IO-5 connector
-#define SHUTTLE_LOCK_PIN 64   // IO-6 connector
-#define SHUTTLE_UNLOCK_PIN 65 // IO-7 connector
-
-// 1. Define constants and enums first
-enum ValvePosition {
-    VALVE_POSITION_UNLOCK,
-    VALVE_POSITION_LOCK
-};
-
-// 2. Define struct types
-struct DoubleSolenoidValve {
-    int unlockPin;
-    int lockPin;
-    ValvePosition position;
-};
-
-// 3. Declare valve variables
-DoubleSolenoidValve tray1Valve;
-DoubleSolenoidValve tray2Valve;
-DoubleSolenoidValve tray3Valve;
-DoubleSolenoidValve shuttleValve;
-
-// 4. Set up arrays that reference the valves
-DoubleSolenoidValve* allValves[] = {&tray1Valve, &tray2Valve, &tray3Valve, &shuttleValve};
-const int valveCount = 4;
-const char* valveNames[] = {"Tray 1", "Tray 2", "Tray 3", "Shuttle"};
-
-// Define sensor pins
-#define TRAY_1_SENSOR_PIN DI6    // Connect Tray 1 sensor to DI-6
-#define TRAY_2_SENSOR_PIN DI7    // Connect Tray 2 sensor to DI-7
-#define TRAY_3_SENSOR_PIN DI8    // Connect Tray 3 sensor to DI-8
-#define SHUTTLE_SENSOR_PIN A9   // Connect Shuttle sensor to DI-9
-
-// Sensor state structure
-struct CylinderSensor {
-    int pin;
-    bool lastState;
-};
-
-// Declare sensor variables
-CylinderSensor tray1Sensor;
-CylinderSensor tray2Sensor;
-CylinderSensor tray3Sensor;
-CylinderSensor shuttleSensor;
-
-// Array of all sensors
-CylinderSensor* allSensors[] = {&tray1Sensor, &tray2Sensor, &tray3Sensor, &shuttleSensor};
-const int sensorCount = 4;
-
-// Minimum recommended pulse duration in milliseconds
-const unsigned long PULSE_DURATION = 100;
-
-// Pure function for pulsing pins
-void pulsePin(int pin, unsigned long duration) {
-    digitalWrite(pin, HIGH);
-    delay(duration);
-    digitalWrite(pin, LOW);
-}
-
-// Pin configuration function
-void configurePinAsOutput(int pin) {
-    pinMode(pin, OUTPUT);
-    digitalWrite(pin, LOW);
-}
-
-// Configure pins for a valve
-void configureValvePins(const DoubleSolenoidValve &valve) {
-    configurePinAsOutput(valve.unlockPin);
-    configurePinAsOutput(valve.lockPin);
-}
-
-// Get the appropriate pin based on target position
-int getActivationPin(const DoubleSolenoidValve &valve, ValvePosition target) {
-    return (target == VALVE_POSITION_UNLOCK) ? valve.unlockPin : valve.lockPin;
-}
-
-
-void valveInit(DoubleSolenoidValve &valve) {
-    // Configure pins
-    configureValvePins(valve);
-    
-    // Force physical position to unlocked
-    pulsePin(valve.unlockPin, PULSE_DURATION);
-    
-    // Set software state
-    valve.position = VALVE_POSITION_UNLOCK;
-}
-
-
-void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target) {
-    // Don't do anything if already in the requested position
-    if (valve.position == target) {
-        return;
-    }
-    
-    // Get the appropriate pin and pulse it
-    int pinToActivate = getActivationPin(valve, target);
-    pulsePin(pinToActivate, PULSE_DURATION);
-    
-    // Update the position state
-    valve.position = target;
-}
-
-
-void valveDeactivate(DoubleSolenoidValve &valve) {
-    digitalWrite(valve.unlockPin, LOW);
-    digitalWrite(valve.lockPin, LOW);
-    // Note: This doesn't change the physical valve position,
-    // it just ensures no coil is energized
-}
-
-// Higher-order function for valve operations
-void withValve(DoubleSolenoidValve &valve, void (*operation)(DoubleSolenoidValve&)) {
-    operation(valve);
-}
-
-// Operations that can be passed to withValve
-void unlockValve(DoubleSolenoidValve &valve) {
-    valveSetPosition(valve, VALVE_POSITION_UNLOCK);
-}
-
-void lockValve(DoubleSolenoidValve &valve) {
-    valveSetPosition(valve, VALVE_POSITION_LOCK);
-}
-
-void deactivateValve(DoubleSolenoidValve &valve) {
-    valveDeactivate(valve);
-}
-
-// Print valve status
-void printValveStatus(const DoubleSolenoidValve &valve, const char* valveName) {
-    Serial.print(valveName);
-    Serial.print(": ");
-    Serial.println(valve.position == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
-}
-
-// Function to apply an operation to multiple valves
-void withAllValves(void (*operation)(DoubleSolenoidValve&)) {
-    for (int i = 0; i < valveCount; i++) {
-        // Skip shuttle valve if no CCIO board
-        if (i == 3 && ccioBoardCount == 0) continue;
-        withValve(*allValves[i], operation);
-    }
-}
-
-// Function to print status of all valves
-void printAllValveStatus() {
-    Serial.println("Current valve positions:");
-    for (int i = 0; i < valveCount; i++) {
-        // Skip shuttle valve if no CCIO board
-        if (i == 3 && ccioBoardCount == 0) continue;
-        printValveStatus(*allValves[i], valveNames[i]);
-    }
-}
-
-// Initialize sensor
-void sensorInit(CylinderSensor &sensor, int pin) {
-    sensor.pin = pin;
-    pinMode(pin, INPUT);
-    sensor.lastState = digitalRead(pin);
-}
-
-// Read sensor state
-bool sensorRead(CylinderSensor &sensor) {
-    bool currentState = digitalRead(sensor.pin);
-    sensor.lastState = currentState;
-    return currentState;
-}
-
-// Print sensor status
-void printSensorStatus(const CylinderSensor &sensor, const char* sensorName) {
-    Serial.print(sensorName);
-    Serial.print(" Sensor: ");
-    Serial.println(sensorRead(const_cast<CylinderSensor&>(sensor)) ? "Not activated" : "Activated");
-}
-
-// Function to print status of all sensors
-void printAllSensorStatus() {
-    Serial.println("Current sensor readings:");
-    for (int i = 0; i < sensorCount; i++) {
-        printSensorStatus(*allSensors[i], valveNames[i]);  // Reuse valve names for sensors
-    }
-}
-
-
-// the setup function runs once when you press reset or power the board
+// The setup function
 void setup()
 {
-    Serial.begin(115200); // Use Arduino's Serial instead of ConnectorUsb
+    Serial.begin(115200);
 
-    // Set up the CCIO-8 COM port.
+    // Set up and detect CCIO-8 boards
     CcioPort.Mode(Connector::CCIO);
     CcioPort.PortOpen();
-
-    // Initialize the CCIO-8 board.
+    // Get count of CCIO-8 boards
     ccioBoardCount = CcioMgr.CcioCount();
-    ccioPinCount = ccioBoardCount * CCIO_PINS_PER_BOARD;
+    ccioPinCount = 0;
 
-    // Wait for USB serial to connect (needed for native USB port only)
-    while (!Serial)
+    // Count available pins by checking each board
+    for (int i = 0; i < ccioBoardCount; i++)
     {
-        ; // wait for serial port to connect
+        // Count 8 pins per board
+        ccioPinCount += 8;
     }
+    // Get count of CCIO-8 boards
+    ccioBoardCount = CcioMgr.CcioCount();
+    ccioPinCount = ccioBoardCount * 8; // Each CCIO-8 board has 8 pins
 
-    Serial.println("Initializing valves...");
-
-    // Print the number of discovered CCIO-8 boards to the serial port.
     snprintf(msg, MAX_MSG_LEN, "Discovered %d CCIO-8 board", ccioBoardCount);
     Serial.print(msg);
     if (ccioBoardCount != 1)
@@ -245,64 +53,37 @@ void setup()
     }
     Serial.println("...");
 
-    // Initialize main board valves
-    tray1Valve.unlockPin = TRAY_1_UNLOCK_PIN;
-    tray1Valve.lockPin = TRAY_1_LOCK_PIN;
-    tray2Valve.unlockPin = TRAY_2_UNLOCK_PIN;
-    tray2Valve.lockPin = TRAY_2_LOCK_PIN;
-    tray3Valve.unlockPin = TRAY_3_UNLOCK_PIN;
-    tray3Valve.lockPin = TRAY_3_LOCK_PIN;
-
-    // Initialize the tray valves
-    valveInit(tray1Valve);
-    valveInit(tray2Valve);
-    valveInit(tray3Valve);
-
-    // Configure CCIO pins - This is the critical part!
-    // Follow exactly like the example does
-    if (ccioBoardCount > 0)
-    {
-        Serial.println("Configuring CCIO pins...");
-        // Explicitly set each CCIO pin we need as an output, one by one
-        pinMode(SHUTTLE_LOCK_PIN, OUTPUT);
-        pinMode(SHUTTLE_UNLOCK_PIN, OUTPUT);
-
-        // Initialize shuttle valve only after configuring its pins
-        shuttleValve.unlockPin = SHUTTLE_UNLOCK_PIN;
-        shuttleValve.lockPin = SHUTTLE_LOCK_PIN;
-        valveInit(shuttleValve);
-    }
-    else
-    {
-        Serial.println("WARNING: No CCIO-8 boards detected! Shuttle valve will not function.");
-    }
-
-    // Initialize sensors
-    Serial.println("Initializing cylinder position sensors...");
-
-    // // Configure A9 as digital input
-    // pinMode(A9, INPUT);
-    
-    tray1Sensor.pin = TRAY_1_SENSOR_PIN;
-    tray2Sensor.pin = TRAY_2_SENSOR_PIN;
-    tray3Sensor.pin = TRAY_3_SENSOR_PIN;
-    shuttleSensor.pin = SHUTTLE_SENSOR_PIN;
-    
-    // Initialize all sensors
-    sensorInit(tray1Sensor, TRAY_1_SENSOR_PIN);
-    sensorInit(tray2Sensor, TRAY_2_SENSOR_PIN);
-    sensorInit(tray3Sensor, TRAY_3_SENSOR_PIN);
-    sensorInit(shuttleSensor, SHUTTLE_SENSOR_PIN);
-    
-    Serial.println("Cylinder sensors initialized");
+    // Initialize valve controller
+    Serial.println("Initializing valve controller...");
+    initValveSystem();
+    initValveWithCCIO(ccioBoardCount > 0);
 
     Serial.println("5/2-way valve controller initialized");
+
+    // Don't initialize the motor automatically
+    Serial.println("Motor controller ready for initialization.");
+    Serial.println("Use 'motor init' command to initialize the motor.");
+
     Serial.println("Type 'help' for available commands");
 }
 
-// the loop function runs over and over again until power down or reset
+// The main loop
 void loop()
 {
+    unsigned long currentTime = millis();
+    
+    // Check and update motor state
+    updateMotorState();
+    
+    // Check homing progress if in progress
+    if (motorState == MOTOR_STATE_HOMING) {
+        checkHomingProgress();
+    }
+    // Check movement progress if moving
+    else if (motorState == MOTOR_STATE_MOVING) {
+        checkMoveProgress();
+    }
+    
     // Check if there's data available to read from Serial
     if (Serial.available() > 0)
     {
@@ -317,77 +98,272 @@ void loop()
         if (command == "tray 1 l" || command == "t1l")
         {
             Serial.println("Command received: Locking tray 1");
-            withValve(tray1Valve, lockValve);
+            DoubleSolenoidValve *valve = getValveByIndex(0);
+            if (valve)
+                lockValve(*valve);
         }
         else if (command == "tray 1 ul" || command == "t1ul")
         {
             Serial.println("Command received: Unlocking tray 1");
-            withValve(tray1Valve, unlockValve);
+            DoubleSolenoidValve *valve = getValveByIndex(0);
+            if (valve)
+                unlockValve(*valve);
         }
         else if (command == "tray 2 l" || command == "t2l")
         {
             Serial.println("Command received: Locking tray 2");
-            withValve(tray2Valve, lockValve);
+            DoubleSolenoidValve *valve = getValveByIndex(1);
+            if (valve)
+                lockValve(*valve);
         }
         else if (command == "tray 2 ul" || command == "t2ul")
         {
             Serial.println("Command received: Unlocking tray 2");
-            withValve(tray2Valve, unlockValve);
+            DoubleSolenoidValve *valve = getValveByIndex(1);
+            if (valve)
+                unlockValve(*valve);
         }
         else if (command == "tray 3 l" || command == "t3l")
         {
             Serial.println("Command received: Locking tray 3");
-            withValve(tray3Valve, lockValve);
+            DoubleSolenoidValve *valve = getValveByIndex(2);
+            if (valve)
+                lockValve(*valve);
         }
         else if (command == "tray 3 ul" || command == "t3ul")
         {
             Serial.println("Command received: Unlocking tray 3");
-            withValve(tray3Valve, unlockValve);
+            DoubleSolenoidValve *valve = getValveByIndex(2);
+            if (valve)
+                unlockValve(*valve);
         }
         else if (command == "shuttle l" || command == "sl")
         {
-            Serial.println("Command received: Locking shuttle");
-            withValve(shuttleValve, lockValve);
+            if (ccioBoardCount > 0)
+            {
+                Serial.println("Command received: Locking shuttle");
+                DoubleSolenoidValve *valve = getValveByIndex(3);
+                if (valve)
+                    lockValve(*valve);
+            }
+            else
+            {
+                Serial.println("ERROR: No CCIO-8 board detected. Shuttle valve not available.");
+            }
         }
         else if (command == "shuttle ul" || command == "sul")
         {
-            Serial.println("Command received: Unlocking shuttle");
-            withValve(shuttleValve, unlockValve);
+            if (ccioBoardCount > 0)
+            {
+                Serial.println("Command received: Unlocking shuttle");
+                DoubleSolenoidValve *valve = getValveByIndex(3);
+                if (valve)
+                    unlockValve(*valve);
+            }
+            else
+            {
+                Serial.println("ERROR: No CCIO-8 board detected. Shuttle valve not available.");
+            }
+        }
+        else if (command == "unlock all" || command == "ua")
+        {
+            Serial.println("Command received: Unlocking all valves");
+            unlockAllValves();
+        }
+        else if (command == "lock all" || command == "la")
+        {
+            Serial.println("Command received: Locking all valves");
+            lockAllValves();
         }
         else if (command == "status" || command == "s")
         {
-            // Report the current status
+            // Report the current valve and sensor status
             printAllValveStatus();
+            Serial.println();
+            printAllSensorStatus();
         }
         else if (command == "sensors" || command == "ss")
         {
-            // Report the current sensor status
+            // Report just the sensor status
             printAllSensorStatus();
         }
-        else if (command == "help" || command == "h")
-        {
-            // Display available commands
+        else if (command == "motor init" || command == "mi") {
+            Serial.println("Initializing motor...");
+            initMotorSystem();
+        }
+        else if (command == "home" || command == "h") {
+            Serial.println("Command received: Homing motor");
+            if (startHoming()) {
+                Serial.println("Homing sequence started. Motor moving to home position...");
+            } else {
+                Serial.println("Error: Could not start homing sequence.");
+            }
+        }
+        else if (command == "move 1" || command == "m1") {
+            Serial.println("Command received: Moving to position 1");
+            moveToPosition(1);
+        }
+        else if (command == "move 2" || command == "m2") {
+            Serial.println("Command received: Moving to position 2");
+            moveToPosition(2);
+        }
+        else if (command == "move 3" || command == "m3") {
+            Serial.println("Command received: Moving to position 3");
+            moveToPosition(3);
+        }
+        else if (command == "move 4" || command == "m4") {
+            Serial.println("Command received: Moving to position 4");
+            moveToPosition(4);
+        }
+        else if (command == "move 5" || command == "m5") {
+            Serial.println("Command received: Moving to position 5");
+            moveToPosition(5);
+        }
+        else if (command.startsWith("move abs ")) {
+            // Extract the position from the command (e.g., "move abs 250")
+            int32_t targetPos = command.substring(9).toInt();
+            Serial.print("Command received: Moving to absolute position ");
+            Serial.println(targetPos);
+            moveToAbsolutePosition(targetPos);
+        }
+        else if (command.startsWith("move mm ")) {
+            // Extract the position from the command (e.g., "move mm 250.5")
+            double targetMm = command.substring(8).toDouble();
+            Serial.print("Command received: Moving to ");
+            Serial.print(targetMm);
+            Serial.println(" mm");
+            
+            moveToPositionMm(targetMm);
+        }
+        else if (command.startsWith("move rel ")) {
+            // Extract the relative distance from the command (e.g., "move rel 50.5")
+            double relativeMm = command.substring(9).toDouble();
+            Serial.print("Command received: Moving relative ");
+            Serial.print(relativeMm);
+            Serial.println(" mm");
+            
+            moveRelative(relativeMm);
+        }
+        else if (command == "stop" || command == "e") {
+            Serial.println("Command received: Emergency stop");
+            stopMotion();
+        }
+        else if (command == "motor status" || command == "ms") {
+            printMotorStatus();
+        }
+        else if (command == "clear fault" || command == "cf") {
+            Serial.println("Command received: Clearing motor fault");
+            clearMotorFaults();
+        }
+        else if (command == "test range" || command == "tr") {
+            Serial.println("Command received: Testing motor range");
+            testMotorRange();
+        }
+        else if (command.startsWith("set rpm ")) {
+            // Extract the RPM from the command (e.g., "set rpm 75")
+            double targetRpm = command.substring(8).toDouble();
+            if (targetRpm > 0 && targetRpm <= 200) {
+                Serial.print("Setting velocity limit to ");
+                Serial.print(targetRpm);
+                Serial.println(" RPM");
+                currentVelMax = rpmToPps(targetRpm);
+                MOTOR_CONNECTOR.VelMax(currentVelMax);
+            } else {
+                Serial.println("Invalid RPM value. Please use a value between 1 and 200 RPM.");
+            }
+        }
+        else if (command == "check home sensor" || command == "chs") {
+            Serial.println("Checking home sensor...");
+            checkHomeSensor();
+        }
+        else if (command.startsWith("log on")) {
+            if (command.length() > 6) {
+                // Extract optional interval value (e.g., "log on 250")
+                unsigned long interval = command.substring(7).toInt();
+                if (interval > 0) {
+                    logging.logInterval = interval;
+                    Serial.print("Logging enabled with interval of ");
+                    Serial.print(interval);
+                    Serial.println(" ms");
+                } else {
+                    Serial.println("Invalid interval. Using default.");
+                    logging.logInterval = DEFAULT_LOG_INTERVAL;
+                }
+            } else {
+                // Use default interval
+                logging.logInterval = DEFAULT_LOG_INTERVAL;
+                Serial.print("Logging enabled with default interval of ");
+                Serial.print(DEFAULT_LOG_INTERVAL);
+                Serial.println(" ms");
+            }
+            logging.previousLogTime = millis(); // Reset the timer
+        }
+        else if (command == "log off") {
+            Serial.println("Logging disabled");
+            logging.logInterval = 0; // Setting to 0 disables logging
+        }
+        else if (command == "log now") {
+            Serial.println("Logging system state now");
+            // Log immediately regardless of interval
+            logSystemState();
+        }
+        else if (command == "help" || command == "?") {
+            // Help command
             Serial.println("Available commands:");
-            Serial.println("Tray commands:");
             Serial.println("  tray 1 l or t1l - Lock tray 1");
             Serial.println("  tray 1 ul or t1ul - Unlock tray 1");
             Serial.println("  tray 2 l or t2l - Lock tray 2");
             Serial.println("  tray 2 ul or t2ul - Unlock tray 2");
             Serial.println("  tray 3 l or t3l - Lock tray 3");
             Serial.println("  tray 3 ul or t3ul - Unlock tray 3");
-            Serial.println("Shuttle commands:");
-            Serial.println("  shuttle l or sl - Lock shuttle");
-            Serial.println("  shuttle ul or sul - Unlock shuttle");
-            Serial.println("General commands:");
-            Serial.println("  status or s - Display current valve positions");
+
+            if (ccioBoardCount > 0)
+            {
+                Serial.println("  shuttle l or sl - Lock shuttle");
+                Serial.println("  shuttle ul or sul - Unlock shuttle");
+            }
+
+            Serial.println("  unlock all or ua - Unlock all valves");
+            Serial.println("  lock all or la - Lock all valves");
+            Serial.println("  status or s - Show status of all valves and sensors");
+            Serial.println("  sensors or ss - Show all sensor readings");
+            Serial.println("  check home sensor or chs - Check home sensor");
+            Serial.println("  log on [interval] - Enable logging with optional interval in ms");
+            Serial.println("  log off - Disable logging");
+            Serial.println("  log now - Log system state immediately");
+            Serial.println("  log on - Turn on logging with default interval (500ms)");
+            Serial.println("  log on X - Turn on logging with interval of X milliseconds");
+            Serial.println("  log off - Turn off logging");
+            Serial.println("  log now - Log system state once immediately");
             Serial.println("  help or h - Show this help message");
-            Serial.println("Sensor commands:");
-            Serial.println("  sensors or ss - Display all sensor readings");
+            
+            // Motor commands
+            Serial.println("\nMotor commands:");
+            Serial.println("  motor init or mi - Initialize the motor system");
+            Serial.println("  home or h - Home the motor (find zero position)");
+            Serial.println("  move 1 or m1 - Move to position 1 (Home)");
+            Serial.println("  move 2 or m2 - Move to position 2 (250mm)");
+            Serial.println("  move 3 or m3 - Move to position 3 (500mm)");
+            Serial.println("  move 4 or m4 - Move to position 4 (750mm)");
+            Serial.println("  move 5 or m5 - Move to position 5 (1000mm)");
+            Serial.println("  move abs X - Move to absolute position X (in pulses)");
+            Serial.println("  move mm X - Move to position X millimeters");
+            Serial.println("  move rel X - Move X mm relative to current position");
+            Serial.println("  set rpm X - Set velocity to X RPM (1-200)");
+            Serial.println("  stop or e - Emergency stop motor movement");
+            Serial.println("  motor status or ms - Show motor status");
+            Serial.println("  test range or tr - Test motor with small incremental moves");
+            Serial.println("  clear fault or cf - Clear motor fault");
         }
-        else
-        {
+        else {
             Serial.println("Unknown command. Type 'help' for available commands.");
         }
     }
-}
 
+    // Log system state periodically if logging is enabled
+    if (logging.logInterval > 0 && currentTime - logging.previousLogTime >= logging.logInterval)
+    {
+        logging.previousLogTime = currentTime;
+        logSystemState();
+    }
+}
