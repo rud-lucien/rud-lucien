@@ -4,7 +4,7 @@
  Author:	rlucien
 */
 
-#include "Arduino.h"
+// #include "Arduino.h"
 #include "ClearCore.h"
 #include "ValveController.h"
 #include "MotorController.h"
@@ -71,6 +71,9 @@ void setup()
 void loop()
 {
     unsigned long currentTime = millis();
+    
+    // Check for E-stop condition (highest priority)
+    handleEStop();
     
     // Check and update motor state
     updateMotorState();
@@ -248,6 +251,17 @@ void loop()
             Serial.println("Command received: Emergency stop");
             stopMotion();
         }
+        else if (command == "abort" || command == "a") {
+            Serial.println("Command received: Abort operation");
+            if (homingInProgress) {
+                abortHoming();
+            } else if (motorState == MOTOR_STATE_MOVING) {
+                stopMotion();
+                motorState = MOTOR_STATE_IDLE;
+            } else {
+                Serial.println("No active operation to abort");
+            }
+        }
         else if (command == "motor status" || command == "ms") {
             printMotorStatus();
         }
@@ -351,9 +365,11 @@ void loop()
             Serial.println("  move rel X - Move X mm relative to current position");
             Serial.println("  set rpm X - Set velocity to X RPM (1-200)");
             Serial.println("  stop or e - Emergency stop motor movement");
+            Serial.println("  abort or a - Abort current operation");
             Serial.println("  motor status or ms - Show motor status");
             Serial.println("  test range or tr - Test motor with small incremental moves");
             Serial.println("  clear fault or cf - Clear motor fault");
+            Serial.println("  abort or a - Abort current operation (homing or movement)");
         }
         else {
             Serial.println("Unknown command. Type 'help' for available commands.");

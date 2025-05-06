@@ -9,70 +9,90 @@ const unsigned long DEFAULT_LOG_INTERVAL = 500; // Default interval of 500ms
 
 void logSystemState()
 {
-    // Log header
-    Serial.println("\n--- System Status ---");
+    // Create a more compact, single-line log format
+    Serial.print("STATE: ");
     
-    // Log tray lock states
-    Serial.println("Tray Lock Status:");
-    
-    // Loop through the known valves using the existing valveCount
+    // Valve status in compact format
     for (int i = 0; i < valveCount; i++) {
         DoubleSolenoidValve *valve = getValveByIndex(i);
         if (valve) {
-            // Use the existing valveNames array for consistent naming
-            Serial.print("  ");
+            // Print valve name and status
             Serial.print(valveNames[i]);
-            Serial.print(": ");
+            Serial.print("=");
             
-            // Check valve position using the existing function
             if (valve->position == VALVE_POSITION_UNLOCK) {
-                Serial.println("UNLOCKED");
+                Serial.print("UNLOCKED");
             } else if (valve->position == VALVE_POSITION_LOCK) {
-                Serial.println("LOCKED");
+                Serial.print("LOCKED");
             } else {
-                Serial.println("UNKNOWN");
+                Serial.print("UNKNOWN");
             }
+            
+            Serial.print(", ");
         }
     }
     
-    // Log motor status
-    Serial.println("Motor Status:");
-    Serial.print("  State: ");
+    // Motor state in compact format
+    Serial.print("MotorState=");
     switch (motorState) {
         case MOTOR_STATE_IDLE:
-            Serial.println("IDLE");
+            Serial.print("IDLE");
             break;
         case MOTOR_STATE_MOVING:
-            Serial.println("MOVING");
+            Serial.print("MOVING");
             break;
         case MOTOR_STATE_HOMING:
-            Serial.println("HOMING");
+            Serial.print("HOMING");
             break;
         case MOTOR_STATE_FAULTED:
-            Serial.println("FAULTED");
+            Serial.print("FAULTED");
             break;
         case MOTOR_STATE_NOT_READY:
-            Serial.println("NOT READY");
+            Serial.print("NOT_READY");
             break;
         default:
-            Serial.println("UNKNOWN");
+            Serial.print("UNKNOWN");
             break;
     }
     
-    Serial.print("  Position: ");
-    Serial.print(currentPositionMm);
-    Serial.println(" mm");
+    // Position and other motor data
+    Serial.print(", Position=");
+    // Get the current position, apply abs() to always show positive
+    double calculatedPositionMm = abs(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()));
+    Serial.print(calculatedPositionMm, 2);  // Display with 2 decimal places
+    Serial.print("mm");
+
+    // Add encoder count information with available data
+    Serial.print(" (Commanded: ");
+    // Show counts as positive 
+    Serial.print(abs(MOTOR_CONNECTOR.PositionRefCommanded()));
+    Serial.print(" counts, Speed: ");
+    // Get the absolute value of velocity for display purposes
+    int32_t velocity = MOTOR_CONNECTOR.VelocityRefCommanded();
+    Serial.print(abs(velocity));
+    Serial.print(" counts/sec = ");
+    Serial.print(abs((double)velocity * 60.0 / PULSES_PER_REV), 1);
+    Serial.print(" RPM");
     
-    Serial.print("  Homed: ");
-    Serial.println(isHomed ? "YES" : "NO");
+    Serial.print(", Homed=");
+    Serial.print(isHomed ? "YES" : "NO");
     
-    // Log home sensor status
-    Serial.print("  Home Sensor: ");
+    // Home sensor status
+    Serial.print(", HomeSensor=");
     bool pinState = digitalRead(HOME_SENSOR_PIN);
     Serial.print(pinState ? "HIGH" : "LOW");
     Serial.print(" (");
-    Serial.print(pinState == LOW ? "TRIGGERED" : "NOT TRIGGERED"); // Assuming active low
-    Serial.println(")");
+    Serial.print(pinState == HIGH ? "TRIGGERED" : "NOT_TRIGGERED");
+    Serial.print(")");
     
-    Serial.println("-------------------");
+    // Add to the end of your logSystemState() function:
+    Serial.print(", E-Stop=");
+    if (isEStopActive()) {
+        Serial.print("TRIGGERED (EMERGENCY STOP)");
+    } else {
+        Serial.print("RELEASED (READY)");
+    }
+    
+    // End the line
+    Serial.println();
 }
