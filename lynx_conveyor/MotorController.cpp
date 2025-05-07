@@ -10,6 +10,14 @@ MotorState motorState = MOTOR_STATE_NOT_READY;
 PositionTarget currentPosition = POSITION_1;
 bool homingInProgress = false;
 unsigned long homingStartTime = 0;
+double currentJogIncrementMm = DEFAULT_JOG_INCREMENT_SMALL;
+int currentJogSpeedRpm = JOG_SPEED_SLOW;
+bool cycleFasterHomingInProgress = false;
+unsigned long enableToggleStartTime = 0;
+bool motorWasDisabled = false;
+bool motorEnableCycleInProgress = false;
+unsigned long enableCycleStartTime = 0;
+bool motorDisablePhaseComplete = false;
 
 // ----------------- Utility Functions -----------------
 
@@ -272,6 +280,105 @@ void stopMotion() {
     Serial.println("Motion stopped");
 }
 
+// ----------------- Jogging Functions -----------------
+
+bool jogMotor(bool direction, double customIncrement) {
+    // Save current speed setting
+    int32_t originalVelMax = currentVelMax;
+    
+    // Set jog speed
+    currentVelMax = rpmToPps(currentJogSpeedRpm);
+    MOTOR_CONNECTOR.VelMax(currentVelMax);
+    
+    // Determine increment to use
+    double increment = (customIncrement > 0) ? customIncrement : currentJogIncrementMm;
+    
+    // Calculate movement direction (positive or negative)
+    double moveMm = direction ? increment : -increment;
+    
+    // Log the jog operation
+    Serial.print("Jogging ");
+    Serial.print(direction ? "forward" : "backward");
+    Serial.print(" by ");
+    Serial.print(increment);
+    Serial.print(" mm at ");
+    Serial.print(currentJogSpeedRpm);
+    Serial.println(" RPM");
+    
+    // Use the existing moveRelative function
+    bool result = moveRelative(moveMm);
+    
+    // Reset to original speed after move is commanded
+    currentVelMax = originalVelMax;
+    MOTOR_CONNECTOR.VelMax(currentVelMax);
+    
+    return result;
+}
+
+bool setJogIncrement(double increment) {
+    // Validate increment is reasonable
+    if (increment <= 0 || increment > 100) {
+        Serial.println("Error: Jog increment must be between 0 and 100mm");
+        return false;
+    }
+    
+    // Set the increment
+    currentJogIncrementMm = increment;
+    Serial.print("Jog increment set to ");
+    Serial.print(currentJogIncrementMm);
+    Serial.println(" mm");
+    
+    return true;
+}
+
+bool setJogSpeed(int speedRpm) {
+    // Validate speed is reasonable
+    if (speedRpm < 10 || speedRpm > MOTOR_VELOCITY_RPM) {
+        Serial.print("Error: Jog speed must be between 10 and ");
+        Serial.print(MOTOR_VELOCITY_RPM);
+        Serial.println(" RPM");
+        return false;
+    }
+    
+    // Set the speed
+    currentJogSpeedRpm = speedRpm;
+    Serial.print("Jog speed set to ");
+    Serial.print(currentJogSpeedRpm);
+    Serial.println(" RPM");
+    
+    return true;
+}
+
+// Convenience function for preset increments
+bool setJogPreset(char size) {
+    switch (size) {
+        case 's': // Small
+            return setJogIncrement(DEFAULT_JOG_INCREMENT_SMALL);
+        case 'm': // Medium
+            return setJogIncrement(DEFAULT_JOG_INCREMENT_MEDIUM);
+        case 'l': // Large
+            return setJogIncrement(DEFAULT_JOG_INCREMENT_LARGE);
+        default:
+            Serial.println("Invalid jog preset. Use 's', 'm', or 'l'");
+            return false;
+    }
+}
+
+// Convenience function for preset speeds
+bool setJogSpeedPreset(char speed) {
+    switch (speed) {
+        case 's': // Slow
+            return setJogSpeed(JOG_SPEED_SLOW);
+        case 'n': // Normal
+            return setJogSpeed(JOG_SPEED_NORMAL);
+        case 'f': // Fast
+            return setJogSpeed(JOG_SPEED_FAST);
+        default:
+            Serial.println("Invalid jog speed preset. Use 's', 'n', or 'f'");
+            return false;
+    }
+}
+
 // ----------------- Status Functions -----------------
 
 bool isMotorReady() {
@@ -282,8 +389,8 @@ bool isMotorReady() {
 }
 
 bool isMotorMoving() {
-    return !MOTOR_CONNECTOR.StepsComplete() || 
-           MOTOR_CONNECTOR.HlfbState() != MotorDriver::HLFB_ASSERTED;
+    // Only consider step completion for motion status
+    return !MOTOR_CONNECTOR.StepsComplete();
 }
 
 bool isMotorInPosition() {
@@ -313,12 +420,14 @@ MotorState updateMotorState() {
     else if (homingInProgress) {
         motorState = MOTOR_STATE_HOMING;
     }
-    // Check if motor is moving
-    else if (isMotorMoving()) {
+    // Check if steps are complete (primary indicator of motion completion)
+    else if (!MOTOR_CONNECTOR.StepsComplete()) {
         motorState = MOTOR_STATE_MOVING;
     }
     // Otherwise, motor is idle
     else {
+        // Even if HLFB isn't asserted yet, if steps are complete,
+        // consider the motor idle for state management purposes
         motorState = MOTOR_STATE_IDLE;
     }
     
@@ -543,194 +652,200 @@ bool testMotorRange() {
 
 // ----------------- Homing Functions -----------------
 
-bool homeSensorTriggered() {
-    static bool lastSensorState = false;
-    static unsigned long lastChangeTime = 0;
-    
-    // Read the current state of the home sensor
-    // Note: This assumes the sensor is active-high. Adjust if needed.
-    bool currentSensorState = digitalRead(HOME_SENSOR_PIN) == HIGH;
-    
-    // If the state has changed, record the time
-    if (currentSensorState != lastSensorState) {
-        lastChangeTime = millis();
-        lastSensorState = currentSensorState;
-    }
-    
-    // Only report the sensor as triggered if the state has been stable for the debounce period
-    if (currentSensorState && (millis() - lastChangeTime > SENSOR_DEBOUNCE_MS)) {
-        return true;
-    }
-    
-    return false;
-}
-
-bool startHoming() {
+bool initiateHomingSequence() {
     // Check if motor is initialized
     if (!motorInitialized) {
         Serial.println("Error: Motor not initialized - run 'motor init' first");
         return false;
     }
     
-    // Check for motor alerts separately
+    // Check for motor alerts
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
         Serial.println("Error: Motor has active alerts - clear faults before homing");
         printMotorAlerts(); // Print the specific alerts
+        Serial.println("Please run 'clear fault' command first");
         return false;
     }
     
-    // Set lower velocity for homing
-    double homingVelocityRpm = HOME_VELOCITY_RPM; 
-    currentVelMax = rpmToPps(homingVelocityRpm);
-    MOTOR_CONNECTOR.VelMax(currentVelMax);
+    // Start the non-blocking enable cycle
+    Serial.println("Cycling motor enable to trigger automatic homing...");
+    MOTOR_CONNECTOR.EnableRequest(false);
+    enableCycleStartTime = millis();
+    motorEnableCycleInProgress = true;
+    motorDisablePhaseComplete = false;
     
     // Initialize homing state
     homingInProgress = true;
     motorState = MOTOR_STATE_HOMING;
     homingStartTime = millis();
     
-    // Split homing into discrete steps
-    // We'll use this homing step flag to track where we are in the process
-    static enum {
-        HOMING_STEP_CHECK_SENSOR,
-        HOMING_STEP_MOVE_AWAY,
-        HOMING_STEP_WAIT_MOVE_AWAY,
-        HOMING_STEP_STABILIZE,
-        HOMING_STEP_MOVE_TO_HOME,
-        HOMING_STEP_COMPLETE
-    } homingStep = HOMING_STEP_CHECK_SENSOR;
-    
-    // Always start with checking the sensor
-    homingStep = HOMING_STEP_CHECK_SENSOR;
-    Serial.println("Starting homing sequence...");
-    
+    // The rest of the homing process will be handled when the enable cycle completes
     return true;
 }
 
-void checkHomingProgress() {
+void executeHomingSequence() {
     if (!homingInProgress) {
         return;
     }
     
-    // Static variables to maintain state between function calls
+    // Handle the movement initiation after enable cycle completes
+    static bool homingMovementStarted = false;
+    
+    // Check if enable cycle just completed and movement hasn't started yet
+    if (!motorEnableCycleInProgress && !homingMovementStarted) {
+        // Start the actual homing movement
+        Serial.println("Starting hard stop homing sequence...");
+        
+        // Set velocity for initial approach
+        int32_t homingVel = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
+        Serial.print("Moving toward hard stop with velocity: ");
+        Serial.print(HOME_APPROACH_VELOCITY_RPM);
+        Serial.println(" RPM");
+        
+        currentVelMax = homingVel;
+        MOTOR_CONNECTOR.VelMax(currentVelMax);
+        
+        // Start moving toward the hard stop
+        MOTOR_CONNECTOR.MoveVelocity(HOMING_DIRECTION * MOTION_DIRECTION * homingVel);
+        
+        homingMovementStarted = true;
+    }
+    
+    // Reset the movement flag if homing is aborted
+    if (!homingInProgress) {
+        homingMovementStarted = false;
+        return;
+    }
+    
+    // Continue with the existing homing state machine
     static enum {
-        HOMING_STEP_CHECK_SENSOR,
-        HOMING_STEP_MOVE_AWAY,
-        HOMING_STEP_WAIT_MOVE_AWAY,
-        HOMING_STEP_STABILIZE,
-        HOMING_STEP_MOVE_TO_HOME,
-        HOMING_STEP_COMPLETE
-    } homingStep = HOMING_STEP_CHECK_SENSOR;
-    
-    static unsigned long stabilizationStartTime = 0;
-    
-    // Check for timeout first
+        HOMING_PHASE_INITIAL_APPROACH,
+        HOMING_PHASE_SLOW_APPROACH,
+        HOMING_PHASE_WAIT_FOR_HARDSTOP,
+        HOMING_PHASE_MOVE_OFFSET,
+        HOMING_PHASE_WAIT_FOR_COMPLETION
+    } homingPhase = HOMING_PHASE_INITIAL_APPROACH;
+
+    static unsigned long phaseStartTime = 0;
+    static bool initialPhaseTimeSet = false;
+
+    // Check for timeout
     if (millis() - homingStartTime > HOME_TIMEOUT_MS) {
         Serial.println("Error: Homing operation timed out");
         stopMotion();
         homingInProgress = false;
+        homingPhase = HOMING_PHASE_INITIAL_APPROACH; // Reset for next time
+        initialPhaseTimeSet = false;
+        homingMovementStarted = false;
         motorState = MOTOR_STATE_FAULTED;
-        homingStep = HOMING_STEP_CHECK_SENSOR; // Reset for next time
         return;
     }
-    
-    // State machine for homing
-    switch (homingStep) {
-        case HOMING_STEP_CHECK_SENSOR:
-            // Check if home sensor is already triggered
-            if (homeSensorTriggered()) {
-                Serial.println("Home sensor is already triggered - moving away before homing");
-                homingStep = HOMING_STEP_MOVE_AWAY;
-            } else {
-                Serial.println("Home sensor not triggered - starting homing movement");
-                homingStep = HOMING_STEP_MOVE_TO_HOME;
+
+    // Process the homing state machine
+    switch (homingPhase) {
+        case HOMING_PHASE_INITIAL_APPROACH:
+            // This phase is handled by the initial movement setup
+            // Just set up the tracking variables
+            if (!initialPhaseTimeSet) {
+                phaseStartTime = millis();
+                initialPhaseTimeSet = true;
+            }
+            
+            // Switch to slower approach after a delay or when close to the hard stop
+            if (millis() - phaseStartTime > 2000) {
+                Serial.println("Switching to slower velocity: " + String(HOME_FINAL_VELOCITY_RPM) + " RPM");
+                
+                // Reduce velocity for final approach
+                int32_t slowHomingVel = rpmToPps(HOME_FINAL_VELOCITY_RPM);
+                MOTOR_CONNECTOR.VelMax(slowHomingVel);
+                homingPhase = HOMING_PHASE_SLOW_APPROACH;
             }
             break;
             
-        case HOMING_STEP_MOVE_AWAY:
-            // Move away in the opposite direction of the homing direction
+        case HOMING_PHASE_SLOW_APPROACH:
+            // We're moving at slow speed toward hard stop
+            homingPhase = HOMING_PHASE_WAIT_FOR_HARDSTOP;
+            Serial.println("Contacting hard stop, waiting for motor to settle...");
+            break;
+            
+        case HOMING_PHASE_WAIT_FOR_HARDSTOP:
             {
-                // Convert mm to pulses
-                double moveAwayMm = MOVE_AWAY_DISTANCE_MM;
-                int32_t moveAwayPulses = mmToPulses(moveAwayMm);
+                // Use a static variable to track last message time
+                static unsigned long lastHardstopMessageTime = 0;
+                unsigned long currentTime = millis();
                 
-                // Apply direction - use negative to move away
-                moveAwayPulses = -HOMING_DIRECTION * abs(moveAwayPulses);
-                
-                Serial.print("Moving away from home sensor by ");
-                Serial.print(moveAwayMm);
-                Serial.println(" mm");
-                
-                // Execute the move away command as a relative move
-                MOTOR_CONNECTOR.Move(moveAwayPulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
-                homingStep = HOMING_STEP_WAIT_MOVE_AWAY;
-            }
-            break;
-            
-        case HOMING_STEP_WAIT_MOVE_AWAY:
-            // Wait until the sensor is no longer triggered or the move is complete
-            if (!homeSensorTriggered() || MOTOR_CONNECTOR.StepsComplete()) {
-                if (!homeSensorTriggered()) {
-                    Serial.println("Successfully moved away from home sensor");
-                } else {
-                    Serial.println("Move away completed but sensor still triggered");
-                    Serial.println("Continuing with caution...");
+                // Check HLFB to detect hard stop contact
+                if (MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED) {
+                    // Hard stop detected!
+                    Serial.println("Hard stop detected (HLFB asserted). Stopping motor.");
+                    
+                    // Stop the motor
+                    MOTOR_CONNECTOR.MoveStopAbrupt();
+                    
+                    // Brief delay to ensure motor stops
+                    delay(100);
+                    
+                    // Move to offset phase
+                    homingPhase = HOMING_PHASE_MOVE_OFFSET;
+                    
+                    // Reset the message timer for next time
+                    lastHardstopMessageTime = 0;
+                } 
+                // Only print status message every 5 seconds
+                else if (currentTime - lastHardstopMessageTime >= 10000) {
+                    Serial.print("Waiting for hardstop. HLFB State: DEASSERTED");
+                    Serial.println();
+                    
+                    // Update last message time
+                    lastHardstopMessageTime = currentTime;
                 }
-                
-                // Wait for mechanical stabilization
-                stabilizationStartTime = millis();
-                homingStep = HOMING_STEP_STABILIZE;
             }
             break;
             
-        case HOMING_STEP_STABILIZE:
-            // Wait for mechanical stabilization
-            if (millis() - stabilizationStartTime >= 200) {
-                Serial.println("Stabilization complete, beginning homing movement");
-                homingStep = HOMING_STEP_MOVE_TO_HOME;
-            }
+        case HOMING_PHASE_MOVE_OFFSET:
+            // Move away from hard stop by the configured offset
+            Serial.print("Moving away from hard stop by ");
+            Serial.print(HOME_OFFSET_DISTANCE_MM);
+            Serial.println(" mm");
+            
+            {  // Add braces to create a new scope
+                // Calculate offset in pulses
+                int32_t offsetPulses = mmToPulses(HOME_OFFSET_DISTANCE_MM);
+                
+                // Use relative move away from hard stop
+                MOTOR_CONNECTOR.Move(-offsetPulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
+            }  // End of scope
+            
+            // Set up to wait for completion
+            homingPhase = HOMING_PHASE_WAIT_FOR_COMPLETION;
             break;
             
-        case HOMING_STEP_MOVE_TO_HOME:
-            // Move toward the home sensor
-            {
-                Serial.print("Moving to home with velocity: ");
-                Serial.print(HOME_VELOCITY_RPM);
-                Serial.println(" RPM");
+        case HOMING_PHASE_WAIT_FOR_COMPLETION:
+            // Wait for offset move to complete
+            if (MOTOR_CONNECTOR.StepsComplete()) {
+                // Homing is complete!
+                Serial.println("Hard stop homing completed successfully.");
                 
-                // Move in the direction specified by HOMING_DIRECTION
-                // Use a large number to ensure we reach the sensor
-                MOTOR_CONNECTOR.Move(HOMING_DIRECTION * 100000, MotorDriver::MOVE_TARGET_ABSOLUTE);
-                
-                Serial.println("Moving toward home position...");
-                homingStep = HOMING_STEP_COMPLETE;
-            }
-            break;
-            
-        case HOMING_STEP_COMPLETE:
-            // Check if the home sensor has been triggered
-            if (homeSensorTriggered()) {
-                Serial.println("Home sensor triggered. Stopping motor.");
-                stopMotion();
-                
-                // Set position to zero at the home position
+                // Set position to zero
                 MOTOR_CONNECTOR.PositionRefSet(0);
-                currentPositionMm = 0.0;
-                currentPosition = POSITION_1;
                 
-                // Reset motor parameters to normal operation
-                currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-                MOTOR_CONNECTOR.VelMax(currentVelMax);
-                
-                // Set homing flags
-                homingInProgress = false;
+                // Update global state
                 isHomed = true;
+                homingInProgress = false;
                 motorState = MOTOR_STATE_IDLE;
+                currentPositionMm = 0.0;
                 
-                Serial.println("Homing completed successfully.");
+                // Reset state machine for next time
+                homingPhase = HOMING_PHASE_INITIAL_APPROACH;
+                initialPhaseTimeSet = false;
+                homingMovementStarted = false;
                 
-                // Reset for next homing operation
-                homingStep = HOMING_STEP_CHECK_SENSOR;
+                // Restore original velocity and acceleration settings
+                currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+                currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
+                MOTOR_CONNECTOR.VelMax(currentVelMax);
+                MOTOR_CONNECTOR.AccelMax(currentAccelMax);
+                Serial.println("Restored motor velocity to " + String(MOTOR_VELOCITY_RPM) + " RPM");
             }
             break;
     }
@@ -744,8 +859,19 @@ void abortHoming() {
     if (homingInProgress) {
         Serial.println("Aborting homing operation");
         MOTOR_CONNECTOR.MoveStopAbrupt();
+        
+        // Reset to normal operation parameters
+        currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+        currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
+        MOTOR_CONNECTOR.VelMax(currentVelMax);
+        MOTOR_CONNECTOR.AccelMax(currentAccelMax);
+        
         homingInProgress = false;
         motorState = MOTOR_STATE_FAULTED;
+        
+        // Reset static variables in executeHomingSequence
+        // This is a way to interact with static variables in another function
+        executeHomingSequence(); // This will reset homingMovementStarted when it sees !homingInProgress
     } else {
         Serial.println("No homing operation in progress");
     }
@@ -774,22 +900,6 @@ void checkMoveProgress() {
         printMotorAlerts();
         motorState = MOTOR_STATE_FAULTED;
     }
-}
-
-// ----------------- Sensor Functions -----------------
-
-void checkHomeSensor() {
-    // Read the raw pin state
-    bool pinState = digitalRead(HOME_SENSOR_PIN);
-    
-    // Convert raw state to sensor triggered status (assuming active-high)
-    bool sensorTriggered = (pinState == HIGH);
-    
-    Serial.print("Home sensor (pin A10) state: ");
-    Serial.print(pinState ? "HIGH" : "LOW");
-    Serial.print(" (Sensor is ");
-    Serial.print(sensorTriggered ? "TRIGGERED" : "NOT TRIGGERED");
-    Serial.println(")");
 }
 
 // ----------------- E-stop Functions -----------------
@@ -840,4 +950,27 @@ void handleEStop() {
     }
     
     eStopWasActive = eStopActive;
+}
+
+// ----------------- Enable Cycle Functions -----------------
+
+void cycleMotorEnableForHoming() {
+    if (!motorEnableCycleInProgress) {
+        return;
+    }
+    
+    unsigned long currentTime = millis();
+    
+    // First stage - wait 200ms with motor disabled
+    if (!motorDisablePhaseComplete && (currentTime - enableCycleStartTime >= 200)) {
+        // Re-enable the motor
+        MOTOR_CONNECTOR.EnableRequest(true);
+        enableCycleStartTime = currentTime;
+        motorDisablePhaseComplete = true;
+    }
+    // Second stage - wait 200ms after re-enabling
+    else if (motorDisablePhaseComplete && (currentTime - enableCycleStartTime >= 200)) {
+        // Enable cycle is complete
+        motorEnableCycleInProgress = false;
+    }
 }

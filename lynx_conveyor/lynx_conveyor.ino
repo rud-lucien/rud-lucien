@@ -9,6 +9,7 @@
 #include "ValveController.h"
 #include "MotorController.h"
 #include "Logging.h"
+#include "Tests.h"
 
 // Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
@@ -71,16 +72,19 @@ void setup()
 void loop()
 {
     unsigned long currentTime = millis();
-    
+
     // Check for E-stop condition (highest priority)
     handleEStop();
     
     // Check and update motor state
     updateMotorState();
     
+    // Process enable cycling for homing if in progress
+    cycleMotorEnableForHoming();
+    
     // Check homing progress if in progress
     if (motorState == MOTOR_STATE_HOMING) {
-        checkHomingProgress();
+        executeHomingSequence();
     }
     // Check movement progress if moving
     else if (motorState == MOTOR_STATE_MOVING) {
@@ -195,12 +199,8 @@ void loop()
             initMotorSystem();
         }
         else if (command == "home" || command == "h") {
-            Serial.println("Command received: Homing motor");
-            if (startHoming()) {
-                Serial.println("Homing sequence started. Motor moving to home position...");
-            } else {
-                Serial.println("Error: Could not start homing sequence.");
-            }
+            Serial.println("Command received: Homing");
+            initiateHomingSequence();
         }
         else if (command == "move 1" || command == "m1") {
             Serial.println("Command received: Moving to position 1");
@@ -273,6 +273,10 @@ void loop()
             Serial.println("Command received: Testing motor range");
             testMotorRange();
         }
+        else if (command == "test homing" || command == "th") {
+            Serial.println("Command received: Testing homing repeatability");
+            testHomingRepeatability();
+        }
         else if (command.startsWith("set rpm ")) {
             // Extract the RPM from the command (e.g., "set rpm 75")
             double targetRpm = command.substring(8).toDouble();
@@ -285,10 +289,6 @@ void loop()
             } else {
                 Serial.println("Invalid RPM value. Please use a value between 1 and 200 RPM.");
             }
-        }
-        else if (command == "check home sensor" || command == "chs") {
-            Serial.println("Checking home sensor...");
-            checkHomeSensor();
         }
         else if (command.startsWith("log on")) {
             if (command.length() > 6) {
@@ -321,6 +321,89 @@ void loop()
             // Log immediately regardless of interval
             logSystemState();
         }
+        else if (command == "jog +" || command == "j+") {
+            Serial.println("Command received: Jog forward");
+            jogMotor(true);
+        }
+        else if (command == "jog -" || command == "j-") {
+            Serial.println("Command received: Jog backward");
+            jogMotor(false);
+        }
+        else if (command.startsWith("jog +") && command.length() > 5) {
+            // Extract custom distance (e.g., "jog +10.5")
+            double distance = command.substring(5).toDouble();
+            Serial.print("Command received: Jog forward by ");
+            Serial.print(distance);
+            Serial.println(" mm");
+            jogMotor(true, distance);
+        }
+        else if (command.startsWith("jog -") && command.length() > 5) {
+            // Extract custom distance (e.g., "jog -10.5")
+            double distance = command.substring(5).toDouble();
+            Serial.print("Command received: Jog backward by ");
+            Serial.print(distance);
+            Serial.println(" mm");
+            jogMotor(false, distance);
+        }
+        else if (command == "jog inc s" || command == "js") {
+            Serial.println("Command received: Set jog increment to small");
+            setJogPreset('s');
+        }
+        else if (command == "jog inc m" || command == "jm") {
+            Serial.println("Command received: Set jog increment to medium");
+            setJogPreset('m');
+        }
+        else if (command == "jog inc l" || command == "jl") {
+            Serial.println("Command received: Set jog increment to large");
+            setJogPreset('l');
+        }
+        else if (command.startsWith("jog inc ")) {
+            // Extract custom increment (e.g., "jog inc 7.5")
+            double increment = command.substring(8).toDouble();
+            Serial.print("Command received: Set jog increment to ");
+            Serial.print(increment);
+            Serial.println(" mm");
+            setJogIncrement(increment);
+        }
+        else if (command == "jog speed s" || command == "jss") {
+            Serial.println("Command received: Set jog speed to slow");
+            setJogSpeedPreset('s');
+        }
+        else if (command == "jog speed n" || command == "jsn") {
+            Serial.println("Command received: Set jog speed to normal");
+            setJogSpeedPreset('n');
+        }
+        else if (command == "jog speed f" || command == "jsf") {
+            Serial.println("Command received: Set jog speed to fast");
+            setJogSpeedPreset('f');
+        }
+        else if (command.startsWith("jog speed ")) {
+            // Extract custom speed (e.g., "jog speed 250")
+            int speed = command.substring(10).toInt();
+            Serial.print("Command received: Set jog speed to ");
+            Serial.print(speed);
+            Serial.println(" RPM");
+            setJogSpeed(speed);
+        }
+        else if (command == "jog status") {
+            Serial.println("Jog Settings:");
+            Serial.print("  Increment: ");
+            Serial.print(currentJogIncrementMm);
+            Serial.println(" mm");
+            
+            Serial.print("  Speed: ");
+            Serial.print(currentJogSpeedRpm);
+            Serial.println(" RPM");
+            
+            // Show what preset this corresponds to (if any)
+            if (currentJogIncrementMm == DEFAULT_JOG_INCREMENT_SMALL) Serial.println("  (Small increment preset)");
+            else if (currentJogIncrementMm == DEFAULT_JOG_INCREMENT_MEDIUM) Serial.println("  (Medium increment preset)");
+            else if (currentJogIncrementMm == DEFAULT_JOG_INCREMENT_LARGE) Serial.println("  (Large increment preset)");
+            
+            if (currentJogSpeedRpm == JOG_SPEED_SLOW) Serial.println("  (Slow speed preset)");
+            else if (currentJogSpeedRpm == JOG_SPEED_NORMAL) Serial.println("  (Normal speed preset)");
+            else if (currentJogSpeedRpm == JOG_SPEED_FAST) Serial.println("  (Fast speed preset)");
+        }
         else if (command == "help" || command == "?") {
             // Help command
             Serial.println("Available commands:");
@@ -341,7 +424,6 @@ void loop()
             Serial.println("  lock all or la - Lock all valves");
             Serial.println("  status or s - Show status of all valves and sensors");
             Serial.println("  sensors or ss - Show all sensor readings");
-            Serial.println("  check home sensor or chs - Check home sensor");
             Serial.println("  log on [interval] - Enable logging with optional interval in ms");
             Serial.println("  log off - Disable logging");
             Serial.println("  log now - Log system state immediately");
@@ -368,8 +450,22 @@ void loop()
             Serial.println("  abort or a - Abort current operation");
             Serial.println("  motor status or ms - Show motor status");
             Serial.println("  test range or tr - Test motor with small incremental moves");
+            Serial.println("  test homing or th - Test homing repeatability with multiple cycles");
             Serial.println("  clear fault or cf - Clear motor fault");
             Serial.println("  abort or a - Abort current operation (homing or movement)");
+            Serial.println("  jog + or j+ - Jog forward");
+            Serial.println("  jog - or j- - Jog backward");
+            Serial.println("  jog +X - Jog forward by X mm");
+            Serial.println("  jog -X - Jog backward by X mm");
+            Serial.println("  jog inc s or js - Set jog increment to small");
+            Serial.println("  jog inc m or jm - Set jog increment to medium");
+            Serial.println("  jog inc l or jl - Set jog increment to large");
+            Serial.println("  jog inc X - Set jog increment to X mm");
+            Serial.println("  jog speed s or jss - Set jog speed to slow");
+            Serial.println("  jog speed n or jsn - Set jog speed to normal");
+            Serial.println("  jog speed f or jsf - Set jog speed to fast");
+            Serial.println("  jog speed X - Set jog speed to X RPM");
+            Serial.println("  jog status - Show current jog settings");
         }
         else {
             Serial.println("Unknown command. Type 'help' for available commands.");

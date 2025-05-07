@@ -9,9 +9,6 @@
 // Motor connector on ClearCore
 #define MOTOR_CONNECTOR ConnectorM0
 
-// Home sensor input
-#define HOME_SENSOR_PIN A10
-
 // E-stop input
 #define E_STOP_PIN DI6  // E-stop connected to DI6 (Normally Closed)
 #define E_STOP_CHECK_INTERVAL_MS 10  // Check E-stop every 10ms
@@ -20,28 +17,27 @@
 
 // Motor & Motion parameters
 #define PULSES_PER_REV 3200              // Motor configured for 3200 pulses per revolution
-#define MM_PER_REV 53.66                 // Calibrated: 53.66mm travel per revolution
-#define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV)  // ~59.64 pulses per mm
+#define MM_PER_REV 52.23                 // Calibrated: 52.23mm travel per revolution
+#define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV)  // ~61.27 pulses per mm
 
 // Motion profile parameters (in RPM units)
 #define MOTOR_VELOCITY_RPM 1000           // Maximum velocity for motor operation (RPM)
 #define MAX_ACCEL_RPM_PER_SEC 5000       // Maximum acceleration in RPM/s
 #define ACCEL_LIMIT_RPM_PER_SEC 2500     // Acceleration limit for normal operation
-#define HOME_VELOCITY_RPM 30             // Slower velocity used during homing
+
 
 // Motion direction control (1 for normal direction, -1 for reversed)
 #define MOTION_DIRECTION -1  // Set to -1 to reverse all motion
 
 // Homing parameters
 #define HOME_TIMEOUT_MS 60000            // Timeout for homing operation (1 minute)
-#define SENSOR_DEBOUNCE_MS 50            // Debounce time for home sensor in milliseconds
+#define HOMING_DIRECTION -1               // Direction to move toward hard stop (1 for positive, -1 for negative)
+#define HOME_APPROACH_VELOCITY_RPM 50   // Initial approach velocity in RPM (faster)
+#define HOME_FINAL_VELOCITY_RPM 25       // Slower velocity for final approach to hard stop in RPM
+#define HOME_APPROACH_TIME_MS 2000       // Time to move at the initial approach velocity
+#define HOME_OFFSET_DISTANCE_MM 5.0      // Distance to move away from hard stop in mm
+#define HOME_HLFB_CHECK_INTERVAL_MS 20   // Time to wait between HLFB state checks
 
-// Homing direction: 1 for positive, -1 for negative
-#define HOMING_DIRECTION 1  // Change to 1 for positive direction
-
-// Move away sequence parameters
-#define MOVE_AWAY_DISTANCE_MM 30.0        // Distance to move away from home sensor (in millimeters)
-#define MOVE_AWAY_TIMEOUT_MS 3000         // Timeout for move away sequence (in milliseconds)
 
 // System travel limits - based on physical measurement
 #define MAX_TRAVEL_MM 1092.2            // Maximum travel in mm (measured)
@@ -60,6 +56,15 @@
 #define POSITION_3_PULSES (PULSES_PER_MM * POSITION_3_MM)       // Position 3 in pulses
 #define POSITION_4_PULSES (PULSES_PER_MM * POSITION_4_MM)       // Position 4 in pulses
 #define POSITION_5_PULSES (PULSES_PER_MM * POSITION_5_MM)       // Position 5 in pulses
+
+// Jog parameters
+#define DEFAULT_JOG_INCREMENT_SMALL 1.0   // Small jog increment (1mm)
+#define DEFAULT_JOG_INCREMENT_MEDIUM 5.0  // Medium jog increment (5mm)
+#define DEFAULT_JOG_INCREMENT_LARGE 20.0  // Large jog increment (20mm)
+
+#define JOG_SPEED_SLOW 25       // 25 RPM (slow)
+#define JOG_SPEED_NORMAL 100     // 100 RPM (medium)
+#define JOG_SPEED_FAST 300       // 300 RPM (fast)
 
 // ----------------- Type Definitions -----------------
 
@@ -90,6 +95,14 @@ extern PositionTarget currentPosition;   // Current target position
 extern int32_t currentVelMax;            // Current velocity maximum in pulse/sec
 extern int32_t currentAccelMax;          // Current acceleration maximum in pulse/sec²
 extern bool homingInProgress;            // Flag indicating if homing is in progress
+extern bool motorEnableCycleInProgress;
+extern unsigned long enableCycleStartTime;
+extern bool motorDisablePhaseComplete;
+
+
+// External variables for jog settings
+extern double currentJogIncrementMm;  // Current jog increment in mm
+extern int currentJogSpeedRpm;        // Current jog speed in RPM
 
 // ----------------- Function Declarations -----------------
 
@@ -102,11 +115,11 @@ double ppsToRpm(int32_t pps);                // Convert Pulses Per Second to RPM
 int32_t rpmPerSecToPpsPerSec(double rpmPerSec); // Convert RPM/s to Pulses/s^2
 
 // Homing functions
-bool homeSensorTriggered();
-bool startHoming();
-void checkHomingProgress();
+bool initiateHomingSequence();
+void executeHomingSequence();
 bool isHomingComplete();
-void checkHomeSensor();
+void cycleMotorEnableForHoming();
+
 
 // Motion control functions
 bool moveToPosition(PositionTarget position);
@@ -209,5 +222,12 @@ int32_t mmToPulses(double mm);
  */
 double pulsesToMm(int32_t pulses);
 void checkMoveProgress();
+
+// Jog control functions
+bool jogMotor(bool direction, double customIncrement = -1.0);
+bool setJogIncrement(double increment);
+bool setJogSpeed(int speedRpm);
+bool setJogPreset(char size);
+bool setJogSpeedPreset(char speed);
 
 #endif // MOTOR_CONTROLLER_H

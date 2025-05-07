@@ -63,7 +63,7 @@ void logSystemState()
     Serial.print("mm");
 
     // Add encoder count information with available data
-    Serial.print(" (Commanded: ");
+    Serial.print(" Commanded: ");
     // Show counts as positive 
     Serial.print(abs(MOTOR_CONNECTOR.PositionRefCommanded()));
     Serial.print(" counts, Speed: ");
@@ -77,13 +77,6 @@ void logSystemState()
     Serial.print(", Homed=");
     Serial.print(isHomed ? "YES" : "NO");
     
-    // Home sensor status
-    Serial.print(", HomeSensor=");
-    bool pinState = digitalRead(HOME_SENSOR_PIN);
-    Serial.print(pinState ? "HIGH" : "LOW");
-    Serial.print(" (");
-    Serial.print(pinState == HIGH ? "TRIGGERED" : "NOT_TRIGGERED");
-    Serial.print(")");
     
     // Add to the end of your logSystemState() function:
     Serial.print(", E-Stop=");
@@ -92,7 +85,59 @@ void logSystemState()
     } else {
         Serial.print("RELEASED (READY)");
     }
-    
+
+    // Get the absolute value of actual velocity for display purposes
+    int32_t currentVelocity = MOTOR_CONNECTOR.VelocityRefCommanded();
+    double currentVelocityRpm = abs((double)currentVelocity * 60.0 / PULSES_PER_REV);
+
+    // Display current velocity with % of limit
+    Serial.print(", Velocity=");
+    Serial.print(currentVelocityRpm, 1); // With one decimal
+    Serial.print("RPM");
+    if (currentVelocityRpm > 0) {
+        Serial.print("(");
+        Serial.print((int)(currentVelocityRpm * 100 / ppsToRpm(currentVelMax)));
+        Serial.print("%)");
+    }
+
+    // Display limit (keep this if still needed, or consider removing to reduce log length)
+    Serial.print(", VelLimit=");
+    Serial.print(ppsToRpm(currentVelMax), 0); // Without decimal
+    Serial.print("RPM(");
+    // Show percentage of max allowed
+    Serial.print((int)(ppsToRpm(currentVelMax) * 100 / MOTOR_VELOCITY_RPM));
+    Serial.print("%)");
+
+    Serial.print(", AccelLimit=");
+    Serial.print((double)currentAccelMax * 60.0 / PULSES_PER_REV, 0); // Convert to RPM/s
+    Serial.print("RPM/s(");
+    // Show percentage of max allowed
+    Serial.print((int)((double)currentAccelMax * 60.0 / PULSES_PER_REV * 100 / MAX_ACCEL_RPM_PER_SEC));
+    Serial.print("%)");
+
+    // Add jog settings if jog functionality is implemented
+    Serial.print(", JogInc=");
+    Serial.print(currentJogIncrementMm, 1);
+    Serial.print("mm");
+    // Display preset name if using standard preset
+    if (currentJogIncrementMm == DEFAULT_JOG_INCREMENT_SMALL) 
+        Serial.print("(Small)");
+    else if (currentJogIncrementMm == DEFAULT_JOG_INCREMENT_MEDIUM) 
+        Serial.print("(Medium)");
+    else if (currentJogIncrementMm == DEFAULT_JOG_INCREMENT_LARGE) 
+        Serial.print("(Large)");
+
+    Serial.print(", JogSpeed=");
+    Serial.print(currentJogSpeedRpm, 0);
+    Serial.print("RPM");
+    // Display speed preset name
+    if (currentJogSpeedRpm == JOG_SPEED_SLOW) 
+        Serial.print("(Slow)");
+    else if (currentJogSpeedRpm == JOG_SPEED_NORMAL)
+        Serial.print("(Normal)");
+    else if (currentJogSpeedRpm == JOG_SPEED_FAST)
+        Serial.print("(Fast)");
+
     // End the line
     Serial.println();
 }
