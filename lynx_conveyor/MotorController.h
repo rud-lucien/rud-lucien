@@ -44,29 +44,38 @@
 #define MAX_TRAVEL_PULSES (int32_t)(MAX_TRAVEL_MM * PULSES_PER_MM)  // ~65,142 counts
 
 // Position definitions (in mm from home)
-#define POSITION_1_MM 0.0                // Position 1 (home position)
-#define POSITION_2_MM (MAX_TRAVEL_MM * 0.25)  // Position 2 (25% = ~273 mm) 
-#define POSITION_3_MM (MAX_TRAVEL_MM * 0.5)   // Position 3 (50% = ~546 mm)
-#define POSITION_4_MM (MAX_TRAVEL_MM * 0.75)  // Position 4 (75% = ~819 mm)
-#define POSITION_5_MM MAX_TRAVEL_MM          // Position 5 (max = 1092.2 mm)
+#define POSITION_HOME_MM 0.0               // Home position
+#define POSITION_1_MM (MAX_TRAVEL_MM * 0.25)  // Position 1 (~273 mm) 
+#define POSITION_2_MM (MAX_TRAVEL_MM * 0.5)   // Position 2 (~546 mm)
+#define POSITION_3_MM (MAX_TRAVEL_MM * 0.75)  // Position 3 (~819 mm)
+#define POSITION_4_MM MAX_TRAVEL_MM          // Position 4 (max = 1092.2 mm)
 
 // Position definitions in pulses (calculated from mm)
+#define POSITION_HOME_PULSES (PULSES_PER_MM * POSITION_HOME_MM)    // Home position in pulses
 #define POSITION_1_PULSES (PULSES_PER_MM * POSITION_1_MM)       // Position 1 in pulses
 #define POSITION_2_PULSES (PULSES_PER_MM * POSITION_2_MM)       // Position 2 in pulses  
 #define POSITION_3_PULSES (PULSES_PER_MM * POSITION_3_MM)       // Position 3 in pulses
 #define POSITION_4_PULSES (PULSES_PER_MM * POSITION_4_MM)       // Position 4 in pulses
-#define POSITION_5_PULSES (PULSES_PER_MM * POSITION_5_MM)       // Position 5 in pulses
 
 // Jog parameters
-#define DEFAULT_JOG_INCREMENT_SMALL 1.0   // Small jog increment (1mm)
-#define DEFAULT_JOG_INCREMENT_MEDIUM 5.0  // Medium jog increment (5mm)
-#define DEFAULT_JOG_INCREMENT_LARGE 20.0  // Large jog increment (20mm)
+#define DEFAULT_JOG_INCREMENT 1.0   // Defualt jog increment (1mm)
 
-#define JOG_SPEED_SLOW 25       // 25 RPM (slow)
-#define JOG_SPEED_NORMAL 100     // 100 RPM (medium)
-#define JOG_SPEED_FAST 300       // 300 RPM (fast)
+
+#define DEFAULT_JOG_SPEED 30       // 30 RPM (slow)
+
 
 // ----------------- Type Definitions -----------------
+
+// Position targets
+typedef enum {
+    POSITION_UNDEFINED = -1,
+    POSITION_HOME = 0,
+    POSITION_1 = 1,
+    POSITION_2 = 2,
+    POSITION_3 = 3,
+    POSITION_4 = 4,
+    POSITION_CUSTOM = 99
+} PositionTarget;
 
 enum MotorState {
     MOTOR_STATE_IDLE,
@@ -74,15 +83,6 @@ enum MotorState {
     MOTOR_STATE_HOMING,
     MOTOR_STATE_FAULTED,
     MOTOR_STATE_NOT_READY
-};
-
-enum PositionTarget {
-    POSITION_1,
-    POSITION_2,
-    POSITION_3,
-    POSITION_4,
-    POSITION_5,
-    POSITION_CUSTOM
 };
 
 // ----------------- Global Variables -----------------
@@ -99,6 +99,15 @@ extern bool motorEnableCycleInProgress;
 extern unsigned long enableCycleStartTime;
 extern bool motorDisablePhaseComplete;
 
+// Target tracking for logging
+extern bool hasCurrentTarget;
+extern bool hasLastTarget;
+extern PositionTarget currentTargetType;
+extern PositionTarget lastTargetType;
+extern double currentTargetPositionMm;
+extern double lastTargetPositionMm;
+extern int32_t currentTargetPulses;
+extern int32_t lastTargetPulses;
 
 // External variables for jog settings
 extern double currentJogIncrementMm;  // Current jog increment in mm
@@ -192,7 +201,7 @@ bool isMotorAtPosition();
 bool isMotorInPosition();
 bool hasMotorFault();
 MotorState updateMotorState();
-void clearMotorFault();
+bool clearMotorFaultWithStatus();
 void clearMotorFaults();
 /**
  * Get the current motor position in millimeters
@@ -203,7 +212,7 @@ void clearMotorFaults();
 double getMotorPositionMm();
 void printMotorStatus();
 void printMotorAlerts();
-bool testMotorRange();
+
 
 // Helper functions
 /**
@@ -227,7 +236,7 @@ void checkMoveProgress();
 bool jogMotor(bool direction, double customIncrement = -1.0);
 bool setJogIncrement(double increment);
 bool setJogSpeed(int speedRpm);
-bool setJogPreset(char size);
-bool setJogSpeedPreset(char speed);
+// bool setJogPreset(char size);
+// bool setJogSpeedPreset(char speed);
 
 #endif // MOTOR_CONTROLLER_H

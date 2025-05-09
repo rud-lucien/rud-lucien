@@ -10,14 +10,24 @@ MotorState motorState = MOTOR_STATE_NOT_READY;
 PositionTarget currentPosition = POSITION_1;
 bool homingInProgress = false;
 unsigned long homingStartTime = 0;
-double currentJogIncrementMm = DEFAULT_JOG_INCREMENT_SMALL;
-int currentJogSpeedRpm = JOG_SPEED_SLOW;
+double currentJogIncrementMm = DEFAULT_JOG_INCREMENT;
+int currentJogSpeedRpm = DEFAULT_JOG_SPEED;
 bool cycleFasterHomingInProgress = false;
 unsigned long enableToggleStartTime = 0;
 bool motorWasDisabled = false;
 bool motorEnableCycleInProgress = false;
 unsigned long enableCycleStartTime = 0;
 bool motorDisablePhaseComplete = false;
+
+// Target tracking for logging
+bool hasCurrentTarget = false;
+bool hasLastTarget = false;
+PositionTarget currentTargetType = POSITION_UNDEFINED;
+PositionTarget lastTargetType = POSITION_UNDEFINED;
+double currentTargetPositionMm = 0.0;
+double lastTargetPositionMm = 0.0;
+int32_t currentTargetPulses = 0;
+int32_t lastTargetPulses = 0;
 
 // ----------------- Utility Functions -----------------
 
@@ -112,6 +122,7 @@ void initMotorSystem() {
     if (ready) {
         Serial.println("Motor initialized and ready");
         motorInitialized = true;
+        motorState = MOTOR_STATE_IDLE;  
     } else {
         Serial.println("Motor initialization timed out or failed");
         Serial.print("HLFB State: ");
@@ -154,59 +165,53 @@ bool moveToAbsolutePosition(int32_t position) {
     return true;
 }
 
-bool moveToPosition(int positionNumber) {
-    int32_t targetPosition;
-    
-    // Determine which position to move to
-    switch (positionNumber) {
-        case 1:
-            targetPosition = POSITION_1_PULSES;
-            break;
-        case 2:
-            targetPosition = POSITION_2_PULSES;
-            break;
-        case 3:
-            targetPosition = POSITION_3_PULSES;
-            break;
-        case 4:
-            targetPosition = POSITION_4_PULSES;
-            break;
-        case 5:
-            targetPosition = POSITION_5_PULSES;
-            break;
-        default:
-            Serial.println("Invalid position number. Use 1-5.");
-            return false;
-    }
-    
-    return moveToAbsolutePosition(targetPosition);
-}
-
 bool moveToPosition(PositionTarget position) {
-    double targetPositionMm = 0.0;
+    // Set current target for logging
+    hasCurrentTarget = true;
+    currentTargetType = position;
     
     switch (position) {
+        case POSITION_HOME:
+            currentTargetPositionMm = POSITION_HOME_MM;
+            currentTargetPulses = POSITION_HOME_PULSES;
+            return moveToAbsolutePosition(POSITION_HOME_PULSES);
         case POSITION_1:
-            targetPositionMm = POSITION_1_MM;
-            break;
+            currentTargetPositionMm = POSITION_1_MM;
+            currentTargetPulses = POSITION_1_PULSES;
+            return moveToAbsolutePosition(POSITION_1_PULSES);
         case POSITION_2:
-            targetPositionMm = POSITION_2_MM;
-            break;
+            currentTargetPositionMm = POSITION_2_MM;
+            currentTargetPulses = POSITION_2_PULSES;
+            return moveToAbsolutePosition(POSITION_2_PULSES);
         case POSITION_3:
-            targetPositionMm = POSITION_3_MM;
-            break;
+            currentTargetPositionMm = POSITION_3_MM;
+            currentTargetPulses = POSITION_3_PULSES;
+            return moveToAbsolutePosition(POSITION_3_PULSES);
         case POSITION_4:
-            targetPositionMm = POSITION_4_MM;
-            break;
-        case POSITION_5:
-            targetPositionMm = POSITION_5_MM;
-            break;
+            currentTargetPositionMm = POSITION_4_MM;
+            currentTargetPulses = POSITION_4_PULSES;
+            return moveToAbsolutePosition(POSITION_4_PULSES);
         default:
-            Serial.println("Invalid position target");
+            hasCurrentTarget = false;
             return false;
     }
-    
-    return moveToPositionMm(targetPositionMm);
+}
+
+bool moveToPosition(int positionNumber) {
+    switch (positionNumber) {
+        case 0:  // "home" as position 0
+            return moveToPosition(POSITION_HOME);
+        case 1:
+            return moveToPosition(POSITION_1);
+        case 2:
+            return moveToPosition(POSITION_2);
+        case 3:
+            return moveToPosition(POSITION_3);
+        case 4:
+            return moveToPosition(POSITION_4);
+        default:
+            return false;
+    }
 }
 
 bool moveToPositionMm(double positionMm) {
@@ -222,14 +227,19 @@ bool moveToPositionMm(double positionMm) {
     
     int32_t pulsePosition = mmToPulses(positionMm);
     
-    if (moveToAbsolutePosition(pulsePosition)) {
-        currentPosition = POSITION_CUSTOM;
-        currentPositionMm = positionMm;
-        motorState = MOTOR_STATE_MOVING;
-        return true;
-    }
+    // Set current target for logging
+    hasCurrentTarget = true;
+    currentTargetType = POSITION_CUSTOM;
+    currentTargetPositionMm = positionMm;
+    currentTargetPulses = pulsePosition;
     
-    return false;
+    if (moveToAbsolutePosition(pulsePosition)) {
+        return true;
+    } else {
+        // Clear current target if movement failed
+        hasCurrentTarget = false;
+        return false;
+    }
 }
 
 bool moveRelative(double relativeMm) {
@@ -347,36 +357,6 @@ bool setJogSpeed(int speedRpm) {
     Serial.println(" RPM");
     
     return true;
-}
-
-// Convenience function for preset increments
-bool setJogPreset(char size) {
-    switch (size) {
-        case 's': // Small
-            return setJogIncrement(DEFAULT_JOG_INCREMENT_SMALL);
-        case 'm': // Medium
-            return setJogIncrement(DEFAULT_JOG_INCREMENT_MEDIUM);
-        case 'l': // Large
-            return setJogIncrement(DEFAULT_JOG_INCREMENT_LARGE);
-        default:
-            Serial.println("Invalid jog preset. Use 's', 'm', or 'l'");
-            return false;
-    }
-}
-
-// Convenience function for preset speeds
-bool setJogSpeedPreset(char speed) {
-    switch (speed) {
-        case 's': // Slow
-            return setJogSpeed(JOG_SPEED_SLOW);
-        case 'n': // Normal
-            return setJogSpeed(JOG_SPEED_NORMAL);
-        case 'f': // Fast
-            return setJogSpeed(JOG_SPEED_FAST);
-        default:
-            Serial.println("Invalid jog speed preset. Use 's', 'n', or 'f'");
-            return false;
-    }
 }
 
 // ----------------- Status Functions -----------------
@@ -533,122 +513,15 @@ void clearMotorFaults() {
     }
 }
 
-void clearMotorFault() {
+bool clearMotorFaultWithStatus() {
+    bool hadAlerts = MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent;
+    
     clearMotorFaults(); // Use the existing implementation
+    
+    // Return success if alerts were cleared or weren't present to begin with
+    return !MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent;
 }
 
-bool testMotorRange() {
-    Serial.println("Testing motor range with small steps...");
-    
-    // Check if the system has been homed
-    if (!isHomed) {
-        Serial.println("Error: Motor must be homed before running range test");
-        Serial.println("Please run the 'home' command first to establish position reference");
-        return false;
-    }
-    
-    // Clear any existing faults first
-    clearMotorFaults();
-    
-    // Set conservative velocity and acceleration
-    double testVelocityRpm = 30.0;    // 30 RPM (slow)
-    double testAccelRpmPerSec = 500.0; // 500 RPM/s (moderate)
-    
-    Serial.print("Setting test velocity to ");
-    Serial.print(testVelocityRpm);
-    Serial.println(" RPM");
-    
-    Serial.print("Setting test acceleration to ");
-    Serial.print(testAccelRpmPerSec);
-    Serial.println(" RPM/s");
-    
-    // Convert to pulses for the API
-    currentVelMax = rpmToPps(testVelocityRpm);
-    currentAccelMax = rpmPerSecToPpsPerSec(testAccelRpmPerSec);
-    
-    MOTOR_CONNECTOR.VelMax(currentVelMax);
-    MOTOR_CONNECTOR.AccelMax(currentAccelMax);
-    
-    // Start with very small movements
-    for (int i = 1; i <= 5; i++) {
-        int32_t testDistance = i * 100;  // Try 100, 200, 300, 400, 500 pulses
-        
-        // Limit test distance to max travel (positive direction)
-        if (testDistance > MAX_TRAVEL_PULSES) {
-            Serial.print("Limiting test distance to maximum travel (");
-            Serial.print(MAX_TRAVEL_PULSES);
-            Serial.println(" pulses)");
-            testDistance = MAX_TRAVEL_PULSES;
-        }
-        
-        // Ensure we don't try to move in negative direction
-        // Since positive pulses move toward maximum travel with MOTION_DIRECTION=-1
-        if ((testDistance * MOTION_DIRECTION) < 0) {
-            Serial.println("Warning: Test would move beyond home position - skipping");
-            testDistance = 0; // Safe position - stay at home
-        }
-        
-        Serial.print("Testing movement of ");
-        Serial.print(testDistance);
-        Serial.print(" pulses (approx. ");
-        Serial.print((double)testDistance / PULSES_PER_REV);
-        Serial.println(" revolutions)");
-        
-        // Move to the test distance
-        MOTOR_CONNECTOR.Move(testDistance, MotorDriver::MOVE_TARGET_ABSOLUTE);
-        
-        // Wait for move to complete or fault
-        unsigned long startTime = millis();
-        while (!MOTOR_CONNECTOR.StepsComplete() && 
-               !MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent &&
-               millis() - startTime < 2000) {
-            delay(10);
-        }
-        
-        // Check what happened
-        if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-            Serial.print("Motor fault at ");
-            Serial.print(testDistance);
-            Serial.println(" pulses.");
-            printMotorAlerts();
-            return false;
-        }
-        
-        Serial.print("Successfully moved to ");
-        Serial.print(testDistance);
-        Serial.println(" pulses.");
-        delay(500);  // Pause between movements
-    }
-    
-    // Return to position 0
-    Serial.println("Returning to home position...");
-    MOTOR_CONNECTOR.Move(0, MotorDriver::MOVE_TARGET_ABSOLUTE);
-    
-    // Wait for move to complete
-    unsigned long startTime = millis();
-    while (!MOTOR_CONNECTOR.StepsComplete() && 
-           !MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent &&
-           millis() - startTime < 2000) {
-        delay(10);
-    }
-    
-    if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-        Serial.println("Motor fault during return to home.");
-        printMotorAlerts();
-        return false;
-    }
-    
-    // Restore original velocity and acceleration
-    currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-    currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
-    
-    MOTOR_CONNECTOR.VelMax(currentVelMax);
-    MOTOR_CONNECTOR.AccelMax(currentAccelMax);
-    
-    Serial.println("Motor range test completed successfully.");
-    Serial.println("Restored original velocity and acceleration limits.");
-    return true;
-}
 
 // ----------------- Homing Functions -----------------
 
@@ -666,6 +539,12 @@ bool initiateHomingSequence() {
         Serial.println("Please run 'clear fault' command first");
         return false;
     }
+    
+    // Set current target for logging to indicate we're homing
+    hasCurrentTarget = true;
+    currentTargetType = POSITION_HOME;
+    currentTargetPositionMm = 0.0;
+    currentTargetPulses = 0;
     
     // Start the non-blocking enable cycle
     Serial.println("Cycling motor enable to trigger automatic homing...");
@@ -880,26 +759,37 @@ void abortHoming() {
 // ----------------- Movement Progress Functions -----------------
 
 void checkMoveProgress() {
+    static MotorState previousState = MOTOR_STATE_NOT_READY;
+
     // Only check if the motor is in the moving state
-    if (motorState != MOTOR_STATE_MOVING) {
-        return;
+    if (motorState == MOTOR_STATE_MOVING) {
+        // Update the current position based on the commanded position
+        currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
     }
-    
-    // Update the current position based on the commanded position
-    currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
-    
+
     // Check if the move has completed
-    if (isMotorInPosition()) {
+    if (previousState == MOTOR_STATE_MOVING && motorState == MOTOR_STATE_IDLE) {
         Serial.println("Move completed successfully");
         motorState = MOTOR_STATE_IDLE;
+
+        // Movement completed successfully, update last target
+        if (hasCurrentTarget) {
+            hasLastTarget = true;
+            lastTargetType = currentTargetType;
+            lastTargetPositionMm = currentTargetPositionMm;
+            lastTargetPulses = currentTargetPulses;
+            hasCurrentTarget = false; // Clear current target
+        }
     }
-    
+
     // Check for motor faults during motion
     else if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
         Serial.println("Motor fault detected during movement:");
         printMotorAlerts();
         motorState = MOTOR_STATE_FAULTED;
     }
+
+    previousState = motorState;
 }
 
 // ----------------- E-stop Functions -----------------

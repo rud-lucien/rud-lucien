@@ -6,6 +6,7 @@
 #include "MotorController.h"
 
 // Test function declarations
-void testHomingRepeatability();
+bool testHomingRepeatability();
+bool testMotorRange(); 
 
 #endif // TESTS_H

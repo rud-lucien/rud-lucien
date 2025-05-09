@@ -2,7 +2,7 @@
 #include "MotorController.h"
 
 // Test homing repeatability by performing multiple home-move cycles
-void testHomingRepeatability() {
+bool testHomingRepeatability() {
     const int NUM_CYCLES = 20;          // Number of test cycles to run
     const double TEST_POSITION_MM = 150.0;  // Position to move to during each cycle
     const unsigned long WAIT_TIME_MS = 5000;  // Wait time between operations (5 sec)
@@ -22,6 +22,7 @@ void testHomingRepeatability() {
         PHASE_PAUSE_AFTER_MOVE,            // Renamed: Clearly shows this is just a timed pause
         PHASE_REPEAT_HOMING,
         PHASE_WAIT_FOR_REPEAT_HOME,        // Renamed: Clearer purpose
+        PHASE_PAUSE_BEFORE_NEXT_CYCLE,     // Add this new state
         PHASE_COMPLETE
     };
     
@@ -31,13 +32,13 @@ void testHomingRepeatability() {
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
         Serial.println("Error: Motor has active alerts - clear faults before testing");
         printMotorAlerts();
-        return;
+        return false;
     }
     
     // Check if motor is initialized
     if (!motorInitialized) {
         Serial.println("Error: Motor not initialized - run 'motor init' first");
-        return;
+        return false;
     }
     
     
@@ -58,7 +59,7 @@ void testHomingRepeatability() {
             Serial.println("Test aborted by user");
             stopMotion();
             motorState = MOTOR_STATE_IDLE;
-            break;
+            return false;
         }
         
         // Check for E-Stop condition
@@ -66,7 +67,7 @@ void testHomingRepeatability() {
             Serial.println("E-STOP detected during test! Aborting immediately.");
             // No need to call stopMotion() as the main handleEStop() will handle it
             testRunning = false;
-            break;
+            return false;
         }
         
         // Check motor state and proceed with test phases
@@ -88,7 +89,7 @@ void testHomingRepeatability() {
                 if (!initiateHomingSequence()) {
                     Serial.println("Error starting homing operation. Aborting test.");
                     testRunning = false;
-                    break;
+                    return false;
                 }
                 currentPhase = PHASE_WAIT_FOR_HOMING_COMPLETE;
                 break;
@@ -129,6 +130,7 @@ void testHomingRepeatability() {
                 else if (motorState == MOTOR_STATE_FAULTED) {
                     Serial.println("Homing failed. Aborting test.");
                     testRunning = false;
+                    return false;
                 }
                 // Use a timeout longer than the internal one in executeHomingSequence (which is 60 seconds)
                 // But DO NOT proceed if homing hasn't completed successfully
@@ -149,6 +151,7 @@ void testHomingRepeatability() {
                     Serial.println("CRITICAL: Cannot proceed without successful homing. Aborting test.");
                     stopMotion(); // Stop any motion to be safe
                     testRunning = false; // Abort the test
+                    return false;
                 }
                 break;
                 
@@ -167,7 +170,7 @@ void testHomingRepeatability() {
                 if (!moveToPositionMm(TEST_POSITION_MM)) {
                     Serial.println("Error during movement. Aborting test.");
                     testRunning = false;
-                    break;
+                    return false;
                 }
                 currentPhase = PHASE_WAIT_FOR_MOVE_COMPLETE;
                 break;
@@ -207,6 +210,7 @@ void testHomingRepeatability() {
                 else if (motorState == MOTOR_STATE_FAULTED) {
                     Serial.println("Movement failed. Aborting test.");
                     testRunning = false;
+                    return false;
                 }
                 // Add a timeout after a reasonable amount of time
                 else if (currentTime - lastActionTime > 60000) { // Increased to 60 seconds
@@ -214,6 +218,7 @@ void testHomingRepeatability() {
                     Serial.println("Movement took too long. Aborting test.");
                     stopMotion(); // Safety stop
                     testRunning = false;
+                    return false;
                 }
                 break;
                 
@@ -230,7 +235,7 @@ void testHomingRepeatability() {
                 if (!initiateHomingSequence()) {
                     Serial.println("Error starting repeat homing operation. Aborting test.");
                     testRunning = false;
-                    break;
+                    return false;
                 }
                 currentPhase = PHASE_WAIT_FOR_REPEAT_HOME;
                 break;
@@ -274,14 +279,15 @@ void testHomingRepeatability() {
                     if (cyclesCompleted >= NUM_CYCLES) {
                         currentPhase = PHASE_COMPLETE;
                     } else {
-                        // Brief pause before starting next cycle
-                        delay(2000);
-                        currentPhase = PHASE_START;
+                        // Instead of delay, set up for non-blocking pause
+                        lastActionTime = currentTime; // Reset timer
+                        currentPhase = PHASE_PAUSE_BEFORE_NEXT_CYCLE; // Move to pause state
                     }
                 }
                 else if (motorState == MOTOR_STATE_FAULTED) {
                     Serial.println("Repeat homing failed. Aborting test.");
                     testRunning = false;
+                    return false;
                 }
                 // Use a timeout longer than the internal one
                 else if (currentTime - lastActionTime > 70000) {
@@ -289,6 +295,13 @@ void testHomingRepeatability() {
                     Serial.println("Cannot proceed without successful homing. Aborting test.");
                     stopMotion(); // Safety stop
                     testRunning = false;
+                    return false;
+                }
+                break;
+                
+            case PHASE_PAUSE_BEFORE_NEXT_CYCLE:
+                if (currentTime - lastActionTime >= 2000) { // 2 second non-blocking pause
+                    currentPhase = PHASE_START; // Move to next cycle after pause
                 }
                 break;
                 
@@ -298,10 +311,193 @@ void testHomingRepeatability() {
                 Serial.print(cyclesCompleted);
                 Serial.println(" cycles.");
                 testRunning = false;
+                return true; // Success! All cycles completed.
                 break;
         }
         
         // Give time for processing other operations
-        delay(10);
+        delayMicroseconds(100);
     }
+    
+    // This line should only be reached if testRunning became false without hitting a return
+    // In that case, the test did not complete successfully
+    return false;
+}
+
+bool testMotorRange() {
+    Serial.println("Testing motor range with small steps...");
+    
+    // State variables for non-blocking operation
+    enum TestState {
+        STATE_START,
+        STATE_MOVING,
+        STATE_WAIT_BETWEEN_MOVES,
+        STATE_RETURN_HOME,
+        STATE_COMPLETE
+    };
+    
+    static TestState currentState = STATE_START;
+    static int currentStep = 1;
+    static unsigned long lastActionTime = 0;
+    static int32_t testDistance = 0;
+    
+    // Check if the system has been homed
+    if (!isHomed) {
+        Serial.println("Error: Motor must be homed before running range test");
+        Serial.println("Please run the 'home' command first to establish position reference");
+        return false;
+    }
+    
+    // Clear any existing faults first
+    clearMotorFaults();
+    
+    // Set conservative velocity and acceleration
+    double testVelocityRpm = 30.0;    // 30 RPM (slow)
+    double testAccelRpmPerSec = 500.0; // 500 RPM/s (moderate)
+    
+    Serial.print("Setting test velocity to ");
+    Serial.print(testVelocityRpm);
+    Serial.println(" RPM");
+    
+    Serial.print("Setting test acceleration to ");
+    Serial.print(testAccelRpmPerSec);
+    Serial.println(" RPM/s");
+    
+    // Convert to pulses for the API
+    currentVelMax = rpmToPps(testVelocityRpm);
+    currentAccelMax = rpmPerSecToPpsPerSec(testAccelRpmPerSec);
+    
+    MOTOR_CONNECTOR.VelMax(currentVelMax);
+    MOTOR_CONNECTOR.AccelMax(currentAccelMax);
+    
+    bool testRunning = true;
+    
+    while (testRunning) {
+        // Always check for E-STOP first (non-blocking)
+        if (isEStopActive()) {
+            Serial.println("E-STOP detected during test! Aborting immediately.");
+            currentState = STATE_COMPLETE;
+            return false;
+        }
+        
+        // Check for user abort
+        if (Serial.available() > 0) {
+            Serial.println("Test aborted by user");
+            stopMotion();
+            currentState = STATE_COMPLETE;
+            return false;
+        }
+        
+        unsigned long currentTime = millis();
+        
+        switch (currentState) {
+            case STATE_START:
+                if (currentStep <= 5) {
+                    testDistance = currentStep * 100;  // Try 100, 200, 300, 400, 500 pulses
+                    
+                    // Limit test distance to max travel (positive direction)
+                    if (testDistance > MAX_TRAVEL_PULSES) {
+                        Serial.print("Limiting test distance to maximum travel (");
+                        Serial.print(MAX_TRAVEL_PULSES);
+                        Serial.println(" pulses)");
+                        testDistance = MAX_TRAVEL_PULSES;
+                    }
+                    
+                    // Ensure we don't try to move in negative direction
+                    if ((testDistance * MOTION_DIRECTION) < 0) {
+                        Serial.println("Warning: Test would move beyond home position - skipping");
+                        testDistance = 0; // Safe position - stay at home
+                    }
+                    
+                    Serial.print("Testing movement of ");
+                    Serial.print(testDistance);
+                    Serial.print(" pulses (approx. ");
+                    Serial.print((double)testDistance / PULSES_PER_REV);
+                    Serial.println(" revolutions)");
+                    
+                    // Move to the test distance
+                    MOTOR_CONNECTOR.Move(testDistance, MotorDriver::MOVE_TARGET_ABSOLUTE);
+                    lastActionTime = currentTime;
+                    currentState = STATE_MOVING;
+                } else {
+                    // All steps done, return home
+                    Serial.println("Returning to home position...");
+                    MOTOR_CONNECTOR.Move(0, MotorDriver::MOVE_TARGET_ABSOLUTE);
+                    lastActionTime = currentTime;
+                    currentState = STATE_RETURN_HOME;
+                }
+                break;
+                
+            case STATE_MOVING:
+                // Check for move completion or fault
+                if (MOTOR_CONNECTOR.StepsComplete()) {
+                    Serial.print("Successfully moved to ");
+                    Serial.print(testDistance);
+                    Serial.println(" pulses.");
+                    lastActionTime = currentTime;
+                    currentState = STATE_WAIT_BETWEEN_MOVES;
+                }
+                else if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
+                    Serial.print("Motor fault at ");
+                    Serial.print(testDistance);
+                    Serial.println(" pulses.");
+                    printMotorAlerts();
+                    return false;
+                }
+                else if (currentTime - lastActionTime > 5000) {
+                    // Timeout - 5 seconds should be enough for these short moves
+                    Serial.println("Move timed out. Aborting test.");
+                    return false;
+                }
+                break;
+                
+            case STATE_WAIT_BETWEEN_MOVES:
+                // Non-blocking wait between moves (500ms)
+                if (currentTime - lastActionTime >= 500) {
+                    currentStep++;
+                    currentState = STATE_START;
+                }
+                break;
+                
+            case STATE_RETURN_HOME:
+                // Check for home move completion or fault
+                if (MOTOR_CONNECTOR.StepsComplete()) {
+                    // Test complete, restore original settings
+                    currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+                    currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
+                    
+                    MOTOR_CONNECTOR.VelMax(currentVelMax);
+                    MOTOR_CONNECTOR.AccelMax(currentAccelMax);
+                    
+                    Serial.println("Motor range test completed successfully.");
+                    Serial.println("Restored original velocity and acceleration limits.");
+                    currentState = STATE_COMPLETE;
+                    testRunning = false;
+                    return true;
+                }
+                else if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
+                    Serial.println("Motor fault during return to home.");
+                    printMotorAlerts();
+                    return false;
+                }
+                else if (currentTime - lastActionTime > 5000) {
+                    // Timeout
+                    Serial.println("Return to home timed out. Aborting test.");
+                    return false;
+                }
+                break;
+                
+            case STATE_COMPLETE:
+                testRunning = false;
+                return true;
+        }
+        
+        delayMicroseconds(100); // Much shorter than delay(10)
+    }
+    
+    // Reset state for next test
+    currentState = STATE_START;
+    currentStep = 1;
+    
+    return false; // Should never reach here
 }
