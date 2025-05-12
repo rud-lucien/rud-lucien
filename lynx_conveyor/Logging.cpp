@@ -9,7 +9,7 @@ const unsigned long DEFAULT_LOG_INTERVAL = 500; // Default interval of 500ms
 
 void logSystemState()
 {
-    Serial.print("STATE: ");
+    Serial.print("[LOG] ");
     
     // 1. DEVICE STATUS GROUP
     // Valve status
@@ -48,33 +48,24 @@ void logSystemState()
     Serial.print(", E-Stop=");
     Serial.print(isEStopActive() ? "TRIGGERED" : "RELEASED");
     
-    // 2. POSITION GROUP
-    // Current position with encoder counts
+    // 2. POSITION GROUP - Simple, clear format
     Serial.print(" | Pos=");
     double calculatedPositionMm = abs(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()));
+    int32_t currentPulses = abs(MOTOR_CONNECTOR.PositionRefCommanded());
     Serial.print(calculatedPositionMm, 2);
     Serial.print("mm (");
-    Serial.print(abs(MOTOR_CONNECTOR.PositionRefCommanded()));
+    Serial.print(currentPulses);
     Serial.print(" counts)");
     
-    // Target information (moved next to position)
+    // Target information - just show the numerical value if moving
     Serial.print(", Target=");
     if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING) {
         if (hasCurrentTarget) {
-            switch (currentTargetType) {
-                case POSITION_HOME: Serial.print("Home"); break;
-                case POSITION_1: Serial.print("Pos1"); break;
-                case POSITION_2: Serial.print("Pos2"); break;
-                case POSITION_3: Serial.print("Pos3"); break;
-                case POSITION_4: Serial.print("Pos4"); break;
-                case POSITION_CUSTOM: 
-                    Serial.print(currentTargetPositionMm, 2);
-                    Serial.print("mm (");
-                    Serial.print(abs(currentTargetPulses));
-                    Serial.print(" counts)");
-                    break;
-                default: Serial.print("Unknown"); break;
-            }
+            // For all target types, just show the actual position value
+            Serial.print(currentTargetPositionMm, 2);
+            Serial.print("mm (");
+            Serial.print(abs(currentTargetPulses));
+            Serial.print(" counts)");
         } else {
             Serial.print("None");
         }
@@ -82,102 +73,13 @@ void logSystemState()
         Serial.print("None");
     }
     
-    Serial.print(", CurrTarget=");
-    if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING) {
-        if (hasCurrentTarget) {
-            switch (currentTargetType) {
-                case POSITION_HOME:
-                    Serial.print("Home(0.00mm, 0 counts)");
-                    break;
-                case POSITION_1:
-                    Serial.print("Pos1(");
-                    Serial.print(POSITION_1_MM, 2);
-                    Serial.print("mm, ");
-                    Serial.print(abs(POSITION_1_PULSES));
-                    Serial.print(" counts)");
-                    break;
-                case POSITION_2:
-                    Serial.print("Pos2(");
-                    Serial.print(POSITION_2_MM, 2);
-                    Serial.print("mm, ");
-                    Serial.print(abs(POSITION_2_PULSES));
-                    Serial.print(" counts)");
-                    break;
-                case POSITION_3:
-                    Serial.print("Pos3(");
-                    Serial.print(POSITION_3_MM, 2);
-                    Serial.print("mm, ");
-                    Serial.print(abs(POSITION_3_PULSES));
-                    Serial.print(" counts)");
-                    break;
-                case POSITION_4:
-                    Serial.print("Pos4(");
-                    Serial.print(POSITION_4_MM, 2);
-                    Serial.print("mm, ");
-                    Serial.print(abs(POSITION_4_PULSES));
-                    Serial.print(" counts)");
-                    break;
-                case POSITION_CUSTOM:
-                    Serial.print(currentTargetPositionMm, 2);
-                    Serial.print("mm, ");
-                    Serial.print(abs(currentTargetPulses));
-                    Serial.print(" counts");
-                    break;
-                default:
-                    Serial.print("Unknown");
-                    break;
-            }
-        } else {
-            Serial.print("None");
-        }
-    } else {
-        Serial.print("None");
-    }
-    
+    // Last target - simplified to just show the completed position
     Serial.print(", LastTarget=");
     if (hasLastTarget) {
-        switch (lastTargetType) {
-            case POSITION_HOME:
-                Serial.print("Home(0.00mm, 0 counts)");
-                break;
-            case POSITION_1:
-                Serial.print("Pos1(");
-                Serial.print(POSITION_1_MM, 2);
-                Serial.print("mm, ");
-                Serial.print(abs(POSITION_1_PULSES));
-                Serial.print(" counts)");
-                break;
-            case POSITION_2:
-                Serial.print("Pos2(");
-                Serial.print(POSITION_2_MM, 2);
-                Serial.print("mm, ");
-                Serial.print(abs(POSITION_2_PULSES));
-                Serial.print(" counts)");
-                break;
-            case POSITION_3:
-                Serial.print("Pos3(");
-                Serial.print(POSITION_3_MM, 2);
-                Serial.print("mm, ");
-                Serial.print(abs(POSITION_3_PULSES));
-                Serial.print(" counts)");
-                break;
-            case POSITION_4:
-                Serial.print("Pos4(");
-                Serial.print(POSITION_4_MM, 2);
-                Serial.print("mm, ");
-                Serial.print(abs(POSITION_4_PULSES));
-                Serial.print(" counts)");
-                break;
-            case POSITION_CUSTOM:
-                Serial.print(lastTargetPositionMm, 2);
-                Serial.print("mm, ");
-                Serial.print(abs(lastTargetPulses));
-                Serial.print(" counts");
-                break;
-            default:
-                Serial.print("Unknown");
-                break;
-        }
+        Serial.print(lastTargetPositionMm, 2);
+        Serial.print("mm (");
+        Serial.print(abs(lastTargetPulses));
+        Serial.print(" counts)");
     } else {
         Serial.print("None");
     }

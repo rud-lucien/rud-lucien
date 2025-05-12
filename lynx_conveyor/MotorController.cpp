@@ -232,7 +232,8 @@ bool moveToPositionMm(double positionMm) {
     currentTargetType = POSITION_CUSTOM;
     currentTargetPositionMm = positionMm;
     currentTargetPulses = pulsePosition;
-    
+
+       
     if (moveToAbsolutePosition(pulsePosition)) {
         return true;
     } else {
@@ -306,6 +307,18 @@ bool jogMotor(bool direction, double customIncrement) {
     // Calculate movement direction (positive or negative)
     double moveMm = direction ? increment : -increment;
     
+    // Set current position
+    double currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
+    
+    // Calculate target position and set target tracking variables
+    double targetPositionMm = currentPositionMm + moveMm;
+    
+    // Update target tracking variables 
+    hasCurrentTarget = true;
+    currentTargetType = POSITION_CUSTOM;
+    currentTargetPositionMm = targetPositionMm;
+    currentTargetPulses = mmToPulses(targetPositionMm);
+    
     // Log the jog operation
     Serial.print("Jogging ");
     Serial.print(direction ? "forward" : "backward");
@@ -317,6 +330,11 @@ bool jogMotor(bool direction, double customIncrement) {
     
     // Use the existing moveRelative function
     bool result = moveRelative(moveMm);
+    
+    // If movement failed, clear target tracking
+    if (!result) {
+        hasCurrentTarget = false;
+    }
     
     // Reset to original speed after move is commanded
     currentVelMax = originalVelMax;
@@ -760,35 +778,46 @@ void abortHoming() {
 
 void checkMoveProgress() {
     static MotorState previousState = MOTOR_STATE_NOT_READY;
-
-    // Only check if the motor is in the moving state
+    static bool wasMoving = false;
+    
+    // Get current movement state
+    bool isMoving = !MOTOR_CONNECTOR.StepsComplete();
+    
+    // Check if we just transitioned to MOVING state
+    if (motorState == MOTOR_STATE_MOVING && previousState != MOTOR_STATE_MOVING) {
+        wasMoving = true;
+        Serial.println("[DIAGNOSTIC] Movement started - tracking for LastTarget update");
+    }
+    
+    // Update the current position when moving
     if (motorState == MOTOR_STATE_MOVING) {
-        // Update the current position based on the commanded position
         currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
     }
 
-    // Check if the move has completed
-    if (previousState == MOTOR_STATE_MOVING && motorState == MOTOR_STATE_IDLE) {
-        Serial.println("Move completed successfully");
-        motorState = MOTOR_STATE_IDLE;
-
+    // Check if the move has just completed (transition from wasMoving to not moving)
+    if (wasMoving && !isMoving) {
+        Serial.println("[DIAGNOSTIC] Move completed successfully");
+        
         // Movement completed successfully, update last target
         if (hasCurrentTarget) {
+            Serial.print("[DIAGNOSTIC] Updating LastTarget to: ");
+            Serial.print(currentTargetPositionMm);
+            Serial.println(" mm");
+            
             hasLastTarget = true;
             lastTargetType = currentTargetType;
             lastTargetPositionMm = currentTargetPositionMm;
             lastTargetPulses = currentTargetPulses;
             hasCurrentTarget = false; // Clear current target
+            
+        } else {
+            Serial.println("[WARNING] Move completed but no current target was set!");
         }
+        
+        // Reset the wasMoving flag
+        wasMoving = false;
     }
-
-    // Check for motor faults during motion
-    else if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-        Serial.println("Motor fault detected during movement:");
-        printMotorAlerts();
-        motorState = MOTOR_STATE_FAULTED;
-    }
-
+    
     previousState = motorState;
 }
 

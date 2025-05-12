@@ -9,66 +9,104 @@ DoubleSolenoidValve tray3Valve;
 DoubleSolenoidValve shuttleValve;
 
 // Sensor instances
-CylinderSensor tray1Sensor;
-CylinderSensor tray2Sensor;
-CylinderSensor tray3Sensor;
-CylinderSensor shuttleSensor;
+CylinderSensor tray1CylinderSensor;  
+CylinderSensor tray2CylinderSensor;  
+CylinderSensor tray3CylinderSensor;  
+CylinderSensor shuttleCylinderSensor; 
 
 // Arrays for batch operations
 DoubleSolenoidValve* allValves[4] = {&tray1Valve, &tray2Valve, &tray3Valve, &shuttleValve};
 const int valveCount = 4;
 const char* valveNames[4] = {"Tray 1", "Tray 2", "Tray 3", "Shuttle"};
 
-CylinderSensor* allSensors[4] = {&tray1Sensor, &tray2Sensor, &tray3Sensor, &shuttleSensor};
-const int sensorCount = 4;
+// New tray detection sensors
+CylinderSensor tray1DetectSensor;
+CylinderSensor tray2DetectSensor;
+CylinderSensor tray3DetectSensor;
+
+// Update your allSensors array to include these new sensors if needed
+CylinderSensor* allCylinderSensors[4] = {
+    &tray1CylinderSensor, &tray2CylinderSensor, 
+    &tray3CylinderSensor, &shuttleCylinderSensor
+};
+const int cylinderSensorCount = 4;
 
 // CCIO Board status
 bool hasCCIO = false;
 
 // ----------------- Initialization functions -----------------
 
-void initValveSystem() {
-    // Set up pins for tray valves
+// Rename and refactor the initialization functions
+void initSensorSystem() {
+    // Initialize all sensors on the main ClearCore board
+    
+    // 1. Cylinder position sensors
+    pinMode(TRAY_1_CYLINDER_SENSOR_PIN, INPUT_PULLUP);
+    pinMode(TRAY_2_CYLINDER_SENSOR_PIN, INPUT_PULLUP);
+    pinMode(TRAY_3_CYLINDER_SENSOR_PIN, INPUT_PULLUP);
+    pinMode(SHUTTLE_CYLINDER_SENSOR_PIN, INPUT_PULLUP);
+    
+    sensorInit(tray1CylinderSensor, TRAY_1_CYLINDER_SENSOR_PIN);
+    sensorInit(tray2CylinderSensor, TRAY_2_CYLINDER_SENSOR_PIN);
+    sensorInit(tray3CylinderSensor, TRAY_3_CYLINDER_SENSOR_PIN);
+    sensorInit(shuttleCylinderSensor, SHUTTLE_CYLINDER_SENSOR_PIN);
+    
+    // 2. Tray detection sensors
+    pinMode(TRAY_1_DETECT_PIN, INPUT_PULLUP);
+    pinMode(TRAY_2_DETECT_PIN, INPUT_PULLUP);
+    pinMode(TRAY_3_DETECT_PIN, INPUT_PULLUP);
+    
+    sensorInit(tray1DetectSensor, TRAY_1_DETECT_PIN);
+    sensorInit(tray2DetectSensor, TRAY_2_DETECT_PIN);
+    sensorInit(tray3DetectSensor, TRAY_3_DETECT_PIN);
+    
+    Serial.println("Sensor system initialized");
+}
+
+void initValveSystem(bool hasCCIOBoard) {
+    // Store CCIO status
+    hasCCIO = hasCCIOBoard;
+    
+    if (!hasCCIO) {
+        Serial.println("No CCIO board detected - valve control unavailable");
+        return;
+    }
+    
+    Serial.println("Initializing valves with CCIO board...");
+    
+    // Configure all valve pins on the CCIO board
+    pinMode(TRAY_1_LOCK_PIN, OUTPUT);
+    pinMode(TRAY_1_UNLOCK_PIN, OUTPUT);
+    
+    pinMode(TRAY_2_LOCK_PIN, OUTPUT);
+    pinMode(TRAY_2_UNLOCK_PIN, OUTPUT);
+    
+    pinMode(TRAY_3_LOCK_PIN, OUTPUT);
+    pinMode(TRAY_3_UNLOCK_PIN, OUTPUT);
+    
+    pinMode(SHUTTLE_LOCK_PIN, OUTPUT);
+    pinMode(SHUTTLE_UNLOCK_PIN, OUTPUT);
+    
+    // Set up all valve pin configurations
     tray1Valve.unlockPin = TRAY_1_UNLOCK_PIN;
     tray1Valve.lockPin = TRAY_1_LOCK_PIN;
+    
     tray2Valve.unlockPin = TRAY_2_UNLOCK_PIN;
     tray2Valve.lockPin = TRAY_2_LOCK_PIN;
+    
     tray3Valve.unlockPin = TRAY_3_UNLOCK_PIN;
     tray3Valve.lockPin = TRAY_3_LOCK_PIN;
     
-    // Initialize tray valves
+    shuttleValve.unlockPin = SHUTTLE_UNLOCK_PIN;
+    shuttleValve.lockPin = SHUTTLE_LOCK_PIN;
+    
+    // Initialize all valves
     valveInit(tray1Valve);
     valveInit(tray2Valve);
     valveInit(tray3Valve);
+    valveInit(shuttleValve);
     
-    // Set up pins for sensors
-    tray1Sensor.pin = TRAY_1_SENSOR_PIN;
-    tray2Sensor.pin = TRAY_2_SENSOR_PIN;
-    tray3Sensor.pin = TRAY_3_SENSOR_PIN;
-    shuttleSensor.pin = SHUTTLE_SENSOR_PIN;
-    
-    // Initialize sensors
-    sensorInit(tray1Sensor, TRAY_1_SENSOR_PIN);
-    sensorInit(tray2Sensor, TRAY_2_SENSOR_PIN);
-    sensorInit(tray3Sensor, TRAY_3_SENSOR_PIN);
-    
-    // Configure A9 as digital input for shuttle sensor
-    pinMode(A9, INPUT);
-    sensorInit(shuttleSensor, SHUTTLE_SENSOR_PIN);
-}
-
-void initValveWithCCIO(bool hasCCIOBoard) {
-    hasCCIO = hasCCIOBoard;
-    
-    if (hasCCIO) {
-        // If CCIO is present, configure shuttle valve
-        pinMode(SHUTTLE_LOCK_PIN, OUTPUT);
-        pinMode(SHUTTLE_UNLOCK_PIN, OUTPUT);
-        
-        shuttleValve.unlockPin = SHUTTLE_UNLOCK_PIN;
-        shuttleValve.lockPin = SHUTTLE_LOCK_PIN;
-        valveInit(shuttleValve);
-    }
+    Serial.println("Valve system initialized");
 }
 
 // ----------------- Low-level hardware functions -----------------
@@ -79,16 +117,6 @@ void pulsePin(int pin, unsigned long duration) {
     digitalWrite(pin, LOW);
 }
 
-void configurePinAsOutput(int pin) {
-    pinMode(pin, OUTPUT);
-    digitalWrite(pin, LOW);
-}
-
-void configureValvePins(const DoubleSolenoidValve &valve) {
-    configurePinAsOutput(valve.unlockPin);
-    configurePinAsOutput(valve.lockPin);
-}
-
 int getActivationPin(const DoubleSolenoidValve &valve, ValvePosition target) {
     return (target == VALVE_POSITION_UNLOCK) ? valve.unlockPin : valve.lockPin;
 }
@@ -96,8 +124,6 @@ int getActivationPin(const DoubleSolenoidValve &valve, ValvePosition target) {
 // ----------------- Valve operations -----------------
 
 void valveInit(DoubleSolenoidValve &valve) {
-    // Configure pins
-    configureValvePins(valve);
     
     // Force physical position to unlocked
     pulsePin(valve.unlockPin, PULSE_DURATION);
@@ -180,9 +206,13 @@ void printSensorStatus(const CylinderSensor &sensor, const char* sensorName) {
 // ----------------- Batch operations -----------------
 
 void withAllValves(void (*operation)(DoubleSolenoidValve&)) {
+    // Only perform operations if CCIO is present since all valves are on CCIO now
+    if (!hasCCIO) {
+        Serial.println("Cannot operate valves: CCIO-8 board not initialized");
+        return;
+    }
+    
     for (int i = 0; i < valveCount; i++) {
-        // Skip shuttle valve if no CCIO board
-        if (i == 3 && !hasCCIO) continue;
         withValve(*allValves[i], operation);
     }
 }
@@ -198,8 +228,8 @@ void printAllValveStatus() {
 
 void printAllSensorStatus() {
     Serial.println("Current sensor readings:");
-    for (int i = 0; i < sensorCount; i++) {
-        printSensorStatus(*allSensors[i], valveNames[i]);
+    for (int i = 0; i < cylinderSensorCount; i++) {
+        printSensorStatus(*allCylinderSensors[i], valveNames[i]);
     }
 }
 
@@ -240,16 +270,16 @@ void unlockAllValves() {
 
 DoubleSolenoidValve* getValveByIndex(int index) {
     if (index >= 0 && index < valveCount) {
-        // Skip shuttle valve if no CCIO
-        if (index == 3 && !hasCCIO) return NULL;
+        // All valves require CCIO now
+        if (!hasCCIO) return NULL;
         return allValves[index];
     }
     return NULL;
 }
 
 CylinderSensor* getSensorByIndex(int index) {
-    if (index >= 0 && index < sensorCount) {
-        return allSensors[index];
+    if (index >= 0 && index < cylinderSensorCount) {
+        return allCylinderSensors[index];
     }
     return NULL;
 }

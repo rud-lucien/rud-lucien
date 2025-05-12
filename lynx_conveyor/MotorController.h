@@ -10,7 +10,7 @@
 #define MOTOR_CONNECTOR ConnectorM0
 
 // E-stop input
-#define E_STOP_PIN DI6  // E-stop connected to DI6 (Normally Closed)
+#define E_STOP_PIN 0  // E-stop connected to DI6 (Normally Closed)
 #define E_STOP_CHECK_INTERVAL_MS 10  // Check E-stop every 10ms
 
 // ----------------- Constants -----------------
@@ -21,7 +21,7 @@
 #define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV)  // ~61.27 pulses per mm
 
 // Motion profile parameters (in RPM units)
-#define MOTOR_VELOCITY_RPM 1000           // Maximum velocity for motor operation (RPM)
+#define MOTOR_VELOCITY_RPM 600           // Maximum velocity for motor operation (RPM)
 #define MAX_ACCEL_RPM_PER_SEC 5000       // Maximum acceleration in RPM/s
 #define ACCEL_LIMIT_RPM_PER_SEC 2500     // Acceleration limit for normal operation
 

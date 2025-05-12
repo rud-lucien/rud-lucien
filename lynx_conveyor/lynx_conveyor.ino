@@ -1,11 +1,10 @@
-
 /*
  Name:		lynx_linear_actuator.ino
  Created:	4/14/2025 12:00:17 PM
  Author:	rlucien
 */
 
-// #include "Arduino.h"
+#include "Arduino.h"
 #include "ClearCore.h"
 #include "ValveController.h"
 #include "MotorController.h"
@@ -23,56 +22,40 @@ uint8_t ccioPinCount;   // Store the number of connected CCIO-8 pins here
 #define MAX_MSG_LEN 80
 char msg[MAX_MSG_LEN + 1];
 
-// Set to true to use CCIO-8 connectors as digital inputs
-const bool inputMode = false;
 
 // The setup function
 void setup()
 {
     Serial.begin(115200);
+    delay(1000);
+    Serial.println("Lynx Conveyor Controller starting up...");
 
-    // Set up and detect CCIO-8 boards
+    // First set up the CCIO board
+    Serial.println("Initializing CCIO-8 expansion boards...");
     CcioPort.Mode(Connector::CCIO);
     CcioPort.PortOpen();
+    
     // Get count of CCIO-8 boards
     ccioBoardCount = CcioMgr.CcioCount();
-    ccioPinCount = 0;
-
-    // Count available pins by checking each board
-    for (int i = 0; i < ccioBoardCount; i++)
-    {
-        // Count 8 pins per board
-        ccioPinCount += 8;
-    }
-    // Get count of CCIO-8 boards
-    ccioBoardCount = CcioMgr.CcioCount();
-    ccioPinCount = ccioBoardCount * 8; // Each CCIO-8 board has 8 pins
-
-    snprintf(msg, MAX_MSG_LEN, "Discovered %d CCIO-8 board", ccioBoardCount);
-    Serial.print(msg);
-    if (ccioBoardCount != 1)
-    {
-        Serial.print("s");
-    }
-    Serial.println("...");
-
-    // Initialize valve controller
+    Serial.print("Discovered CCIO boards: ");
+    Serial.println(ccioBoardCount);
+    
+    // Now initialize sensor systems
+    Serial.println("Initializing sensor systems...");
+    initSensorSystem();
+    
+    // Initialize valve system with CCIO board status
     Serial.println("Initializing valve controller...");
-    initValveSystem();
-    initValveWithCCIO(ccioBoardCount > 0);
-
-    Serial.println("5/2-way valve controller initialized");
-
-    // Don't initialize the motor automatically
+    initValveSystem(ccioBoardCount > 0);
+    
+    // Rest of your setup code...
     Serial.println("Motor controller ready for initialization.");
     Serial.println("Use 'motor init' command to initialize the motor.");
-
-    // --- Setup Commander API ---
+    
     commander.attachTree(API_tree);
     commander.init();
-
-    Serial.println(F("[MESSAGE] System ready."));
-
+    
+    Serial.println("[MESSAGE] System ready.");
     Serial.println("Type 'help' for available commands");
 }
 
@@ -86,8 +69,12 @@ void loop()
 
     // Handle incoming serial commands using Commander API
     handleSerialCommands();
+    
+     // Always check move progress - not just when MOVING
+    // This ensures we catch the transition from moving to stopped
+    checkMoveProgress();
 
-    // Check and update motor state
+    // Then update motor state
     updateMotorState();
 
     // Process enable cycling for homing if in progress
@@ -98,11 +85,6 @@ void loop()
     {
         executeHomingSequence();
     }
-    // Check movement progress if moving
-    else if (motorState == MOTOR_STATE_MOVING)
-    {
-        checkMoveProgress();
-    }
 
     // Log system state periodically if logging is enabled
     if (logging.logInterval > 0 && currentTime - logging.previousLogTime >= logging.logInterval)
@@ -111,3 +93,5 @@ void loop()
         logSystemState();
     }
 }
+
+

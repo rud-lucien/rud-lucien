@@ -24,24 +24,30 @@ struct CylinderSensor {
 
 // ----------------- Pin Mapping Constants -----------------
 
-// Valve solenoid pins
-#define TRAY_1_LOCK_PIN 0     // IO-0 connector
-#define TRAY_1_UNLOCK_PIN 1   // IO-1 connector
-#define TRAY_2_LOCK_PIN 2     // IO-2 connector
-#define TRAY_2_UNLOCK_PIN 3   // IO-3 connector
-#define TRAY_3_LOCK_PIN 4     // IO-4 connector
-#define TRAY_3_UNLOCK_PIN 5   // IO-5 connector
-#define SHUTTLE_LOCK_PIN 64   // IO-6 connector (CCIO)
-#define SHUTTLE_UNLOCK_PIN 65 // IO-7 connector (CCIO)
+// Valve solenoid pins - Use ClearCore constants
+#define TRAY_1_LOCK_PIN CLEARCORE_PIN_CCIOA0     // CCIO IO-0 connector  
+#define TRAY_1_UNLOCK_PIN CLEARCORE_PIN_CCIOA1   // CCIO IO-1 connector
+#define TRAY_2_LOCK_PIN CLEARCORE_PIN_CCIOA2     // CCIO IO-2 connector
+#define TRAY_2_UNLOCK_PIN CLEARCORE_PIN_CCIOA3   // CCIO IO-3 connector
+#define TRAY_3_LOCK_PIN CLEARCORE_PIN_CCIOA4     // CCIO IO-4 connector
+#define TRAY_3_UNLOCK_PIN CLEARCORE_PIN_CCIOA5   // CCIO IO-5 connector
+#define SHUTTLE_LOCK_PIN CLEARCORE_PIN_CCIOA6    // CCIO IO-6 connector
+#define SHUTTLE_UNLOCK_PIN CLEARCORE_PIN_CCIOA7  // CCIO IO-7 connector
 
-// Sensor pins
-#define TRAY_1_SENSOR_PIN DI6    // Connect Tray 1 sensor to DI-6
-#define TRAY_2_SENSOR_PIN DI7    // Connect Tray 2 sensor to DI-7
-#define TRAY_3_SENSOR_PIN DI8    // Connect Tray 3 sensor to DI-8
-#define SHUTTLE_SENSOR_PIN A9    // Connect Shuttle sensor to A9
+// Cylinder position sensors (detect lock/unlock state)
+#define TRAY_1_CYLINDER_SENSOR_PIN 4    // ClearCore IO-4 - Detects Tray 1 cylinder position
+#define TRAY_2_CYLINDER_SENSOR_PIN 5    // ClearCore IO-5 - Detects Tray 2 cylinder position
+#define TRAY_3_CYLINDER_SENSOR_PIN A9   // ClearCore A9 - Detects Tray 3 cylinder position
+#define SHUTTLE_CYLINDER_SENSOR_PIN A10 // ClearCore A10 - Detects Shuttle cylinder position
 
 // Other constants
 #define PULSE_DURATION 100  // Minimum recommended pulse duration in milliseconds
+
+
+// Tray detection sensors on IO pins of ClearCore main board
+#define TRAY_1_DETECT_PIN 1    // ClearCore IO-1 - Detects tray at position 1
+#define TRAY_2_DETECT_PIN 2    // ClearCore IO-2 - Detects tray at position 2  
+#define TRAY_3_DETECT_PIN 3    // ClearCore IO-3 - Detects tray at position 3
 
 // ----------------- Global variables -----------------
 
@@ -52,18 +58,23 @@ extern DoubleSolenoidValve tray3Valve;
 extern DoubleSolenoidValve shuttleValve;
 
 // Sensor instances
-extern CylinderSensor tray1Sensor;
-extern CylinderSensor tray2Sensor;
-extern CylinderSensor tray3Sensor;
-extern CylinderSensor shuttleSensor;
+extern CylinderSensor tray1CylinderSensor;  
+extern CylinderSensor tray2CylinderSensor;  
+extern CylinderSensor tray3CylinderSensor;  
+extern CylinderSensor shuttleCylinderSensor; 
+
+// New tray detection sensor declarations
+extern CylinderSensor tray1DetectSensor;
+extern CylinderSensor tray2DetectSensor;
+extern CylinderSensor tray3DetectSensor;
 
 // Arrays for batch operations
 extern DoubleSolenoidValve* allValves[4];
 extern const int valveCount;
 extern const char* valveNames[4];
 
-extern CylinderSensor* allSensors[4];
-extern const int sensorCount;
+extern CylinderSensor* allCylinderSensors[4];  // Changed from allSensors
+extern const int cylinderSensorCount;  // Changed from sensorCount
 
 // CCIO Board status
 extern bool hasCCIO;
@@ -71,13 +82,11 @@ extern bool hasCCIO;
 // ----------------- Function Declarations -----------------
 
 // Initialization functions
-void initValveSystem();
-void initValveWithCCIO(bool hasCCIOBoard);
+void initSensorSystem();  // For all sensors on the main board
+void initValveSystem(bool hasCCIOBoard);  // Single function for all valve initialization
 
 // Low-level hardware functions
 void pulsePin(int pin, unsigned long duration);
-void configurePinAsOutput(int pin);
-void configureValvePins(const DoubleSolenoidValve &valve);
 int getActivationPin(const DoubleSolenoidValve &valve, ValvePosition target);
 
 // Valve operations
