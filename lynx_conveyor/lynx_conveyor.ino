@@ -70,7 +70,10 @@ void loop()
     // Handle incoming serial commands using Commander API
     handleSerialCommands();
     
-     // Always check move progress - not just when MOVING
+    // Process fault clearing if in progress
+    processFaultClearing();
+    
+    // Always check move progress - not just when MOVING
     // This ensures we catch the transition from moving to stopped
     checkMoveProgress();
 

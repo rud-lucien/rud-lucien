@@ -51,7 +51,7 @@ void initSensorSystem() {
     sensorInit(tray2DetectSensor, TRAY_2_DETECT_PIN);
     sensorInit(tray3DetectSensor, TRAY_3_DETECT_PIN);
     
-    Serial.println(F("Sensor system initialized"));
+    Serial.println(F("[MESSAGE] Sensor system initialized"));
 }
 
 void initValveSystem(bool hasCCIOBoard) {
@@ -59,11 +59,11 @@ void initValveSystem(bool hasCCIOBoard) {
     hasCCIO = hasCCIOBoard;
     
     if (!hasCCIO) {
-        Serial.println("No CCIO board detected - valve control unavailable");
+        Serial.println(F("[ERROR] No CCIO board detected - valve control unavailable"));
         return;
     }
     
-    Serial.println("Initializing valves with CCIO board...");
+    Serial.println(F("[MESSAGE] Initializing valves with CCIO board..."));
     
     // Configure all valve pins on the CCIO board
     pinMode(TRAY_1_LOCK_PIN, OUTPUT);
@@ -97,7 +97,7 @@ void initValveSystem(bool hasCCIOBoard) {
     valveInit(tray3Valve);
     valveInit(shuttleValve);
     
-    Serial.println("Valve system initialized");
+    Serial.println(F("[MESSAGE] Valve system initialized"));
 }
 
 // ----------------- Low-level hardware functions -----------------
@@ -183,15 +183,17 @@ bool sensorRead(CylinderSensor &sensor) {
 // ----------------- Status reporting -----------------
 
 void printValveStatus(const DoubleSolenoidValve &valve, const char* valveName) {
+    Serial.print(F("[DIAGNOSTIC] "));
     Serial.print(valveName);
-    Serial.print(": ");
-    Serial.println(valve.position == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
+    Serial.print(F(": "));
+    Serial.println(valve.position == VALVE_POSITION_UNLOCK ? F("Unlocked") : F("Locked"));
 }
 
 void printSensorStatus(const CylinderSensor &sensor, const char* sensorName) {
+    Serial.print(F("[DIAGNOSTIC] "));
     Serial.print(sensorName);
-    Serial.print(" Sensor: ");
-    Serial.println(sensorRead(const_cast<CylinderSensor&>(sensor)) ? "Not activated" : "Activated");
+    Serial.print(F(" Sensor: "));
+    Serial.println(sensorRead(const_cast<CylinderSensor&>(sensor)) ? F("Not activated") : F("Activated"));
 }
 
 // ----------------- Batch operations -----------------
@@ -199,7 +201,7 @@ void printSensorStatus(const CylinderSensor &sensor, const char* sensorName) {
 void withAllValves(void (*operation)(DoubleSolenoidValve&)) {
     // Only perform operations if CCIO is present since all valves are on CCIO now
     if (!hasCCIO) {
-        Serial.println("Cannot operate valves: CCIO-8 board not initialized");
+        Serial.println(F("[ERROR] Cannot operate valves: CCIO-8 board not initialized"));
         return;
     }
     
@@ -209,7 +211,7 @@ void withAllValves(void (*operation)(DoubleSolenoidValve&)) {
 }
 
 void printAllValveStatus() {
-    Serial.println("Current valve positions:");
+    Serial.println(F("[DIAGNOSTIC] Current valve positions:"));
     for (int i = 0; i < valveCount; i++) {
         // Skip shuttle valve if no CCIO board
         if (i == 3 && !hasCCIO) continue;
@@ -218,7 +220,7 @@ void printAllValveStatus() {
 }
 
 void printAllSensorStatus() {
-    Serial.println("Current sensor readings:");
+    Serial.println(F("[DIAGNOSTIC] Current sensor readings:"));
     for (int i = 0; i < cylinderSensorCount; i++) {
         printSensorStatus(*allCylinderSensors[i], valveNames[i]);
     }
@@ -230,6 +232,9 @@ bool waitForSensor(CylinderSensor &sensor, bool expectedState, unsigned long tim
     unsigned long startTime = millis();
     while (sensorRead(sensor) != expectedState) {
         if (millis() - startTime > timeoutMs) {
+            Serial.print(F("[ERROR] Sensor timeout: waited "));
+            Serial.print(timeoutMs);
+            Serial.println(F("ms for expected state"));
             return false; // Timeout occurred
         }
         delay(10); // Short delay to prevent excessive CPU usage
@@ -289,7 +294,7 @@ CylinderSensor* allTrayDetectSensors[3] = {
 const int trayDetectSensorCount = 3;
 
 void printTrayDetectionStatus() {
-    Serial.println(F("Tray Detection Status:"));
+    Serial.println(F("[DIAGNOSTIC] Tray Detection Status:"));
     for (int i = 0; i < trayDetectSensorCount; i++) {
         bool trayDetected = sensorRead(*allTrayDetectSensors[i]);
         Serial.print(F("  Tray "));

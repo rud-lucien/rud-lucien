@@ -11,12 +11,15 @@ void logSystemState()
 {
     Serial.print(F("[LOG] "));
     
-    // 1. DEVICE STATUS GROUP
-    // Valve status
+    // 1. VALVES section
+    Serial.print(F("Valves: "));
+    // Updated valve names for clarity
+    const char* updatedValveNames[4] = {"Lock1", "Lock2", "Lock3", "Shuttle"};
+    
     for (int i = 0; i < valveCount; i++) {
         DoubleSolenoidValve *valve = getValveByIndex(i);
         if (valve) {
-            Serial.print(valveNames[i]);
+            Serial.print(updatedValveNames[i]);
             Serial.print(F("="));
             
             if (valve->position == VALVE_POSITION_UNLOCK) {
@@ -27,20 +30,24 @@ void logSystemState()
                 Serial.print(F("UNKNOWN"));
             }
             
-            Serial.print(F(", "));
+            // Add comma except after last item
+            if (i < valveCount - 1) {
+                Serial.print(F(", "));
+            }
         }
     }
-
-    // Individual tray sensor readings
+    
+    // 2. SENSORS section
+    Serial.print(F(" | Sensors: "));
     Serial.print(F("Tray1="));
     Serial.print(sensorRead(tray1DetectSensor) ? F("PRESENT") : F("EMPTY"));
     Serial.print(F(", Tray2="));
     Serial.print(sensorRead(tray2DetectSensor) ? F("PRESENT") : F("EMPTY"));
     Serial.print(F(", Tray3="));
     Serial.print(sensorRead(tray3DetectSensor) ? F("PRESENT") : F("EMPTY"));
-    Serial.print(F(", "));
     
-    // Motor and safety state
+    // 3. SYSTEM section
+    Serial.print(F(" | System: "));
     Serial.print(F("Motor="));
     switch (motorState) {
         case MOTOR_STATE_IDLE: Serial.print(F("IDLE")); break;
@@ -57,8 +64,8 @@ void logSystemState()
     Serial.print(F(", E-Stop="));
     Serial.print(isEStopActive() ? F("TRIGGERED") : F("RELEASED"));
     
-    // 2. POSITION GROUP - Simple, clear format
-    Serial.print(F(" | Pos="));
+    // 4. POSITION GROUP with improved naming
+    Serial.print(F(" | Position: "));
     double calculatedPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
     int32_t currentPulses = normalizeEncoderValue(MOTOR_CONNECTOR.PositionRefCommanded());
     Serial.print(calculatedPositionMm, 2);
@@ -66,14 +73,13 @@ void logSystemState()
     Serial.print(currentPulses);
     Serial.print(F(" counts)"));
     
-    // Target information - just show the numerical value if moving
+    // Target information
     Serial.print(F(", Target="));
     if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING) {
         if (hasCurrentTarget) {
-            // For all target types, just show the actual position value
             Serial.print(currentTargetPositionMm, 2);
             Serial.print(F("mm ("));
-            Serial.print(normalizeEncoderValue(currentTargetPulses)); // Normalize here
+            Serial.print(normalizeEncoderValue(currentTargetPulses));
             Serial.print(F(" counts)"));
         } else {
             Serial.print(F("None"));
@@ -82,20 +88,19 @@ void logSystemState()
         Serial.print(F("None"));
     }
     
-    // Last target - simplified to just show the completed position
+    // Last target position
     Serial.print(F(", LastTarget="));
     if (hasLastTarget) {
         Serial.print(lastTargetPositionMm, 2);
         Serial.print(F("mm ("));
-        Serial.print(normalizeEncoderValue(lastTargetPulses)); // Normalize here
+        Serial.print(normalizeEncoderValue(lastTargetPulses));
         Serial.print(F(" counts)"));
     } else {
         Serial.print(F("None"));
     }
     
-    // 3. MOTION PARAMETERS GROUP
-    // Current velocity (removed redundant counts/sec display)
-    Serial.print(F(" | Vel="));
+    // 5. VELOCITY GROUP with improved naming
+    Serial.print(F(" | Velocity: "));
     double currentVelocityRpm = abs((double)MOTOR_CONNECTOR.VelocityRefCommanded() * 60.0 / PULSES_PER_REV);
     Serial.print(currentVelocityRpm, 1);
     Serial.print(F("RPM"));
@@ -112,18 +117,12 @@ void logSystemState()
     Serial.print((double)currentAccelMax * 60.0 / PULSES_PER_REV, 0);
     Serial.print(F("RPM/s"));
     
-    // 4. JOG SETTINGS GROUP
+    // 6. JOG SETTINGS GROUP - removed (D) indicators
     Serial.print(F(" | Jog: "));
     Serial.print(currentJogIncrementMm, 1);
-    Serial.print(F("mm"));
-    if (currentJogIncrementMm == DEFAULT_JOG_INCREMENT) 
-        Serial.print(F("(D)"));
-    
-    Serial.print(F("/"));
+    Serial.print(F("mm/"));
     Serial.print(currentJogSpeedRpm);
     Serial.print(F("RPM"));
-    if (currentJogSpeedRpm == DEFAULT_JOG_SPEED)
-        Serial.print(F("(D)"));
     
     // End the line
     Serial.println();

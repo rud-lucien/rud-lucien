@@ -85,6 +85,17 @@ enum MotorState {
     MOTOR_STATE_NOT_READY
 };
 
+// State machine for non-blocking fault clearing
+enum FaultClearingState {
+    FAULT_CLEAR_IDLE,
+    FAULT_CLEAR_DISABLE,
+    FAULT_CLEAR_WAITING_DISABLE,
+    FAULT_CLEAR_ENABLE, 
+    FAULT_CLEAR_WAITING_ENABLE,
+    FAULT_CLEAR_ALERTS,
+    FAULT_CLEAR_FINISHED
+};
+
 // ----------------- Global Variables -----------------
 
 extern bool isHomed;                     // Flag indicating if the motor has been homed
@@ -112,6 +123,10 @@ extern int32_t lastTargetPulses;
 // External variables for jog settings
 extern double currentJogIncrementMm;  // Current jog increment in mm
 extern int currentJogSpeedRpm;        // Current jog speed in RPM
+
+extern FaultClearingState faultClearState;
+extern unsigned long faultClearTimer;
+extern bool faultClearInProgress;
 
 // ----------------- Function Declarations -----------------
 
@@ -220,6 +235,19 @@ double getMotorPositionMm();
 void printMotorStatus();
 void printMotorAlerts();
 
+/**
+ * Process the non-blocking fault clearing state machine
+ * What it does: Handles the fault clearing process without blocking the main loop
+ * When to use: Call this function in every main loop iteration
+ */
+void processFaultClearing();
+
+/**
+ * Check if fault clearing is currently in progress
+ * What it does: Returns the status of the fault clearing process
+ * @return true if fault clearing is active, false otherwise
+ */
+bool isFaultClearingInProgress();
 
 // Helper functions
 /**

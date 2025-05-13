@@ -30,33 +30,33 @@ bool testHomingRepeatability() {
 
     // Check for motor alerts
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-        Serial.println("Error: Motor has active alerts - clear faults before testing");
+        Serial.println(F("[ERROR] Motor has active alerts - clear faults before testing"));
         printMotorAlerts();
         return false;
     }
     
     // Check if motor is initialized
     if (!motorInitialized) {
-        Serial.println("Error: Motor not initialized - run 'motor init' first");
+        Serial.println(F("[ERROR] Motor not initialized - run 'motor init' first"));
         return false;
     }
     
     
-    Serial.println("Starting homing repeatability test");
-    Serial.println("To abort, type 'a' or 'abort' or any other character");
-    Serial.print("Will perform ");
+    Serial.println(F("[MESSAGE] Starting homing repeatability test"));
+    Serial.println(F("[MESSAGE] To abort, type 'a' or 'abort' or any other character"));
+    Serial.print(F("[MESSAGE] Will perform "));
     Serial.print(NUM_CYCLES);
-    Serial.print(" cycles of: home → wait → move to ");
+    Serial.print(F(" cycles of: home → wait → move to "));
     Serial.print(TEST_POSITION_MM);
-    Serial.println("mm → wait → repeat");
-    Serial.println("Press any key to abort test");
+    Serial.println(F("mm → wait → repeat"));
+    Serial.println(F("[MESSAGE] Press any key to abort test"));
     
     lastActionTime = millis();
     
     while (testRunning) {
         // Check for abort command
         if (Serial.available() > 0) {
-            Serial.println("Test aborted by user");
+            Serial.println(F("[MESSAGE] Test aborted by user"));
             stopMotion();
             motorState = MOTOR_STATE_IDLE;
             return false;
@@ -64,7 +64,7 @@ bool testHomingRepeatability() {
         
         // Check for E-Stop condition
         if (isEStopActive()) {
-            Serial.println("E-STOP detected during test! Aborting immediately.");
+            Serial.println(F("[ERROR] E-STOP detected during test! Aborting immediately."));
             // No need to call stopMotion() as the main handleEStop() will handle it
             testRunning = false;
             return false;
@@ -75,9 +75,9 @@ bool testHomingRepeatability() {
         
         switch (currentPhase) {
             case PHASE_START:
-                Serial.print("Starting cycle ");
+                Serial.print(F("[MESSAGE] Starting cycle "));
                 Serial.print(cyclesCompleted + 1);
-                Serial.print(" of ");
+                Serial.print(F(" of "));
                 Serial.println(NUM_CYCLES);
                 currentPhase = PHASE_INITIAL_HOMING;
                 lastActionTime = currentTime;
@@ -85,9 +85,9 @@ bool testHomingRepeatability() {
                 
             case PHASE_INITIAL_HOMING:
                 // Start homing
-                Serial.println("Homing...");
+                Serial.println(F("[MESSAGE] Homing..."));
                 if (!initiateHomingSequence()) {
-                    Serial.println("Error starting homing operation. Aborting test.");
+                    Serial.println(F("[ERROR] Error starting homing operation. Aborting test."));
                     testRunning = false;
                     return false;
                 }
@@ -98,17 +98,17 @@ bool testHomingRepeatability() {
                 // Print status every 2 seconds for user feedback
                 static unsigned long lastStatusPrint = 0;
                 if (currentTime - lastStatusPrint > 2000) {
-                    Serial.print("Waiting for homing to complete. Current state: ");
+                    Serial.print(F("[DIAGNOSTIC] Waiting for homing to complete. Current state: "));
                     switch (motorState) {
-                        case MOTOR_STATE_IDLE: Serial.print("IDLE"); break;
-                        case MOTOR_STATE_MOVING: Serial.print("MOVING"); break; 
-                        case MOTOR_STATE_HOMING: Serial.print("HOMING"); break;
-                        case MOTOR_STATE_FAULTED: Serial.print("FAULTED"); break;
-                        case MOTOR_STATE_NOT_READY: Serial.print("NOT_READY"); break;
-                        default: Serial.print("UNKNOWN");
+                        case MOTOR_STATE_IDLE: Serial.print(F("IDLE")); break;
+                        case MOTOR_STATE_MOVING: Serial.print(F("MOVING")); break; 
+                        case MOTOR_STATE_HOMING: Serial.print(F("HOMING")); break;
+                        case MOTOR_STATE_FAULTED: Serial.print(F("FAULTED")); break;
+                        case MOTOR_STATE_NOT_READY: Serial.print(F("NOT_READY")); break;
+                        default: Serial.print(F("UNKNOWN"));
                     }
-                    Serial.print(", Homed: ");
-                    Serial.println(isHomed ? "YES" : "NO");
+                    Serial.print(F(", Homed: "));
+                    Serial.println(isHomed ? F("YES") : F("NO"));
                     lastStatusPrint = currentTime;
                 }
                 
@@ -123,32 +123,32 @@ bool testHomingRepeatability() {
                 
                 // Wait for homing to complete successfully
                 if (motorState == MOTOR_STATE_IDLE && isHomed) {
-                    Serial.println("Homing complete. Waiting...");
+                    Serial.println(F("[MESSAGE] Homing complete. Waiting..."));
                     lastActionTime = currentTime;
                     currentPhase = PHASE_PAUSE_AFTER_HOMING;  // Use explicit state
                 }
                 else if (motorState == MOTOR_STATE_FAULTED) {
-                    Serial.println("Homing failed. Aborting test.");
+                    Serial.println(F("[ERROR] Homing failed. Aborting test."));
                     testRunning = false;
                     return false;
                 }
                 // Use a timeout longer than the internal one in executeHomingSequence (which is 60 seconds)
                 // But DO NOT proceed if homing hasn't completed successfully
                 else if (currentTime - lastActionTime > 70000) { // 70 seconds (longer than the 60-second internal timeout)
-                    Serial.println("Timeout waiting for homing to complete.");
-                    Serial.print("Current state: ");
+                    Serial.println(F("[ERROR] Timeout waiting for homing to complete."));
+                    Serial.print(F("[DIAGNOSTIC] Current state: "));
                     
                     switch (motorState) {
-                        case MOTOR_STATE_IDLE: Serial.println("IDLE"); break;
-                        case MOTOR_STATE_MOVING: Serial.println("MOVING"); break; 
-                        case MOTOR_STATE_HOMING: Serial.println("HOMING"); break;
-                        case MOTOR_STATE_FAULTED: Serial.println("FAULTED"); break;
-                        case MOTOR_STATE_NOT_READY: Serial.println("NOT_READY"); break;
-                        default: Serial.println("UNKNOWN");
+                        case MOTOR_STATE_IDLE: Serial.println(F("IDLE")); break;
+                        case MOTOR_STATE_MOVING: Serial.println(F("MOVING")); break; 
+                        case MOTOR_STATE_HOMING: Serial.println(F("HOMING")); break;
+                        case MOTOR_STATE_FAULTED: Serial.println(F("FAULTED")); break;
+                        case MOTOR_STATE_NOT_READY: Serial.println(F("NOT_READY")); break;
+                        default: Serial.println(F("UNKNOWN"));
                     }
                     
                     // Safety critical: NEVER proceed without successful homing
-                    Serial.println("CRITICAL: Cannot proceed without successful homing. Aborting test.");
+                    Serial.println(F("[ERROR] CRITICAL: Cannot proceed without successful homing. Aborting test."));
                     stopMotion(); // Stop any motion to be safe
                     testRunning = false; // Abort the test
                     return false;
@@ -164,11 +164,11 @@ bool testHomingRepeatability() {
                 
             case PHASE_MOVE_TO_POSITION:
                 // Move to test position
-                Serial.print("Moving to ");
+                Serial.print(F("[MESSAGE] Moving to "));
                 Serial.print(TEST_POSITION_MM);
-                Serial.println("mm...");
+                Serial.println(F("mm..."));
                 if (!moveToPositionMm(TEST_POSITION_MM)) {
-                    Serial.println("Error during movement. Aborting test.");
+                    Serial.println(F("[ERROR] Error during movement. Aborting test."));
                     testRunning = false;
                     return false;
                 }
@@ -179,43 +179,43 @@ bool testHomingRepeatability() {
                 // Add diagnostic printing to track move progress
                 static unsigned long lastMoveStatusPrint = 0;
                 if (currentTime - lastMoveStatusPrint > 2000) { // Print every 2 seconds
-                    Serial.print("Move status - Position: ");
+                    Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
                     Serial.print(getMotorPositionMm());
-                    Serial.print("mm, Target: ");
+                    Serial.print(F("mm, Target: "));
                     Serial.print(TEST_POSITION_MM);
-                    Serial.print("mm, State: ");
+                    Serial.print(F("mm, State: "));
                     switch (motorState) {
-                        case MOTOR_STATE_IDLE: Serial.print("IDLE"); break;
-                        case MOTOR_STATE_MOVING: Serial.print("MOVING"); break; 
-                        case MOTOR_STATE_HOMING: Serial.print("HOMING"); break;
-                        case MOTOR_STATE_FAULTED: Serial.print("FAULTED"); break;
-                        case MOTOR_STATE_NOT_READY: Serial.print("NOT_READY"); break;
-                        default: Serial.print("UNKNOWN");
+                        case MOTOR_STATE_IDLE: Serial.print(F("IDLE")); break;
+                        case MOTOR_STATE_MOVING: Serial.print(F("MOVING")); break; 
+                        case MOTOR_STATE_HOMING: Serial.print(F("HOMING")); break;
+                        case MOTOR_STATE_FAULTED: Serial.print(F("FAULTED")); break;
+                        case MOTOR_STATE_NOT_READY: Serial.print(F("NOT_READY")); break;
+                        default: Serial.print(F("UNKNOWN"));
                     }
-                    Serial.print(", StepsComplete: ");
-                    Serial.println(MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
+                    Serial.print(F(", StepsComplete: "));
+                    Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                     lastMoveStatusPrint = currentTime;
                 }
                 
                 // Wait for move to complete
                 if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED) {
                     // This is a more reliable way to check for move completion
-                    Serial.print("Position reached: ");
+                    Serial.print(F("[MESSAGE] Position reached: "));
                     Serial.print(getMotorPositionMm());
-                    Serial.println("mm. Waiting...");
+                    Serial.println(F("mm. Waiting..."));
                     motorState = MOTOR_STATE_IDLE; // Force the state update if needed
                     lastActionTime = currentTime;
                     currentPhase = PHASE_PAUSE_AFTER_MOVE;
                 }
                 else if (motorState == MOTOR_STATE_FAULTED) {
-                    Serial.println("Movement failed. Aborting test.");
+                    Serial.println(F("[ERROR] Movement failed. Aborting test."));
                     testRunning = false;
                     return false;
                 }
                 // Add a timeout after a reasonable amount of time
                 else if (currentTime - lastActionTime > 60000) { // Increased to 60 seconds
-                    Serial.println("Timeout waiting for move to complete.");
-                    Serial.println("Movement took too long. Aborting test.");
+                    Serial.println(F("[ERROR] Timeout waiting for move to complete."));
+                    Serial.println(F("[ERROR] Movement took too long. Aborting test."));
                     stopMotion(); // Safety stop
                     testRunning = false;
                     return false;
@@ -231,9 +231,9 @@ bool testHomingRepeatability() {
                 
             case PHASE_REPEAT_HOMING:
                 // Home again
-                Serial.println("Homing again...");
+                Serial.println(F("[MESSAGE] Homing again..."));
                 if (!initiateHomingSequence()) {
-                    Serial.println("Error starting repeat homing operation. Aborting test.");
+                    Serial.println(F("[ERROR] Error starting repeat homing operation. Aborting test."));
                     testRunning = false;
                     return false;
                 }
@@ -244,17 +244,17 @@ bool testHomingRepeatability() {
                 // Print status periodically
                 static unsigned long lastRepeatStatusPrint = 0;
                 if (currentTime - lastRepeatStatusPrint > 2000) {
-                    Serial.print("Waiting for repeat homing to complete. State: ");
+                    Serial.print(F("[DIAGNOSTIC] Waiting for repeat homing to complete. State: "));
                     switch (motorState) {
-                        case MOTOR_STATE_IDLE: Serial.print("IDLE"); break;
-                        case MOTOR_STATE_MOVING: Serial.print("MOVING"); break; 
-                        case MOTOR_STATE_HOMING: Serial.print("HOMING"); break;
-                        case MOTOR_STATE_FAULTED: Serial.print("FAULTED"); break;
-                        case MOTOR_STATE_NOT_READY: Serial.print("NOT_READY"); break;
-                        default: Serial.print("UNKNOWN");
+                        case MOTOR_STATE_IDLE: Serial.print(F("IDLE")); break;
+                        case MOTOR_STATE_MOVING: Serial.print(F("MOVING")); break; 
+                        case MOTOR_STATE_HOMING: Serial.print(F("HOMING")); break;
+                        case MOTOR_STATE_FAULTED: Serial.print(F("FAULTED")); break;
+                        case MOTOR_STATE_NOT_READY: Serial.print(F("NOT_READY")); break;
+                        default: Serial.print(F("UNKNOWN"));
                     }
-                    Serial.print(", Homed: ");
-                    Serial.println(isHomed ? "YES" : "NO");
+                    Serial.print(F(", Homed: "));
+                    Serial.println(isHomed ? F("YES") : F("NO"));
                     lastRepeatStatusPrint = currentTime;
                 }
                 
@@ -270,11 +270,11 @@ bool testHomingRepeatability() {
                 // Wait for homing to complete successfully
                 if (motorState == MOTOR_STATE_IDLE && isHomed) {
                     cyclesCompleted++;
-                    Serial.print("Cycle ");
+                    Serial.print(F("[MESSAGE] Cycle "));
                     Serial.print(cyclesCompleted);
-                    Serial.print(" completed. Position after homing: ");
+                    Serial.print(F(" completed. Position after homing: "));
                     Serial.print(getMotorPositionMm());
-                    Serial.println("mm");
+                    Serial.println(F("mm"));
                     
                     if (cyclesCompleted >= NUM_CYCLES) {
                         currentPhase = PHASE_COMPLETE;
@@ -285,14 +285,14 @@ bool testHomingRepeatability() {
                     }
                 }
                 else if (motorState == MOTOR_STATE_FAULTED) {
-                    Serial.println("Repeat homing failed. Aborting test.");
+                    Serial.println(F("[ERROR] Repeat homing failed. Aborting test."));
                     testRunning = false;
                     return false;
                 }
                 // Use a timeout longer than the internal one
                 else if (currentTime - lastActionTime > 70000) {
-                    Serial.println("Timeout waiting for repeat homing to complete.");
-                    Serial.println("Cannot proceed without successful homing. Aborting test.");
+                    Serial.println(F("[ERROR] Timeout waiting for repeat homing to complete."));
+                    Serial.println(F("[ERROR] Cannot proceed without successful homing. Aborting test."));
                     stopMotion(); // Safety stop
                     testRunning = false;
                     return false;
@@ -306,10 +306,10 @@ bool testHomingRepeatability() {
                 break;
                 
             case PHASE_COMPLETE:
-                Serial.println("Homing repeatability test completed successfully.");
-                Serial.print("Completed ");
+                Serial.println(F("[MESSAGE] Homing repeatability test completed successfully."));
+                Serial.print(F("[MESSAGE] Completed "));
                 Serial.print(cyclesCompleted);
-                Serial.println(" cycles.");
+                Serial.println(F(" cycles."));
                 testRunning = false;
                 return true; // Success! All cycles completed.
                 break;
@@ -325,7 +325,7 @@ bool testHomingRepeatability() {
 }
 
 bool testMotorRange() {
-    Serial.println("Testing motor range with small steps...");
+    Serial.println(F("[MESSAGE] Testing motor range with small steps..."));
     
     // State variables for non-blocking operation
     enum TestState {
@@ -343,8 +343,8 @@ bool testMotorRange() {
     
     // Check if the system has been homed
     if (!isHomed) {
-        Serial.println("Error: Motor must be homed before running range test");
-        Serial.println("Please run the 'home' command first to establish position reference");
+        Serial.println(F("[ERROR] Motor must be homed before running range test"));
+        Serial.println(F("[MESSAGE] Please run the 'home' command first to establish position reference"));
         return false;
     }
     
@@ -355,13 +355,13 @@ bool testMotorRange() {
     double testVelocityRpm = 30.0;    // 30 RPM (slow)
     double testAccelRpmPerSec = 500.0; // 500 RPM/s (moderate)
     
-    Serial.print("Setting test velocity to ");
+    Serial.print(F("[MESSAGE] Setting test velocity to "));
     Serial.print(testVelocityRpm);
-    Serial.println(" RPM");
+    Serial.println(F(" RPM"));
     
-    Serial.print("Setting test acceleration to ");
+    Serial.print(F("[MESSAGE] Setting test acceleration to "));
     Serial.print(testAccelRpmPerSec);
-    Serial.println(" RPM/s");
+    Serial.println(F(" RPM/s"));
     
     // Convert to pulses for the API
     currentVelMax = rpmToPps(testVelocityRpm);
@@ -375,14 +375,14 @@ bool testMotorRange() {
     while (testRunning) {
         // Always check for E-STOP first (non-blocking)
         if (isEStopActive()) {
-            Serial.println("E-STOP detected during test! Aborting immediately.");
+            Serial.println(F("[ERROR] E-STOP detected during test! Aborting immediately."));
             currentState = STATE_COMPLETE;
             return false;
         }
         
         // Check for user abort
         if (Serial.available() > 0) {
-            Serial.println("Test aborted by user");
+            Serial.println(F("[MESSAGE] Test aborted by user"));
             stopMotion();
             currentState = STATE_COMPLETE;
             return false;
@@ -397,23 +397,23 @@ bool testMotorRange() {
                     
                     // Limit test distance to max travel (positive direction)
                     if (testDistance > MAX_TRAVEL_PULSES) {
-                        Serial.print("Limiting test distance to maximum travel (");
+                        Serial.print(F("[DIAGNOSTIC] Limiting test distance to maximum travel ("));
                         Serial.print(MAX_TRAVEL_PULSES);
-                        Serial.println(" pulses)");
+                        Serial.println(F(" pulses)"));
                         testDistance = MAX_TRAVEL_PULSES;
                     }
                     
                     // Ensure we don't try to move in negative direction
                     if ((testDistance * MOTION_DIRECTION) < 0) {
-                        Serial.println("Warning: Test would move beyond home position - skipping");
+                        Serial.println(F("[DIAGNOSTIC] Warning: Test would move beyond home position - skipping"));
                         testDistance = 0; // Safe position - stay at home
                     }
                     
-                    Serial.print("Testing movement of ");
+                    Serial.print(F("[MESSAGE] Testing movement of "));
                     Serial.print(testDistance);
-                    Serial.print(" pulses (approx. ");
+                    Serial.print(F(" pulses (approx. "));
                     Serial.print((double)testDistance / PULSES_PER_REV);
-                    Serial.println(" revolutions)");
+                    Serial.println(F(" revolutions)"));
                     
                     // Move to the test distance
                     MOTOR_CONNECTOR.Move(testDistance, MotorDriver::MOVE_TARGET_ABSOLUTE);
@@ -421,7 +421,7 @@ bool testMotorRange() {
                     currentState = STATE_MOVING;
                 } else {
                     // All steps done, return home
-                    Serial.println("Returning to home position...");
+                    Serial.println(F("[MESSAGE] Returning to home position..."));
                     MOTOR_CONNECTOR.Move(0, MotorDriver::MOVE_TARGET_ABSOLUTE);
                     lastActionTime = currentTime;
                     currentState = STATE_RETURN_HOME;
@@ -431,22 +431,22 @@ bool testMotorRange() {
             case STATE_MOVING:
                 // Check for move completion or fault
                 if (MOTOR_CONNECTOR.StepsComplete()) {
-                    Serial.print("Successfully moved to ");
+                    Serial.print(F("[MESSAGE] Successfully moved to "));
                     Serial.print(testDistance);
-                    Serial.println(" pulses.");
+                    Serial.println(F(" pulses."));
                     lastActionTime = currentTime;
                     currentState = STATE_WAIT_BETWEEN_MOVES;
                 }
                 else if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-                    Serial.print("Motor fault at ");
+                    Serial.print(F("[ERROR] Motor fault at "));
                     Serial.print(testDistance);
-                    Serial.println(" pulses.");
+                    Serial.println(F(" pulses."));
                     printMotorAlerts();
                     return false;
                 }
                 else if (currentTime - lastActionTime > 5000) {
                     // Timeout - 5 seconds should be enough for these short moves
-                    Serial.println("Move timed out. Aborting test.");
+                    Serial.println(F("[ERROR] Move timed out. Aborting test."));
                     return false;
                 }
                 break;
@@ -469,20 +469,20 @@ bool testMotorRange() {
                     MOTOR_CONNECTOR.VelMax(currentVelMax);
                     MOTOR_CONNECTOR.AccelMax(currentAccelMax);
                     
-                    Serial.println("Motor range test completed successfully.");
-                    Serial.println("Restored original velocity and acceleration limits.");
+                    Serial.println(F("[MESSAGE] Motor range test completed successfully."));
+                    Serial.println(F("[MESSAGE] Restored original velocity and acceleration limits."));
                     currentState = STATE_COMPLETE;
                     testRunning = false;
                     return true;
                 }
                 else if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-                    Serial.println("Motor fault during return to home.");
+                    Serial.println(F("[ERROR] Motor fault during return to home."));
                     printMotorAlerts();
                     return false;
                 }
                 else if (currentTime - lastActionTime > 5000) {
                     // Timeout
-                    Serial.println("Return to home timed out. Aborting test.");
+                    Serial.println(F("[ERROR] Return to home timed out. Aborting test."));
                     return false;
                 }
                 break;

@@ -29,6 +29,11 @@ double lastTargetPositionMm = 0.0;
 int32_t currentTargetPulses = 0;
 int32_t lastTargetPulses = 0;
 
+// Fault clearing state variables
+FaultClearingState faultClearState = FAULT_CLEAR_IDLE;
+unsigned long faultClearTimer = 0;
+bool faultClearInProgress = false;
+
 // ----------------- Utility Functions -----------------
 
 // Convert RPM to Pulses Per Second
@@ -64,15 +69,15 @@ int32_t normalizeEncoderValue(int32_t rawValue) {
 // ----------------- Basic Setup Functions -----------------
 
 void initMotorSystem() {
-    Serial.println("Initializing motor system...");
+    Serial.println(F("[MESSAGE] Initializing motor system..."));
     
     // Set up E-stop input pin with internal pull-up
     pinMode(E_STOP_PIN, INPUT_PULLUP);
-    Serial.print("Checking E-Stop state: ");
+    Serial.print(F("[MESSAGE] Checking E-Stop state: "));
     if (isEStopActive()) {
-        Serial.println("E-STOP ACTIVE! Please reset E-stop before continuing.");
+        Serial.println(F("[ERROR] E-STOP ACTIVE! Please reset E-stop before continuing."));
     } else {
-        Serial.println("E-stop inactive, system ready.");
+        Serial.println(F("[MESSAGE] E-stop inactive, system ready."));
     }
     
     // Set the input clocking rate
@@ -88,27 +93,27 @@ void initMotorSystem() {
     MOTOR_CONNECTOR.HlfbCarrier(MotorDriver::HLFB_CARRIER_482_HZ);
     
     // Set velocity and acceleration limits using RPM values
-    Serial.print("Setting velocity limit to ");
+    Serial.print(F("[MESSAGE] Setting velocity limit to "));
     Serial.print(MOTOR_VELOCITY_RPM); // CHANGED: Using consolidated constant
-    Serial.println(" RPM");
+    Serial.println(F(" RPM"));
     
     currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM); // CHANGED
     MOTOR_CONNECTOR.VelMax(currentVelMax);
     
     // Set acceleration limit
-    Serial.print("Setting acceleration limit to ");
+    Serial.print(F("[MESSAGE] Motor enable requested"));
     Serial.print(MAX_ACCEL_RPM_PER_SEC);
-    Serial.println(" RPM/s");
+    Serial.println(F(" RPM"));
     
     currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
     MOTOR_CONNECTOR.AccelMax(currentAccelMax);
     
     // Enable the motor
     MOTOR_CONNECTOR.EnableRequest(true);
-    Serial.println("Motor enable requested");
+    Serial.println(F("[MESSAGE] Motor enable requested"));
     
     // Wait for HLFB to assert (up to 2 seconds)
-    Serial.println("Waiting for HLFB...");
+    Serial.println(F("[MESSAGE] Waiting for HLFB..."));
     unsigned long startTime = millis();
     bool ready = false;
     
@@ -116,7 +121,7 @@ void initMotorSystem() {
         if (MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED) {
             ready = true;
         } else if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-            Serial.println("Motor alert detected:");
+            Serial.println(F("[ERROR] Motor alert detected:"));
             printMotorAlerts();
             break;
         }
@@ -124,11 +129,11 @@ void initMotorSystem() {
     }
     
     if (ready) {
-        Serial.println("Motor initialized and ready");
+        Serial.println(F("[MESSAGE] Motor initialized and ready"));
         motorInitialized = true;
         motorState = MOTOR_STATE_IDLE;  
     } else {
-        Serial.println("Motor initialization timed out or failed");
+        Serial.println(F("[ERROR] Motor initialization timed out or failed"));
         Serial.print("HLFB State: ");
         Serial.println(MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED ? 
                       "ASSERTED" : "NOT ASSERTED");
@@ -142,29 +147,29 @@ bool moveToAbsolutePosition(int32_t position) {
     // Check if position is within valid range (accounting for MOTION_DIRECTION)
     if ((MOTION_DIRECTION * position < 0) || 
         (MOTION_DIRECTION * position > MAX_TRAVEL_PULSES)) {
-        Serial.print("Error: Requested position ");
+        Serial.print(F("[ERROR] Requested position "));
         Serial.print(position);
-        Serial.print(" pulses is outside valid range (0 to ");
+        Serial.print(F(" pulses is outside valid range (0 to "));
         Serial.print(MOTION_DIRECTION * MAX_TRAVEL_PULSES);
-        Serial.println(" pulses)");
+        Serial.println(F(" pulses)"));
         return false;
     }
     
     // Check if motor has alerts
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-        Serial.println("Motor alert detected. Cannot move.");
+        Serial.println(F("[ERROR] Motor alert detected. Cannot move."));
         printMotorAlerts();
         return false;
     }
     
-    Serial.print("Moving to absolute position: ");
+    Serial.print(F("[MESSAGE] Moving to absolute position: "));
     Serial.println(normalizeEncoderValue(position));
     
     // Command the absolute move
     MOTOR_CONNECTOR.Move(position, MotorDriver::MOVE_TARGET_ABSOLUTE);
     
     // Report initial status
-    Serial.println("Move commanded. Motor in motion...");
+    Serial.println(F("[MESSAGE] Move commanded. Motor in motion..."));
     
     return true;
 }
@@ -221,11 +226,11 @@ bool moveToPosition(int positionNumber) {
 bool moveToPositionMm(double positionMm) {
     // Safety check - prevent movement beyond physical limits
     if (positionMm < 0 || positionMm > MAX_TRAVEL_MM) {
-        Serial.print("Error: Requested position ");
+        Serial.print(F("[ERROR] Requested position "));
         Serial.print(positionMm);
-        Serial.print(" mm is outside valid range (0 to ");
+        Serial.print(F(" mm is outside valid range (0 to "));
         Serial.print(MAX_TRAVEL_MM);
-        Serial.println(" mm)");
+        Serial.println(F(" mm)"));
         return false;
     }
     
@@ -253,16 +258,16 @@ bool moveRelative(double relativeMm) {
     
     // Check if the target position would be out of bounds
     if (targetPositionMm < 0 || targetPositionMm > MAX_TRAVEL_MM) {
-        Serial.print("Error: Relative move would exceed valid range (0 to ");
+        Serial.print(F("[ERROR] Relative move would exceed valid range (0 to "));
         Serial.print(MAX_TRAVEL_MM);
-        Serial.println(" mm)");
-        Serial.print("Current position: ");
+        Serial.println(F(" mm)"));
+        Serial.print(F("[ERROR] Current position: "));
         Serial.print(currentPositionMm);
-        Serial.print(" mm, Requested move: ");
+        Serial.print(F(" mm, Requested move: "));
         Serial.print(relativeMm);
-        Serial.print(" mm, Target would be: ");
+        Serial.print(F(" mm, Target would be: "));
         Serial.print(targetPositionMm);
-        Serial.println(" mm");
+        Serial.println(F(" mm"));
         return false;
     }
     
@@ -276,11 +281,11 @@ bool moveRelative(double relativeMm) {
     motorState = MOTOR_STATE_MOVING;
     currentPosition = POSITION_CUSTOM;
     
-    Serial.print("Moving ");
+    Serial.print(F("[MESSAGE] Moving "));
     Serial.print(relativeMm);
-    Serial.print(" mm from current position (");
+    Serial.print(F(" mm from current position ("));
     Serial.print(normalizeEncoderValue(relativePulses));
-    Serial.println(" pulses)");
+    Serial.println(F(" pulses)"));
     
     return true;
 }
@@ -292,7 +297,7 @@ double getMotorPositionMm() {
 void stopMotion() {
     // Stop the motor abruptly
     MOTOR_CONNECTOR.MoveStopAbrupt();
-    Serial.println("Motion stopped");
+    Serial.println(F("[MESSAGE] Motion stopped"));
 }
 
 // ----------------- Jogging Functions -----------------
@@ -324,13 +329,13 @@ bool jogMotor(bool direction, double customIncrement) {
     currentTargetPulses = mmToPulses(targetPositionMm);
     
     // Log the jog operation
-    Serial.print("Jogging ");
-    Serial.print(direction ? "forward" : "backward");
-    Serial.print(" by ");
+    Serial.print(F("[MESSAGE] Jogging "));
+    Serial.print(direction ? F("forward") : F("backward"));
+    Serial.print(F(" by "));
     Serial.print(increment);
-    Serial.print(" mm at ");
+    Serial.print(F(" mm at "));
     Serial.print(currentJogSpeedRpm);
-    Serial.println(" RPM");
+    Serial.println(F(" RPM"));
     
     // Use the existing moveRelative function
     bool result = moveRelative(moveMm);
@@ -350,15 +355,15 @@ bool jogMotor(bool direction, double customIncrement) {
 bool setJogIncrement(double increment) {
     // Validate increment is reasonable
     if (increment <= 0 || increment > 100) {
-        Serial.println("Error: Jog increment must be between 0 and 100mm");
+        Serial.println(F("[ERROR] Jog increment must be between 0 and 100mm"));
         return false;
     }
     
     // Set the increment
     currentJogIncrementMm = increment;
-    Serial.print("Jog increment set to ");
+    Serial.print(F("[MESSAGE] Jog increment set to "));
     Serial.print(currentJogIncrementMm);
-    Serial.println(" mm");
+    Serial.println(F(" mm"));
     
     return true;
 }
@@ -366,17 +371,17 @@ bool setJogIncrement(double increment) {
 bool setJogSpeed(int speedRpm) {
     // Validate speed is reasonable
     if (speedRpm < 10 || speedRpm > MOTOR_VELOCITY_RPM) {
-        Serial.print("Error: Jog speed must be between 10 and ");
+        Serial.print(F("[ERROR] Jog speed must be between 10 and "));
         Serial.print(MOTOR_VELOCITY_RPM);
-        Serial.println(" RPM");
+        Serial.println(F(" RPM"));
         return false;
     }
     
     // Set the speed
     currentJogSpeedRpm = speedRpm;
-    Serial.print("Jog speed set to ");
+    Serial.print(F("[MESSAGE] Jog speed set to "));
     Serial.print(currentJogSpeedRpm);
-    Serial.println(" RPM");
+    Serial.println(F(" RPM"));
     
     return true;
 }
@@ -437,128 +442,195 @@ MotorState updateMotorState() {
 }
 
 void printMotorStatus() {
-    Serial.println("Motor Status:");
+    Serial.println(F("[MESSAGE] Motor Status:"));
     
-    Serial.print("  Enabled: ");
-    Serial.println(MOTOR_CONNECTOR.EnableRequest() ? "Yes" : "No");
+    Serial.print(F("  Enabled: "));
+    Serial.println(MOTOR_CONNECTOR.EnableRequest() ? F("Yes") : F("No"));
     
-    Serial.print("  Moving: ");
-    Serial.println(isMotorAtPosition() ? "No" : "Yes");
+    Serial.print(F("  Moving: "));
+    Serial.println(isMotorAtPosition() ? F("No") : F("Yes"));
     
-    Serial.print("  Position: ");
+    Serial.print(F("  Position: "));
     Serial.print(normalizeEncoderValue(MOTOR_CONNECTOR.PositionRefCommanded()));
-    Serial.println(" pulses");
+    Serial.println(F(" pulses"));
     
-    Serial.print("  Current Velocity Limit: ");
+    Serial.print(F("  Current Velocity Limit: "));
     Serial.print(ppsToRpm(currentVelMax));
-    Serial.println(" RPM");
+    Serial.println(F(" RPM"));
     
-    Serial.print("  Current Acceleration Limit: ");
+    Serial.print(F("  Current Acceleration Limit: "));
     double accelRpmPerSec = (double)currentAccelMax * 60.0 / PULSES_PER_REV;
     Serial.print(accelRpmPerSec);
-    Serial.println(" RPM/s");
+    Serial.println(F(" RPM/s"));
     
-    Serial.print("  HLFB Status: ");
+    Serial.print(F("  HLFB Status: "));
     switch (MOTOR_CONNECTOR.HlfbState()) {
         case MotorDriver::HLFB_ASSERTED:
-            Serial.println("Asserted (In Position/Ready)");
+            Serial.println(F("Asserted (In Position/Ready)"));
             break;
         case MotorDriver::HLFB_DEASSERTED:
-            Serial.println("Deasserted (Moving/Fault)");
+            Serial.println(F("Deasserted (Moving/Fault)"));
             break;
         case MotorDriver::HLFB_UNKNOWN:
         default:
-            Serial.println("Unknown");
+            Serial.println(F("Unknown"));
             break;
     }
     
     // Print any alerts
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-        Serial.println("  Alerts present:");
+        Serial.println(F("  Alerts present:"));
         printMotorAlerts();
     } else {
-        Serial.println("  No alerts");
+        Serial.println(F("  No alerts"));
     }
 }
 
 void printMotorAlerts() {
     if (MOTOR_CONNECTOR.AlertReg().bit.MotionCanceledInAlert) {
-        Serial.println("    MotionCanceledInAlert");
+        Serial.println(F("[ERROR]     MotionCanceledInAlert"));
     }
     if (MOTOR_CONNECTOR.AlertReg().bit.MotionCanceledPositiveLimit) {
-        Serial.println("    MotionCanceledPositiveLimit");
+        Serial.println(F("[ERROR]     MotionCanceledPositiveLimit"));
     }
     if (MOTOR_CONNECTOR.AlertReg().bit.MotionCanceledNegativeLimit) {
-        Serial.println("    MotionCanceledNegativeLimit");
+        Serial.println(F("[ERROR]     MotionCanceledNegativeLimit"));
     }
     if (MOTOR_CONNECTOR.AlertReg().bit.MotionCanceledSensorEStop) {
-        Serial.println("    MotionCanceledSensorEStop");
+        Serial.println(F("[ERROR]     MotionCanceledSensorEStop"));
     }
     if (MOTOR_CONNECTOR.AlertReg().bit.MotionCanceledMotorDisabled) {
-        Serial.println("    MotionCanceledMotorDisabled");
+        Serial.println(F("[ERROR]     MotionCanceledMotorDisabled"));
     }
     if (MOTOR_CONNECTOR.AlertReg().bit.MotorFaulted) {
-        Serial.println("    MotorFaulted");
+        Serial.println(F("[ERROR]     MotorFaulted"));
     }
 }
 
 void clearMotorFaults() {
-    Serial.println("Attempting to clear motor faults...");
-    
-    // First check if there are faults present
-    if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-        Serial.println("Alerts detected:");
-        printMotorAlerts();
+    // If we're not already in the process of clearing faults, start the process
+    if (!faultClearInProgress) {
+        Serial.println(F("[DIAGNOSTIC] Attempting to clear motor faults..."));
         
-        // If a motor fault is present, clear it by cycling enable
-        if (MOTOR_CONNECTOR.AlertReg().bit.MotorFaulted) {
-            Serial.println("Motor faulted. Cycling enable signal...");
-            MOTOR_CONNECTOR.EnableRequest(false);
-            delay(100);  // Give more time for disable to take effect
-            MOTOR_CONNECTOR.EnableRequest(true);
-            delay(100);  // Give more time for enable to take effect
-        }
-        
-        // Clear alerts
-        Serial.println("Clearing motor alerts...");
-        MOTOR_CONNECTOR.ClearAlerts();
-        
-        // Verify alerts were cleared
+        // First check if there are faults present
         if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-            Serial.println("Warning: Alerts are still present after clearing.");
+            Serial.println(F("[DIAGNOSTIC] Alerts detected:"));
             printMotorAlerts();
+            
+            // Start the fault clearing state machine
+            faultClearState = FAULT_CLEAR_DISABLE;
+            faultClearTimer = millis();
+            faultClearInProgress = true;
         } else {
-            Serial.println("Alerts successfully cleared.");
+            Serial.println(F("[MESSAGE] No alerts to clear."));
         }
-    } else {
-        Serial.println("No alerts to clear.");
     }
 }
 
-bool clearMotorFaultWithStatus() {
-    bool hadAlerts = MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent;
+void processFaultClearing() {
+    // If we're not clearing faults, just return
+    if (!faultClearInProgress) {
+        return;
+    }
     
-    clearMotorFaults(); // Use the existing implementation
+    unsigned long currentTime = millis();
     
-    // Return success if alerts were cleared or weren't present to begin with
-    return !MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent;
+    switch (faultClearState) {
+        case FAULT_CLEAR_DISABLE:
+            // Disable the motor
+            if (MOTOR_CONNECTOR.AlertReg().bit.MotorFaulted) {
+                Serial.println(F("[DIAGNOSTIC] Motor faulted. Cycling enable signal..."));
+                MOTOR_CONNECTOR.EnableRequest(false);
+            }
+            faultClearTimer = currentTime;
+            faultClearState = FAULT_CLEAR_WAITING_DISABLE;
+            break;
+            
+        case FAULT_CLEAR_WAITING_DISABLE:
+            // Wait 100ms after disabling
+            if (currentTime - faultClearTimer >= 100) {
+                faultClearState = FAULT_CLEAR_ENABLE;
+            }
+            break;
+            
+        case FAULT_CLEAR_ENABLE:
+            // Re-enable the motor
+            MOTOR_CONNECTOR.EnableRequest(true);
+            faultClearTimer = currentTime;
+            faultClearState = FAULT_CLEAR_WAITING_ENABLE;
+            break;
+            
+        case FAULT_CLEAR_WAITING_ENABLE:
+            // Wait 100ms after enabling
+            if (currentTime - faultClearTimer >= 100) {
+                faultClearState = FAULT_CLEAR_ALERTS;
+            }
+            break;
+            
+        case FAULT_CLEAR_ALERTS:
+            // Clear alerts
+            Serial.println(F("[DIAGNOSTIC] Clearing motor alerts..."));
+            MOTOR_CONNECTOR.ClearAlerts();
+            
+            // Check if alerts were cleared
+            if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
+                Serial.println(F("[ERROR] Alerts are still present after clearing."));
+                printMotorAlerts();
+            } else {
+                Serial.println(F("[MESSAGE] Alerts successfully cleared."));
+            }
+            
+            faultClearState = FAULT_CLEAR_FINISHED;
+            break;
+            
+        case FAULT_CLEAR_FINISHED:
+            // Reset state for next time
+            faultClearState = FAULT_CLEAR_IDLE;
+            faultClearInProgress = false;
+            break;
+            
+        default:
+            faultClearState = FAULT_CLEAR_IDLE;
+            faultClearInProgress = false;
+            break;
+    }
 }
 
+bool isFaultClearingInProgress() {
+    return faultClearInProgress;
+}
+
+bool clearMotorFaultWithStatus() {
+    // If fault clearing is already in progress, return false
+    if (faultClearInProgress) {
+        Serial.println(F("[MESSAGE] Fault clearing already in progress"));
+        return false;
+    }
+    
+    bool hadAlerts = MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent;
+    
+    // Start fault clearing process
+    clearMotorFaults();
+    
+    // Return true if there were no alerts to clear (immediate success)
+    // Return false if clearing process has started (delayed result)
+    return !hadAlerts;
+}
 
 // ----------------- Homing Functions -----------------
 
 bool initiateHomingSequence() {
     // Check if motor is initialized
     if (!motorInitialized) {
-        Serial.println("Error: Motor not initialized - run 'motor init' first");
+        Serial.println(F("[ERROR] Motor not initialized - run 'motor init' first"));
         return false;
     }
     
     // Check for motor alerts
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
-        Serial.println("Error: Motor has active alerts - clear faults before homing");
+        Serial.println(F("[ERROR] Motor has active alerts - clear faults before homing"));
         printMotorAlerts(); // Print the specific alerts
-        Serial.println("Please run 'clear fault' command first");
+        Serial.println(F("[ERROR] Please run 'clear fault' command first"));
         return false;
     }
     
@@ -569,7 +641,7 @@ bool initiateHomingSequence() {
     currentTargetPulses = 0;
     
     // Start the non-blocking enable cycle
-    Serial.println("Cycling motor enable to trigger automatic homing...");
+    Serial.println(F("[MESSAGE] Cycling motor enable to trigger automatic homing..."));
     MOTOR_CONNECTOR.EnableRequest(false);
     enableCycleStartTime = millis();
     motorEnableCycleInProgress = true;
@@ -595,13 +667,13 @@ void executeHomingSequence() {
     // Check if enable cycle just completed and movement hasn't started yet
     if (!motorEnableCycleInProgress && !homingMovementStarted) {
         // Start the actual homing movement
-        Serial.println("Starting hard stop homing sequence...");
+        Serial.println(F("[MESSAGE] Starting hard stop homing sequence..."));
         
         // Set velocity for initial approach
         int32_t homingVel = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
-        Serial.print("Moving toward hard stop with velocity: ");
+        Serial.print(F("[MESSAGE] Moving toward hard stop with velocity: "));
         Serial.print(HOME_APPROACH_VELOCITY_RPM);
-        Serial.println(" RPM");
+        Serial.println(F(" RPM"));
         
         currentVelMax = homingVel;
         MOTOR_CONNECTOR.VelMax(currentVelMax);
@@ -632,7 +704,7 @@ void executeHomingSequence() {
 
     // Check for timeout
     if (millis() - homingStartTime > HOME_TIMEOUT_MS) {
-        Serial.println("Error: Homing operation timed out");
+        Serial.println(F("[ERROR] Homing operation timed out"));
         stopMotion();
         homingInProgress = false;
         homingPhase = HOMING_PHASE_INITIAL_APPROACH; // Reset for next time
@@ -654,7 +726,9 @@ void executeHomingSequence() {
             
             // Switch to slower approach after a delay or when close to the hard stop
             if (millis() - phaseStartTime > 2000) {
-                Serial.println("Switching to slower velocity: " + String(HOME_FINAL_VELOCITY_RPM) + " RPM");
+                Serial.print(F("[DIAGNOSTIC] Switching to slower velocity: "));
+                Serial.print(HOME_FINAL_VELOCITY_RPM);
+                Serial.println(F(" RPM"));
                 
                 // Reduce velocity for final approach
                 int32_t slowHomingVel = rpmToPps(HOME_FINAL_VELOCITY_RPM);
@@ -666,35 +740,46 @@ void executeHomingSequence() {
         case HOMING_PHASE_SLOW_APPROACH:
             // We're moving at slow speed toward hard stop
             homingPhase = HOMING_PHASE_WAIT_FOR_HARDSTOP;
-            Serial.println("Contacting hard stop, waiting for motor to settle...");
+            Serial.println(F("[DIAGNOSTIC] Contacting hard stop, waiting for motor to settle..."));
             break;
             
         case HOMING_PHASE_WAIT_FOR_HARDSTOP:
             {
-                // Use a static variable to track last message time
+                // Use static variables to track timing and messaging
                 static unsigned long lastHardstopMessageTime = 0;
+                static unsigned long hardStopDetectedTime = 0;
+                static bool hardStopDetected = false;
+                
                 unsigned long currentTime = millis();
                 
                 // Check HLFB to detect hard stop contact
-                if (MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED) {
+                if (MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED && !hardStopDetected) {
                     // Hard stop detected!
-                    Serial.println("Hard stop detected (HLFB asserted). Stopping motor.");
+                    Serial.println(F("[MESSAGE] Hard stop detected (HLFB asserted). Stopping motor."));
                     
                     // Stop the motor
                     MOTOR_CONNECTOR.MoveStopAbrupt();
                     
-                    // Brief delay to ensure motor stops
-                    delay(100);
+                    // Record when we detected the hard stop
+                    hardStopDetected = true;
+                    hardStopDetectedTime = currentTime;
+                    
+                    // Don't transition to next phase yet - wait non-blockingly
+                } 
+                // If we've detected a hard stop and waited the required time
+                else if (hardStopDetected && (currentTime - hardStopDetectedTime >= 100)) {
+                    // Reset for next homing operation
+                    hardStopDetected = false;
                     
                     // Move to offset phase
                     homingPhase = HOMING_PHASE_MOVE_OFFSET;
                     
                     // Reset the message timer for next time
                     lastHardstopMessageTime = 0;
-                } 
-                // Only print status message every 5 seconds
-                else if (currentTime - lastHardstopMessageTime >= 10000) {
-                    Serial.print("Waiting for hardstop. HLFB State: DEASSERTED");
+                }
+                // Only print status message every 10 seconds if still waiting
+                else if (!hardStopDetected && (currentTime - lastHardstopMessageTime >= 10000)) {
+                    Serial.print(F("[DIAGNOSTIC] Waiting for hardstop. HLFB State: DEASSERTED"));
                     Serial.println();
                     
                     // Update last message time
@@ -705,9 +790,9 @@ void executeHomingSequence() {
             
         case HOMING_PHASE_MOVE_OFFSET:
             // Move away from hard stop by the configured offset
-            Serial.print("Moving away from hard stop by ");
+            Serial.print(F("[MESSAGE] Moving away from hard stop by "));
             Serial.print(HOME_OFFSET_DISTANCE_MM);
-            Serial.println(" mm");
+            Serial.println(F(" mm"));
             
             {  // Add braces to create a new scope
                 // Calculate offset in pulses
@@ -725,7 +810,7 @@ void executeHomingSequence() {
             // Wait for offset move to complete
             if (MOTOR_CONNECTOR.StepsComplete()) {
                 // Homing is complete!
-                Serial.println("Hard stop homing completed successfully.");
+                Serial.println(F("[MESSAGE] Hard stop homing completed successfully."));
                 
                 // Set position to zero
                 MOTOR_CONNECTOR.PositionRefSet(0);
@@ -746,7 +831,9 @@ void executeHomingSequence() {
                 currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
                 MOTOR_CONNECTOR.VelMax(currentVelMax);
                 MOTOR_CONNECTOR.AccelMax(currentAccelMax);
-                Serial.println("Restored motor velocity to " + String(MOTOR_VELOCITY_RPM) + " RPM");
+                Serial.print(F("[MESSAGE] Restored motor velocity to "));
+                Serial.print(MOTOR_VELOCITY_RPM);
+                Serial.println(F(" RPM"));
             }
             break;
     }
@@ -758,7 +845,7 @@ bool isHomingComplete() {
 
 void abortHoming() {
     if (homingInProgress) {
-        Serial.println("Aborting homing operation");
+        Serial.println(F("[MESSAGE] Aborting homing operation"));
         MOTOR_CONNECTOR.MoveStopAbrupt();
         
         // Reset to normal operation parameters
@@ -774,7 +861,7 @@ void abortHoming() {
         // This is a way to interact with static variables in another function
         executeHomingSequence(); // This will reset homingMovementStarted when it sees !homingInProgress
     } else {
-        Serial.println("No homing operation in progress");
+        Serial.println(F("[MESSAGE] No homing operation in progress"));
     }
 }
 
@@ -790,7 +877,7 @@ void checkMoveProgress() {
     // Check if we just transitioned to MOVING state
     if (motorState == MOTOR_STATE_MOVING && previousState != MOTOR_STATE_MOVING) {
         wasMoving = true;
-        Serial.println("[DIAGNOSTIC] Movement started - tracking for LastTarget update");
+        Serial.println(F("[DIAGNOSTIC] Movement started - tracking for LastTarget update"));
     }
     
     // Update the current position when moving
@@ -800,13 +887,13 @@ void checkMoveProgress() {
 
     // Check if the move has just completed (transition from wasMoving to not moving)
     if (wasMoving && !isMoving) {
-        Serial.println("[DIAGNOSTIC] Move completed successfully");
+        Serial.println(F("[DIAGNOSTIC] Move completed successfully"));
         
         // Movement completed successfully, update last target
         if (hasCurrentTarget) {
-            Serial.print("[DIAGNOSTIC] Updating LastTarget to: ");
+            Serial.print(F("[DIAGNOSTIC] Updating LastTarget to: "));
             Serial.print(currentTargetPositionMm);
-            Serial.println(" mm");
+            Serial.println(F(" mm"));
             
             hasLastTarget = true;
             lastTargetType = currentTargetType;
@@ -815,7 +902,7 @@ void checkMoveProgress() {
             hasCurrentTarget = false; // Clear current target
             
         } else {
-            Serial.println("[WARNING] Move completed but no current target was set!");
+            Serial.println(F("[DIAGNOSTIC] Move completed but no current target was set!"));
         }
         
         // Reset the wasMoving flag
@@ -850,7 +937,7 @@ void handleEStop() {
     
     // Only take action if E-stop state changes from inactive to active
     if (eStopActive && !eStopWasActive) {
-        Serial.println("E-STOP TRIGGERED!");
+        Serial.println(F("[ERROR] E-STOP TRIGGERED!"));
         
         // Stop any motion immediately
         MOTOR_CONNECTOR.MoveStopAbrupt();
@@ -860,7 +947,7 @@ void handleEStop() {
         
         // If homing was in progress, abort it
         if (homingInProgress) {
-            Serial.println("Aborting homing operation");
+            Serial.println(F("[MESSAGE] Aborting homing operation"));
             homingInProgress = false;
         }
         
@@ -869,7 +956,7 @@ void handleEStop() {
     } 
     // Report when E-stop is released
     else if (!eStopActive && eStopWasActive) {
-        Serial.println("E-STOP RELEASED - System remains in fault state until cleared");
+        Serial.println(F("[MESSAGE] E-STOP RELEASED - System remains in fault state until cleared"));
     }
     
     eStopWasActive = eStopActive;
