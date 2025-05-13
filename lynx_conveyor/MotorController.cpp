@@ -56,7 +56,11 @@ double pulsesToMm(int32_t pulses) {
     // When converting from pulses to mm for display, include the MOTION_DIRECTION factor
     return (double)pulses / PULSES_PER_MM * MOTION_DIRECTION;
 }
-
+// Normalize encoder values for display
+int32_t normalizeEncoderValue(int32_t rawValue) {
+    // Apply the same direction multiplier as used in movement calculations
+    return rawValue * MOTION_DIRECTION;
+}
 // ----------------- Basic Setup Functions -----------------
 
 void initMotorSystem() {
@@ -154,7 +158,7 @@ bool moveToAbsolutePosition(int32_t position) {
     }
     
     Serial.print("Moving to absolute position: ");
-    Serial.println(position);
+    Serial.println(normalizeEncoderValue(position));
     
     // Command the absolute move
     MOTOR_CONNECTOR.Move(position, MotorDriver::MOVE_TARGET_ABSOLUTE);
@@ -275,7 +279,7 @@ bool moveRelative(double relativeMm) {
     Serial.print("Moving ");
     Serial.print(relativeMm);
     Serial.print(" mm from current position (");
-    Serial.print(relativePulses);
+    Serial.print(normalizeEncoderValue(relativePulses));
     Serial.println(" pulses)");
     
     return true;
@@ -442,7 +446,7 @@ void printMotorStatus() {
     Serial.println(isMotorAtPosition() ? "No" : "Yes");
     
     Serial.print("  Position: ");
-    Serial.print(MOTOR_CONNECTOR.PositionRefCommanded());
+    Serial.print(normalizeEncoderValue(MOTOR_CONNECTOR.PositionRefCommanded()));
     Serial.println(" pulses");
     
     Serial.print("  Current Velocity Limit: ");

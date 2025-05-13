@@ -40,7 +40,7 @@
 
 
 // System travel limits - based on physical measurement
-#define MAX_TRAVEL_MM 1092.2            // Maximum travel in mm (measured)
+#define MAX_TRAVEL_MM 1050.0            // Maximum travel in mm (measured)
 #define MAX_TRAVEL_PULSES (int32_t)(MAX_TRAVEL_MM * PULSES_PER_MM)  // ~65,142 counts
 
 // Position definitions (in mm from home)
@@ -172,6 +172,13 @@ bool moveToAbsolutePosition(int32_t position);
  * @return true if movement was successfully commanded, false if error
  */
 bool moveToPosition(int positionNumber);
+/**
+ * Normalize encoder values for consistent display
+ * What it does: Applies the MOTION_DIRECTION factor to raw encoder values to make display consistent with movement commands
+ * @param rawValue Raw encoder count from the motor
+ * @return Normalized encoder value for user display
+ */
+int32_t normalizeEncoderValue(int32_t rawValue);
 /**
  * Stop the motor immediately
  * What it does: Abruptly stops any current motion

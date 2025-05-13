@@ -28,35 +28,35 @@ void setup()
 {
     Serial.begin(115200);
     delay(1000);
-    Serial.println("Lynx Conveyor Controller starting up...");
+    Serial.println(F("[MESSAGE] Lynx Conveyor Controller starting up..."));
 
     // First set up the CCIO board
-    Serial.println("Initializing CCIO-8 expansion boards...");
+    Serial.println(F("[MESSAGE] Initializing CCIO-8 expansion boards..."));
     CcioPort.Mode(Connector::CCIO);
     CcioPort.PortOpen();
     
     // Get count of CCIO-8 boards
     ccioBoardCount = CcioMgr.CcioCount();
-    Serial.print("Discovered CCIO boards: ");
+    Serial.print(F("[MESSAGE] Discovered CCIO boards: "));
     Serial.println(ccioBoardCount);
     
     // Now initialize sensor systems
-    Serial.println("Initializing sensor systems...");
+    Serial.println(F("[MESSAGE] Initializing sensor systems..."));
     initSensorSystem();
     
     // Initialize valve system with CCIO board status
-    Serial.println("Initializing valve controller...");
+    Serial.println(F("[MESSAGE] Initializing valve controller..."));
     initValveSystem(ccioBoardCount > 0);
     
     // Rest of your setup code...
-    Serial.println("Motor controller ready for initialization.");
-    Serial.println("Use 'motor init' command to initialize the motor.");
+    Serial.println(F("[MESSAGE] Motor controller ready for initialization."));
+    Serial.println(F("[MESSAGE] Use 'motor init' command to initialize the motor."));
     
     commander.attachTree(API_tree);
     commander.init();
     
-    Serial.println("[MESSAGE] System ready.");
-    Serial.println("Type 'help' for available commands");
+    Serial.println(F("[MESSAGE] System ready."));
+    Serial.println(F("[MESSAGE] Type 'help' for available commands"));
 }
 
 // The main loop

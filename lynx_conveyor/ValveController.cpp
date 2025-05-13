@@ -40,27 +40,18 @@ bool hasCCIO = false;
 void initSensorSystem() {
     // Initialize all sensors on the main ClearCore board
     
-    // 1. Cylinder position sensors
-    pinMode(TRAY_1_CYLINDER_SENSOR_PIN, INPUT_PULLUP);
-    pinMode(TRAY_2_CYLINDER_SENSOR_PIN, INPUT_PULLUP);
-    pinMode(TRAY_3_CYLINDER_SENSOR_PIN, INPUT_PULLUP);
-    pinMode(SHUTTLE_CYLINDER_SENSOR_PIN, INPUT_PULLUP);
-    
+    // 1. Cylinder position sensors   
     sensorInit(tray1CylinderSensor, TRAY_1_CYLINDER_SENSOR_PIN);
     sensorInit(tray2CylinderSensor, TRAY_2_CYLINDER_SENSOR_PIN);
     sensorInit(tray3CylinderSensor, TRAY_3_CYLINDER_SENSOR_PIN);
     sensorInit(shuttleCylinderSensor, SHUTTLE_CYLINDER_SENSOR_PIN);
     
-    // 2. Tray detection sensors
-    pinMode(TRAY_1_DETECT_PIN, INPUT_PULLUP);
-    pinMode(TRAY_2_DETECT_PIN, INPUT_PULLUP);
-    pinMode(TRAY_3_DETECT_PIN, INPUT_PULLUP);
-    
+    // 2. Tray detection sensors   
     sensorInit(tray1DetectSensor, TRAY_1_DETECT_PIN);
     sensorInit(tray2DetectSensor, TRAY_2_DETECT_PIN);
     sensorInit(tray3DetectSensor, TRAY_3_DETECT_PIN);
     
-    Serial.println("Sensor system initialized");
+    Serial.println(F("Sensor system initialized"));
 }
 
 void initValveSystem(bool hasCCIOBoard) {
@@ -289,4 +280,21 @@ const char* getValveNameByIndex(int index) {
         return valveNames[index];
     }
     return "Unknown";
+}
+
+// Create an array for tray detection sensors for easier batch operations
+CylinderSensor* allTrayDetectSensors[3] = {
+    &tray1DetectSensor, &tray2DetectSensor, &tray3DetectSensor
+};
+const int trayDetectSensorCount = 3;
+
+void printTrayDetectionStatus() {
+    Serial.println(F("Tray Detection Status:"));
+    for (int i = 0; i < trayDetectSensorCount; i++) {
+        bool trayDetected = sensorRead(*allTrayDetectSensors[i]);
+        Serial.print(F("  Tray "));
+        Serial.print(i+1);
+        Serial.print(F(": "));
+        Serial.println(trayDetected ? F("DETECTED") : F("Not Present"));
+    }
 }

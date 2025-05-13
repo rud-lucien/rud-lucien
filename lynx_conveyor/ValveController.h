@@ -76,6 +76,10 @@ extern const char* valveNames[4];
 extern CylinderSensor* allCylinderSensors[4];  // Changed from allSensors
 extern const int cylinderSensorCount;  // Changed from sensorCount
 
+// Array of tray detection sensor pointers for logging
+extern CylinderSensor* allTrayDetectSensors[3];
+extern const int trayDetectSensorCount;
+
 // CCIO Board status
 extern bool hasCCIO;
 
@@ -125,5 +129,7 @@ void unlockAllValves();
 DoubleSolenoidValve* getValveByIndex(int index);
 CylinderSensor* getSensorByIndex(int index);
 const char* getValveNameByIndex(int index);
+
+void printTrayDetectionStatus();
 
 #endif // VALVE_CONTROLLER_H

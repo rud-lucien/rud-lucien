@@ -9,7 +9,7 @@ const unsigned long DEFAULT_LOG_INTERVAL = 500; // Default interval of 500ms
 
 void logSystemState()
 {
-    Serial.print("[LOG] ");
+    Serial.print(F("[LOG] "));
     
     // 1. DEVICE STATUS GROUP
     // Valve status
@@ -17,104 +17,113 @@ void logSystemState()
         DoubleSolenoidValve *valve = getValveByIndex(i);
         if (valve) {
             Serial.print(valveNames[i]);
-            Serial.print("=");
+            Serial.print(F("="));
             
             if (valve->position == VALVE_POSITION_UNLOCK) {
-                Serial.print("UNLOCKED");
+                Serial.print(F("UNLOCKED"));
             } else if (valve->position == VALVE_POSITION_LOCK) {
-                Serial.print("LOCKED");
+                Serial.print(F("LOCKED"));
             } else {
-                Serial.print("UNKNOWN");
+                Serial.print(F("UNKNOWN"));
             }
             
-            Serial.print(", ");
+            Serial.print(F(", "));
         }
     }
+
+    // Individual tray sensor readings
+    Serial.print(F("Tray1="));
+    Serial.print(sensorRead(tray1DetectSensor) ? F("PRESENT") : F("EMPTY"));
+    Serial.print(F(", Tray2="));
+    Serial.print(sensorRead(tray2DetectSensor) ? F("PRESENT") : F("EMPTY"));
+    Serial.print(F(", Tray3="));
+    Serial.print(sensorRead(tray3DetectSensor) ? F("PRESENT") : F("EMPTY"));
+    Serial.print(F(", "));
     
     // Motor and safety state
-    Serial.print("Motor=");
+    Serial.print(F("Motor="));
     switch (motorState) {
-        case MOTOR_STATE_IDLE: Serial.print("IDLE"); break;
-        case MOTOR_STATE_MOVING: Serial.print("MOVING"); break;
-        case MOTOR_STATE_HOMING: Serial.print("HOMING"); break;
-        case MOTOR_STATE_FAULTED: Serial.print("FAULTED"); break;
-        case MOTOR_STATE_NOT_READY: Serial.print("NOT_READY"); break;
-        default: Serial.print("UNKNOWN"); break;
+        case MOTOR_STATE_IDLE: Serial.print(F("IDLE")); break;
+        case MOTOR_STATE_MOVING: Serial.print(F("MOVING")); break;
+        case MOTOR_STATE_HOMING: Serial.print(F("HOMING")); break;
+        case MOTOR_STATE_FAULTED: Serial.print(F("FAULTED")); break;
+        case MOTOR_STATE_NOT_READY: Serial.print(F("NOT_READY")); break;
+        default: Serial.print(F("UNKNOWN")); break;
     }
     
-    Serial.print(", Homed=");
-    Serial.print(isHomed ? "YES" : "NO");
+    Serial.print(F(", Homed="));
+    Serial.print(isHomed ? F("YES") : F("NO"));
     
-    Serial.print(", E-Stop=");
-    Serial.print(isEStopActive() ? "TRIGGERED" : "RELEASED");
+    Serial.print(F(", E-Stop="));
+    Serial.print(isEStopActive() ? F("TRIGGERED") : F("RELEASED"));
     
     // 2. POSITION GROUP - Simple, clear format
-    Serial.print(" | Pos=");
-    double calculatedPositionMm = abs(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()));
-    int32_t currentPulses = abs(MOTOR_CONNECTOR.PositionRefCommanded());
+    Serial.print(F(" | Pos="));
+    double calculatedPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
+    int32_t currentPulses = normalizeEncoderValue(MOTOR_CONNECTOR.PositionRefCommanded());
     Serial.print(calculatedPositionMm, 2);
-    Serial.print("mm (");
+    Serial.print(F("mm ("));
     Serial.print(currentPulses);
-    Serial.print(" counts)");
+    Serial.print(F(" counts)"));
     
     // Target information - just show the numerical value if moving
-    Serial.print(", Target=");
+    Serial.print(F(", Target="));
     if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING) {
         if (hasCurrentTarget) {
             // For all target types, just show the actual position value
             Serial.print(currentTargetPositionMm, 2);
-            Serial.print("mm (");
-            Serial.print(abs(currentTargetPulses));
-            Serial.print(" counts)");
+            Serial.print(F("mm ("));
+            Serial.print(normalizeEncoderValue(currentTargetPulses)); // Normalize here
+            Serial.print(F(" counts)"));
         } else {
-            Serial.print("None");
+            Serial.print(F("None"));
         }
     } else {
-        Serial.print("None");
+        Serial.print(F("None"));
     }
     
     // Last target - simplified to just show the completed position
-    Serial.print(", LastTarget=");
+    Serial.print(F(", LastTarget="));
     if (hasLastTarget) {
         Serial.print(lastTargetPositionMm, 2);
-        Serial.print("mm (");
-        Serial.print(abs(lastTargetPulses));
-        Serial.print(" counts)");
+        Serial.print(F("mm ("));
+        Serial.print(normalizeEncoderValue(lastTargetPulses)); // Normalize here
+        Serial.print(F(" counts)"));
     } else {
-        Serial.print("None");
+        Serial.print(F("None"));
     }
     
     // 3. MOTION PARAMETERS GROUP
     // Current velocity (removed redundant counts/sec display)
-    Serial.print(" | Vel=");
+    Serial.print(F(" | Vel="));
     double currentVelocityRpm = abs((double)MOTOR_CONNECTOR.VelocityRefCommanded() * 60.0 / PULSES_PER_REV);
     Serial.print(currentVelocityRpm, 1);
-    Serial.print("RPM");
+    Serial.print(F("RPM"));
     if (currentVelocityRpm > 0) {
-        Serial.print(" (");
+        Serial.print(F(" ("));
         Serial.print((int)(currentVelocityRpm * 100 / ppsToRpm(currentVelMax)));
-        Serial.print("%)");
+        Serial.print(F("%)"));
     }
     
     // Limits (condensed)
-    Serial.print(", Limits: ");
+    Serial.print(F(", Limits: "));
     Serial.print(ppsToRpm(currentVelMax), 0);
-    Serial.print("RPM/");
+    Serial.print(F("RPM/"));
     Serial.print((double)currentAccelMax * 60.0 / PULSES_PER_REV, 0);
-    Serial.print("RPM/s");
+    Serial.print(F("RPM/s"));
     
     // 4. JOG SETTINGS GROUP
-    Serial.print(" | Jog: ");
+    Serial.print(F(" | Jog: "));
     Serial.print(currentJogIncrementMm, 1);
-    Serial.print("mm");
+    Serial.print(F("mm"));
     if (currentJogIncrementMm == DEFAULT_JOG_INCREMENT) 
-        Serial.print("(D)");
+        Serial.print(F("(D)"));
     
-    Serial.print("/");
+    Serial.print(F("/"));
     Serial.print(currentJogSpeedRpm);
-    Serial.print("RPM");
+    Serial.print(F("RPM"));
     if (currentJogSpeedRpm == DEFAULT_JOG_SPEED)
-        Serial.print("(D)");
+        Serial.print(F("(D)"));
     
     // End the line
     Serial.println();
