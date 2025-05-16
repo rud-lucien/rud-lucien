@@ -5,8 +5,15 @@
 #include "ClearCore.h"
 #include "MotorController.h"
 
-// Test function declarations
-bool testHomingRepeatability();
-bool testMotorRange(); 
+//=============================================================================
+// FUNCTION DECLARATIONS
+//=============================================================================
+
+//-----------------------------------------------------------------------------
+// Motor System Tests
+// Evaluate motor positioning and homing performance
+//-----------------------------------------------------------------------------
+bool testHomingRepeatability();  // Test homing repeatability over multiple cycles
+bool testMotorRange();           // Test motor movement across its range
 
 #endif // TESTS_H

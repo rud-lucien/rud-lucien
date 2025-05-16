@@ -4,27 +4,34 @@
 #include "Arduino.h"
 #include "ClearCore.h"
 
-// ----------------- Type Definitions -----------------
+//=============================================================================
+// TYPE DEFINITIONS
+//=============================================================================
 
+// Valve position states
 enum ValvePosition {
     VALVE_POSITION_UNLOCK,
     VALVE_POSITION_LOCK
 };
 
+// Double solenoid valve structure
 struct DoubleSolenoidValve {
     int unlockPin;
     int lockPin;
     ValvePosition position;
 };
 
+// Sensor structure
 struct CylinderSensor {
     int pin;
     bool lastState;
 };
 
-// ----------------- Pin Mapping Constants -----------------
+//=============================================================================
+// PIN MAPPING CONSTANTS
+//=============================================================================
 
-// Valve solenoid pins - Use ClearCore constants
+// Valve solenoid pins - Use ClearCore CCIO board pins
 #define TRAY_1_LOCK_PIN CLEARCORE_PIN_CCIOA0     // CCIO IO-0 connector  
 #define TRAY_1_UNLOCK_PIN CLEARCORE_PIN_CCIOA1   // CCIO IO-1 connector
 #define TRAY_2_LOCK_PIN CLEARCORE_PIN_CCIOA2     // CCIO IO-2 connector
@@ -40,16 +47,17 @@ struct CylinderSensor {
 #define TRAY_3_CYLINDER_SENSOR_PIN A9   // ClearCore A9 - Detects Tray 3 cylinder position
 #define SHUTTLE_CYLINDER_SENSOR_PIN A10 // ClearCore A10 - Detects Shuttle cylinder position
 
-// Other constants
-#define PULSE_DURATION 100  // Minimum recommended pulse duration in milliseconds
-
-
 // Tray detection sensors on IO pins of ClearCore main board
 #define TRAY_1_DETECT_PIN 1    // ClearCore IO-1 - Detects tray at position 1
 #define TRAY_2_DETECT_PIN 2    // ClearCore IO-2 - Detects tray at position 2  
 #define TRAY_3_DETECT_PIN 3    // ClearCore IO-3 - Detects tray at position 3
 
-// ----------------- Global variables -----------------
+// Other constants
+#define PULSE_DURATION 100  // Minimum recommended pulse duration in milliseconds
+
+//=============================================================================
+// GLOBAL VARIABLES
+//=============================================================================
 
 // Valve instances
 extern DoubleSolenoidValve tray1Valve;
@@ -57,13 +65,13 @@ extern DoubleSolenoidValve tray2Valve;
 extern DoubleSolenoidValve tray3Valve;
 extern DoubleSolenoidValve shuttleValve;
 
-// Sensor instances
+// Cylinder position sensor instances
 extern CylinderSensor tray1CylinderSensor;  
 extern CylinderSensor tray2CylinderSensor;  
 extern CylinderSensor tray3CylinderSensor;  
 extern CylinderSensor shuttleCylinderSensor; 
 
-// New tray detection sensor declarations
+// Tray detection sensor instances
 extern CylinderSensor tray1DetectSensor;
 extern CylinderSensor tray2DetectSensor;
 extern CylinderSensor tray3DetectSensor;
@@ -73,63 +81,103 @@ extern DoubleSolenoidValve* allValves[4];
 extern const int valveCount;
 extern const char* valveNames[4];
 
-extern CylinderSensor* allCylinderSensors[4];  // Changed from allSensors
-extern const int cylinderSensorCount;  // Changed from sensorCount
+extern CylinderSensor* allCylinderSensors[4]; 
+extern const int cylinderSensorCount;
 
-// Array of tray detection sensor pointers for logging
 extern CylinderSensor* allTrayDetectSensors[3];
 extern const int trayDetectSensorCount;
 
 // CCIO Board status
 extern bool hasCCIO;
 
-// ----------------- Function Declarations -----------------
+//=============================================================================
+// FUNCTION DECLARATIONS
+//-----------------------------------------------------------------------------
+// System Initialization
+// Setup valve and sensor systems
+//-----------------------------------------------------------------------------
+void initSensorSystem();  
+void initValveSystem(bool hasCCIOBoard);
 
-// Initialization functions
-void initSensorSystem();  // For all sensors on the main board
-void initValveSystem(bool hasCCIOBoard);  // Single function for all valve initialization
-
-// Low-level hardware functions
+//-----------------------------------------------------------------------------
+// Basic Hardware Control
+// Low-level control of hardware pins
+//-----------------------------------------------------------------------------
 void pulsePin(int pin, unsigned long duration);
 int getActivationPin(const DoubleSolenoidValve &valve, ValvePosition target);
 
-// Valve operations
+//-----------------------------------------------------------------------------
+// Valve Core Operations
+// Direct control of valves
+//-----------------------------------------------------------------------------
 void valveInit(DoubleSolenoidValve &valve);
 void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target);
 void valveDeactivate(DoubleSolenoidValve &valve);
 ValvePosition valveGetPosition(const DoubleSolenoidValve &valve);
 
-// Higher-order valve operations
+//-----------------------------------------------------------------------------
+// Valve Convenience Functions
+// Higher-level valve operations with semantic names
+//-----------------------------------------------------------------------------
 void withValve(DoubleSolenoidValve &valve, void (*operation)(DoubleSolenoidValve&));
 void unlockValve(DoubleSolenoidValve &valve);
 void lockValve(DoubleSolenoidValve &valve);
 void deactivateValve(DoubleSolenoidValve &valve);
+void lockAllValves();
+void unlockAllValves();
 
-// Sensor operations
+//-----------------------------------------------------------------------------
+// Sensor Operations
+// Initialize and read sensors
+//-----------------------------------------------------------------------------
 void sensorInit(CylinderSensor &sensor, int pin);
 bool sensorRead(CylinderSensor &sensor);
 
-// Status reporting
+//-----------------------------------------------------------------------------
+// Status Reporting
+// Display valve and sensor states
+//-----------------------------------------------------------------------------
 void printValveStatus(const DoubleSolenoidValve &valve, const char* valveName);
 void printSensorStatus(const CylinderSensor &sensor, const char* sensorName);
-
-// Batch operations
-void withAllValves(void (*operation)(DoubleSolenoidValve&));
 void printAllValveStatus();
 void printAllSensorStatus();
+void printTrayDetectionStatus();
 
-// Advanced operations with sensor feedback
+//-----------------------------------------------------------------------------
+// Batch Operations
+// Perform operations on all valves
+//-----------------------------------------------------------------------------
+void withAllValves(void (*operation)(DoubleSolenoidValve&));
+
+//-----------------------------------------------------------------------------
+// Advanced Operations
+// Operations with sensor feedback and safety features
+//-----------------------------------------------------------------------------
 bool waitForSensor(CylinderSensor &sensor, bool expectedState, unsigned long timeoutMs);
 bool safeValveOperation(DoubleSolenoidValve &valve, CylinderSensor &sensor,
-                      ValvePosition targetPosition, unsigned long timeoutMs);
+                       ValvePosition targetPosition, unsigned long timeoutMs);
 
-// Convenience functions
-void lockAllValves();
-void unlockAllValves();
-DoubleSolenoidValve* getValveByIndex(int index);
-CylinderSensor* getSensorByIndex(int index);
-const char* getValveNameByIndex(int index);
+//-----------------------------------------------------------------------------
+// Accessor Functions
+//-----------------------------------------------------------------------------
 
-void printTrayDetectionStatus();
+// Helper function to access shuttle valve specifically
+DoubleSolenoidValve* getShuttleValve();
+
+// Helper functions to access specific valves
+DoubleSolenoidValve* getTray1Valve();
+DoubleSolenoidValve* getTray2Valve();
+DoubleSolenoidValve* getTray3Valve();
+
+// Helper functions to access cylinder sensors
+CylinderSensor* getTray1Sensor();
+CylinderSensor* getTray2Sensor();
+CylinderSensor* getTray3Sensor();
+CylinderSensor* getShuttleSensor();
+
+// Helper functions to access tray detection sensors
+CylinderSensor* getTray1DetectionSensor();
+CylinderSensor* getTray2DetectionSensor();
+CylinderSensor* getTray3DetectionSensor();
 
 #endif // VALVE_CONTROLLER_H

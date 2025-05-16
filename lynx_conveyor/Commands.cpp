@@ -4,6 +4,7 @@
 #include "ValveController.h"
 #include "MotorController.h"
 #include "Tests.h"
+#include "Utils.h"
 
 // External declaration for the logging structure
 extern LoggingManagement logging;
@@ -148,7 +149,17 @@ bool cmd_lock(char *args, CommandCaller *caller)
         if (ccioBoardCount > 0)
         {
             caller->println(F("[MESSAGE] Engaging shuttle"));
-            DoubleSolenoidValve *valve = getValveByIndex(3);
+            DoubleSolenoidValve *valve = NULL;
+            switch (3) {
+                case 0: valve = getTray1Valve(); break;
+                case 1: valve = getTray2Valve(); break;
+                case 2: valve = getTray3Valve(); break;
+                case 3: valve = getShuttleValve(); break;
+                default:
+                    Serial.print(F("[ERROR] Invalid valve index: "));
+                    Serial.println(3);
+                    return false;
+            }
             if (valve)
             {
                 // Check current state first
@@ -186,7 +197,18 @@ bool cmd_lock(char *args, CommandCaller *caller)
         {
             caller->print(F("[MESSAGE] Engaging tray "));
             caller->println(trayNum);
-            DoubleSolenoidValve *valve = getValveByIndex(trayNum - 1);
+            DoubleSolenoidValve *valve = NULL;
+            switch (trayNum - 1) {
+                case 0: valve = getTray1Valve(); break;
+                case 1: valve = getTray2Valve(); break;
+                case 2: valve = getTray3Valve(); break;
+                case 3: valve = getShuttleValve(); break;
+                default:
+                    Serial.print(F("[ERROR] Invalid valve index: "));
+                    Serial.println(trayNum - 1);
+                    return false;
+            }
+
             if (valve)
             {
                 // Check current state first
@@ -269,7 +291,17 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         if (ccioBoardCount > 0)
         {
             caller->println(F("[MESSAGE] Disengaging shuttle"));
-            DoubleSolenoidValve *valve = getValveByIndex(3);
+            DoubleSolenoidValve *valve = NULL;
+            switch (3) {
+                case 0: valve = getTray1Valve(); break;
+                case 1: valve = getTray2Valve(); break;
+                case 2: valve = getTray3Valve(); break;
+                case 3: valve = getShuttleValve(); break;
+                default:
+                    Serial.print(F("[ERROR] Invalid valve index: "));
+                    Serial.println(3);
+                    return false;
+            }
             if (valve)
             {
                 // Check current state first
@@ -307,7 +339,18 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         {
             caller->print(F("[MESSAGE] Disengaging tray "));
             caller->println(trayNum);
-            DoubleSolenoidValve *valve = getValveByIndex(trayNum - 1);
+            DoubleSolenoidValve *valve = NULL;
+            switch (trayNum - 1) {
+                case 0: valve = getTray1Valve(); break;
+                case 1: valve = getTray2Valve(); break;
+                case 2: valve = getTray3Valve(); break;
+                case 3: valve = getShuttleValve(); break;
+                default:
+                    Serial.print(F("[ERROR] Invalid valve index: "));
+                    Serial.println(trayNum - 1);
+                    return false;
+            }
+
             if (valve)
             {
                 // Check current state first
@@ -1513,6 +1556,223 @@ bool cmd_jog(char *args, CommandCaller *caller)
     return false; // Should never reach here, but included for completeness
 }
 
+bool cmd_system_state(char *args, CommandCaller *caller) {
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+    
+    // Determine the subcommand
+    char *subcommand = strtok(trimmed, " ");
+    
+    // If no subcommand provided, display usage
+    if (subcommand == NULL || strlen(subcommand) == 0) {
+        caller->println(F("[MESSAGE] Usage: system,state - Display current system state"));
+        caller->println(F("                 system,safety - Display safety validation status"));
+        caller->println(F("                 system,trays - Display tray system status"));
+        return false;
+    }
+    
+    // Handle subcommands
+    if (strcmp(subcommand, "state") == 0) {
+        // Capture and print system state
+        SystemState currentState = captureSystemState();
+        printSystemState(currentState, caller);
+        return true;
+    }
+    // Add this new section to display safety validation
+    else if (strcmp(subcommand, "safety") == 0) {
+        // Capture system state, validate safety, and print results
+        SystemState currentState = captureSystemState();
+        SafetyValidationResult safety = validateSafety(currentState);
+        
+        caller->println(F("\n===== SAFETY VALIDATION STATUS ====="));
+        printSafetyStatus(safety, caller);
+        
+        return true;
+    }
+    else if (strcmp(subcommand, "trays") == 0) {
+        // Display tray system status
+        SystemState currentState = captureSystemState();
+        updateTrayTrackingFromSensors(currentState);
+        
+        caller->println(F("\n===== TRAY SYSTEM STATUS ====="));
+        caller->print(F("Total trays in system: "));
+        caller->println(trayTracking.totalTraysInSystem);
+        
+        caller->println(F("\nPosition occupancy:"));
+        caller->print(F("  Position 1 (Loading): "));
+        caller->println(trayTracking.position1Occupied ? F("OCCUPIED") : F("EMPTY"));
+        caller->print(F("  Position 2 (Middle): "));
+        caller->println(trayTracking.position2Occupied ? F("OCCUPIED") : F("EMPTY"));
+        caller->print(F("  Position 3 (Unloading): "));
+        caller->println(trayTracking.position3Occupied ? F("OCCUPIED") : F("EMPTY"));
+        
+        caller->println(F("\nOperation statistics:"));
+        caller->print(F("  Total loads completed: "));
+        caller->println(trayTracking.totalLoadsCompleted);
+        caller->print(F("  Total unloads completed: "));
+        caller->println(trayTracking.totalUnloadsCompleted);
+        
+        if (trayTracking.lastLoadTime > 0) {
+            caller->print(F("  Last load: "));
+            caller->print((millis() - trayTracking.lastLoadTime) / 1000);
+            caller->println(F(" seconds ago"));
+        }
+        
+        if (trayTracking.lastUnloadTime > 0) {
+            caller->print(F("  Last unload: "));
+            caller->print((millis() - trayTracking.lastUnloadTime) / 1000);
+            caller->println(F(" seconds ago"));
+        }
+        
+        return true;
+    }
+    else {
+        // Unknown subcommand
+        caller->print(F("[ERROR] Unknown system command: "));
+        caller->println(subcommand);
+        caller->println(F("Valid options are 'system,state', 'system,safety', or 'system,trays'"));
+        return false;
+    }
+}
+
+// Tray command handler
+bool cmd_tray(char *args, CommandCaller *caller) {
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+    
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        caller->println(F("[ERROR] Missing parameter. Usage: tray,<request|placed|released|status>"));
+        return false;
+    }
+
+    // Parse the subcommand
+    char *subcommand = strtok(trimmed, " ");
+    if (subcommand == NULL) {
+        caller->println(F("[ERROR] Invalid format. Usage: tray,<request|placed|released|status>"));
+        return false;
+    }
+    
+    // Skip leading spaces from subcommand
+    subcommand = trimLeadingSpaces(subcommand);
+    
+    // Handle the different subcommands
+    if (strcmp(subcommand, "request") == 0) {
+        // Mitsubishi robot is requesting to load a tray
+        
+        // 1. Check if the system can accept a tray
+        SystemState state = captureSystemState();
+        updateTrayTrackingFromSensors(state);
+        
+        // 2. Verify position 1 is free and no operations are in progress
+        if (trayTracking.position1Occupied) {
+            caller->println(F("POSITION_OCCUPIED"));
+            return false;
+        }
+        
+        if (operationInProgress) {
+            caller->println(F("SYSTEM_BUSY"));
+            return false;
+        }
+        
+        // 3. Validate safety constraints
+        SafetyValidationResult safety = validateSafety(state);
+        if (!safety.safeToLoadTrayToPos1) {
+            caller->print(F("UNSAFE: "));
+            caller->println(safety.loadTrayPos1UnsafeReason);
+            return false;
+        }
+        
+        // 4. Set the target position for position 1
+        if (!moveToPositionMm(POSITION_1_MM)) {
+            caller->println(F("ERROR_MOVE_FAILURE"));
+            return false;
+        }
+        
+        // 5. System is ready to receive tray
+        caller->println(F("READY_TO_RECEIVE"));
+        return true;
+    }
+    else if (strcmp(subcommand, "placed") == 0) {
+        // Mitsubishi robot has placed the tray
+        
+        // 1. Verify tray sensor shows tray is present
+        SystemState state = captureSystemState();
+        if (!state.tray1Present) {
+            caller->println(F("ERROR_NO_TRAY_DETECTED"));
+            return false;
+        }
+        
+        // 2. Lock the tray in position
+        DoubleSolenoidValve *valve = getTray1Valve(); // Tray 1 valve
+        if (valve && valve->position != VALVE_POSITION_LOCK) {
+            lockValve(*valve);
+            caller->println(F("TRAY_SECURED"));
+            
+            // Update tray tracking
+            addTrayAtPosition1();
+            return true;
+        }
+        else if (valve && valve->position == VALVE_POSITION_LOCK) {
+            caller->println(F("TRAY_ALREADY_SECURED"));
+            addTrayAtPosition1();
+            return true;
+        }
+        else {
+            caller->println(F("ERROR_LOCK_FAILURE"));
+            return false;
+        }
+    }
+    else if (strcmp(subcommand, "released") == 0) {
+        // Start the automated operation
+        beginOperation();
+        
+        // Set the operation details
+        currentOperation.inProgress = true;
+        currentOperation.type = OPERATION_LOADING;
+        currentOperation.startTime = millis();
+        
+        // No need to manually set target - it will be set in processTrayLoading()
+        
+        caller->println(F("STARTING_PROCESSING"));
+        return true;
+    }
+    else if (strcmp(subcommand, "status") == 0) {
+        // Return system status in machine-readable format
+        SystemState state = captureSystemState();
+        updateTrayTrackingFromSensors(state);
+        
+        // Format: STATUS:P1:[0/1],P2:[0/1],P3:[0/1],OP:[0/1]
+        // Where P1/P2/P3 are positions, OP is operation in progress
+        caller->print(F("STATUS:P1:"));
+        caller->print(trayTracking.position1Occupied ? "1" : "0");
+        caller->print(F(",P2:"));
+        caller->print(trayTracking.position2Occupied ? "1" : "0");
+        caller->print(F(",P3:"));
+        caller->print(trayTracking.position3Occupied ? "1" : "0");
+        caller->print(F(",OP:"));
+        caller->println(operationInProgress ? "1" : "0");
+        
+        return true;
+    }
+    else {
+        caller->print(F("[ERROR] Unknown tray command: "));
+        caller->println(subcommand);
+        caller->println(F("Valid options are 'request', 'placed', 'released', or 'status'"));
+        return false;
+    }
+}
+
 Commander commander;
 
 Commander::systemCommand_t API_tree[] = {
@@ -1526,6 +1786,13 @@ Commander::systemCommand_t API_tree[] = {
 
     // Logging command
     systemCommand("log", "Logging controls (usage: log,on[,interval] or log,off or log,now)", cmd_log),
+
+    // NEW: State command to display system state
+    systemCommand("system", "System commands:\n"
+                            "  system,state  - Display current system state (sensors, actuators, positions)\n"
+                            "  system,safety - Display comprehensive safety validation status\n"
+                            "  system,trays  - Display tray tracking and statistics",
+                 cmd_system_state),
 
     // Motor control commands
     systemCommand("motor", "Motor control:\n"
@@ -1553,4 +1820,12 @@ Commander::systemCommand_t API_tree[] = {
                          "  jog,inc,X     - Get or set jog increment (X in mm or 'default')\n"
                          "  jog,speed,X   - Get or set jog speed (X in RPM or 'default')\n"
                          "  jog,status    - Display current jog settings",
-                  cmd_jog)};
+                  cmd_jog),
+
+    // Tray command
+    systemCommand("tray", "Tray operations:\n"
+                          "  tray,request   - Request to load a tray (Mitsubishi)\n"
+                          "  tray,placed    - Notify tray has been placed (Mitsubishi)\n"
+                          "  tray,released  - Notify tray has been released (Mitsubishi)\n"
+                          "  tray,status    - Get tray system status (machine-readable)",
+                  cmd_tray)};

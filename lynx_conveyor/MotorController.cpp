@@ -1,4 +1,5 @@
 #include "MotorController.h"
+#include "Utils.h"
 
 // ----------------- Global Variables -----------------
 bool motorInitialized = false;
@@ -938,6 +939,11 @@ void handleEStop() {
     // Only take action if E-stop state changes from inactive to active
     if (eStopActive && !eStopWasActive) {
         Serial.println(F("[ERROR] E-STOP TRIGGERED!"));
+        
+        // If an automated operation is in progress, abort it
+        if (currentOperation.inProgress) {
+            abortOperation(ABORT_REASON_ESTOP);
+        }
         
         // Stop any motion immediately
         MOTOR_CONNECTOR.MoveStopAbrupt();

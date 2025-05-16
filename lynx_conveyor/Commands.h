@@ -8,35 +8,62 @@
 #include "Logging.h"
 #include "Tests.h"
 
-// Add this line to reference the variable from lynx_conveyor.ino
+//=============================================================================
+// COMMAND CONSTANTS
+//=============================================================================
+
+// Command tree size
+#define COMMAND_SIZE 11 // Increased from 10
+
+//=============================================================================
+// EXTERNAL REFERENCES
+//=============================================================================
+
+// Reference to the variable from lynx_conveyor.ino
 extern uint8_t ccioBoardCount; // Number of CCIO-8 boards detected
 
-#define COMMAND_SIZE 9 // Increased from 10
+// Global Command Tree and Commander Object
+extern Commander::systemCommand_t API_tree[COMMAND_SIZE];
+extern const int API_tree_size;
+extern Commander commander;
 
-// Command Function Prototypes
+//=============================================================================
+// FUNCTION DECLARATIONS
+//=============================================================================
+
+//-----------------------------------------------------------------------------
+// Core Command Functions
+// Top-level command handlers
+//-----------------------------------------------------------------------------
 bool cmd_print_help(char *args, CommandCaller *caller);
 
-// Motor commands
+//-----------------------------------------------------------------------------
+// Motor Control Commands
+// Functions for motor movement and configuration
+//-----------------------------------------------------------------------------
 bool cmd_motor(char *args, CommandCaller *caller);
 bool cmd_move(char *args, CommandCaller *caller);
+bool cmd_jog(char *args, CommandCaller *caller);
 
-// Valve control commands
+//-----------------------------------------------------------------------------
+// Valve Control Commands
+// Functions for operating pneumatic valves
+//-----------------------------------------------------------------------------
 bool cmd_lock(char *args, CommandCaller *caller);
 bool cmd_unlock(char *args, CommandCaller *caller);
 
-// Status and logging commands
+//-----------------------------------------------------------------------------
+// Status and Logging Commands
+// Functions for reporting system state
+//-----------------------------------------------------------------------------
 bool cmd_log(char *args, CommandCaller *caller);
+bool cmd_system_state(char *args, CommandCaller *caller); // New state command
 
-// Jog commands
-bool cmd_jog(char *args, CommandCaller *caller);
-
-// Helper functions
+//-----------------------------------------------------------------------------
+// Command Processing Utilities
+// Helper functions for processing commands
+//-----------------------------------------------------------------------------
 char *trimLeadingSpaces(char *str);
 void handleSerialCommands();
-
-// Global Command Tree and Commander Object
-extern Commander::systemCommand_t API_tree[9];
-extern const int API_tree_size;
-extern Commander commander;
 
 #endif // COMMANDS_H

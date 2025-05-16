@@ -16,8 +16,16 @@ void logSystemState()
     // Updated valve names for clarity
     const char* updatedValveNames[4] = {"Lock1", "Lock2", "Lock3", "Shuttle"};
     
+    // Replace this loop that uses getValveByIndex()
     for (int i = 0; i < valveCount; i++) {
-        DoubleSolenoidValve *valve = getValveByIndex(i);
+        DoubleSolenoidValve *valve = NULL;
+        
+        // Get the appropriate valve using the specific accessor functions
+        if (i == 0) valve = getTray1Valve();
+        else if (i == 1) valve = getTray2Valve();
+        else if (i == 2) valve = getTray3Valve();
+        else if (i == 3) valve = getShuttleValve();
+        
         if (valve) {
             Serial.print(updatedValveNames[i]);
             Serial.print(F("="));
@@ -126,4 +134,12 @@ void logSystemState()
     
     // End the line
     Serial.println();
+    
+    // Updated valve status printing
+    for (int i = 0; i < valveCount; i++) {
+        if (i == 0) printValveStatus(*getTray1Valve(), "Tray 1");
+        else if (i == 1) printValveStatus(*getTray2Valve(), "Tray 2");
+        else if (i == 2) printValveStatus(*getTray3Valve(), "Tray 3");
+        else if (i == 3) printValveStatus(*getShuttleValve(), "Shuttle");
+    }
 }

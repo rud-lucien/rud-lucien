@@ -264,28 +264,6 @@ void unlockAllValves() {
     withAllValves(unlockValve);
 }
 
-DoubleSolenoidValve* getValveByIndex(int index) {
-    if (index >= 0 && index < valveCount) {
-        // All valves require CCIO now
-        if (!hasCCIO) return NULL;
-        return allValves[index];
-    }
-    return NULL;
-}
-
-CylinderSensor* getSensorByIndex(int index) {
-    if (index >= 0 && index < cylinderSensorCount) {
-        return allCylinderSensors[index];
-    }
-    return NULL;
-}
-
-const char* getValveNameByIndex(int index) {
-    if (index >= 0 && index < valveCount) {
-        return valveNames[index];
-    }
-    return "Unknown";
-}
 
 // Create an array for tray detection sensors for easier batch operations
 CylinderSensor* allTrayDetectSensors[3] = {
@@ -302,4 +280,76 @@ void printTrayDetectionStatus() {
         Serial.print(F(": "));
         Serial.println(trayDetected ? F("DETECTED") : F("Not Present"));
     }
+}
+
+// Helper function to get a reference to the shuttle valve
+DoubleSolenoidValve* getShuttleValve() {
+    if (!hasCCIO) {
+        Serial.println(F("[ERROR] Cannot access shuttle valve: CCIO board not detected"));
+        return NULL;
+    }
+    // Shuttle valve is the fourth valve in the allValves array (index 3)
+    return &shuttleValve;
+}
+
+// Helper function to get a reference to tray 1 valve
+DoubleSolenoidValve* getTray1Valve() {
+    if (!hasCCIO) {
+        Serial.println(F("[ERROR] Cannot access tray 1 valve: CCIO board not detected"));
+        return NULL;
+    }
+    return &tray1Valve;
+}
+
+// Helper function to get a reference to tray 2 valve
+DoubleSolenoidValve* getTray2Valve() {
+    if (!hasCCIO) {
+        Serial.println(F("[ERROR] Cannot access tray 2 valve: CCIO board not detected"));
+        return NULL;
+    }
+    return &tray2Valve;
+}
+
+// Helper function to get a reference to tray 3 valve
+DoubleSolenoidValve* getTray3Valve() {
+    if (!hasCCIO) {
+        Serial.println(F("[ERROR] Cannot access tray 3 valve: CCIO board not detected"));
+        return NULL;
+    }
+    return &tray3Valve;
+}
+
+// Helper function to get a reference to tray 1 cylinder sensor
+CylinderSensor* getTray1Sensor() {
+    return &tray1CylinderSensor;
+}
+
+// Helper function to get a reference to tray 2 cylinder sensor
+CylinderSensor* getTray2Sensor() {
+    return &tray2CylinderSensor;
+}
+
+// Helper function to get a reference to tray 3 cylinder sensor
+CylinderSensor* getTray3Sensor() {
+    return &tray3CylinderSensor;
+}
+
+// Helper function to get a reference to shuttle cylinder sensor
+CylinderSensor* getShuttleSensor() {
+    return &shuttleCylinderSensor;
+}
+
+// Helper function to get a reference to tray 1 detection sensor
+CylinderSensor* getTray1DetectionSensor() {
+    return &tray1DetectSensor;
+}
+
+// Helper function to get a reference to tray 2 detection sensor
+CylinderSensor* getTray2DetectionSensor() {
+    return &tray2DetectSensor;
+}
+
+// Helper function to get a reference to tray 3 detection sensor
+CylinderSensor* getTray3DetectionSensor() {
+    return &tray3DetectSensor;
 }
