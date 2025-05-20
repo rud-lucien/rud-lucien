@@ -25,7 +25,7 @@
 #define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV)  // ~61.27 pulses per mm
 
 // Motion profile parameters (in RPM units)
-#define MOTOR_VELOCITY_RPM 600           // Maximum velocity for motor operation (RPM)
+#define MOTOR_VELOCITY_RPM 300           // Maximum velocity for motor operation (RPM)
 #define MAX_ACCEL_RPM_PER_SEC 5000       // Maximum acceleration in RPM/s
 #define ACCEL_LIMIT_RPM_PER_SEC 2500     // Acceleration limit for normal operation
 
@@ -54,9 +54,9 @@
 
 // Position definitions (in mm from home)
 #define POSITION_HOME_MM 0.0                 // Home position
-#define POSITION_1_MM (MAX_TRAVEL_MM * 0.25) // Position 1 (~273 mm) 
-#define POSITION_2_MM (MAX_TRAVEL_MM * 0.5)  // Position 2 (~546 mm)
-#define POSITION_3_MM (MAX_TRAVEL_MM * 0.75) // Position 3 (~819 mm)
+#define POSITION_1_MM 28.50                   // Position 1 (28.50 mm)  
+#define POSITION_2_MM 455.70                  // Position 2 (455.70 mm)
+#define POSITION_3_MM 883.55                 // Position 3 (883.55 mm)
 #define POSITION_4_MM MAX_TRAVEL_MM          // Position 4 (max = 1050 mm)
 
 // Position definitions in pulses (calculated from mm)

@@ -184,23 +184,23 @@ bool moveToPosition(PositionTarget position) {
         case POSITION_HOME:
             currentTargetPositionMm = POSITION_HOME_MM;
             currentTargetPulses = POSITION_HOME_PULSES;
-            return moveToAbsolutePosition(POSITION_HOME_PULSES);
+            return moveToAbsolutePosition(normalizeEncoderValue(POSITION_HOME_PULSES));
         case POSITION_1:
             currentTargetPositionMm = POSITION_1_MM;
             currentTargetPulses = POSITION_1_PULSES;
-            return moveToAbsolutePosition(POSITION_1_PULSES);
+            return moveToAbsolutePosition(normalizeEncoderValue(POSITION_1_PULSES));
         case POSITION_2:
             currentTargetPositionMm = POSITION_2_MM;
             currentTargetPulses = POSITION_2_PULSES;
-            return moveToAbsolutePosition(POSITION_2_PULSES);
+            return moveToAbsolutePosition(normalizeEncoderValue(POSITION_2_PULSES));
         case POSITION_3:
             currentTargetPositionMm = POSITION_3_MM;
             currentTargetPulses = POSITION_3_PULSES;
-            return moveToAbsolutePosition(POSITION_3_PULSES);
+            return moveToAbsolutePosition(normalizeEncoderValue(POSITION_3_PULSES));
         case POSITION_4:
             currentTargetPositionMm = POSITION_4_MM;
             currentTargetPulses = POSITION_4_PULSES;
-            return moveToAbsolutePosition(POSITION_4_PULSES);
+            return moveToAbsolutePosition(normalizeEncoderValue(POSITION_4_PULSES));
         default:
             hasCurrentTarget = false;
             return false;

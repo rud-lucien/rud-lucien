@@ -13,7 +13,7 @@
 //=============================================================================
 
 // Command tree size
-#define COMMAND_SIZE 11 // Increased from 10
+#define COMMAND_SIZE 12 // Increased from 10
 
 //=============================================================================
 // EXTERNAL REFERENCES
@@ -58,6 +58,7 @@ bool cmd_unlock(char *args, CommandCaller *caller);
 //-----------------------------------------------------------------------------
 bool cmd_log(char *args, CommandCaller *caller);
 bool cmd_system_state(char *args, CommandCaller *caller); // New state command
+bool cmd_test(char *args, CommandCaller *caller); // Test command for diagnostics
 
 //-----------------------------------------------------------------------------
 // Command Processing Utilities

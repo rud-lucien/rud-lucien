@@ -148,35 +148,42 @@ bool cmd_lock(char *args, CommandCaller *caller)
     {
         if (ccioBoardCount > 0)
         {
-            caller->println(F("[MESSAGE] Engaging shuttle"));
-            DoubleSolenoidValve *valve = NULL;
-            switch (3) {
-                case 0: valve = getTray1Valve(); break;
-                case 1: valve = getTray2Valve(); break;
-                case 2: valve = getTray3Valve(); break;
-                case 3: valve = getShuttleValve(); break;
-                default:
-                    Serial.print(F("[ERROR] Invalid valve index: "));
-                    Serial.println(3);
-                    return false;
-            }
-            if (valve)
+            caller->println(F("[MESSAGE] Engaging shuttle with sensor verification..."));
+            DoubleSolenoidValve *valve = getShuttleValve();
+            CylinderSensor *sensor = getShuttleSensor();
+            
+            if (valve && sensor)
             {
                 // Check current state first
                 if (valve->position == VALVE_POSITION_LOCK)
                 {
                     caller->println(F("[MESSAGE] Shuttle already engaged"));
+                    
+                    // Verify actual position with sensor
+                    if (sensorRead(*sensor) == true) { // Sensor true = locked
+                        caller->println(F("[OK] Shuttle lock confirmed by sensor"));
+                    } else {
+                        caller->println(F("[WARNING] Shuttle should be locked but sensor doesn't confirm - check air pressure"));
+                    }
+                    return true;
                 }
                 else
                 {
-                    lockValve(*valve);
-                    caller->println(F("[MESSAGE] Shuttle engaged successfully"));
+                    // Try locking with sensor feedback
+                    caller->println(F("[MESSAGE] Locking shuttle..."));
+                    if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000)) {
+                        caller->println(F("[MESSAGE] Shuttle engaged and confirmed by sensor"));
+                        return true;
+                    } else {
+                        caller->println(F("[ERROR] Failed to engage shuttle - sensor did not confirm lock"));
+                        caller->println(F("[WARNING] Check air pressure and valve functionality"));
+                        return false;
+                    }
                 }
-                return true;
             }
             else
             {
-                caller->println(F("[ERROR] Failed to access shuttle valve. Possible causes:"));
+                caller->println(F("[ERROR] Failed to access shuttle valve or sensor. Possible causes:"));
                 caller->println(F("  - CCIO board detected but shuttle valve not configured"));
                 caller->println(F("  - System memory corruption"));
                 caller->println(F("Try restarting the system or run 'status' to check valve configuration"));
@@ -196,20 +203,31 @@ bool cmd_lock(char *args, CommandCaller *caller)
         if (trayNum >= 1 && trayNum <= 3)
         {
             caller->print(F("[MESSAGE] Engaging tray "));
-            caller->println(trayNum);
+            caller->print(trayNum);
+            caller->println(F(" with sensor verification..."));
+            
             DoubleSolenoidValve *valve = NULL;
-            switch (trayNum - 1) {
-                case 0: valve = getTray1Valve(); break;
-                case 1: valve = getTray2Valve(); break;
-                case 2: valve = getTray3Valve(); break;
-                case 3: valve = getShuttleValve(); break;
+            CylinderSensor *sensor = NULL;
+            
+            // Get the appropriate valve and sensor
+            switch (trayNum) {
+                case 1:
+                    valve = getTray1Valve();
+                    sensor = getTray1Sensor();
+                    break;
+                case 2:
+                    valve = getTray2Valve();
+                    sensor = getTray2Sensor();
+                    break;
+                case 3:
+                    valve = getTray3Valve();
+                    sensor = getTray3Sensor();
+                    break;
                 default:
-                    Serial.print(F("[ERROR] Invalid valve index: "));
-                    Serial.println(trayNum - 1);
                     return false;
             }
 
-            if (valve)
+            if (valve && sensor)
             {
                 // Check current state first
                 if (valve->position == VALVE_POSITION_LOCK)
@@ -217,21 +235,36 @@ bool cmd_lock(char *args, CommandCaller *caller)
                     caller->print(F("[MESSAGE] Tray "));
                     caller->print(trayNum);
                     caller->println(F(" already engaged"));
+                    
+                    // Verify actual position with sensor
+                    if (sensorRead(*sensor) == true) { // Sensor true = locked
+                        caller->println(F("[OK] Tray lock confirmed by sensor"));
+                    } else {
+                        caller->println(F("[WARNING] Tray should be locked but sensor doesn't confirm - check air pressure"));
+                    }
+                    return true;
                 }
                 else
                 {
-                    lockValve(*valve);
-                    caller->print(F("[MESSAGE] Tray "));
-                    caller->print(trayNum);
-                    caller->println(F(" engaged successfully"));
+                    // Try locking with sensor feedback
+                    if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000)) {
+                        caller->print(F("[MESSAGE] Tray "));
+                        caller->print(trayNum);
+                        caller->println(F(" engaged and confirmed by sensor"));
+                        return true;
+                    } else {
+                        caller->print(F("[ERROR] Failed to engage tray "));
+                        caller->println(trayNum);
+                        caller->println(F("[WARNING] Check air pressure and valve functionality"));
+                        return false;
+                    }
                 }
-                return true;
             }
             else
             {
                 caller->print(F("[ERROR] Failed to access tray "));
                 caller->print(trayNum);
-                caller->println(F(" valve. Possible causes:"));
+                caller->println(F(" valve or sensor. Possible causes:"));
                 caller->println(F("  - Hardware initialization issue"));
                 caller->println(F("  - Valve controller not properly initialized"));
                 caller->println(F("  - System memory corruption"));
@@ -281,44 +314,55 @@ bool cmd_unlock(char *args, CommandCaller *caller)
     // Handle unlocking based on target
     if (strcmp(target, "all") == 0)
     {
-        caller->println(F("[MESSAGE] Disengaging all valves"));
-        unlockAllValves();
-        caller->println(F("[MESSAGE] All valves successfully disengaged"));
-        return true;
+        caller->println(F("[MESSAGE] Disengaging all valves with sensor verification..."));
+        if (safeUnlockAllValves(1000)) {
+            caller->println(F("[MESSAGE] All valves successfully disengaged"));
+            return true;
+        } else {
+            caller->println(F("[WARNING] Some valves could not be disengaged - check air pressure"));
+            return false;
+        }
     }
     else if (strcmp(target, "shuttle") == 0)
     {
         if (ccioBoardCount > 0)
         {
-            caller->println(F("[MESSAGE] Disengaging shuttle"));
-            DoubleSolenoidValve *valve = NULL;
-            switch (3) {
-                case 0: valve = getTray1Valve(); break;
-                case 1: valve = getTray2Valve(); break;
-                case 2: valve = getTray3Valve(); break;
-                case 3: valve = getShuttleValve(); break;
-                default:
-                    Serial.print(F("[ERROR] Invalid valve index: "));
-                    Serial.println(3);
-                    return false;
-            }
-            if (valve)
+            caller->println(F("[MESSAGE] Disengaging shuttle with sensor verification..."));
+            DoubleSolenoidValve *valve = getShuttleValve();
+            CylinderSensor *sensor = getShuttleSensor();
+            
+            if (valve && sensor)
             {
                 // Check current state first
                 if (valve->position == VALVE_POSITION_UNLOCK)
                 {
                     caller->println(F("[MESSAGE] Shuttle already disengaged"));
+                    
+                    // Verify actual position with sensor
+                    if (sensorRead(*sensor) == false) { // Sensor false = unlocked
+                        caller->println(F("[OK] Shuttle unlock confirmed by sensor"));
+                    } else {
+                        caller->println(F("[WARNING] Shuttle should be unlocked but sensor doesn't confirm - check air pressure"));
+                    }
+                    return true;
                 }
                 else
                 {
-                    unlockValve(*valve);
-                    caller->println(F("[MESSAGE] Shuttle disengaged successfully"));
+                    // Try unlocking with sensor feedback
+                    caller->println(F("[MESSAGE] Unlocking shuttle..."));
+                    if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000)) {
+                        caller->println(F("[MESSAGE] Shuttle disengaged and confirmed by sensor"));
+                        return true;
+                    } else {
+                        caller->println(F("[ERROR] Failed to disengage shuttle - sensor did not confirm unlock"));
+                        caller->println(F("[WARNING] Check air pressure and valve functionality"));
+                        return false;
+                    }
                 }
-                return true;
             }
             else
             {
-                caller->println(F("[ERROR] Failed to access shuttle valve. Possible causes:"));
+                caller->println(F("[ERROR] Failed to access shuttle valve or sensor. Possible causes:"));
                 caller->println(F("  - CCIO board detected but shuttle valve not configured"));
                 caller->println(F("  - System memory corruption"));
                 caller->println(F("Try restarting the system or run 'status' to check valve configuration"));
@@ -338,20 +382,31 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         if (trayNum >= 1 && trayNum <= 3)
         {
             caller->print(F("[MESSAGE] Disengaging tray "));
-            caller->println(trayNum);
+            caller->print(trayNum);
+            caller->println(F(" with sensor verification..."));
+            
             DoubleSolenoidValve *valve = NULL;
-            switch (trayNum - 1) {
-                case 0: valve = getTray1Valve(); break;
-                case 1: valve = getTray2Valve(); break;
-                case 2: valve = getTray3Valve(); break;
-                case 3: valve = getShuttleValve(); break;
+            CylinderSensor *sensor = NULL;
+            
+            // Get the appropriate valve and sensor
+            switch (trayNum) {
+                case 1:
+                    valve = getTray1Valve();
+                    sensor = getTray1Sensor();
+                    break;
+                case 2:
+                    valve = getTray2Valve();
+                    sensor = getTray2Sensor();
+                    break;
+                case 3:
+                    valve = getTray3Valve();
+                    sensor = getTray3Sensor();
+                    break;
                 default:
-                    Serial.print(F("[ERROR] Invalid valve index: "));
-                    Serial.println(trayNum - 1);
                     return false;
             }
 
-            if (valve)
+            if (valve && sensor)
             {
                 // Check current state first
                 if (valve->position == VALVE_POSITION_UNLOCK)
@@ -359,21 +414,36 @@ bool cmd_unlock(char *args, CommandCaller *caller)
                     caller->print(F("[MESSAGE] Tray "));
                     caller->print(trayNum);
                     caller->println(F(" already disengaged"));
+                    
+                    // Verify actual position with sensor
+                    if (sensorRead(*sensor) == false) { // Sensor false = unlocked
+                        caller->println(F("[OK] Tray unlock confirmed by sensor"));
+                    } else {
+                        caller->println(F("[WARNING] Tray should be unlocked but sensor doesn't confirm - check air pressure"));
+                    }
+                    return true;
                 }
                 else
                 {
-                    unlockValve(*valve);
-                    caller->print(F("[MESSAGE] Tray "));
-                    caller->print(trayNum);
-                    caller->println(F(" disengaged successfully"));
+                    // Try unlocking with sensor feedback
+                    if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000)) {
+                        caller->print(F("[MESSAGE] Tray "));
+                        caller->print(trayNum);
+                        caller->println(F(" disengaged and confirmed by sensor"));
+                        return true;
+                    } else {
+                        caller->print(F("[ERROR] Failed to disengage tray "));
+                        caller->println(trayNum);
+                        caller->println(F("[WARNING] Check air pressure and valve functionality"));
+                        return false;
+                    }
                 }
-                return true;
             }
             else
             {
                 caller->print(F("[ERROR] Failed to access tray "));
                 caller->print(trayNum);
-                caller->println(F(" valve. Possible causes:"));
+                caller->println(F(" valve or sensor. Possible causes:"));
                 caller->println(F("  - Hardware initialization issue"));
                 caller->println(F("  - Valve controller not properly initialized"));
                 caller->println(F("  - System memory corruption"));
@@ -1715,18 +1785,28 @@ bool cmd_tray(char *args, CommandCaller *caller) {
         
         // 2. Lock the tray in position
         DoubleSolenoidValve *valve = getTray1Valve(); // Tray 1 valve
-        if (valve && valve->position != VALVE_POSITION_LOCK) {
-            lockValve(*valve);
-            caller->println(F("TRAY_SECURED"));
-            
-            // Update tray tracking
-            addTrayAtPosition1();
-            return true;
-        }
-        else if (valve && valve->position == VALVE_POSITION_LOCK) {
-            caller->println(F("TRAY_ALREADY_SECURED"));
-            addTrayAtPosition1();
-            return true;
+        CylinderSensor *sensor = getTray1Sensor();    // Add this line to get the sensor
+
+        if (valve && sensor) {
+            // Check current state first
+            if (valve->position != VALVE_POSITION_LOCK) {
+                if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000)) {
+                    caller->println(F("[ERROR] Failed to lock tray - sensor didn't confirm"));
+                    caller->println(F("[WARNING] Check air pressure and valve functionality"));
+                    return false;
+                }
+                caller->println(F("TRAY_SECURED"));
+                
+                // Update tray tracking
+                addTrayAtPosition1();
+                return true;
+            }
+            else {
+                // Valve already in lock position
+                caller->println(F("TRAY_ALREADY_SECURED"));
+                addTrayAtPosition1();
+                return true;
+            }
         }
         else {
             caller->println(F("ERROR_LOCK_FAILURE"));
@@ -1769,6 +1849,88 @@ bool cmd_tray(char *args, CommandCaller *caller) {
         caller->print(F("[ERROR] Unknown tray command: "));
         caller->println(subcommand);
         caller->println(F("Valid options are 'request', 'placed', 'released', or 'status'"));
+        return false;
+    }
+}
+
+bool cmd_test(char *args, CommandCaller *caller) {
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        caller->println(F("Available tests:"));
+        caller->println(F("  home     - Test homing repeatability"));
+        caller->println(F("  position - Test position cycling (for tray loading)"));
+        caller->println(F("  tray     - Test complete tray handling operations"));
+        caller->println(F("Usage: test,<test_name>"));
+        return true;
+    }
+
+    // Parse the first argument - we'll use spaces as separators (commas converted to spaces)
+    char *testType = strtok(trimmed, " ");
+    if (testType == NULL) {
+        caller->println(F("[ERROR] Invalid format. Usage: test,<home|position|tray>"));
+        return false;
+    }
+
+    // Trim leading spaces from test type
+    testType = trimLeadingSpaces(testType);
+    
+    // Check motor initialization first
+    if (motorState == MOTOR_STATE_NOT_READY) {
+        caller->println(F("[ERROR] Motor not initialized. Run 'motor,init' first."));
+        return false;
+    }
+
+    // Check E-Stop condition
+    if (isEStopActive()) {
+        caller->println(F("[ERROR] Cannot run tests while E-Stop is active."));
+        return false;
+    }
+    
+    // Run the appropriate test
+    if (strcmp(testType, "home") == 0) {
+        caller->println(F("[MESSAGE] Starting homing repeatability test..."));
+        if (testHomingRepeatability()) {
+            caller->println(F("[MESSAGE] Homing repeatability test completed successfully."));
+            return true;
+        } else {
+            caller->println(F("[ERROR] Homing repeatability test failed or was aborted."));
+            return false;
+        }
+    } 
+    else if (strcmp(testType, "position") == 0) {
+        caller->println(F("[MESSAGE] Starting position cycling test..."));
+        
+        if (testPositionCycling()) {
+            caller->println(F("[MESSAGE] Position cycling test completed successfully."));
+            return true;
+        } else {
+            caller->println(F("[ERROR] Position cycling test failed or was aborted."));
+            return false;
+        }
+    }
+    else if (strcmp(testType, "tray") == 0) {
+        caller->println(F("[MESSAGE] Starting tray handling test..."));
+        
+        if (testTrayHandling()) {
+            caller->println(F("[MESSAGE] Tray handling test completed successfully."));
+            return true;
+        } else {
+            caller->println(F("[ERROR] Tray handling test failed or was aborted."));
+            return false;
+        }
+    }
+    else {
+        caller->print(F("[ERROR] Unknown test type: "));
+        caller->println(testType);
+        caller->println(F("Available tests: 'home', 'position', 'tray'"));
         return false;
     }
 }
@@ -1828,4 +1990,11 @@ Commander::systemCommand_t API_tree[] = {
                           "  tray,placed    - Notify tray has been placed (Mitsubishi)\n"
                           "  tray,released  - Notify tray has been released (Mitsubishi)\n"
                           "  tray,status    - Get tray system status (machine-readable)",
-                  cmd_tray)};
+                  cmd_tray),
+
+    // Test command
+    systemCommand("test", "Run tests on the system:\n"
+                     "  test,home     - Run homing repeatability test\n"
+                     "  test,position - Run position cycling test for tray loading\n"
+                     "  test,tray     - Run tray handling test (request, place, release)",
+             cmd_test)};

@@ -132,11 +132,11 @@ SystemState captureSystemState() {
     state.shuttleCylinderActivated = sensorRead(*getShuttleSensor());
     
     // Determine lock states from sensors
-    // For example: LOCKED when sensor is ACTIVATED
-    state.tray1Locked = state.tray1CylinderActivated;
-    state.tray2Locked = state.tray2CylinderActivated;
-    state.tray3Locked = state.tray3CylinderActivated;
-    state.shuttleLocked = state.shuttleCylinderActivated;
+    // INVERTED LOGIC: Sensors are ACTIVATED when UNLOCKED
+    state.tray1Locked = !state.tray1CylinderActivated;
+    state.tray2Locked = !state.tray2CylinderActivated;
+    state.tray3Locked = !state.tray3CylinderActivated;
+    state.shuttleLocked = !state.shuttleCylinderActivated;
     
     // Capture tray presence
     state.tray1Present = sensorRead(*getTray1DetectionSensor());
@@ -194,16 +194,16 @@ void printSystemState(const SystemState &state, Print* output) {
     // Cylinder sensors (raw readings)
     output->println(F("\n  Cylinder Sensors:"));
     output->print(F("    Tray 1: ")); 
-    output->println(state.tray1CylinderActivated ? F("ACTIVATED") : F("NOT ACTIVATED"));
+    output->println(state.tray1CylinderActivated ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
     
     output->print(F("    Tray 2: ")); 
-    output->println(state.tray2CylinderActivated ? F("ACTIVATED") : F("NOT ACTIVATED"));
+    output->println(state.tray2CylinderActivated ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
     
     output->print(F("    Tray 3: ")); 
-    output->println(state.tray3CylinderActivated ? F("ACTIVATED") : F("NOT ACTIVATED"));
+    output->println(state.tray3CylinderActivated ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
     
     output->print(F("    Shuttle: ")); 
-    output->println(state.shuttleCylinderActivated ? F("ACTIVATED") : F("NOT ACTIVATED"));
+    output->println(state.shuttleCylinderActivated ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
     
     // Lock states (derived from sensor readings)
     output->println(F("\n  Lock States:"));
@@ -929,7 +929,13 @@ void processTrayLoading() {
                 // Start locking shuttle
                 DoubleSolenoidValve *shuttleValve = getShuttleValve();
                 if (shuttleValve) {
-                    lockValve(*shuttleValve);
+                    if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_LOCK, 1000)) {
+                        Serial.println(F("[ERROR] Failed to lock shuttle - sensor didn't confirm"));
+                        currentOperation.inProgress = false;
+                        currentOperation.success = false;
+                        strncpy(currentOperation.message, "SHUTTLE_LOCK_FAILURE", sizeof(currentOperation.message));
+                        return;
+                    }
                     valveActuationStartTime = currentMillis;
                     Serial.println(F("[MESSAGE] Locking shuttle to grip tray"));
                 } else {
@@ -972,7 +978,13 @@ void processTrayLoading() {
                 // Start unlocking tray 1
                 DoubleSolenoidValve *valve = getTray1Valve();
                 if (valve) {
-                    unlockValve(*valve);
+                    if (!safeValveOperation(*valve, *getTray1Sensor(), VALVE_POSITION_UNLOCK, 1000)) {
+                        Serial.println(F("[ERROR] Failed to unlock tray 1 - sensor didn't confirm"));
+                        currentOperation.inProgress = false;
+                        currentOperation.success = false;
+                        strncpy(currentOperation.message, "UNLOCK_FAILURE", sizeof(currentOperation.message));
+                        return;
+                    }
                     valveActuationStartTime = currentMillis;
                     Serial.println(F("[MESSAGE] Unlocking tray at position 1"));
                 } else {
@@ -1056,7 +1068,13 @@ void processTrayLoading() {
                 // Unlock shuttle now that we've reached the destination
                 DoubleSolenoidValve *shuttleValve = getShuttleValve();
                 if (shuttleValve) {
-                    unlockValve(*shuttleValve);
+                    if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_UNLOCK, 1000)) {
+                        Serial.println(F("[ERROR] Failed to unlock shuttle - sensor didn't confirm"));
+                        currentOperation.inProgress = false;
+                        currentOperation.success = false;
+                        strncpy(currentOperation.message, "SHUTTLE_UNLOCK_FAILURE", sizeof(currentOperation.message));
+                        return;
+                    }
                     valveActuationStartTime = currentMillis;
                     Serial.println(F("[MESSAGE] Unlocking shuttle to release tray"));
                 } else {
@@ -1099,7 +1117,20 @@ void processTrayLoading() {
                 }
                 
                 if (valve) {
-                    lockValve(*valve);
+                    CylinderSensor *sensor = NULL;
+                    if (targetPosition == POSITION_2_MM) {
+                        sensor = getTray2Sensor();
+                    } else if (targetPosition == POSITION_3_MM) {
+                        sensor = getTray3Sensor();
+                    }
+
+                    if (sensor && !safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000)) {
+                        Serial.println(F("[ERROR] Failed to lock tray at target position - sensor didn't confirm"));
+                        currentOperation.inProgress = false;
+                        currentOperation.success = false;
+                        strncpy(currentOperation.message, "LOCK_FAILURE", sizeof(currentOperation.message));
+                        return;
+                    }
                     valveActuationStartTime = currentMillis;
                     Serial.print(F("[MESSAGE] Locking tray at position "));
                     Serial.println(targetPosition);

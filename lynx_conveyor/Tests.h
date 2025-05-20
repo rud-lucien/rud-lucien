@@ -14,6 +14,7 @@
 // Evaluate motor positioning and homing performance
 //-----------------------------------------------------------------------------
 bool testHomingRepeatability();  // Test homing repeatability over multiple cycles
-bool testMotorRange();           // Test motor movement across its range
+bool testPositionCycling(); // Test cycling through all positions
+bool testTrayHandling();  // Test tray handling operations
 
 #endif // TESTS_H

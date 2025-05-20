@@ -11,31 +11,43 @@ void logSystemState()
 {
     Serial.print(F("[LOG] "));
     
-    // 1. VALVES section
+    // 1. VALVES section - Enhanced to include sensor feedback
     Serial.print(F("Valves: "));
-    // Updated valve names for clarity
     const char* updatedValveNames[4] = {"Lock1", "Lock2", "Lock3", "Shuttle"};
     
-    // Replace this loop that uses getValveByIndex()
+    // Get the appropriate valves and sensors
+    DoubleSolenoidValve* valves[4] = {
+        getTray1Valve(), getTray2Valve(), getTray3Valve(), getShuttleValve()
+    };
+    
+    CylinderSensor* sensors[4] = {
+        getTray1Sensor(), getTray2Sensor(), getTray3Sensor(), getShuttleSensor()
+    };
+    
     for (int i = 0; i < valveCount; i++) {
-        DoubleSolenoidValve *valve = NULL;
-        
-        // Get the appropriate valve using the specific accessor functions
-        if (i == 0) valve = getTray1Valve();
-        else if (i == 1) valve = getTray2Valve();
-        else if (i == 2) valve = getTray3Valve();
-        else if (i == 3) valve = getShuttleValve();
-        
-        if (valve) {
+        if (valves[i]) {
             Serial.print(updatedValveNames[i]);
             Serial.print(F("="));
             
-            if (valve->position == VALVE_POSITION_UNLOCK) {
-                Serial.print(F("UNLOCKED"));
-            } else if (valve->position == VALVE_POSITION_LOCK) {
-                Serial.print(F("LOCKED"));
+            // Determine commanded position
+            bool isLocked = (valves[i]->position == VALVE_POSITION_LOCK);
+            
+            // Read actual sensor state
+            bool sensorState = sensorRead(*sensors[i]);
+            
+            // Verify if they match (sensor state should be TRUE when locked)
+            bool positionVerified = (sensorState == !isLocked);
+            
+            // Display position with verification indicator
+            if (isLocked) {
+                Serial.print(positionVerified ? F("LOCKED") : F("LOCKED?"));
             } else {
-                Serial.print(F("UNKNOWN"));
+                Serial.print(positionVerified ? F("UNLOCKED") : F("UNLOCKED?"));
+            }
+            
+            // Add ? indicator for mismatches
+            if (!positionVerified) {
+                Serial.print(F("[!]"));
             }
             
             // Add comma except after last item
@@ -134,12 +146,4 @@ void logSystemState()
     
     // End the line
     Serial.println();
-    
-    // Updated valve status printing
-    for (int i = 0; i < valveCount; i++) {
-        if (i == 0) printValveStatus(*getTray1Valve(), "Tray 1");
-        else if (i == 1) printValveStatus(*getTray2Valve(), "Tray 2");
-        else if (i == 2) printValveStatus(*getTray3Valve(), "Tray 3");
-        else if (i == 3) printValveStatus(*getShuttleValve(), "Shuttle");
-    }
 }

@@ -27,6 +27,7 @@ struct CylinderSensor {
     bool lastState;
 };
 
+
 //=============================================================================
 // PIN MAPPING CONSTANTS
 //=============================================================================
@@ -90,6 +91,7 @@ extern const int trayDetectSensorCount;
 // CCIO Board status
 extern bool hasCCIO;
 
+
 //=============================================================================
 // FUNCTION DECLARATIONS
 //-----------------------------------------------------------------------------
@@ -112,19 +114,15 @@ int getActivationPin(const DoubleSolenoidValve &valve, ValvePosition target);
 //-----------------------------------------------------------------------------
 void valveInit(DoubleSolenoidValve &valve);
 void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target);
-void valveDeactivate(DoubleSolenoidValve &valve);
 ValvePosition valveGetPosition(const DoubleSolenoidValve &valve);
 
 //-----------------------------------------------------------------------------
-// Valve Convenience Functions
-// Higher-level valve operations with semantic names
+// Valve Safety Operations
+// Higher-level valve operations with appropriate safety considerations
 //-----------------------------------------------------------------------------
-void withValve(DoubleSolenoidValve &valve, void (*operation)(DoubleSolenoidValve&));
-void unlockValve(DoubleSolenoidValve &valve);
-void lockValve(DoubleSolenoidValve &valve);
-void deactivateValve(DoubleSolenoidValve &valve);
-void lockAllValves();
-void unlockAllValves();
+void unsafeLockValve(DoubleSolenoidValve &valve);
+void unsafeUnlockValve(DoubleSolenoidValve &valve);
+bool safeUnlockAllValves(unsigned long timeoutMs = 1000);
 
 //-----------------------------------------------------------------------------
 // Sensor Operations
