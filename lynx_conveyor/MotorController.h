@@ -230,5 +230,6 @@ bool isFaultClearingInProgress();
 //-----------------------------------------------------------------------------
 bool isEStopActive();
 void handleEStop();
+void updateMotorTarget(float targetPositionMm);
 
 #endif // MOTOR_CONTROLLER_H

@@ -56,31 +56,10 @@ void processEncoderInput() {
         return;  // Only process when encoder control is active and motor is not faulted
     }
     
-    static unsigned long lastDebugTime = 0;
     static int32_t accumulatedDelta = 0; // Accumulate encoder movement over time
     static unsigned long lastMoveTime = 0;
     
     unsigned long currentTime = millis();
-    
-    // Periodically output encoder position for debugging (once per second)
-    if (currentTime - lastDebugTime > 1000) {
-        lastDebugTime = currentTime;
-        Serial.print(F("[DEBUG] Encoder position: "));
-        Serial.print(EncoderIn.Position());
-        Serial.print(F(", Active: "));
-        Serial.print(encoderControlActive ? "Yes" : "No");
-        Serial.print(F(", Motor state: "));
-        
-        // Direct output of motor state
-        switch (motorState) {
-            case MOTOR_STATE_IDLE: Serial.println(F("IDLE")); break;
-            case MOTOR_STATE_MOVING: Serial.println(F("MOVING")); break;
-            case MOTOR_STATE_HOMING: Serial.println(F("HOMING")); break;
-            case MOTOR_STATE_FAULTED: Serial.println(F("FAULTED")); break;
-            case MOTOR_STATE_NOT_READY: Serial.println(F("NOT_READY")); break;
-            default: Serial.println(F("UNKNOWN")); break;
-        }
-    }
     
     // Read current encoder position first
     int32_t currentEncoderPosition = EncoderIn.Position();
@@ -88,9 +67,7 @@ void processEncoderInput() {
     
     // If encoder has moved
     if (encoderDelta != 0) {
-        Serial.print(F("[DEBUG] Encoder delta: "));
-        Serial.println(encoderDelta);
-        
+               
         // Check for quadrature errors after movement detected (less prone to false positives)
         if (EncoderIn.QuadratureError()) {
             Serial.println(F("[ERROR] Quadrature error detected in encoder! Disabling control."));
@@ -122,28 +99,23 @@ void processEncoderInput() {
         bool shouldMove = false;
         
         // Either we have accumulated enough movement or waited long enough since last move
-        if (abs(accumulatedDelta) >= 5 || (currentTime - lastMoveTime > 100 && accumulatedDelta != 0)) {
+        // Increase this value for smoother, less frequent moves
+        if (abs(accumulatedDelta) >= 10 || (currentTime - lastMoveTime > 150 && accumulatedDelta != 0)) {
             shouldMove = true;
         }
         
         if (shouldMove && motorState != MOTOR_STATE_MOVING) {
             // Only move if we're not already moving
-            // Get velocity directly from the encoder for better accuracy
-            int32_t currentVelocity = EncoderIn.Velocity();
+            // Make velocity proportional to encoder speed
+            int32_t encoderVel = EncoderIn.Velocity();
+            // Scale velocity between min and max based on encoder speed
+            int32_t scaledVelocity = map(abs(encoderVel), 0, 500, ENCODER_MIN_VELOCITY, ENCODER_MAX_VELOCITY);
             
-            // Scale the velocity based on the encoder's velocity and direction
-            int32_t absVelocity = abs(currentVelocity);
-            int32_t scaledVelocity;
-            
-            // Adjust velocity scaling for better response
-            if (absVelocity < 10) {
+            // Ensure velocity stays within bounds
+            if (scaledVelocity < ENCODER_MIN_VELOCITY) {
                 scaledVelocity = ENCODER_MIN_VELOCITY;
-            } else if (absVelocity > 100) {
+            } else if (scaledVelocity > ENCODER_MAX_VELOCITY) {
                 scaledVelocity = ENCODER_MAX_VELOCITY;
-            } else {
-                // Linear scaling between min and max
-                double velocityRatio = (absVelocity - 10.0) / 90.0;
-                scaledVelocity = ENCODER_MIN_VELOCITY + velocityRatio * (ENCODER_MAX_VELOCITY - ENCODER_MIN_VELOCITY);
             }
             
             // Calculate steps to move based on accumulated delta and current multiplier
@@ -166,8 +138,8 @@ void processEncoderInput() {
                 Serial.print(MAX_TRAVEL_MM);
                 Serial.println(F(" mm)"));
             } else {
-                // We don't need to set those global variables since they're not defined in this scope
-                // Just proceed with the movement
+                // Update target tracking in motor controller
+                updateMotorTarget(targetPositionMm);
                 
                 Serial.print(F("[MPG] Moving motor by "));
                 Serial.print(stepsToMove);

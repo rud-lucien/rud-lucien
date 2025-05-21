@@ -47,7 +47,7 @@ void setup()
 
     // Initialize encoder with default direction (modify if needed)
     Serial.println(F("[MESSAGE] Initializing MPG handwheel interface..."));
-    initEncoderControl(false, false);
+    initEncoderControl(true, false);
 
     // Rest of your setup code...
     Serial.println(F("[MESSAGE] Motor controller ready for initialization."));

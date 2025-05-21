@@ -990,3 +990,12 @@ void cycleMotorEnableForHoming() {
         motorEnableCycleInProgress = false;
     }
 }
+
+// Implement the function correctly using your existing variable names:
+void updateMotorTarget(float targetPositionMm) {
+    // Update the target variables
+    hasCurrentTarget = true;
+    currentTargetType = POSITION_CUSTOM;
+    currentTargetPositionMm = targetPositionMm;
+    currentTargetPulses = mmToPulses(targetPositionMm);
+}
