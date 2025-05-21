@@ -935,6 +935,7 @@ bool testTrayHandling()
     const int NUM_CYCLES = 10;                 // Number of test cycles to run
     const unsigned long WAIT_TIME_MS = 5000;   // Fixed 5-second wait time at each position
     const unsigned long VALVE_DELAY_MS = 1000; // Delay between valve operations to prevent race conditions
+    const unsigned long ADDITIONAL_UNLOCK_DELAY_MS = 2000; // Additional safety delay after tray unlock before moving
     int cyclesCompleted = 0;
     bool testRunning = true;
     unsigned long lastActionTime = 0;
@@ -966,25 +967,26 @@ bool testTrayHandling()
     enum TestPhase
     {
         PHASE_START,
-        PHASE_CHECK_POSITION_1,                // Verify we're at position 1
-        PHASE_WAIT_FOR_MOVE_TO_POS1,           // Wait for move to position 1 if needed
-        PHASE_CHECK_TRAY_AT_POS1,              // Verify tray at position 1
-        PHASE_LOCK_TRAY_AT_POS1,               // Lock tray at position 1
-        PHASE_DELAY_AFTER_LOCK_TRAY_POS1,      // Delay after valve operation
-        PHASE_LOCK_SHUTTLE_AT_POS1,            // Lock shuttle
-        PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1,   // Delay after valve operation
-        PHASE_UNLOCK_TRAY_AT_POS1,             // Unlock tray at position 1
-        PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1,    // Delay after valve operation
-        PHASE_VERIFY_TRAY_STILL_AT_POS1,       // Check tray still present before moving
-        PHASE_CHECK_TRAY_AT_POS3,              // Ensure position 3 is clear before moving
-        PHASE_MOVE_TO_POSITION_3,              // Move to position 3
-        PHASE_WAIT_FOR_MOVE_TO_POS3,           // Wait for move to complete
-        PHASE_VERIFY_TRAY_AT_POS3,             // Check tray made it to position 3
-        PHASE_UNLOCK_SHUTTLE_AT_POS3,          // Unlock shuttle at position 3
-        PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS3, // Delay after valve operation
-        PHASE_LOCK_TRAY_AT_POS3,               // Lock tray at position 3
-        PHASE_DELAY_AFTER_LOCK_TRAY_POS3,      // Delay after valve operation
-        PHASE_WAIT_AT_POS3,                    // Wait at position 3
+        PHASE_CHECK_POSITION_1,                   // Verify we're at position 1
+        PHASE_WAIT_FOR_MOVE_TO_POS1,              // Wait for move to position 1 if needed
+        PHASE_CHECK_TRAY_AT_POS1,                 // Verify tray at position 1
+        PHASE_LOCK_TRAY_AT_POS1,                  // Lock tray at position 1
+        PHASE_DELAY_AFTER_LOCK_TRAY_POS1,         // Delay after valve operation
+        PHASE_LOCK_SHUTTLE_AT_POS1,               // Lock shuttle
+        PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1,      // Delay after valve operation
+        PHASE_UNLOCK_TRAY_AT_POS1,                // Unlock tray at position 1
+        PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1,       // Delay after valve operation
+        PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1, // Additional delay before verifying tray position
+        PHASE_VERIFY_TRAY_STILL_AT_POS1,          // Check tray still present before moving
+        PHASE_CHECK_TRAY_AT_POS3,                 // Ensure position 3 is clear before moving
+        PHASE_MOVE_TO_POSITION_3,                 // Move to position 3
+        PHASE_WAIT_FOR_MOVE_TO_POS3,              // Wait for move to complete
+        PHASE_VERIFY_TRAY_AT_POS3,                // Check tray made it to position 3
+        PHASE_UNLOCK_SHUTTLE_AT_POS3,             // Unlock shuttle at position 3
+        PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS3,    // Delay after valve operation
+        PHASE_LOCK_TRAY_AT_POS3,                  // Lock tray at position 3
+        PHASE_DELAY_AFTER_LOCK_TRAY_POS3,         // Delay after valve operation
+        PHASE_WAIT_AT_POS3,                       // Wait at position 3
 
         // Empty shuttle return from position 3 to position 1
         PHASE_RETURN_TO_POS1_FROM_POS3_EMPTY, // Return empty to position 1
@@ -993,33 +995,35 @@ bool testTrayHandling()
         PHASE_RETURN_TO_POS3,                 // Return to position 3 to pick up tray
         PHASE_WAIT_FOR_RETURN_TO_POS3,        // Wait for move to position 3
 
-        PHASE_LOCK_SHUTTLE_AT_POS3,                   // Lock shuttle at position 3
-        PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS3,          // Delay after valve operation
-        PHASE_UNLOCK_TRAY_AT_POS3,                    // Unlock tray at position 3
-        PHASE_DELAY_AFTER_UNLOCK_TRAY_POS3,           // Delay after valve operation
-        PHASE_CHECK_TRAY_AT_POS1_AGAIN,               // Check position 1 is clear before returning
-        PHASE_MOVE_TO_POSITION_1_FROM_3,              // Move back to position 1
-        PHASE_WAIT_FOR_MOVE_TO_POS1_FROM_3,           // Wait for move to complete
-        PHASE_VERIFY_TRAY_AT_POS1_FROM_3,             // Check tray made it back to position 1
-        PHASE_UNLOCK_SHUTTLE_AT_POS1_FROM_3,          // Unlock shuttle at position 1
-        PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS1_FROM_3, // Delay after valve operation
-        PHASE_LOCK_TRAY_AT_POS1_FROM_3,               // Lock tray at position 1
-        PHASE_DELAY_AFTER_LOCK_TRAY_POS1_FROM_3,      // Delay after valve operation
-        PHASE_WAIT_AT_POS1,                           // Wait at position 1
-        PHASE_LOCK_SHUTTLE_AT_POS1_FROM_3,            // Lock shuttle at position 1
-        PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1_FROM_3,   // Delay after valve operation
-        PHASE_UNLOCK_TRAY_AT_POS1_AGAIN,              // Unlock tray at position 1 again
-        PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1_AGAIN,     // Delay after valve operation
-        PHASE_VERIFY_TRAY_STILL_AT_POS1_AGAIN,        // Check tray still present for position 2 move
-        PHASE_CHECK_TRAY_AT_POS2,                     // Ensure position 2 is clear before moving
-        PHASE_MOVE_TO_POSITION_2,                     // Move to position 2
-        PHASE_WAIT_FOR_MOVE_TO_POS2,                  // Wait for move to complete
-        PHASE_VERIFY_TRAY_AT_POS2,                    // Check tray made it to position 2
-        PHASE_UNLOCK_SHUTTLE_AT_POS2,                 // Unlock shuttle at position 2
-        PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS2,        // Delay after valve operation
-        PHASE_LOCK_TRAY_AT_POS2,                      // Lock tray at position 2
-        PHASE_DELAY_AFTER_LOCK_TRAY_POS2,             // Delay after valve operation
-        PHASE_WAIT_AT_POS2,                           // Wait at position 2
+        PHASE_LOCK_SHUTTLE_AT_POS3,                     // Lock shuttle at position 3
+        PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS3,            // Delay after valve operation
+        PHASE_UNLOCK_TRAY_AT_POS3,                      // Unlock tray at position 3
+        PHASE_DELAY_AFTER_UNLOCK_TRAY_POS3,             // Delay after valve operation
+        PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS3,       // Additional delay before moving from position 3
+        PHASE_CHECK_TRAY_AT_POS1_AGAIN,                 // Check position 1 is clear before returning
+        PHASE_MOVE_TO_POSITION_1_FROM_3,                // Move back to position 1
+        PHASE_WAIT_FOR_MOVE_TO_POS1_FROM_3,             // Wait for move to complete
+        PHASE_VERIFY_TRAY_AT_POS1_FROM_3,               // Check tray made it back to position 1
+        PHASE_UNLOCK_SHUTTLE_AT_POS1_FROM_3,            // Unlock shuttle at position 1
+        PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS1_FROM_3,   // Delay after valve operation
+        PHASE_LOCK_TRAY_AT_POS1_FROM_3,                 // Lock tray at position 1
+        PHASE_DELAY_AFTER_LOCK_TRAY_POS1_FROM_3,        // Delay after valve operation
+        PHASE_WAIT_AT_POS1,                             // Wait at position 1
+        PHASE_LOCK_SHUTTLE_AT_POS1_FROM_3,              // Lock shuttle at position 1
+        PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1_FROM_3,     // Delay after valve operation
+        PHASE_UNLOCK_TRAY_AT_POS1_AGAIN,                // Unlock tray at position 1 again
+        PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1_AGAIN,       // Delay after valve operation
+        PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1_AGAIN, // Additional delay before verifying tray position
+        PHASE_VERIFY_TRAY_STILL_AT_POS1_AGAIN,          // Check tray still present for position 2 move
+        PHASE_CHECK_TRAY_AT_POS2,                       // Ensure position 2 is clear before moving
+        PHASE_MOVE_TO_POSITION_2,                       // Move to position 2
+        PHASE_WAIT_FOR_MOVE_TO_POS2,                    // Wait for move to complete
+        PHASE_VERIFY_TRAY_AT_POS2,                      // Check tray made it to position 2
+        PHASE_UNLOCK_SHUTTLE_AT_POS2,                   // Unlock shuttle at position 2
+        PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS2,          // Delay after valve operation
+        PHASE_LOCK_TRAY_AT_POS2,                        // Lock tray at position 2
+        PHASE_DELAY_AFTER_LOCK_TRAY_POS2,               // Delay after valve operation
+        PHASE_WAIT_AT_POS2,                             // Wait at position 2
 
         // Empty shuttle return from position 2 to position 1
         PHASE_RETURN_TO_POS1_FROM_POS2_EMPTY,          // Return empty to position 1
@@ -1032,6 +1036,7 @@ bool testTrayHandling()
         PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS2,           // Delay after valve operation
         PHASE_UNLOCK_TRAY_AT_POS2,                     // Unlock tray at position 2
         PHASE_DELAY_AFTER_UNLOCK_TRAY_POS2,            // Delay after valve operation
+        PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS2,      // Additional delay before moving from position 2
         PHASE_CHECK_TRAY_AT_POS1_BEFORE_RETURN,        // Check position 1 is clear before final return
         PHASE_MOVE_BACK_TO_POSITION_1,                 // Move back to position 1 to complete cycle
         PHASE_WAIT_FOR_MOVE_BACK_TO_POS1,              // Wait for move to complete
@@ -1067,6 +1072,9 @@ bool testTrayHandling()
     Serial.println(F("ms"));
     Serial.print(F("[MESSAGE] Delay between valve operations: "));
     Serial.print(VALVE_DELAY_MS);
+    Serial.println(F("ms"));
+    Serial.print(F("[MESSAGE] Additional safety delay after tray unlock: "));
+    Serial.print(ADDITIONAL_UNLOCK_DELAY_MS);
     Serial.println(F("ms"));
 
     lastActionTime = millis();
@@ -1334,6 +1342,19 @@ bool testTrayHandling()
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
+                Serial.println(F("[MESSAGE] Adding additional safety delay before movement..."));
+                currentPhase = PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1;
+                lastActionTime = currentTime;
+            }
+            break;
+        }
+
+        case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1:
+        {
+            // Additional delay before checking if we can move
+            if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
+            {
+                Serial.println(F("[MESSAGE] Verifying tray is still at Position 1..."));
                 currentPhase = PHASE_VERIFY_TRAY_STILL_AT_POS1;
                 lastActionTime = currentTime;
             }
@@ -1840,6 +1861,18 @@ bool testTrayHandling()
             // Add delay between operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
+                Serial.println(F("[MESSAGE] Adding additional safety delay before movement..."));
+                currentPhase = PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS3;
+                lastActionTime = currentTime;
+            }
+            break;
+        }
+
+        case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS3:
+        {
+            // Additional delay before checking if we can move
+            if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
+            {
                 Serial.println(F("[MESSAGE] Checking Position 1 before moving."));
                 currentPhase = PHASE_CHECK_TRAY_AT_POS1_AGAIN;
                 lastActionTime = currentTime;
@@ -2139,11 +2172,25 @@ bool testTrayHandling()
             break;
         }
 
+        // Implementation for Position 1 (again)
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1_AGAIN:
         {
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
+                Serial.println(F("[MESSAGE] Adding additional safety delay before movement..."));
+                currentPhase = PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1_AGAIN;
+                lastActionTime = currentTime;
+            }
+            break;
+        }
+
+        case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1_AGAIN:
+        {
+            // Additional delay before checking if we can move
+            if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
+            {
+                Serial.println(F("[MESSAGE] Verifying tray is still at Position 1..."));
                 currentPhase = PHASE_VERIFY_TRAY_STILL_AT_POS1_AGAIN;
                 lastActionTime = currentTime;
             }
@@ -2649,6 +2696,18 @@ bool testTrayHandling()
         {
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
+            {
+                Serial.println(F("[MESSAGE] Adding additional safety delay before movement..."));
+                currentPhase = PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS2;
+                lastActionTime = currentTime;
+            }
+            break;
+        }
+
+        case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS2:
+        {
+            // Additional delay before checking if we can move
+            if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
                 Serial.println(F("[MESSAGE] Checking Position 1 before final return."));
                 currentPhase = PHASE_CHECK_TRAY_AT_POS1_BEFORE_RETURN;

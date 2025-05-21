@@ -13,7 +13,7 @@
 //=============================================================================
 
 // Command tree size
-#define COMMAND_SIZE 12 // Increased from 10
+#define COMMAND_SIZE 13 // Increased from 10
 
 //=============================================================================
 // EXTERNAL REFERENCES
@@ -66,5 +66,11 @@ bool cmd_test(char *args, CommandCaller *caller); // Test command for diagnostic
 //-----------------------------------------------------------------------------
 char *trimLeadingSpaces(char *str);
 void handleSerialCommands();
+
+//-----------------------------------------------------------------------------
+// Encoder Control Commands
+// Functions for controlling the MPG handwheel
+//-----------------------------------------------------------------------------
+bool cmd_encoder(char *args, CommandCaller *caller);
 
 #endif // COMMANDS_H

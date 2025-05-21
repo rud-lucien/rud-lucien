@@ -5,6 +5,7 @@
 #include "MotorController.h"
 #include "Tests.h"
 #include "Utils.h"
+#include "EncoderController.h"
 
 // External declaration for the logging structure
 extern LoggingManagement logging;
@@ -1935,6 +1936,225 @@ bool cmd_test(char *args, CommandCaller *caller) {
     }
 }
 
+bool cmd_encoder(char *args, CommandCaller *caller) {
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        // Display current encoder status
+        caller->println(F("[MESSAGE] MPG Handwheel Controls:"));
+        caller->println(F("  encoder,enable          - Enable MPG handwheel control"));
+        caller->println(F("  encoder,disable         - Disable MPG handwheel control"));
+        caller->println(F("  encoder,multiplier,[1|10|100] - Set movement multiplier"));
+        
+        // Show current status
+        if (encoderControlActive) {
+            caller->println(F("\n[STATUS] MPG control is currently ENABLED"));
+            caller->print(F("[STATUS] Current multiplier: x"));
+            caller->println(currentMultiplier);
+            
+            // Show position information if motor is homed
+            if (isHomed) {
+                double positionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
+                caller->print(F("[STATUS] Current position: "));
+                caller->print(positionMm, 2);
+                caller->println(F(" mm"));
+            }
+        } else {
+            caller->println(F("\n[STATUS] MPG control is currently DISABLED"));
+            
+            // Show reasons why encoder control might not be available
+            if (!motorInitialized) {
+                caller->println(F("[NOTE] Motor needs to be initialized first (motor,init)"));
+            } else if (!isHomed) {
+                caller->println(F("[NOTE] Motor needs to be homed first (motor,home)"));
+            }
+        }
+        
+        caller->println(F("\n[MULTIPLIERS] Effect of one full handwheel rotation (100 pulses):"));
+        caller->print(F("  x1: ~"));
+        caller->print(100 * MULTIPLIER_X1 / PULSES_PER_MM, 2);
+        caller->println(F(" mm (fine adjustment)"));
+        caller->print(F("  x10: ~"));
+        caller->print(100 * MULTIPLIER_X10 / PULSES_PER_MM, 2);
+        caller->println(F(" mm (medium adjustment)"));
+        caller->print(F("  x100: ~"));
+        caller->print(100 * MULTIPLIER_X100 / PULSES_PER_MM, 2);
+        caller->println(F(" mm (coarse adjustment)"));
+        
+        return true;
+    }
+
+    // Debug the raw argument
+    Serial.print(F("[DEBUG] Raw encoder command argument: '"));
+    Serial.print(trimmed);
+    Serial.println(F("'"));
+
+    // Parse the argument - make sure we're handling comma separators correctly too
+    // Replace commas with spaces first (if you're using spaces as delimiters)
+    for (int i = 0; trimmed[i] != '\0'; i++) {
+        if (trimmed[i] == ',') {
+            trimmed[i] = ' ';
+        }
+    }
+
+    // Get the subcommand
+    char *subcommand = strtok(trimmed, " ");
+    if (subcommand == NULL) {
+        caller->println(F("[ERROR] Invalid format. Usage: encoder,<enable|disable|multiplier>"));
+        return false;
+    }
+
+    // Debug parsed subcommand
+    Serial.print(F("[DEBUG] Parsed encoder subcommand: '"));
+    Serial.print(subcommand);
+    Serial.println(F("'"));
+
+    // Trim leading spaces from subcommand
+    subcommand = trimLeadingSpaces(subcommand);
+
+    // Handle commands
+    if (strcmp(subcommand, "enable") == 0) {
+        // Check preconditions
+        if (!motorInitialized) {
+            caller->println(F("[ERROR] Motor must be initialized before enabling MPG control"));
+            caller->println(F("[MESSAGE] Use 'motor,init' first"));
+            return false;
+        }
+        
+        if (!isHomed) {
+            caller->println(F("[ERROR] Motor must be homed before enabling MPG control"));
+            caller->println(F("[MESSAGE] Use 'motor,home' to establish a reference position"));
+            return false;
+        }
+        
+        if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING) {
+            caller->println(F("[ERROR] Cannot enable MPG control while motor is moving"));
+            caller->println(F("[MESSAGE] Wait for current movement to complete or use 'motor,abort'"));
+            return false;
+        }
+        
+        if (motorState == MOTOR_STATE_FAULTED) {
+            caller->println(F("[ERROR] Cannot enable MPG control while motor is in fault state"));
+            caller->println(F("[MESSAGE] Use 'motor,clear' to clear fault first"));
+            return false;
+        }
+        
+        if (isEStopActive()) {
+            caller->println(F("[ERROR] Cannot enable MPG control while E-Stop is active"));
+            return false;
+        }
+        
+        // Enable encoder control
+        encoderControlActive = true;
+        
+        // Reset encoder position
+        EncoderIn.Position(0);
+        lastEncoderPosition = 0;
+        lastEncoderUpdateTime = millis();
+        
+        caller->print(F("[MESSAGE] MPG handwheel control enabled - current position: "));
+        caller->print(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()), 2);
+        caller->println(F(" mm"));
+        caller->print(F("[MESSAGE] Using multiplier x"));
+        caller->print(getMultiplierName(currentMultiplier));
+        caller->print(F(" ("));
+        caller->print(currentMultiplier);
+        caller->println(F(")"));
+        caller->println(F("[MESSAGE] Issue 'encoder,disable' when finished with manual control"));
+        
+        return true;
+    }
+    else if (strcmp(subcommand, "disable") == 0) {
+        // Disable encoder control
+        encoderControlActive = false;
+        caller->println(F("[MESSAGE] MPG handwheel control disabled"));
+        return true;
+    }
+    else if (strcmp(subcommand, "multiplier") == 0) {
+        // Look for the NEXT argument - this is the same approach used in move,mm,X
+        char* originalArgs = args; // Save the original args string
+        
+        // Find the "multiplier" substring within args
+        char* multiplierPos = strstr(originalArgs, "multiplier");
+        if (multiplierPos != NULL) {
+            // Move past "multiplier"
+            multiplierPos += strlen("multiplier");
+            
+            // Skip any spaces or commas
+            while (*multiplierPos && (*multiplierPos == ' ' || *multiplierPos == ',')) {
+                multiplierPos++;
+            }
+            
+            // Now multiplierPos should point to the actual value
+            if (*multiplierPos) {
+                // Parse the actual multiplier value
+                int multiplier = atoi(multiplierPos);
+                
+                Serial.print(F("[DEBUG] Direct extracted value: "));
+                Serial.println(multiplier);
+                
+                // Set the multiplier based on the input value
+                switch (multiplier) {
+                    case 1:
+                        setEncoderMultiplier(1);
+                        caller->println(F("[MESSAGE] Multiplier set to x1 (fine adjustment)"));
+                        break;
+                    case 10:
+                        setEncoderMultiplier(10);
+                        caller->println(F("[MESSAGE] Multiplier set to x10 (medium adjustment)"));
+                        break;
+                    case 100:
+                        setEncoderMultiplier(100);
+                        caller->println(F("[MESSAGE] Multiplier set to x100 (coarse adjustment)"));
+                        break;
+                    default:
+                        caller->println(F("[ERROR] Invalid multiplier. Use 1, 10, or 100."));
+                        return false;
+                }
+                
+                // Show current multiplier and effect
+                caller->print(F("[MESSAGE] Current multiplier value: "));
+                caller->println(currentMultiplier);
+                double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
+                caller->print(F("[MESSAGE] One full rotation moves ~"));
+                caller->print(mmPerRotation, 2);
+                caller->println(F(" mm"));
+                return true;
+            }
+        }
+        
+        // If we get here, display the current multiplier
+        caller->print(F("[MESSAGE] Current multiplier: x"));
+        caller->print(getMultiplierName(currentMultiplier));
+        caller->print(F(" ("));
+        caller->print(currentMultiplier);
+        caller->println(F(")"));
+        
+        // Show what one full rotation will move
+        double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
+        caller->print(F("[MESSAGE] One full rotation moves ~"));
+        caller->print(mmPerRotation, 2);
+        caller->println(F(" mm"));
+        
+        return true;
+    }
+    else {
+        caller->print(F("[ERROR] Unknown encoder command: "));
+        caller->println(subcommand);
+        caller->println(F("[MESSAGE] Valid options: 'enable', 'disable', 'multiplier'"));
+        return false;
+    }
+    
+    return false;
+}
+
 Commander commander;
 
 Commander::systemCommand_t API_tree[] = {
@@ -1997,4 +2217,12 @@ Commander::systemCommand_t API_tree[] = {
                      "  test,home     - Run homing repeatability test\n"
                      "  test,position - Run position cycling test for tray loading\n"
                      "  test,tray     - Run tray handling test (request, place, release)",
-             cmd_test)};
+             cmd_test),
+            
+    // Encoder control commands
+    systemCommand("encoder", "Encoder handwheel control:\n"
+                             "  encoder,enable  - Enable encoder control\n"
+                             "  encoder,disable - Disable encoder control\n"
+                             "  encoder,multiplier,X - Set encoder multiplier (X = 1, 10, or 100)",
+                  cmd_encoder),
+            };

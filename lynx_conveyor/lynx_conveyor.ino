@@ -12,6 +12,7 @@
 #include "Tests.h"
 #include "Commands.h"
 #include "Utils.h"
+#include "EncoderController.h"
 
 // Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
@@ -43,6 +44,10 @@ void setup()
     // Initialize valve system with CCIO board status
     Serial.println(F("[MESSAGE] Initializing valve controller..."));
     initValveSystem(ccioBoardCount > 0);
+
+    // Initialize encoder with default direction (modify if needed)
+    Serial.println(F("[MESSAGE] Initializing MPG handwheel interface..."));
+    initEncoderControl(false, false);
 
     // Rest of your setup code...
     Serial.println(F("[MESSAGE] Motor controller ready for initialization."));
@@ -114,6 +119,11 @@ void loop()
 
     // Store current state as previous for next cycle
     previousState = currentState;
+
+    // Process encoder input if enabled
+    if (encoderControlActive) {
+        processEncoderInput();
+    }
 }
 
 /* # TODO: Implement Operation Step Sequence Validation
