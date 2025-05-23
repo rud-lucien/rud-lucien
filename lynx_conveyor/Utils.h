@@ -8,6 +8,7 @@
 #include "Logging.h"
 #include "Tests.h"
 #include "Commands.h"
+#include "EncoderController.h"
 
 // Forward declarations of types from other headers
 // to avoid circular dependencies

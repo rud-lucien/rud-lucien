@@ -28,7 +28,7 @@ char *trimLeadingSpaces(char *str)
 
 void handleSerialCommands()
 {
-    static char commandBuffer[32]; // Buffer to store incoming command
+    static char commandBuffer[64]; // Increase from 32 to 64 bytes
     static uint8_t commandIndex = 0;
 
     while (Serial.available())
@@ -54,10 +54,24 @@ void handleSerialCommands()
             // Execute the command with commas converted to spaces
             bool success = commander.execute(commandBuffer, &Serial);
 
-            // Debug output for command execution result
-            if (!success)
-            {
-                Serial.println(F("[ERROR] Command not found or execution failed"));
+            // Print error ONLY when commander couldn't find the command
+            // Most functions that return false already print their own error messages
+            if (!success) {
+                // Check if this looks like a valid main command by checking against the command tree
+                bool isKnownCommand = false;
+                for (size_t i = 0; i < sizeof(API_tree) / sizeof(Commander::systemCommand_t); i++) {
+                    const char* cmdName = API_tree[i].name;
+                    // See if the command matches the first part of the input
+                    if (strncmp(commandBuffer, cmdName, strlen(cmdName)) == 0) {
+                        isKnownCommand = true;
+                        break;
+                    }
+                }
+                
+                // Only print generic error if command wasn't found in the command tree
+                if (!isKnownCommand) {
+                    Serial.println(F("[ERROR] Command not found"));
+                }
             }
 
             commandIndex = 0; // Reset buffer index
@@ -72,6 +86,8 @@ void handleSerialCommands()
             {
                 // Command too long - prevent buffer overflow
                 commandIndex = sizeof(commandBuffer) - 1;
+                // Add notification of truncation
+                Serial.println(F("[WARNING] Command truncated - exceeded maximum length"));
             }
         }
     }
@@ -1952,6 +1968,13 @@ bool cmd_encoder(char *args, CommandCaller *caller) {
         caller->println(F("  encoder,enable          - Enable MPG handwheel control"));
         caller->println(F("  encoder,disable         - Disable MPG handwheel control"));
         caller->println(F("  encoder,multiplier,[1|10|100] - Set movement multiplier"));
+
+        // Add the setup sequence here where users will actually see it
+        caller->println(F("\n[SETUP SEQUENCE]"));
+        caller->println(F("  1. 'motor,init' - Initialize the motor"));
+        caller->println(F("  2. 'motor,home' - Establish a reference position"));
+        caller->println(F("  3. 'encoder,enable' - Activate handwheel control"));
+        caller->println(F("  4. 'encoder,multiplier,[1|10|100]' - Set step multiplier"));
         
         // Show current status
         if (encoderControlActive) {
@@ -1991,11 +2014,6 @@ bool cmd_encoder(char *args, CommandCaller *caller) {
         return true;
     }
 
-    // Debug the raw argument
-    Serial.print(F("[DEBUG] Raw encoder command argument: '"));
-    Serial.print(trimmed);
-    Serial.println(F("'"));
-
     // Parse the argument - make sure we're handling comma separators correctly too
     // Replace commas with spaces first (if you're using spaces as delimiters)
     for (int i = 0; trimmed[i] != '\0'; i++) {
@@ -2010,11 +2028,6 @@ bool cmd_encoder(char *args, CommandCaller *caller) {
         caller->println(F("[ERROR] Invalid format. Usage: encoder,<enable|disable|multiplier>"));
         return false;
     }
-
-    // Debug parsed subcommand
-    Serial.print(F("[DEBUG] Parsed encoder subcommand: '"));
-    Serial.print(subcommand);
-    Serial.println(F("'"));
 
     // Trim leading spaces from subcommand
     subcommand = trimLeadingSpaces(subcommand);
@@ -2097,9 +2110,6 @@ bool cmd_encoder(char *args, CommandCaller *caller) {
                 // Parse the actual multiplier value
                 int multiplier = atoi(multiplierPos);
                 
-                Serial.print(F("[DEBUG] Direct extracted value: "));
-                Serial.println(multiplier);
-                
                 // Set the multiplier based on the input value
                 switch (multiplier) {
                     case 1:
@@ -2145,11 +2155,12 @@ bool cmd_encoder(char *args, CommandCaller *caller) {
         
         return true;
     }
-    else {
-        caller->print(F("[ERROR] Unknown encoder command: "));
-        caller->println(subcommand);
-        caller->println(F("[MESSAGE] Valid options: 'enable', 'disable', 'multiplier'"));
-        return false;
+    else if (strcmp(subcommand, "help") == 0) {
+        caller->println(F("[MESSAGE] MPG Handwheel Setup & Usage:"));
+        caller->println(F("\n[SETUP SEQUENCE]"));
+        caller->println(F("  1. 'motor,init' - Initialize the motor"));
+        caller->println(F("  2. 'motor,home' - Establish a reference position"));
+        caller->println(F("  3. 'encoder,enable' - Activate handwheel control"));
     }
     
     return false;
@@ -2221,8 +2232,9 @@ Commander::systemCommand_t API_tree[] = {
             
     // Encoder control commands
     systemCommand("encoder", "Encoder handwheel control:\n"
-                             "  encoder,enable  - Enable encoder control\n"
-                             "  encoder,disable - Disable encoder control\n"
-                             "  encoder,multiplier,X - Set encoder multiplier (X = 1, 10, or 100)",
-                  cmd_encoder),
+                         "  encoder,enable  - Enable encoder control\n"
+                         "  encoder,disable - Disable encoder control\n"
+                         "  encoder,multiplier,X - Set encoder multiplier (X = 1, 10, or 100)\n"
+                         "  encoder,help    - Display setup instructions and usage tips",
+              cmd_encoder),
             };

@@ -878,7 +878,7 @@ void checkMoveProgress() {
     // Check if we just transitioned to MOVING state
     if (motorState == MOTOR_STATE_MOVING && previousState != MOTOR_STATE_MOVING) {
         wasMoving = true;
-        Serial.println(F("[DIAGNOSTIC] Movement started - tracking for LastTarget update"));
+        // Serial.println(F("[DIAGNOSTIC] Movement started - tracking for LastTarget update"));
     }
     
     // Update the current position when moving
@@ -888,13 +888,13 @@ void checkMoveProgress() {
 
     // Check if the move has just completed (transition from wasMoving to not moving)
     if (wasMoving && !isMoving) {
-        Serial.println(F("[DIAGNOSTIC] Move completed successfully"));
+        // Serial.println(F("[DIAGNOSTIC] Move completed successfully"));
         
         // Movement completed successfully, update last target
         if (hasCurrentTarget) {
-            Serial.print(F("[DIAGNOSTIC] Updating LastTarget to: "));
-            Serial.print(currentTargetPositionMm);
-            Serial.println(F(" mm"));
+            // Serial.print(F("[DIAGNOSTIC] Updating LastTarget to: "));
+            // Serial.print(currentTargetPositionMm);
+            // Serial.println(F(" mm"));
             
             hasLastTarget = true;
             lastTargetType = currentTargetType;
@@ -903,7 +903,7 @@ void checkMoveProgress() {
             hasCurrentTarget = false; // Clear current target
             
         } else {
-            Serial.println(F("[DIAGNOSTIC] Move completed but no current target was set!"));
+            // Serial.println(F("[DIAGNOSTIC] Move completed but no current target was set!"));
         }
         
         // Reset the wasMoving flag

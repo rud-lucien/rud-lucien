@@ -14,13 +14,10 @@ const char* getMultiplierName(float multiplier) {
     if (fabs(multiplier - MULTIPLIER_X10) < 0.001f) return "10";
     if (fabs(multiplier - MULTIPLIER_X100) < 0.001f) return "100";
     
-    // Debug output to help diagnose the issue
-    char buffer[50];
-    sprintf(buffer, "unknown:%.2f", multiplier);
-    Serial.print(F("[DEBUG] getMultiplierName received: "));
-    Serial.println(buffer);
-    
-    return "unknown";
+    // Still return something helpful in case of unexpected values
+    static char buffer[10];
+    sprintf(buffer, "%.1f", multiplier);
+    return buffer;
 }
 
 // Initialize the encoder interface
@@ -42,12 +39,7 @@ void initEncoderControl(bool swapDirection, bool indexInverted) {
     lastEncoderUpdateTime = millis();
     currentMultiplier = MULTIPLIER_X1;  // Make sure default is set
     
-    Serial.println(F("[MESSAGE] MPG Handwheel interface initialized"));
-    Serial.println(F("[MESSAGE] Setup sequence: "));
-    Serial.println(F("  1. 'motor init' - Initialize the motor"));
-    Serial.println(F("  2. 'home' - Establish a reference position"));
-    Serial.println(F("  3. 'encoder enable' - Activate handwheel control"));
-    Serial.println(F("  4. 'encoder multiplier [1|10|100]' - Set step multiplier"));
+    Serial.println(F("[MESSAGE] Manual Pulse Generator (MPG) Handwheel interface initialized"));
 }
 
 // Process encoder movement
@@ -141,14 +133,26 @@ void processEncoderInput() {
                 // Update target tracking in motor controller
                 updateMotorTarget(targetPositionMm);
                 
-                Serial.print(F("[MPG] Moving motor by "));
-                Serial.print(stepsToMove);
-                Serial.print(F(" steps (multiplier: x"));
+                // When displaying the move message, show the directional step count for user readability
+                // We want positive numbers when moving away from home (increasing position)
+                int32_t displaySteps;
+                if (targetPositionMm > currentPositionMm) {
+                    // Moving away from home (increasing position) - show positive
+                    displaySteps = abs(stepsToMove);
+                } else {
+                    // Moving towards home (decreasing position) - show negative
+                    displaySteps = -abs(stepsToMove);
+                }
+                
+                // Update the move message to use displaySteps
+                Serial.print(F("[MPG] Move: "));
+                Serial.print(displaySteps);  // Use displaySteps for more intuitive direction display
+                Serial.print(F(" steps (x"));
                 Serial.print(getMultiplierName(currentMultiplier));
-                Serial.print(F("), velocity: "));
-                Serial.print(scaledVelocity);
-                Serial.print(F(", target: "));
-                Serial.print(targetPositionMm);
+                Serial.print(F(", "));
+                Serial.print(scaledVelocity/1000); // Show in thousands for cleaner display
+                Serial.print(F("k pps) → "));
+                Serial.print(targetPositionMm, 2); // Show with 2 decimal places
                 Serial.println(F(" mm"));
                 
                 // Set velocity for this move
@@ -216,9 +220,7 @@ void enableEncoderControl(bool enable) {
 
 // Set the multiplier (x1, x10, x100)
 void setEncoderMultiplier(int multiplier) {
-    Serial.print(F("[DEBUG] setEncoderMultiplier called with: "));
-    Serial.println(multiplier);
-    
+
     switch (multiplier) {
         case 1:
             currentMultiplier = MULTIPLIER_X1;
@@ -239,9 +241,11 @@ void setEncoderMultiplier(int multiplier) {
             Serial.println(F("[ERROR] Invalid multiplier. Use 1, 10, or 100"));
             return;
     }
-    
-    // Verify the currentMultiplier was actually set
-    Serial.print(F("[DEBUG] currentMultiplier is now: "));
-    Serial.println(currentMultiplier);
+
+    // Useful diagnostic information
+    float mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
+    Serial.print(F("[MESSAGE] One full rotation moves ~"));
+    Serial.print(mmPerRotation, 2);
+    Serial.println(F(" mm"));
 }
 

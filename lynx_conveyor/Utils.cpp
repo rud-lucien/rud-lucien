@@ -255,6 +255,22 @@ void printSystemState(const SystemState &state, Print* output) {
                              (state.tray3Locked && !state.tray3Present);
     output->print(F("    Tray/Lock Mismatch: ")); 
     output->println(missingTraysLocked ? F("YES - LOCK WITHOUT TRAY") : F("NO"));
+
+    // Encoder status
+    output->println(F("\n  MPG Handwheel:"));
+    output->print(F("    Status: "));
+    output->println(encoderControlActive ? F("ENABLED") : F("DISABLED"));
+    
+    if (encoderControlActive) {
+        output->print(F("    Multiplier: x"));
+        output->print(getMultiplierName(currentMultiplier));
+        output->print(F(" ("));
+        
+        // Calculate how much one full rotation moves (100 pulses typical for MPG handwheels)
+        double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
+        output->print(mmPerRotation, 2);
+        output->println(F(" mm/rotation)"));
+    }
     
     output->println(F("-------------------------------------------"));
 }

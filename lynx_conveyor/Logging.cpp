@@ -1,6 +1,7 @@
 #include "Logging.h"
 #include "ValveController.h"
 #include "MotorController.h"
+#include "EncoderController.h"
 
 // Initialize with logging disabled (logInterval = 0)
 // but keep the default interval value of 500ms for when it's enabled
@@ -143,6 +144,21 @@ void logSystemState()
     Serial.print(F("mm/"));
     Serial.print(currentJogSpeedRpm);
     Serial.print(F("RPM"));
+
+    // Encoder status
+    Serial.print(F(" | MPG: "));
+    if (encoderControlActive) {
+        Serial.print(F("ON x"));
+        Serial.print(getMultiplierName(currentMultiplier));
+        
+        // Add mm/rotation information in a compact format
+        double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
+        Serial.print(F(" ("));
+        Serial.print(mmPerRotation, 2);
+        Serial.print(F("mm/rot)"));
+    } else {
+        Serial.print(F("OFF"));
+    }
     
     // End the line
     Serial.println();
