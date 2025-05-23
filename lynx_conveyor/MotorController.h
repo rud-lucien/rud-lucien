@@ -110,6 +110,41 @@ enum FaultClearingState {
     FAULT_CLEAR_FINISHED          // Process complete
 };
 
+// In MotorController.h
+struct DecelerationConfig {
+    float decelerationDistanceMm;
+    float minVelocityRPM;
+    bool enableDeceleration;
+    
+    // Just declare the method
+    int32_t getMinVelocityPPS() const;
+};
+
+#define VELOCITY_CHANGE_THRESHOLD 3  // 3 RPM minimum change to update velocity
+
+// Distance thresholds for velocity scaling
+#define VERY_SHORT_MOVE_THRESHOLD_MM     10.0    // Moves less than 10mm are very short
+#define SHORT_MOVE_THRESHOLD_MM          30.0    // Moves less than 30mm are short
+#define MEDIUM_MOVE_THRESHOLD_MM         100.0   // Moves less than 100mm are medium
+
+// Velocity scaling for different move distances
+#define VERY_SHORT_MOVE_VELOCITY_RPM     25      // 25 RPM for very short moves
+#define SHORT_MOVE_VELOCITY_RPM          50      // 50 RPM for short moves  
+#define MEDIUM_MOVE_VELOCITY_RPM         100     // 100 RPM for medium moves
+
+// Deceleration configuration defaults
+#define DEFAULT_DECELERATION_DISTANCE_MM     35.0    // Start decelerating when 35mm from target
+#define DEFAULT_MIN_VELOCITY_RPM             5.0     // Minimum velocity of 5 RPM during deceleration
+#define DEFAULT_DECELERATION_ENABLED         true    // Deceleration enabled by default
+
+// Deceleration stages configuration
+#define DECEL_TRANSITION_POINT_RATIO         0.5f    // First stage to second stage transition (50%)
+#define DECEL_FIRST_STAGE_END_RATIO          0.4f    // First stage decelerates to 40% of range
+#define DECEL_S_CURVE_MULTIPLIER             2.78f   // S-curve multiplier for first stage
+
+// Very short move detection
+#define VERY_SHORT_MOVE_RATIO                1.1f    // Moves < 110% of decel distance considered "very short"
+
 //=============================================================================
 // GLOBAL VARIABLES
 //=============================================================================
@@ -149,6 +184,9 @@ extern int currentJogSpeedRpm;            // Current jog speed in RPM
 extern FaultClearingState faultClearState; // Current fault clearing state
 extern unsigned long faultClearTimer;      // Timestamp for fault clearing timing
 extern bool faultClearInProgress;          // Flag indicating if fault clearing is in progress
+
+// Deceleration configuration
+extern DecelerationConfig motorDecelConfig;  // Deceleration settings
 
 //=============================================================================
 // FUNCTION DECLARATIONS
@@ -199,7 +237,7 @@ void checkMoveProgress();
 //-----------------------------------------------------------------------------
 bool jogMotor(bool direction, double customIncrement = -1.0);
 bool setJogIncrement(double increment);
-bool setJogSpeed(int speedRpm);
+bool setJogSpeed(int speedRpm, double jogDistanceMm);
 
 //-----------------------------------------------------------------------------
 // Status and Feedback
@@ -232,4 +270,11 @@ bool isEStopActive();
 void handleEStop();
 void updateMotorTarget(float targetPositionMm);
 
+//-----------------------------------------------------------------------------
+// Deceleration Configuration
+// Functions for configuring deceleration settings
+//-----------------------------------------------------------------------------
+
+
+int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVelocity);
 #endif // MOTOR_CONTROLLER_H

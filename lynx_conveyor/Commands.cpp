@@ -1559,7 +1559,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
             // Handle "default" keyword
             if (strcmp(speedStr, "default") == 0)
             {
-                if (setJogSpeed(DEFAULT_JOG_SPEED))
+                if (setJogSpeed(DEFAULT_JOG_SPEED, currentJogIncrementMm))
                 {
                     caller->print(F("[MESSAGE] Jog speed set to default ("));
                     caller->print(currentJogSpeedRpm);
@@ -1577,7 +1577,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
             int newSpeed = atoi(speedStr);
 
             // Set new jog speed
-            if (setJogSpeed(newSpeed))
+            if (setJogSpeed(newSpeed, currentJogIncrementMm))
             {
                 caller->print(F("[MESSAGE] Jog speed set to "));
                 caller->print(currentJogSpeedRpm);
