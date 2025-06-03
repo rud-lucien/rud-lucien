@@ -104,8 +104,9 @@ void loop()
     SafetyValidationResult safety = validateSafety(currentState);
 
     // Check for safety violations that require immediate action
-    if (operationInProgress && 
-        (!safety.operationWithinTimeout || !safety.operationSequenceValid)) {
+    if (operationInProgress &&
+        (!safety.operationWithinTimeout || !safety.operationSequenceValid))
+    {
         Serial.print(F("SAFETY VIOLATION: "));
         Serial.println(safety.operationSequenceMessage);
 
@@ -121,16 +122,11 @@ void loop()
     previousState = currentState;
 
     // Process encoder input if enabled
-    if (encoderControlActive) {
+    if (encoderControlActive)
+    {
         processEncoderInput();
     }
 }
-
-/* TODO: Disable encoder control during automatic operations
-This task is about ensuring that the encoder control does not interfere with automated operations, particularly during homing or other critical movements.
-## Task Description
-Disable the encoder control system when the motor is in an automatic operation mode, such as homing or tray loading and unloading. This prevents user input from interfering with critical operations.
-*/
 
 /* TODO: Figure out how to implement collision detection
 This task is about implementing a collision detection system for the conveyor controller to prevent mechanical damage during operations.
@@ -139,18 +135,14 @@ How do I update code to handle this? when the motor is stalled what message does
 prints a helpful message to the user that this is potentially a collision detection issue and not just a motor fault?
 */
 
-
-
-
-
 /* TODO: Figure out what to do when a manual command is sent while an automated operation is in progress (like tray loading or unloading). How do we handle this? Should we reject the command or allow it to interrupt the operation?
-*/
+ */
 
 /* TODO: implement TCP/IP such that we can send commands to the conveyor controller over a network connection. This will allow remote control and monitoring of the conveyor system.
-*/
+ */
 
-/* TODO: update all functions that send messages such that outputs can go to serial and client at the same time. 
-*/
+/* TODO: update all functions that send messages such that outputs can go to serial and client at the same time.
+ */
 /* # TODO: Implement Operation Step Sequence Validation
 
 This TODO task should focus on improving the operation step sequence validation system. Here's what should be included:

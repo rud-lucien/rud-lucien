@@ -16,17 +16,17 @@ struct LoggingManagement;
 class CommandCaller;
 
 // Position tracking
-extern double commandedPositionMm;  // Last commanded position, -1 means no command yet
+extern double commandedPositionMm; // Last commanded position, -1 means no command yet
 
 // Operation state tracking
-extern bool operationInProgress;  // Flag indicating if an operation is running
-extern bool newCommandReceived;   // Set when a new command comes in
-extern unsigned long operationStartTime;  // When the current operation started
-extern unsigned long operationTimeoutMs;  // Default timeout (10 seconds)
-extern int currentOperationStep;      // Current step in operation sequence
-extern int expectedOperationStep;     // Expected step at this point
-extern bool operationEncoderState;  // True if encoder control is active during operation
-extern bool homingEncoderState;  // Stores the encoder control state before homing begins
+extern bool operationInProgress;         // Flag indicating if an operation is running
+extern bool newCommandReceived;          // Set when a new command comes in
+extern unsigned long operationStartTime; // When the current operation started
+extern unsigned long operationTimeoutMs; // Default timeout (10 seconds)
+extern int currentOperationStep;         // Current step in operation sequence
+extern int expectedOperationStep;        // Expected step at this point
+extern bool operationEncoderState;       // True if encoder control is active during operation
+extern bool homingEncoderState;          // Stores the encoder control state before homing begins
 
 // State machine timing variables
 extern unsigned long valveActuationStartTime;
@@ -37,7 +37,8 @@ extern const unsigned long SAFETY_DELAY_AFTER_MOVEMENT_MS;
 extern const unsigned long SENSOR_VERIFICATION_DELAY_MS;
 
 // Operation type enum
-enum OperationType {
+enum OperationType
+{
     OPERATION_NONE = 0,
     OPERATION_LOADING,
     OPERATION_UNLOADING,
@@ -46,33 +47,34 @@ enum OperationType {
 };
 
 // System state structure - captures all sensor and actuator states
-struct SystemState {
+struct SystemState
+{
     // Motor state
     MotorState motorState;
     bool isHomed;
     double currentPositionMm;
     MotorDriver::HlfbStates hlfbStatus;
-    
+
     // Cylinder sensor states (raw readings)
     bool tray1CylinderActivated;
     bool tray2CylinderActivated;
     bool tray3CylinderActivated;
     bool shuttleCylinderActivated;
-    
+
     // Derived lock states (based on cylinder sensors)
     bool tray1Locked;
     bool tray2Locked;
     bool tray3Locked;
     bool shuttleLocked;
-    
+
     // Tray presence detection
     bool tray1Present;
     bool tray2Present;
     bool tray3Present;
-    
+
     // Safety system
     bool eStopActive;
-    
+
     // Hardware status
     bool ccioBoardPresent;
 
@@ -84,19 +86,20 @@ struct SystemState {
 };
 
 // Tray tracking structure
-struct TrayTracking {
+struct TrayTracking
+{
     // Total count of trays in the system
     uint8_t totalTraysInSystem;
-    
+
     // Position occupancy
     bool position1Occupied;
     bool position2Occupied;
     bool position3Occupied;
-    
+
     // Last loading/unloading timestamps
     unsigned long lastLoadTime;
     unsigned long lastUnloadTime;
-    
+
     // Count of load/unload operations since startup
     uint16_t totalLoadsCompleted;
     uint16_t totalUnloadsCompleted;
@@ -106,7 +109,8 @@ struct TrayTracking {
 extern TrayTracking trayTracking;
 
 // Tray status structure
-struct TrayStatus {
+struct TrayStatus
+{
     bool position1Occupied;
     bool position2Occupied;
     bool position3Occupied;
@@ -117,7 +121,8 @@ struct TrayStatus {
 extern TrayStatus trayStatus;
 
 // Operation status structure
-struct OperationStatus {
+struct OperationStatus
+{
     bool inProgress;
     OperationType type;
     int trayNumber;
@@ -129,7 +134,8 @@ struct OperationStatus {
 extern OperationStatus currentOperation;
 
 // Abort reason enum
-enum AbortReason {
+enum AbortReason
+{
     ABORT_REASON_ESTOP,
     ABORT_REASON_MOTOR_TIMEOUT,
     ABORT_REASON_OPERATION_TIMEOUT,
@@ -139,7 +145,8 @@ enum AbortReason {
 };
 
 // Safety validation results - per operation type
-struct SafetyValidationResult {
+struct SafetyValidationResult
+{
     // Motor movement safety flags
     bool safeToMove;
     String moveUnsafeReason;
@@ -173,19 +180,19 @@ struct SafetyValidationResult {
     String unloadTrayPos1UnsafeReason;
     String unloadTrayPos2UnsafeReason;
     String unloadTrayPos3UnsafeReason;
-    
+
     // System state validation
     bool commandStateValid;
     bool trayPositionValid;
     bool targetPositionValid;
     String stateValidationMessage;
-    
+
     // Operational sequence validation
     bool safeToAcceptNewCommand;
     bool operationWithinTimeout;
     bool operationSequenceValid;
     String operationSequenceMessage;
-    
+
     // Abort reason - directly indicates what type of abort should be triggered
     AbortReason failureReason;
 };
@@ -196,11 +203,11 @@ struct SafetyValidationResult {
 
 // System state tracking functions
 SystemState captureSystemState();
-void printSystemState(const SystemState &state, Print* output = &Serial);
+void printSystemState(const SystemState &state, Print *output = &Serial);
 
 // Safety validation functions
 SafetyValidationResult validateSafety(const SystemState &state);
-void printSafetyStatus(const SafetyValidationResult &result, Print* output = &Serial);
+void printSafetyStatus(const SafetyValidationResult &result, Print *output = &Serial);
 
 // Motor position helper functions
 bool isAtPosition(double currentPosition, double targetPosition);
@@ -237,9 +244,8 @@ int determineUnloadingWorkflow();
 bool isPathClearForLoading(double startPosition, double targetPosition, const SystemState &state);
 bool isPathClearForUnloading(double startPosition, double targetPosition, const SystemState &state);
 
-
 void abortOperation(AbortReason reason);
-const char* getAbortReasonString(AbortReason reason);
+const char *getAbortReasonString(AbortReason reason);
 void resetSystemState(); // Function to reset the system state after a failure
 
 // Global variable declaration

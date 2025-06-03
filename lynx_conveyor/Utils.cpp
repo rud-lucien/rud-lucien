@@ -24,7 +24,6 @@ int currentOperationStep = 0;
 int expectedOperationStep = 0;
 bool operationEncoderState = false;
 
-
 // State machine timing variables and substep tracking
 unsigned long valveActuationStartTime = 0;
 unsigned long safetyDelayStartTime = 0;
@@ -1401,9 +1400,9 @@ bool isPathClearForLoading(double startPosition, double targetPosition, const Sy
         }
         return true;
     }
-    
+
     // When returning to position 1 (empty shuttle), no path checking needed
-    if ((isAtPosition(startPosition, POSITION_2_MM) || isAtPosition(startPosition, POSITION_3_MM)) && 
+    if ((isAtPosition(startPosition, POSITION_2_MM) || isAtPosition(startPosition, POSITION_3_MM)) &&
         isMovingToPosition(POSITION_1_MM, targetPosition))
     {
         return true; // Always safe for empty shuttle to return
@@ -1418,14 +1417,14 @@ bool isPathClearForUnloading(double startPosition, double targetPosition, const 
 {
     // SCENARIO 1: Moving from loading position (1) to pick up a tray (2 or 3)
     // When going to pick up a tray, no path checking needed as shuttle is empty
-    if (isAtPosition(startPosition, POSITION_1_MM) && 
-        (isMovingToPosition(POSITION_2_MM, targetPosition) || 
+    if (isAtPosition(startPosition, POSITION_1_MM) &&
+        (isMovingToPosition(POSITION_2_MM, targetPosition) ||
          isMovingToPosition(POSITION_3_MM, targetPosition)))
     {
         // Always safe to move an empty shuttle from position 1 to pick up a tray
         return true;
     }
-    
+
     // SCENARIO 2: Moving FROM position 3 TO position 1 WITH a tray
     // Must check that position 2 is clear to avoid collision
     // AND must check that position 1 is clear (destination)
@@ -1435,14 +1434,14 @@ bool isPathClearForUnloading(double startPosition, double targetPosition, const 
         {
             return false; // Path blocked at position 2
         }
-        
+
         if (state.tray1Present)
         {
             return false; // Destination already occupied
         }
         return true;
     }
-    
+
     // SCENARIO 3: Moving FROM position 2 TO position 1 WITH a tray
     // Must check that position 1 is clear (destination)
     if (isAtPosition(startPosition, POSITION_2_MM) && isMovingToPosition(POSITION_1_MM, targetPosition))
@@ -1453,7 +1452,7 @@ bool isPathClearForUnloading(double startPosition, double targetPosition, const 
         }
         return true;
     }
-    
+
     // Default - assume the path is clear for any other case
     return true;
 }
@@ -2762,16 +2761,17 @@ void beginOperation()
 {
     // Store previous encoder state if we need to restore it later
     bool wasEncoderActive = encoderControlActive;
-    
+
     // Disable encoder control if it's active
-    if (encoderControlActive) {
+    if (encoderControlActive)
+    {
         encoderControlActive = false;
         Serial.println(F("[INFO] MPG handwheel control temporarily disabled during automated operation"));
     }
-    
+
     // Store the encoder state so we can restore it if needed
     operationEncoderState = wasEncoderActive;
-    
+
     operationInProgress = true;
     operationStartTime = millis();
     // Use the updateOperationStep function to keep steps in sync
@@ -2790,7 +2790,8 @@ void endOperation()
     hasCurrentTarget = false; // Clear current target
 
     // Restore encoder control if it was active before
-    if (operationEncoderState) {
+    if (operationEncoderState)
+    {
         encoderControlActive = true;
         Serial.println(F("[INFO] MPG handwheel control re-enabled after automated operation"));
     }

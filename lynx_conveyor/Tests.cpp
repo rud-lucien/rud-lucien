@@ -3,8 +3,6 @@
 #include "Utils.h"
 #include "ValveController.h"
 
-
-
 // Test homing repeatability by performing multiple home-move cycles
 bool testHomingRepeatability()
 {
@@ -928,9 +926,9 @@ bool testPositionCycling()
 // Test tray handling operations including sensors, locking/unlocking
 bool testTrayHandling()
 {
-    const int NUM_CYCLES = 10;                 // Number of test cycles to run
-    const unsigned long WAIT_TIME_MS = 5000;   // Fixed 5-second wait time at each position
-    const unsigned long VALVE_DELAY_MS = 1000; // Delay between valve operations to prevent race conditions
+    const int NUM_CYCLES = 10;                             // Number of test cycles to run
+    const unsigned long WAIT_TIME_MS = 5000;               // Fixed 5-second wait time at each position
+    const unsigned long VALVE_DELAY_MS = 1000;             // Delay between valve operations to prevent race conditions
     const unsigned long ADDITIONAL_UNLOCK_DELAY_MS = 2000; // Additional safety delay after tray unlock before moving
     int cyclesCompleted = 0;
     bool testRunning = true;

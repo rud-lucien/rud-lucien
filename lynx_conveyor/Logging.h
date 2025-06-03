@@ -8,9 +8,10 @@
 //=============================================================================
 
 // Structure to manage periodic logging behavior
-struct LoggingManagement {
-    unsigned long previousLogTime;  // Time of last log
-    unsigned long logInterval;      // Interval (ms) between logs, 0 = disabled
+struct LoggingManagement
+{
+    unsigned long previousLogTime; // Time of last log
+    unsigned long logInterval;     // Interval (ms) between logs, 0 = disabled
 };
 
 //=============================================================================
@@ -31,4 +32,3 @@ extern const unsigned long DEFAULT_LOG_INTERVAL;
 void logSystemState();
 
 #endif // LOGGING_H
-
