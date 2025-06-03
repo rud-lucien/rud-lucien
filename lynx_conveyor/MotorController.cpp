@@ -10,6 +10,7 @@ double currentPositionMm = 0.0;
 MotorState motorState = MOTOR_STATE_NOT_READY;
 PositionTarget currentPosition = POSITION_1;
 bool homingInProgress = false;
+bool homingEncoderState = false;
 unsigned long homingStartTime = 0;
 double currentJogIncrementMm = DEFAULT_JOG_INCREMENT;
 int currentJogSpeedRpm = DEFAULT_JOG_SPEED;
@@ -41,6 +42,12 @@ DecelerationConfig motorDecelConfig = {
     DEFAULT_MIN_VELOCITY_RPM,         // Minimum velocity of 5 RPM
     DEFAULT_DECELERATION_ENABLED      // Enabled by default
 };
+
+// Homing-specific state variables (moved from local static in checkHomingProgress)
+static bool homing_hlfbWentNonAsserted = false;
+static unsigned long homing_hlfbNonAssertedTime = 0;
+static bool homing_minDistanceTraveled = false;
+static int32_t homing_startPulses = 0; // To store position at the start of a homing move
 
 // ----------------- Utility Functions -----------------
 
@@ -244,14 +251,28 @@ bool moveToPosition(PositionTarget position)
     currentTargetPositionMm = targetPositionMm;
     currentTargetPulses = targetPulses;
 
-    // Calculate distance to move
+    // IMPORTANT: Update currentPositionMm with the latest position before calculating distance
+    currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
+
+    // Debug print to show the actual positions being used
+    Serial.print(F("[DEBUG] Current position: "));
+    Serial.print(currentPositionMm);
+    Serial.print(F("mm, Target position: "));
+    Serial.print(targetPositionMm);
+    Serial.println(F("mm"));
+
+    // Calculate distance to move with updated position value
     double distanceToMoveMm = fabs(targetPositionMm - currentPositionMm);
+
+    Serial.print(F("[DEBUG] Calculated move distance: "));
+    Serial.print(distanceToMoveMm);
+    Serial.println(F("mm"));
 
     // Apply velocity scaling based on move distance
     if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Serial.print(F("[MESSAGE] Short move detected ("));
+        Serial.print(F("[MESSAGE] Very short move detected ("));
         Serial.print(distanceToMoveMm);
         Serial.print(F("mm) - Using reduced speed: "));
         Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
@@ -286,20 +307,15 @@ bool moveToPosition(PositionTarget position)
         Serial.println(F(" RPM"));
     }
 
-    // Apply the new velocity limit to the motor
+    // Rest of function remains the same
     MOTOR_CONNECTOR.VelMax(currentVelMax);
-
-    // Execute the move
     bool moveResult = moveToAbsolutePosition(normalizeEncoderValue(targetPulses));
-
-    // If move fails, restore velocity and clear target
     if (!moveResult)
     {
         currentVelMax = originalVelMax;
         MOTOR_CONNECTOR.VelMax(currentVelMax);
         hasCurrentTarget = false;
     }
-
     return moveResult;
 }
 
@@ -335,8 +351,22 @@ bool moveToPositionMm(double positionMm)
         return false;
     }
 
+    // IMPORTANT: Update currentPositionMm with the latest position before calculating distance
+    currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
+
+    // Debug print to show the actual positions being used
+    Serial.print(F("[DEBUG] Current position: "));
+    Serial.print(currentPositionMm);
+    Serial.print(F("mm, Target position: "));
+    Serial.print(positionMm);
+    Serial.println(F("mm"));
+
     // Calculate distance to move
     double distanceToMoveMm = fabs(positionMm - currentPositionMm);
+
+    Serial.print(F("[DEBUG] Calculated move distance: "));
+    Serial.print(distanceToMoveMm);
+    Serial.println(F("mm"));
 
     // Save original velocity
     int32_t originalVelMax = currentVelMax;
@@ -414,8 +444,18 @@ bool moveToPositionMm(double positionMm)
 
 bool moveRelative(double relativeMm)
 {
+    // IMPORTANT: Update currentPositionMm with the latest position before calculating distance
+    currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
+
     // Calculate the target absolute position
     double targetPositionMm = currentPositionMm + relativeMm;
+
+    // Debug print to show the actual positions being used
+    Serial.print(F("[DEBUG] Current position: "));
+    Serial.print(currentPositionMm);
+    Serial.print(F("mm, Target position: "));
+    Serial.print(targetPositionMm);
+    Serial.println(F("mm"));
 
     // Check if the target position would be out of bounds
     if (targetPositionMm < 0 || targetPositionMm > MAX_TRAVEL_MM)
@@ -433,17 +473,21 @@ bool moveRelative(double relativeMm)
         return false;
     }
 
-    // Save original velocity for restoration later
-    int32_t originalVelMax = currentVelMax;
-
     // Calculate distance to move (use absolute value for velocity scaling)
     double distanceToMoveMm = fabs(relativeMm);
+
+    Serial.print(F("[DEBUG] Calculated move distance: "));
+    Serial.print(distanceToMoveMm);
+    Serial.println(F("mm"));
+
+    // Save original velocity for restoration later
+    int32_t originalVelMax = currentVelMax;
 
     // Apply velocity scaling based on move distance
     if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Serial.print(F("[MESSAGE] Short move detected ("));
+        Serial.print(F("[MESSAGE] Very short move detected ("));
         Serial.print(distanceToMoveMm);
         Serial.print(F("mm) - Using reduced speed: "));
         Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
@@ -959,239 +1003,211 @@ bool clearMotorFaultWithStatus()
 
 // ----------------- Homing Functions -----------------
 
-bool initiateHomingSequence()
-{
+bool initiateHomingSequence() {
     // Check if motor is initialized
-    if (!motorInitialized)
-    {
-        Serial.println(F("[ERROR] Motor not initialized - run 'motor init' first"));
+    if (!motorInitialized) {
+        Serial.println(F("[ERROR] Motor not initialized"));
         return false;
     }
 
-    // Check for motor alerts
-    if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
-    {
+    // Check for faults
+    if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
         Serial.println(F("[ERROR] Motor has active alerts - clear faults before homing"));
-        printMotorAlerts(); // Print the specific alerts
-        Serial.println(F("[ERROR] Please run 'clear fault' command first"));
         return false;
     }
 
-    // Set current target for logging to indicate we're homing
-    hasCurrentTarget = true;
-    currentTargetType = POSITION_HOME;
-    currentTargetPositionMm = 0.0;
-    currentTargetPulses = 0;
+    resetHomingState(); // Call this FIRST to ensure a clean state for all homing variables
 
-    // Start the non-blocking enable cycle
-    Serial.println(F("[MESSAGE] Cycling motor enable to trigger automatic homing..."));
+    // For "Upon every Enable" configuration, cycle the enable signal
     MOTOR_CONNECTOR.EnableRequest(false);
-    enableCycleStartTime = millis();
-    motorEnableCycleInProgress = true;
-    motorDisablePhaseComplete = false;
+    delay(200);
+    MOTOR_CONNECTOR.EnableRequest(true);
+    delay(200);
 
-    // Initialize homing state
-    homingInProgress = true;
+    // Set velocity for homing
+    int32_t homingVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
+    MOTOR_CONNECTOR.VelMax(homingVelPps);
+
+    // Store the motor's commanded position BEFORE starting the homing move
+    homing_startPulses = MOTOR_CONNECTOR.PositionRefCommanded();
+
+    // Move in homing direction at continuous velocity
+    MOTOR_CONNECTOR.MoveVelocity(HOMING_DIRECTION * homingVelPps);
+
+    homingInProgress = true; // Set this after successfully starting the move
     motorState = MOTOR_STATE_HOMING;
     homingStartTime = millis();
 
-    // The rest of the homing process will be handled when the enable cycle completes
+    Serial.println(F("[MESSAGE] Homing sequence initiated. Motor will move to find home position.")); // Added this line back from your original
     return true;
 }
 
-void executeHomingSequence()
-{
-    if (!homingInProgress)
-    {
-        return;
-    }
+void checkHomingProgress() {
+    if (!homingInProgress) return;
 
-    // Handle the movement initiation after enable cycle completes
-    static bool homingMovementStarted = false;
+    unsigned long currentTime = millis();
 
-    // Check if enable cycle just completed and movement hasn't started yet
-    if (!motorEnableCycleInProgress && !homingMovementStarted)
-    {
-        // Start the actual homing movement
-        Serial.println(F("[MESSAGE] Starting hard stop homing sequence..."));
+    // Add continuous HLFB monitoring for debugging
+    // static unsigned long lastHlfbLogTime = 0; // Keep if needed for debug logs
+    static const int32_t minimumMovementPulses = 3000; // Minimum movement before detecting hardstop (can remain const static)
 
-        // Set velocity for initial approach
-        int32_t homingVel = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
-        Serial.print(F("[MESSAGE] Moving toward hard stop with velocity: "));
-        Serial.print(HOME_APPROACH_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
+    MotorDriver::HlfbStates currentHlfbState = MOTOR_CONNECTOR.HlfbState();
+    int32_t currentPosition = MOTOR_CONNECTOR.PositionRefCommanded();
 
-        currentVelMax = homingVel;
-        MOTOR_CONNECTOR.VelMax(currentVelMax);
+    // Log HLFB state changes and periodic status - simplified to just ASSERTED or NOT_ASSERTED
+    // if (currentHlfbState != lastHlfbState || (currentTime - lastHlfbLogTime > 2000)) {
+    //     lastHlfbLogTime = currentTime;
+    //     Serial.print(F("[HLFB DEBUG] State: "));
+    //     Serial.print(currentHlfbState == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT_ASSERTED"));
+    //     Serial.print(F(", Position: "));
+    //     Serial.print(currentPosition);
+    //     Serial.print(F(", Time: "));
+    //     Serial.print((currentTime - homingStartTime) / 1000.0);
+    //     Serial.println(F("s"));
 
-        // Start moving toward the hard stop
-        MOTOR_CONNECTOR.MoveVelocity(HOMING_DIRECTION * MOTION_DIRECTION * homingVel);
+    //     lastHlfbState = currentHlfbState;
+    // }
 
-        homingMovementStarted = true;
-    }
-
-    // Reset the movement flag if homing is aborted
-    if (!homingInProgress)
-    {
-        homingMovementStarted = false;
-        return;
-    }
-
-    // Continue with the existing homing state machine
-    static enum {
-        HOMING_PHASE_INITIAL_APPROACH,
-        HOMING_PHASE_SLOW_APPROACH,
-        HOMING_PHASE_WAIT_FOR_HARDSTOP,
-        HOMING_PHASE_MOVE_OFFSET,
-        HOMING_PHASE_WAIT_FOR_COMPLETION
-    } homingPhase = HOMING_PHASE_INITIAL_APPROACH;
-
-    static unsigned long phaseStartTime = 0;
-    static bool initialPhaseTimeSet = false;
-
-    // Check for timeout
-    if (millis() - homingStartTime > HOME_TIMEOUT_MS)
-    {
+    // Check for timeout first
+    if (currentTime - homingStartTime > 30000) { // 30 seconds timeout
         Serial.println(F("[ERROR] Homing operation timed out"));
-        stopMotion();
-        homingInProgress = false;
-        homingPhase = HOMING_PHASE_INITIAL_APPROACH; // Reset for next time
-        initialPhaseTimeSet = false;
-        homingMovementStarted = false;
-        motorState = MOTOR_STATE_FAULTED;
+        Serial.print(F("[DEBUG] Final HLFB state: "));
+        Serial.println(currentHlfbState == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT ASSERTED"));
+
+        MOTOR_CONNECTOR.MoveStopAbrupt();
+
+        // Set current position as home despite timeout
+        Serial.println(F("[MESSAGE] Setting current position as home reference despite timeout"));
+        MOTOR_CONNECTOR.PositionRefSet(0);
+
+        // Complete homing setup
+        completeHomingSequence();
         return;
     }
 
-    // Process the homing state machine
-    switch (homingPhase)
-    {
-    case HOMING_PHASE_INITIAL_APPROACH:
-        // This phase is handled by the initial movement setup
-        // Just set up the tracking variables
-        if (!initialPhaseTimeSet)
-        {
-            phaseStartTime = millis();
-            initialPhaseTimeSet = true;
-        }
+    // Check for alerts during homing
+    if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
+        Serial.println(F("[ERROR] Motor alert during homing"));
+        printMotorAlerts();
 
-        // Switch to slower approach after a delay or when close to the hard stop
-        if (millis() - phaseStartTime > 2000)
-        {
-            Serial.print(F("[DIAGNOSTIC] Switching to slower velocity: "));
-            Serial.print(HOME_FINAL_VELOCITY_RPM);
-            Serial.println(F(" RPM"));
+        // Stop motion and abort homing
+        MOTOR_CONNECTOR.MoveStopAbrupt();
+        abortHoming(); // abortHoming should call the updated resetHomingState
+        return;
+    }
 
-            // Reduce velocity for final approach
-            int32_t slowHomingVel = rpmToPps(HOME_FINAL_VELOCITY_RPM);
-            MOTOR_CONNECTOR.VelMax(slowHomingVel);
-            homingPhase = HOMING_PHASE_SLOW_APPROACH;
-        }
-        break;
+    // Calculate pulses moved during THIS specific homing attempt
+    int32_t pulsesMovedThisHoming = abs(currentPosition - homing_startPulses);
 
-    case HOMING_PHASE_SLOW_APPROACH:
-        // We're moving at slow speed toward hard stop
-        homingPhase = HOMING_PHASE_WAIT_FOR_HARDSTOP;
-        Serial.println(F("[DIAGNOSTIC] Contacting hard stop, waiting for motor to settle..."));
-        break;
+    // Check if we've moved enough distance to consider hardstop detection
+    if (pulsesMovedThisHoming >= minimumMovementPulses && !homing_minDistanceTraveled) {
+        homing_minDistanceTraveled = true;
+        Serial.print(F("[MESSAGE] Minimum travel distance reached ("));
+        Serial.print(pulsesMovedThisHoming); // Log actual travel for this homing
+        Serial.println(F(" pulses) - Hardstop detection enabled"));
+    }
 
-    case HOMING_PHASE_WAIT_FOR_HARDSTOP:
-    {
-        // Use static variables to track timing and messaging
-        static unsigned long lastHardstopMessageTime = 0;
-        static unsigned long hardStopDetectedTime = 0;
-        static bool hardStopDetected = false;
-
-        unsigned long currentTime = millis();
-
-        // Check HLFB to detect hard stop contact
-        if (MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED && !hardStopDetected)
-        {
-            // Hard stop detected!
-            Serial.println(F("[MESSAGE] Hard stop detected (HLFB asserted). Stopping motor."));
-
-            // Stop the motor
-            MOTOR_CONNECTOR.MoveStopAbrupt();
-
-            // Record when we detected the hard stop
-            hardStopDetected = true;
-            hardStopDetectedTime = currentTime;
-
-            // Don't transition to next phase yet - wait non-blockingly
-        }
-        // If we've detected a hard stop and waited the required time
-        else if (hardStopDetected && (currentTime - hardStopDetectedTime >= 100))
-        {
-            // Reset for next homing operation
-            hardStopDetected = false;
-
-            // Move to offset phase
-            homingPhase = HOMING_PHASE_MOVE_OFFSET;
-
-            // Reset the message timer for next time
-            lastHardstopMessageTime = 0;
-        }
-        // Only print status message every 10 seconds if still waiting
-        else if (!hardStopDetected && (currentTime - lastHardstopMessageTime >= 10000))
-        {
-            Serial.print(F("[DIAGNOSTIC] Waiting for hardstop. HLFB State: DEASSERTED"));
-            Serial.println();
-
-            // Update last message time
-            lastHardstopMessageTime = currentTime;
+    // Check for non-asserted state (HLFB indicates movement or fault)
+    if (currentHlfbState != MotorDriver::HLFB_ASSERTED) {
+        if (!homing_hlfbWentNonAsserted) {
+            homing_hlfbWentNonAsserted = true;
+            homing_hlfbNonAssertedTime = currentTime;
+            Serial.println(F("[MESSAGE] HLFB went non-asserted - approaching hardstop"));
         }
     }
-    break;
 
-    case HOMING_PHASE_MOVE_OFFSET:
-        // Move away from hard stop by the configured offset
-        Serial.print(F("[MESSAGE] Moving away from hard stop by "));
-        Serial.print(HOME_OFFSET_DISTANCE_MM);
-        Serial.println(F(" mm"));
+    // If HLFB was non-asserted and now reasserted, AND we've moved enough, hardstop is reached
+    if (homing_hlfbWentNonAsserted &&
+        currentHlfbState == MotorDriver::HLFB_ASSERTED &&
+        (currentTime - homing_hlfbNonAssertedTime > 100) && // Small delay to avoid noise/debounce
+        homing_minDistanceTraveled) { // Must have moved minimum distance *during this attempt*
 
-        { // Add braces to create a new scope
-            // Calculate offset in pulses
+        Serial.println(F("[MESSAGE] Hardstop reached - HLFB reasserted"));
+
+        // Stop the velocity move
+        MOTOR_CONNECTOR.MoveStopAbrupt();
+        
+        // Set position to zero at the actual hardstop before offset
+        MOTOR_CONNECTOR.PositionRefSet(0);
+
+        // Move away from hardstop to complete homing
+        if (HOME_OFFSET_DISTANCE_MM > 0) {
+            Serial.print(F("[MESSAGE] Moving "));
+            Serial.print(HOME_OFFSET_DISTANCE_MM);
+            Serial.println(F("mm away from hardstop"));
+
+            // Reset velocity to normal (or a specific offset velocity if desired)
+            int32_t normalVelPps = rpmToPps(MOTOR_VELOCITY_RPM); // Or a slower offset speed
+            MOTOR_CONNECTOR.VelMax(normalVelPps);
+
+            // Move away from hardstop
             int32_t offsetPulses = mmToPulses(HOME_OFFSET_DISTANCE_MM);
+            // The direction of offset should be opposite to HOMING_DIRECTION
+            MOTOR_CONNECTOR.Move(-HOMING_DIRECTION * offsetPulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
 
-            // Use relative move away from hard stop
-            MOTOR_CONNECTOR.Move(-offsetPulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
-        } // End of scope
+            // Wait for offset move to complete
+            Serial.println(F("[MESSAGE] Waiting for offset move to complete..."));
+            unsigned long offsetMoveStartTime = millis(); // Use a fresh start time for this wait
+            while (!MOTOR_CONNECTOR.StepsComplete() &&
+                   (millis() - offsetMoveStartTime < 5000)) { // Timeout for offset move
+                delay(10);
 
-        // Set up to wait for completion
-        homingPhase = HOMING_PHASE_WAIT_FOR_COMPLETION;
-        break;
+                // Check for alerts during offset move
+                if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent) {
+                    Serial.println(F("[ERROR] Alert during offset move"));
+                    abortHoming(); // abortHoming should call the updated resetHomingState
+                    return;
+                }
+            }
+            if (!MOTOR_CONNECTOR.StepsComplete()){
+                Serial.println(F("[ERROR] Offset move timed out or failed to complete."));
+                // Decide how to handle this: abort or try to complete homing anyway?
+                // For now, we'll proceed to set home, but this is a potential issue.
+            }
 
-    case HOMING_PHASE_WAIT_FOR_COMPLETION:
-        // Wait for offset move to complete
-        if (MOTOR_CONNECTOR.StepsComplete())
-        {
-            // Homing is complete!
-            Serial.println(F("[MESSAGE] Hard stop homing completed successfully."));
 
-            // Set position to zero
+            // Re-zero at offset position
             MOTOR_CONNECTOR.PositionRefSet(0);
-
-            // Update global state
-            isHomed = true;
-            homingInProgress = false;
-            motorState = MOTOR_STATE_IDLE;
-            currentPositionMm = 0.0;
-
-            // Reset state machine for next time
-            homingPhase = HOMING_PHASE_INITIAL_APPROACH;
-            initialPhaseTimeSet = false;
-            homingMovementStarted = false;
-
-            // Restore original velocity and acceleration settings
-            currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-            currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
-            MOTOR_CONNECTOR.VelMax(currentVelMax);
-            MOTOR_CONNECTOR.AccelMax(currentAccelMax);
-            Serial.print(F("[MESSAGE] Restored motor velocity to "));
-            Serial.print(MOTOR_VELOCITY_RPM);
-            Serial.println(F(" RPM"));
+            Serial.println(F("[MESSAGE] Home offset established as zero position"));
+        } else {
+             Serial.println(F("[MESSAGE] Hardstop established as zero position (no offset)"));
         }
-        break;
+
+        // Complete the homing sequence
+        completeHomingSequence();
+
+        // The file-static variables (homing_hlfbWentNonAsserted, etc.)
+        // will be reset by resetHomingState() at the start of the *next* homing attempt.
     }
+}
+
+
+
+void completeHomingSequence()
+{
+    // Reset to normal operation parameters
+    currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+    currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
+    MOTOR_CONNECTOR.VelMax(currentVelMax);
+    MOTOR_CONNECTOR.AccelMax(currentAccelMax);
+
+    // Set homing complete flags
+    isHomed = true;
+    homingInProgress = false; // This signals the end of the process
+    motorState = MOTOR_STATE_IDLE;
+    currentPositionMm = 0.0; // Position is now defined as 0
+
+    // Restore encoder control if it was active before homing
+    if (homingEncoderState) {
+        encoderControlActive = true;
+        Serial.println(F("[INFO] MPG handwheel control re-enabled after homing"));
+    }
+
+    Serial.println(F("[MESSAGE] Homing sequence completed successfully"));
+
+    // Now automatically move to position 1 (loading position)
+    Serial.println(F("[MESSAGE] Moving to position 1 (loading position)..."));
+    moveToPosition(POSITION_1);
 }
 
 bool isHomingComplete()
@@ -1199,9 +1215,25 @@ bool isHomingComplete()
     return isHomed && !homingInProgress;
 }
 
+// Add this new function to MotorController.cpp
+void resetHomingState()
+{
+    homingInProgress = false;
+    // motorState = MOTOR_STATE_IDLE; // Consider if this is always appropriate or if updateMotorState should handle it
+
+    // Reset the file-static homing state variables
+    homing_hlfbWentNonAsserted = false;
+    homing_hlfbNonAssertedTime = 0;
+    homing_minDistanceTraveled = false;
+    homing_startPulses = 0;
+
+    Serial.println(F("[DIAGNOSTIC] Homing internal state variables reset."));
+}
+
+// Then update abortHoming() to use it:
 void abortHoming()
 {
-    if (homingInProgress)
+    if (homingInProgress) // Check if homing was actually in progress
     {
         Serial.println(F("[MESSAGE] Aborting homing operation"));
         MOTOR_CONNECTOR.MoveStopAbrupt();
@@ -1212,16 +1244,15 @@ void abortHoming()
         MOTOR_CONNECTOR.VelMax(currentVelMax);
         MOTOR_CONNECTOR.AccelMax(currentAccelMax);
 
-        homingInProgress = false;
-        motorState = MOTOR_STATE_FAULTED;
+        // Use the dedicated reset function which now clears all necessary homing states
+        resetHomingState(); 
 
-        // Reset static variables in executeHomingSequence
-        // This is a way to interact with static variables in another function
-        executeHomingSequence(); // This will reset homingMovementStarted when it sees !homingInProgress
+        // motorState will be set by resetHomingState or subsequent updateMotorState()
+        Serial.println(F("[MESSAGE] Homing operation aborted successfully"));
     }
     else
     {
-        Serial.println(F("[MESSAGE] No homing operation in progress"));
+        Serial.println(F("[MESSAGE] No homing operation in progress to abort"));
     }
 }
 
@@ -1236,6 +1267,11 @@ void checkMoveProgress()
     // Get current movement state
     bool isMoving = !MOTOR_CONNECTOR.StepsComplete();
 
+    // ALWAYS update position when homed - moved to top for hygiene
+    if (isHomed) {
+        currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
+    }
+
     // Check if we just transitioned to MOVING state
     if (motorState == MOTOR_STATE_MOVING && previousState != MOTOR_STATE_MOVING)
     {
@@ -1246,7 +1282,6 @@ void checkMoveProgress()
     // Update the current position when moving
     if (motorState == MOTOR_STATE_MOVING)
     {
-        currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
 
         // Apply deceleration when approaching target
         if (hasCurrentTarget && motorDecelConfig.enableDeceleration)
@@ -1269,7 +1304,21 @@ void checkMoveProgress()
                 // Serial.print(distanceToTargetMm);
                 // Serial.print(F("mm, Velocity: "));
                 // Serial.print(ppsToRpm(newVelocity));
-                // Serial.println(F(" RPM"));
+                // Serial.print(F(" RPM, Position: "));
+                // Serial.print(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()));
+                // Serial.print(F("mm ("));
+                // Serial.print(MOTOR_CONNECTOR.PositionRefCommanded());
+                // Serial.print(F(" pulses), Target: "));
+                // Serial.print(currentTargetPositionMm);
+                // Serial.print(F("mm, HLFB: "));
+                // Serial.print(MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT_ASSERTED"));
+                // Serial.print(F(", Moving: "));
+                // Serial.print(MOTOR_CONNECTOR.StepsComplete() ? F("NO") : F("YES"));
+                // Serial.print(F(", Direction: ")); // Fixed: removed "mm"
+                // Serial.print(currentTargetPulses > MOTOR_CONNECTOR.PositionRefCommanded() ? F("POS") : F("NEG"));
+                // Serial.print(F(", Delta: "));
+                // Serial.print(ppsToRpm(abs(newVelocity - lastSetVelocity)));
+                // Serial.println();
             }
         }
     }
@@ -1373,33 +1422,6 @@ void handleEStop()
     eStopWasActive = eStopActive;
 }
 
-// ----------------- Enable Cycle Functions -----------------
-
-void cycleMotorEnableForHoming()
-{
-    if (!motorEnableCycleInProgress)
-    {
-        return;
-    }
-
-    unsigned long currentTime = millis();
-
-    // First stage - wait 200ms with motor disabled
-    if (!motorDisablePhaseComplete && (currentTime - enableCycleStartTime >= 200))
-    {
-        // Re-enable the motor
-        MOTOR_CONNECTOR.EnableRequest(true);
-        enableCycleStartTime = currentTime;
-        motorDisablePhaseComplete = true;
-    }
-    // Second stage - wait 200ms after re-enabling
-    else if (motorDisablePhaseComplete && (currentTime - enableCycleStartTime >= 200))
-    {
-        // Enable cycle is complete
-        motorEnableCycleInProgress = false;
-    }
-}
-
 // Implement the function correctly using your existing variable names:
 void updateMotorTarget(float targetPositionMm)
 {
@@ -1410,13 +1432,131 @@ void updateMotorTarget(float targetPositionMm)
     currentTargetPulses = mmToPulses(targetPositionMm);
 }
 
-// In MotorController.cpp
+// ----------------- Deceleration Configuration Functions -----------------
 int32_t DecelerationConfig::getMinVelocityPPS() const
 {
     return rpmToPps(minVelocityRPM);
 }
 
-// Calculate appropriate velocity based on distance to target(two-stage deceleration)
+// // Calculate appropriate velocity based on distance to target(two-stage deceleration)
+// int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVelocity)
+// {
+//     // If deceleration is disabled, just return the max velocity
+//     if (!motorDecelConfig.enableDeceleration)
+//     {
+//         return maxVelocity;
+//     }
+
+//     // Special handling for very short moves (total move < decel distance)
+//     static bool isVeryShortMove = false;
+//     static float totalMoveDistance = 0.0f;
+//     static int32_t initialTargetPulses = 0;
+
+//     // Only check for very short move at the BEGINNING of a move
+//     // Compare current target pulses to a static variable to detect new moves
+//     if (hasCurrentTarget && initialTargetPulses != currentTargetPulses)
+//     {
+//         // This is a new target - check if it's a very short move
+//         initialTargetPulses = currentTargetPulses;
+//         float moveDistance = fabs(currentTargetPositionMm - currentPositionMm);
+
+//         // Check if this is a very short move
+//         if (moveDistance < motorDecelConfig.decelerationDistanceMm * VERY_SHORT_MOVE_RATIO)
+//         {
+//             isVeryShortMove = true;
+//             totalMoveDistance = moveDistance;
+//             Serial.print(F("[DECEL] Very short move detected ("));
+//             Serial.print(totalMoveDistance);
+//             Serial.println(F("mm) - Using special deceleration profile"));
+//         }
+//         else
+//         {
+//             isVeryShortMove = false;
+//         }
+//     }
+
+//     // If we're within deceleration distance
+//     if (distanceToTargetMm < motorDecelConfig.decelerationDistanceMm)
+//     {
+//         float ratio;
+//         int32_t minVelocityPPS = rpmToPps(motorDecelConfig.minVelocityRPM);
+
+//         // For very short moves, use a proportional velocity based on distance
+//         if (isVeryShortMove)
+//         {
+//             // Calculate how far we've gone in the move as a percentage
+//             float moveProgress = 1.0f - (distanceToTargetMm / totalMoveDistance);
+
+//             // Create a triangular velocity profile with peak at 25% of the move
+//             if (moveProgress < 0.25f)
+//             {
+//                 // First 25%: Accelerate from 30% to 70% of max velocity
+//                 ratio = 0.3f + (moveProgress / 0.25f) * 0.4f;
+//             }
+//             else
+//             {
+//                 // Remaining 75%: Decelerate from 70% down to min velocity
+//                 float decelProgress = (moveProgress - 0.25f) / 0.75f;
+//                 ratio = 0.7f - (decelProgress * decelProgress) * 0.7f;
+//             }
+
+//             // Safety floor - ensure minimum velocity near the end
+//             if (distanceToTargetMm < 5.0f)
+//             {
+//                 float minRatio = minVelocityPPS / (float)maxVelocity;
+//                 if (ratio < minRatio)
+//                     ratio = minRatio;
+//             }
+//         }
+//         // Rest of code remains the same...
+//         else
+//         {
+//             // Normal two-stage deceleration code
+//             // (unchanged)
+//             const float stageTransitionPoint = motorDecelConfig.decelerationDistanceMm * DECEL_TRANSITION_POINT_RATIO;
+
+//             if (distanceToTargetMm > stageTransitionPoint)
+//             {
+//                 float firstStageRatio = (distanceToTargetMm - stageTransitionPoint) /
+//                                         (motorDecelConfig.decelerationDistanceMm - stageTransitionPoint);
+
+//                 ratio = DECEL_FIRST_STAGE_END_RATIO +
+//                         (1.0f - DECEL_FIRST_STAGE_END_RATIO) * firstStageRatio;
+
+//                 float normalized = (ratio - DECEL_FIRST_STAGE_END_RATIO) /
+//                                    (1.0f - DECEL_FIRST_STAGE_END_RATIO);
+//                 ratio = DECEL_FIRST_STAGE_END_RATIO +
+//                         (1.0f - DECEL_FIRST_STAGE_END_RATIO) * normalized * normalized * DECEL_S_CURVE_MULTIPLIER;
+//             }
+//             else
+//             {
+//                 ratio = DECEL_FIRST_STAGE_END_RATIO * (distanceToTargetMm / stageTransitionPoint);
+//             }
+//         }
+
+//         // Calculate the scaled velocity
+//         int32_t scaledVelocity = minVelocityPPS + ratio * (maxVelocity - minVelocityPPS);
+
+//         // Safety check - never go below minimum velocity
+//         if (scaledVelocity < minVelocityPPS)
+//         {
+//             scaledVelocity = minVelocityPPS;
+//         }
+
+//         return scaledVelocity;
+//     }
+
+//     // If we're at the end of a move, reset the short move flag and target
+//     if (!hasCurrentTarget || distanceToTargetMm <= 0.1f)
+//     {
+//         isVeryShortMove = false;
+//         initialTargetPulses = 0; // Reset the initial target detection
+//     }
+
+//     // If we're not in deceleration zone, use maximum velocity
+//     return maxVelocity;
+// }
+
 int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVelocity)
 {
     // If deceleration is disabled, just return the max velocity
@@ -1425,41 +1565,93 @@ int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVeloci
         return maxVelocity;
     }
 
-    // Special handling for very short moves (total move < decel distance)
+    // Static variables to track move characteristics
     static bool isVeryShortMove = false;
     static float totalMoveDistance = 0.0f;
     static int32_t initialTargetPulses = 0;
+    static bool isLongMoveDecelerating = false;
+    static float longMoveDecelStartDistance = 0.0f;
 
-    // Only check for very short move at the BEGINNING of a move
-    // Compare current target pulses to a static variable to detect new moves
+    // Only check for move type at the BEGINNING of a move
     if (hasCurrentTarget && initialTargetPulses != currentTargetPulses)
     {
-        // This is a new target - check if it's a very short move
+        // This is a new target - analyze the move
         initialTargetPulses = currentTargetPulses;
         float moveDistance = fabs(currentTargetPositionMm - currentPositionMm);
+        totalMoveDistance = moveDistance;
+
+        // RESET ALL FLAGS FOR NEW MOVE - This ensures clean state for each move
+        isVeryShortMove = false;
+        isLongMoveDecelerating = false;
+
+        // Log debug info for any move
+        // Serial.print(F("[DECEL] New move detected: "));
+        // Serial.print(moveDistance);
+        // Serial.println(F("mm"));
 
         // Check if this is a very short move
         if (moveDistance < motorDecelConfig.decelerationDistanceMm * VERY_SHORT_MOVE_RATIO)
         {
             isVeryShortMove = true;
-            totalMoveDistance = moveDistance;
-            Serial.print(F("[DECEL] Very short move detected ("));
-            Serial.print(totalMoveDistance);
-            Serial.println(F("mm) - Using special deceleration profile"));
+
+            // Serial.print(F("[DECEL] Very short move detected ("));
+            // Serial.print(totalMoveDistance);
+            // Serial.println(F("mm) - Using special deceleration profile"));
         }
-        else
+        // Handle long moves specifically
+        else if (moveDistance > 100.0f)
         {
-            isVeryShortMove = false;
+            isLongMoveDecelerating = true;
+
+            // For long moves, use a longer deceleration distance (2x normal)
+            longMoveDecelStartDistance = min(moveDistance * 0.3f, 150.0f);
+
+            // Serial.print(F("[DECEL] Long move detected ("));
+            // Serial.print(totalMoveDistance);
+            // Serial.print(F("mm) - Deceleration starts at "));
+            // Serial.print(longMoveDecelStartDistance);
+            // Serial.println(F("mm from target"));
         }
+        // Normal moves (between very short and long) use default behavior
+        // Both flags remain false from reset above
     }
 
-    // If we're within deceleration distance
+    // Special case for long moves
+    if (isLongMoveDecelerating)
+    {
+        if (distanceToTargetMm < longMoveDecelStartDistance)
+        {
+            // Calculate deceleration ratio for long moves
+            float ratio = distanceToTargetMm / longMoveDecelStartDistance;
+
+            // Use an improved deceleration curve (quadratic for smoother decel)
+            ratio = ratio * ratio;
+
+            // Ensure minimum velocity at end of move
+            int32_t minVelocityPPS = rpmToPps(motorDecelConfig.minVelocityRPM);
+            int32_t targetVelocity = minVelocityPPS + ratio * (maxVelocity - minVelocityPPS);
+
+            // Additional logging to track deceleration
+            // if (distanceToTargetMm < 50.0f && (int)distanceToTargetMm % 10 == 0) {
+            //     Serial.print(F("[DECEL] Long move: "));
+            //     Serial.print(distanceToTargetMm);
+            //     Serial.print(F("mm to target, Velocity: "));
+            //     Serial.print(ppsToRpm(targetVelocity));
+            //     Serial.println(F(" RPM"));
+            // }
+
+            return targetVelocity;
+        }
+        return maxVelocity;
+    }
+
+    // Existing code for very short moves and standard deceleration
     if (distanceToTargetMm < motorDecelConfig.decelerationDistanceMm)
     {
         float ratio;
         int32_t minVelocityPPS = rpmToPps(motorDecelConfig.minVelocityRPM);
 
-        // For very short moves, use a proportional velocity based on distance
+        // For very short moves, use existing proportional velocity based on distance
         if (isVeryShortMove)
         {
             // Calculate how far we've gone in the move as a percentage
@@ -1486,11 +1678,9 @@ int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVeloci
                     ratio = minRatio;
             }
         }
-        // Rest of code remains the same...
         else
         {
-            // Normal two-stage deceleration code
-            // (unchanged)
+            // Normal two-stage deceleration
             const float stageTransitionPoint = motorDecelConfig.decelerationDistanceMm * DECEL_TRANSITION_POINT_RATIO;
 
             if (distanceToTargetMm > stageTransitionPoint)
@@ -1524,12 +1714,8 @@ int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVeloci
         return scaledVelocity;
     }
 
-    // If we're at the end of a move, reset the short move flag and target
-    if (!hasCurrentTarget || distanceToTargetMm <= 0.1f)
-    {
-        isVeryShortMove = false;
-        initialTargetPulses = 0; // Reset the initial target detection
-    }
+    // REMOVED: End-of-move reset logic (now handled at beginning of new moves)
+    // This prevents flags from being reset while a move is still in progress
 
     // If we're not in deceleration zone, use maximum velocity
     return maxVelocity;

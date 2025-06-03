@@ -25,10 +25,16 @@ extern unsigned long operationStartTime;  // When the current operation started
 extern unsigned long operationTimeoutMs;  // Default timeout (10 seconds)
 extern int currentOperationStep;      // Current step in operation sequence
 extern int expectedOperationStep;     // Expected step at this point
+extern bool operationEncoderState;  // True if encoder control is active during operation
+extern bool homingEncoderState;  // Stores the encoder control state before homing begins
 
 // State machine timing variables
 extern unsigned long valveActuationStartTime;
 extern const unsigned long VALVE_ACTUATION_TIME_MS;
+extern const unsigned long SAFETY_DELAY_AFTER_UNLOCK_MS;
+extern const unsigned long SAFETY_DELAY_BEFORE_MOVEMENT_MS;
+extern const unsigned long SAFETY_DELAY_AFTER_MOVEMENT_MS;
+extern const unsigned long SENSOR_VERIFICATION_DELAY_MS;
 
 // Operation type enum
 enum OperationType {
@@ -197,9 +203,7 @@ SafetyValidationResult validateSafety(const SystemState &state);
 void printSafetyStatus(const SafetyValidationResult &result, Print* output = &Serial);
 
 // Motor position helper functions
-bool isMotorAtPosition1(double currentPosition);
-bool isMotorAtPosition2(double currentPosition);
-bool isMotorAtPosition3(double currentPosition);
+bool isAtPosition(double currentPosition, double targetPosition);
 
 // Additional movement helper
 bool isMovingToPosition(double targetPosition, double currentTargetPositionMm);
@@ -218,15 +222,25 @@ void processTrayAdvance();
 // Operation management
 void beginOperation();
 void endOperation();
+void updateOperationStep(int newStep); // New function for synchronized step tracking
 
 // Tray tracking management functions
-bool addTrayAtPosition1();
-bool advanceTrays();
-bool removeTrayAtPosition3();
+bool moveTray(int fromPosition, int toPosition);
+bool loadFirstTray();
+bool loadSecondTray();
+bool loadThirdTray();
+bool unloadFirstTray();
+bool unloadSecondTray();
+bool unloadThirdTray();
+int determineLoadingWorkflow();
+int determineUnloadingWorkflow();
+bool isPathClearForLoading(double startPosition, double targetPosition, const SystemState &state);
+bool isPathClearForUnloading(double startPosition, double targetPosition, const SystemState &state);
 
 
 void abortOperation(AbortReason reason);
 const char* getAbortReasonString(AbortReason reason);
+void resetSystemState(); // Function to reset the system state after a failure
 
 // Global variable declaration
 extern SystemState previousState;

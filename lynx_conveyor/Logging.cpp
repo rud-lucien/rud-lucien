@@ -6,7 +6,7 @@
 // Initialize with logging disabled (logInterval = 0)
 // but keep the default interval value of 500ms for when it's enabled
 LoggingManagement logging = {0, 0}; // Initially disabled, previousLogTime=0, logInterval=0
-const unsigned long DEFAULT_LOG_INTERVAL = 500; // Default interval of 500ms
+const unsigned long DEFAULT_LOG_INTERVAL = 250; // Default interval of 500ms
 
 void logSystemState()
 {
@@ -84,7 +84,11 @@ void logSystemState()
     
     Serial.print(F(", E-Stop="));
     Serial.print(isEStopActive() ? F("TRIGGERED") : F("RELEASED"));
-    
+
+    Serial.print(F(", HLFB="));
+    bool hlfbAsserted = MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED;
+    Serial.print(hlfbAsserted ? F("ASSERTED") : F("NOT_ASSERTED"));
+
     // 4. POSITION GROUP with improved naming
     Serial.print(F(" | Position: "));
     double calculatedPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());

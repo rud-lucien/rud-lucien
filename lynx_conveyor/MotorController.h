@@ -37,9 +37,8 @@
 //=============================================================================
 
 #define HOME_TIMEOUT_MS 60000            // Timeout for homing operation (1 minute)
-#define HOMING_DIRECTION -1              // Direction to move toward hard stop (1 for positive, -1 for negative)
+#define HOMING_DIRECTION 1               // Direction to move toward hard stop (1 for positive, -1 for negative)
 #define HOME_APPROACH_VELOCITY_RPM 50    // Initial approach velocity in RPM (faster)
-#define HOME_FINAL_VELOCITY_RPM 25       // Slower velocity for final approach to hard stop in RPM
 #define HOME_APPROACH_TIME_MS 2000       // Time to move at the initial approach velocity
 #define HOME_OFFSET_DISTANCE_MM 5.0      // Distance to move away from hard stop in mm
 #define HOME_HLFB_CHECK_INTERVAL_MS 20   // Time to wait between HLFB state checks
@@ -54,9 +53,9 @@
 
 // Position definitions (in mm from home)
 #define POSITION_HOME_MM 0.0                 // Home position
-#define POSITION_1_MM 28.50                   // Position 1 (28.50 mm)  
-#define POSITION_2_MM 455.70                  // Position 2 (455.70 mm)
-#define POSITION_3_MM 883.55                 // Position 3 (883.55 mm)
+#define POSITION_1_MM 28.70                   // Position 1 (29.48 mm)  
+#define POSITION_2_MM 456.00                 // Position 2 (456.50 mm)
+#define POSITION_3_MM 883.58                 // Position 3 (884.81 mm)
 #define POSITION_4_MM MAX_TRAVEL_MM          // Position 4 (max = 1050 mm)
 
 // Position definitions in pulses (calculated from mm)
@@ -120,7 +119,7 @@ struct DecelerationConfig {
     int32_t getMinVelocityPPS() const;
 };
 
-#define VELOCITY_CHANGE_THRESHOLD 3  // 3 RPM minimum change to update velocity
+#define VELOCITY_CHANGE_THRESHOLD 0.5  // 3 RPM minimum change to update velocity
 
 // Distance thresholds for velocity scaling
 #define VERY_SHORT_MOVE_THRESHOLD_MM     10.0    // Moves less than 10mm are very short
@@ -128,22 +127,23 @@ struct DecelerationConfig {
 #define MEDIUM_MOVE_THRESHOLD_MM         100.0   // Moves less than 100mm are medium
 
 // Velocity scaling for different move distances
-#define VERY_SHORT_MOVE_VELOCITY_RPM     25      // 25 RPM for very short moves
-#define SHORT_MOVE_VELOCITY_RPM          50      // 50 RPM for short moves  
-#define MEDIUM_MOVE_VELOCITY_RPM         100     // 100 RPM for medium moves
+#define VERY_SHORT_MOVE_VELOCITY_RPM     50      // CHANGED: 50 RPM for very short moves (was 25)
+#define SHORT_MOVE_VELOCITY_RPM          175      // CHANGED: 75 RPM for short moves (was 50)
+#define MEDIUM_MOVE_VELOCITY_RPM         125     // CHANGED: 125 RPM for medium moves (was 100)
 
 // Deceleration configuration defaults
 #define DEFAULT_DECELERATION_DISTANCE_MM     35.0    // Start decelerating when 35mm from target
-#define DEFAULT_MIN_VELOCITY_RPM             5.0     // Minimum velocity of 5 RPM during deceleration
+#define DEFAULT_MIN_VELOCITY_RPM             50    // CHANGED: Minimum velocity of 50 RPM during deceleration (was 25.0)
 #define DEFAULT_DECELERATION_ENABLED         true    // Deceleration enabled by default
 
-// Deceleration stages configuration
+// Deceleration stages configuration - NO CHANGES NEEDED
 #define DECEL_TRANSITION_POINT_RATIO         0.5f    // First stage to second stage transition (50%)
 #define DECEL_FIRST_STAGE_END_RATIO          0.4f    // First stage decelerates to 40% of range
 #define DECEL_S_CURVE_MULTIPLIER             2.78f   // S-curve multiplier for first stage
 
-// Very short move detection
+// Very short move detection - NO CHANGE NEEDED
 #define VERY_SHORT_MOVE_RATIO                1.1f    // Moves < 110% of decel distance considered "very short"
+
 
 //=============================================================================
 // GLOBAL VARIABLES
@@ -162,6 +162,7 @@ extern int32_t currentAccelMax;           // Current acceleration maximum in pul
 
 // Homing state variables
 extern bool homingInProgress;             // Flag indicating if homing is in progress
+extern bool homingEncoderState;           // Stores the encoder control state before homing begins. Used to restore encoder control after homing completes
 extern bool motorEnableCycleInProgress;   // Flag indicating if enable cycling is in progress
 extern unsigned long enableCycleStartTime; // Timestamp for enable cycle timing
 extern bool motorDisablePhaseComplete;    // Flag indicating disable phase completion
@@ -214,9 +215,10 @@ int32_t normalizeEncoderValue(int32_t rawValue);
 // Functions for establishing a reference position
 //-----------------------------------------------------------------------------
 bool initiateHomingSequence();
-void executeHomingSequence();
+void checkHomingProgress();
+void completeHomingSequence();
 bool isHomingComplete();
-void cycleMotorEnableForHoming();
+void resetHomingState();
 void abortHoming();
 
 //-----------------------------------------------------------------------------

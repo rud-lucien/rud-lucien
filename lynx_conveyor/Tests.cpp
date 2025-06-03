@@ -3,6 +3,8 @@
 #include "Utils.h"
 #include "ValveController.h"
 
+
+
 // Test homing repeatability by performing multiple home-move cycles
 bool testHomingRepeatability()
 {
@@ -135,14 +137,11 @@ bool testHomingRepeatability()
                 lastStatusPrint = currentTime;
             }
 
-            // Actively call both functions needed for homing
+            // Replace both blocks with just:
             if (motorState == MOTOR_STATE_HOMING)
             {
-                // Process the enable cycling first
-                cycleMotorEnableForHoming();
-
-                // Then ensure the homing state machine advances
-                executeHomingSequence();
+                // Ensure the homing state machine advances
+                checkHomingProgress();
             }
 
             // Wait for homing to complete successfully
@@ -330,14 +329,11 @@ bool testHomingRepeatability()
                 lastRepeatStatusPrint = currentTime;
             }
 
-            // Actively call both functions needed for homing
+            // Replace both blocks with just:
             if (motorState == MOTOR_STATE_HOMING)
             {
-                // Process the enable cycling first
-                cycleMotorEnableForHoming();
-
-                // Then ensure the homing state machine advances
-                executeHomingSequence();
+                // Ensure the homing state machine advances
+                checkHomingProgress();
             }
 
             // Wait for homing to complete successfully

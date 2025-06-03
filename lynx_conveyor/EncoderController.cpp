@@ -1,4 +1,5 @@
 #include "EncoderController.h"
+#include "Utils.h"
 
 // Initialize control variables
 bool encoderControlActive = false;
@@ -46,6 +47,14 @@ void initEncoderControl(bool swapDirection, bool indexInverted) {
 void processEncoderInput() {
     if (!encoderControlActive || motorState == MOTOR_STATE_FAULTED) {
         return;  // Only process when encoder control is active and motor is not faulted
+    }
+
+    // Extra safety check - ignore encoder input during automatic operations
+    if (motorState == MOTOR_STATE_HOMING || motorState == MOTOR_STATE_MOVING || operationInProgress) {
+        // Just reset the encoder position to avoid accumulating inputs
+        EncoderIn.Position(0);
+        lastEncoderPosition = 0;
+        return;
     }
     
     static int32_t accumulatedDelta = 0; // Accumulate encoder movement over time

@@ -71,6 +71,9 @@ void loop()
     // Always capture current system state - it's the foundation of safety
     SystemState currentState = captureSystemState();
 
+    // Update tray tracking from physical sensors each cycle
+    updateTrayTrackingFromSensors(currentState);
+
     // Handle incoming serial commands using Commander API
     handleSerialCommands();
 
@@ -84,13 +87,10 @@ void loop()
     // Then update motor state
     updateMotorState();
 
-    // Process enable cycling for homing if in progress
-    cycleMotorEnableForHoming();
-
     // Check homing progress if in progress
     if (motorState == MOTOR_STATE_HOMING)
     {
-        executeHomingSequence();
+        checkHomingProgress();
     }
 
     // Log system state periodically if logging is enabled
@@ -126,6 +126,31 @@ void loop()
     }
 }
 
+/* TODO: Disable encoder control during automatic operations
+This task is about ensuring that the encoder control does not interfere with automated operations, particularly during homing or other critical movements.
+## Task Description
+Disable the encoder control system when the motor is in an automatic operation mode, such as homing or tray loading and unloading. This prevents user input from interfering with critical operations.
+*/
+
+/* TODO: Figure out how to implement collision detection
+This task is about implementing a collision detection system for the conveyor controller to prevent mechanical damage during operations.
+in the clearpath settings I lowered the max torque to 20%, basically if the motor is stalled it will not try to push through the stall, it will just stop.
+How do I update code to handle this? when the motor is stalled what message does it send and how do we deal with it currently? how do we make sure that stalling
+prints a helpful message to the user that this is potentially a collision detection issue and not just a motor fault?
+*/
+
+
+
+
+
+/* TODO: Figure out what to do when a manual command is sent while an automated operation is in progress (like tray loading or unloading). How do we handle this? Should we reject the command or allow it to interrupt the operation?
+*/
+
+/* TODO: implement TCP/IP such that we can send commands to the conveyor controller over a network connection. This will allow remote control and monitoring of the conveyor system.
+*/
+
+/* TODO: update all functions that send messages such that outputs can go to serial and client at the same time. 
+*/
 /* # TODO: Implement Operation Step Sequence Validation
 
 This TODO task should focus on improving the operation step sequence validation system. Here's what should be included:
@@ -176,4 +201,30 @@ if (operationInProgress && currentOperationStep != expectedOperationStep) {
 ## Priority
 Medium - This is important for robust operation but not blocking immediate abort functionality implementation.
 
+*/
+
+/* # TODO: Think about commands to enable/disable deceleration and scaling
+This task is about implementing a command interface for toggling deceleration and distance-based scaling features in the motor control system.
+
+
+1. **Implement Basic Toggles Only**:
+   - `motor,decel,on|off` - Enable/disable deceleration
+   - `motor,scaling,on|off` - Enable/disable distance-based scaling
+
+2. **Add a Status Command**:
+   - `motor,profile` - Display current motion profile settings (deceleration distance, thresholds, etc.)
+
+3. **Consider Advanced Configuration Later**:
+   - Only if users specifically request it
+   - Could be implemented via a configuration file approach rather than many separate commands
+
+This gives operators the ability to disable features if they're causing issues, while keeping the interface relatively simple and protecting the mechanical system from poorly chosen parameters.
+
+## Implementation Complexity
+
+The basic toggles would be straightforward to implement since you already have the flags:
+- `motorDecelConfig.enableDeceleration` for deceleration
+- You'd need to add a similar flag for distance-based scaling
+
+Would you like to proceed with this minimal implementation, or would you prefer a more comprehensive set of commands?
 */
