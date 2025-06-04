@@ -2125,7 +2125,7 @@ bool cmd_test(char *args, CommandCaller *caller)
     }
     else if (strcmp(testType, "tray") == 0)
     {
-        caller->println(F("[MESSAGE] Starting tray handling test..."));
+        caller->println(F("[INFO] Starting tray handling test..."));
 
         if (testTrayHandling())
         {

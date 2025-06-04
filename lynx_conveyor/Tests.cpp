@@ -965,13 +965,14 @@ bool testTrayHandling()
     // Set test flag
     testInProgress = true;
 
-    const int NUM_CYCLES = 10;                             // Number of test cycles to run
+    const int NUM_CYCLES = 50;                             // Number of test cycles to run
     const unsigned long WAIT_TIME_MS = 5000;               // Fixed 5-second wait time at each position
     const unsigned long VALVE_DELAY_MS = 1000;             // Delay between valve operations to prevent race conditions
     const unsigned long ADDITIONAL_UNLOCK_DELAY_MS = 2000; // Additional safety delay after tray unlock before moving
     int cyclesCompleted = 0;
     bool testRunning = true;
     unsigned long lastActionTime = 0;
+    const unsigned long TRAY_SETTLING_DELAY_MS = 750; // Delay to allow tray to fully settle in position
 
     // Helper function for tray presence detection
     auto isTrayPresentAtPosition = [](int position) -> bool
@@ -1003,6 +1004,7 @@ bool testTrayHandling()
         PHASE_CHECK_POSITION_1,                   // Verify we're at position 1
         PHASE_WAIT_FOR_MOVE_TO_POS1,              // Wait for move to position 1 if needed
         PHASE_CHECK_TRAY_AT_POS1,                 // Verify tray at position 1
+        PHASE_TRAY_SETTLING_AT_POS1,              // Allow tray to fully settle at position 1
         PHASE_LOCK_TRAY_AT_POS1,                  // Lock tray at position 1
         PHASE_DELAY_AFTER_LOCK_TRAY_POS1,         // Delay after valve operation
         PHASE_LOCK_SHUTTLE_AT_POS1,               // Lock shuttle
@@ -1015,6 +1017,7 @@ bool testTrayHandling()
         PHASE_MOVE_TO_POSITION_3,                 // Move to position 3
         PHASE_WAIT_FOR_MOVE_TO_POS3,              // Wait for move to complete
         PHASE_VERIFY_TRAY_AT_POS3,                // Check tray made it to position 3
+        PHASE_TRAY_SETTLING_AT_POS3,              // Allow tray to fully settle at position 3
         PHASE_UNLOCK_SHUTTLE_AT_POS3,             // Unlock shuttle at position 3
         PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS3,    // Delay after valve operation
         PHASE_LOCK_TRAY_AT_POS3,                  // Lock tray at position 3
@@ -1037,6 +1040,7 @@ bool testTrayHandling()
         PHASE_MOVE_TO_POSITION_1_FROM_3,                // Move back to position 1
         PHASE_WAIT_FOR_MOVE_TO_POS1_FROM_3,             // Wait for move to complete
         PHASE_VERIFY_TRAY_AT_POS1_FROM_3,               // Check tray made it back to position 1
+        PHASE_TRAY_SETTLING_AT_POS1_FROM_3,             // Allow tray to fully settle at position 1
         PHASE_UNLOCK_SHUTTLE_AT_POS1_FROM_3,            // Unlock shuttle at position 1
         PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS1_FROM_3,   // Delay after valve operation
         PHASE_LOCK_TRAY_AT_POS1_FROM_3,                 // Lock tray at position 1
@@ -1052,6 +1056,7 @@ bool testTrayHandling()
         PHASE_MOVE_TO_POSITION_2,                       // Move to position 2
         PHASE_WAIT_FOR_MOVE_TO_POS2,                    // Wait for move to complete
         PHASE_VERIFY_TRAY_AT_POS2,                      // Check tray made it to position 2
+        PHASE_TRAY_SETTLING_AT_POS2,                    // Allow tray to fully settle at position 2
         PHASE_UNLOCK_SHUTTLE_AT_POS2,                   // Unlock shuttle at position 2
         PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS2,          // Delay after valve operation
         PHASE_LOCK_TRAY_AT_POS2,                        // Lock tray at position 2
@@ -1073,6 +1078,8 @@ bool testTrayHandling()
         PHASE_CHECK_TRAY_AT_POS1_BEFORE_RETURN,        // Check position 1 is clear before final return
         PHASE_MOVE_BACK_TO_POSITION_1,                 // Move back to position 1 to complete cycle
         PHASE_WAIT_FOR_MOVE_BACK_TO_POS1,              // Wait for move to complete
+        PHASE_VERIFY_TRAY_BACK_AT_POS1,                // NEW: Verify tray at position 1 after return
+        PHASE_TRAY_SETTLING_BACK_AT_POS1,              // NEW: Allow tray to fully settle at position 1
         PHASE_UNLOCK_SHUTTLE_END_OF_CYCLE,             // Unlock shuttle at the end of cycle
         PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_END_OF_CYCLE, // Delay after valve operation
         PHASE_PAUSE_BEFORE_NEXT_CYCLE,                 // Wait before starting next cycle
@@ -1096,7 +1103,6 @@ bool testTrayHandling()
         return false;
     }
 
-    Console.info(F("Starting enhanced tray handling test"));
     Console.info(F("This test includes empty shuttle returns and valve delays"));
     Console.info(F("To abort, type any character"));
     Console.print(F("[INFO] Will perform "));
@@ -1256,9 +1262,30 @@ bool testTrayHandling()
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray detected at Position 1. Continuing test."));
-            currentPhase = PHASE_LOCK_TRAY_AT_POS1;
+            Console.info(F("Tray detected at Position 1. Waiting for tray to settle..."));
+            // Change to settling phase instead of going directly to lock
+            currentPhase = PHASE_TRAY_SETTLING_AT_POS1;
             lastActionTime = currentTime;
+            break;
+        }
+
+        // Add new case for tray settling
+        case PHASE_TRAY_SETTLING_AT_POS1:
+        {
+            // Wait 750ms for tray to fully settle
+            static unsigned long lastSettlingPrint = 0;
+            if (currentTime - lastSettlingPrint > 2000)
+            {
+                Console.info(F("Waiting for tray to settle at Position 1..."));
+                lastSettlingPrint = currentTime;
+            }
+
+            if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
+            {
+                Console.info(F("Tray settling complete at Position 1. Proceeding to lock tray."));
+                currentPhase = PHASE_LOCK_TRAY_AT_POS1;
+                lastActionTime = currentTime;
+            }
             break;
         }
 
@@ -1535,9 +1562,30 @@ bool testTrayHandling()
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray successfully moved to Position 3. Proceeding to unlock shuttle."));
-            currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS3;
+            Console.info(F("Tray successfully moved to Position 3. Waiting for tray to settle..."));
+            // Change to settling phase instead of going directly to unlock shuttle
+            currentPhase = PHASE_TRAY_SETTLING_AT_POS3;
             lastActionTime = currentTime;
+            break;
+        }
+
+        // Add new case for tray settling at position 3
+        case PHASE_TRAY_SETTLING_AT_POS3:
+        {
+            // Wait 750ms for tray to fully settle
+            static unsigned long lastSettlingPrint = 0;
+            if (currentTime - lastSettlingPrint > 2000)
+            {
+                Console.info(F("Waiting for tray to settle at Position 3..."));
+                lastSettlingPrint = currentTime;
+            }
+
+            if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
+            {
+                Console.info(F("Tray settling complete at Position 3. Proceeding to unlock shuttle."));
+                currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS3;
+                lastActionTime = currentTime;
+            }
             break;
         }
 
@@ -2057,9 +2105,30 @@ bool testTrayHandling()
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray confirmed at Position 1. Proceeding to unlock shuttle."));
-            currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS1_FROM_3;
+            Console.info(F("Tray confirmed at Position 1. Waiting for tray to settle..."));
+            // Change to settling phase instead of going directly to unlock shuttle
+            currentPhase = PHASE_TRAY_SETTLING_AT_POS1_FROM_3;
             lastActionTime = currentTime;
+            break;
+        }
+
+        // Add new case for tray settling
+        case PHASE_TRAY_SETTLING_AT_POS1_FROM_3:
+        {
+            // Wait 750ms for tray to fully settle
+            static unsigned long lastSettlingPrint = 0;
+            if (currentTime - lastSettlingPrint > 2000)
+            {
+                Console.info(F("Waiting for tray to settle at Position 1 after return from Position 3..."));
+                lastSettlingPrint = currentTime;
+            }
+
+            if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
+            {
+                Console.info(F("Tray settling complete at Position 1. Proceeding to unlock shuttle."));
+                currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS1_FROM_3;
+                lastActionTime = currentTime;
+            }
             break;
         }
 
@@ -2404,9 +2473,30 @@ bool testTrayHandling()
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray successfully moved to Position 2. Proceeding to unlock shuttle."));
-            currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS2;
+            Console.info(F("Tray successfully moved to Position 2. Waiting for tray to settle..."));
+            // Change to settling phase instead of going directly to unlock shuttle
+            currentPhase = PHASE_TRAY_SETTLING_AT_POS2;
             lastActionTime = currentTime;
+            break;
+        }
+
+        // Add new case for tray settling
+        case PHASE_TRAY_SETTLING_AT_POS2:
+        {
+            // Wait 750ms for tray to fully settle
+            static unsigned long lastSettlingPrint = 0;
+            if (currentTime - lastSettlingPrint > 2000)
+            {
+                Console.info(F("Waiting for tray to settle at Position 2..."));
+                lastSettlingPrint = currentTime;
+            }
+
+            if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
+            {
+                Console.info(F("Tray settling complete at Position 2. Proceeding to unlock shuttle."));
+                currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS2;
+                lastActionTime = currentTime;
+            }
             break;
         }
 
@@ -2903,20 +2993,11 @@ bool testTrayHandling()
                     return false;
                 }
 
-                // Cycle complete
-                cyclesCompleted++;
+                // REMOVED: Don't increment cycle count here
+                // Instead, proceed to verification and settling phase
+                Console.info(F("Tray detected at Position 1. Moving to verification phase."));
+                currentPhase = PHASE_VERIFY_TRAY_BACK_AT_POS1;
                 lastActionTime = currentTime;
-
-                if (cyclesCompleted >= NUM_CYCLES)
-                {
-                    currentPhase = PHASE_COMPLETE;
-                }
-                else
-                {
-                    // Change this to go to a new unlock shuttle phase instead
-                    currentPhase = PHASE_UNLOCK_SHUTTLE_END_OF_CYCLE; // New phase to unlock shuttle
-                    lastActionTime = currentTime;
-                }
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
@@ -2926,14 +3007,71 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
-            { // 60-second timeout
+            else if (currentTime - lastActionTime > 60000) // 60-second timeout
+            {
                 Console.error(F("Timeout waiting for movement back to Position 1."));
                 Console.error(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
                 return false;
+            }
+            break;
+        }
+
+        // Verification phase - checks tray is present before settling
+        case PHASE_VERIFY_TRAY_BACK_AT_POS1:
+        {
+            // Double-check tray is present at position 1
+            if (!isTrayPresentAtPosition(1))
+            {
+                Console.error(F("Tray not detected at Position 1 during final verification. Aborting test."));
+                testRunning = false;
+                testInProgress = false;
+                return false;
+            }
+
+            Console.info(F("Tray confirmed at Position 1. Waiting for tray to settle..."));
+            currentPhase = PHASE_TRAY_SETTLING_BACK_AT_POS1;
+            lastActionTime = currentTime;
+            break;
+        }
+
+        // Tray settling phase - adds delay before continuing
+        case PHASE_TRAY_SETTLING_BACK_AT_POS1:
+        {
+            // Wait 750ms for tray to fully settle
+            static unsigned long lastSettlingPrint = 0;
+            if (currentTime - lastSettlingPrint > 2000)
+            {
+                Console.info(F("Waiting for tray to settle at Position 1 after cycle completion..."));
+                lastSettlingPrint = currentTime;
+            }
+
+            if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
+            {
+                Console.info(F("Tray settling complete at Position 1."));
+
+                // NOW increment cycle count after tray has fully settled
+                cyclesCompleted++;
+
+                // Report cycle status
+                Console.print(F("[INFO] Cycle "));
+                Console.print(cyclesCompleted);
+                Console.print(F(" of "));
+                Console.print(NUM_CYCLES);
+                Console.println(F(" completed"));
+
+                lastActionTime = currentTime;
+
+                if (cyclesCompleted >= NUM_CYCLES)
+                {
+                    currentPhase = PHASE_COMPLETE;
+                }
+                else
+                {
+                    currentPhase = PHASE_UNLOCK_SHUTTLE_END_OF_CYCLE;
+                }
             }
             break;
         }
@@ -3013,13 +3151,15 @@ bool testTrayHandling()
             testRunning = false;
             testInProgress = false;
             return true;
-            break;
+            break; // Note: This break is never reached because of the return
         }
-        }
+        } 
 
-        // Give time for processing other operations
+        
         delayMicroseconds(100);
-    }
 
+    } 
+
+    
     return false;
-}
+} 
