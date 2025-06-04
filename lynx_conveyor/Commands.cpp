@@ -1,11 +1,4 @@
 #include "Commands.h"
-#include "Arduino.h"
-#include "ClearCore.h"
-#include "ValveController.h"
-#include "MotorController.h"
-#include "Tests.h"
-#include "Utils.h"
-#include "EncoderController.h"
 
 // External declaration for the logging structure
 extern LoggingManagement logging;
@@ -14,88 +7,6 @@ extern const unsigned long DEFAULT_LOG_INTERVAL;
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
-
-// Function to handle serial input for commands
-
-char *trimLeadingSpaces(char *str)
-{
-    while (*str && isspace(*str))
-    {
-        str++;
-    }
-    return str;
-}
-
-void handleSerialCommands()
-{
-    static char commandBuffer[64]; // Increase from 32 to 64 bytes
-    static uint8_t commandIndex = 0;
-
-    while (Serial.available())
-    {
-        char c = Serial.read();
-        if (c == '\n')
-        {
-            commandBuffer[commandIndex] = '\0'; // Null-terminate the command
-
-            // Print the received command for debugging
-            Serial.print(F("[SERIAL COMMAND] Received: "));
-            Serial.println(commandBuffer);
-
-            // Pre-process: Replace all commas with spaces
-            for (uint8_t i = 0; i < commandIndex; i++)
-            {
-                if (commandBuffer[i] == ',')
-                {
-                    commandBuffer[i] = ' ';
-                }
-            }
-
-            // Execute the command with commas converted to spaces
-            bool success = commander.execute(commandBuffer, &Serial);
-
-            // Print error ONLY when commander couldn't find the command
-            // Most functions that return false already print their own error messages
-            if (!success)
-            {
-                // Check if this looks like a valid main command by checking against the command tree
-                bool isKnownCommand = false;
-                for (size_t i = 0; i < sizeof(API_tree) / sizeof(Commander::systemCommand_t); i++)
-                {
-                    const char *cmdName = API_tree[i].name;
-                    // See if the command matches the first part of the input
-                    if (strncmp(commandBuffer, cmdName, strlen(cmdName)) == 0)
-                    {
-                        isKnownCommand = true;
-                        break;
-                    }
-                }
-
-                // Only print generic error if command wasn't found in the command tree
-                if (!isKnownCommand)
-                {
-                    Serial.println(F("[ERROR] Command not found"));
-                }
-            }
-
-            commandIndex = 0; // Reset buffer index
-        }
-        else if (c != '\r') // Ignore carriage returns
-        {
-            if (commandIndex < (sizeof(commandBuffer) - 1))
-            {
-                commandBuffer[commandIndex++] = c;
-            }
-            else
-            {
-                // Command too long - prevent buffer overflow
-                commandIndex = sizeof(commandBuffer) - 1;
-                // Add notification of truncation
-                Serial.println(F("[WARNING] Command truncated - exceeded maximum length"));
-            }
-        }
-    }
-}
 
 bool cmd_print_help(char *args, CommandCaller *caller)
 {
@@ -1701,7 +1612,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
     {
         // Capture and print system state
         SystemState currentState = captureSystemState();
-        printSystemState(currentState, caller);
+        printSystemState(currentState);
         return true;
     }
     // Add this new section to display safety validation
@@ -1712,7 +1623,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         SafetyValidationResult safety = validateSafety(currentState);
 
         caller->println(F("\n===== SAFETY VALIDATION STATUS ====="));
-        printSafetyStatus(safety, caller);
+        printSafetyStatus(safety);
 
         return true;
     }
@@ -2548,3 +2459,5 @@ Commander::systemCommand_t API_tree[] = {
                              "  encoder,help    - Display setup instructions and usage tips",
                   cmd_encoder),
 };
+
+const size_t API_tree_size = sizeof(API_tree) / sizeof(Commander::systemCommand_t);

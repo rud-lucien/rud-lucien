@@ -9,6 +9,7 @@
 #include "Tests.h"
 #include "Commands.h"
 #include "EncoderController.h"
+#include "OutputManager.h"
 
 // Forward declarations of types from other headers
 // to avoid circular dependencies
@@ -203,11 +204,11 @@ struct SafetyValidationResult
 
 // System state tracking functions
 SystemState captureSystemState();
-void printSystemState(const SystemState &state, Print *output = &Serial);
+void printSystemState(const SystemState &state);
 
 // Safety validation functions
 SafetyValidationResult validateSafety(const SystemState &state);
-void printSafetyStatus(const SafetyValidationResult &result, Print *output = &Serial);
+void printSafetyStatus(const SafetyValidationResult &result);
 
 // Motor position helper functions
 bool isAtPosition(double currentPosition, double targetPosition);

@@ -1,12 +1,18 @@
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
+#include "Arduino.h"
+#include "ClearCore.h"
 #include "Commander-API.hpp"
 #include "Commander-IO.hpp"
 #include "MotorController.h"
 #include "ValveController.h"
 #include "Logging.h"
 #include "Tests.h"
+#include "CommandHandler.h"
+#include "Tests.h"
+#include "Utils.h"
+#include "EncoderController.h"
 
 //=============================================================================
 // COMMAND CONSTANTS
@@ -24,7 +30,7 @@ extern uint8_t ccioBoardCount; // Number of CCIO-8 boards detected
 
 // Global Command Tree and Commander Object
 extern Commander::systemCommand_t API_tree[COMMAND_SIZE];
-extern const int API_tree_size;
+extern const size_t API_tree_size;
 extern Commander commander;
 
 //=============================================================================
@@ -59,13 +65,6 @@ bool cmd_unlock(char *args, CommandCaller *caller);
 bool cmd_log(char *args, CommandCaller *caller);
 bool cmd_system_state(char *args, CommandCaller *caller); // New state command
 bool cmd_test(char *args, CommandCaller *caller);         // Test command for diagnostics
-
-//-----------------------------------------------------------------------------
-// Command Processing Utilities
-// Helper functions for processing commands
-//-----------------------------------------------------------------------------
-char *trimLeadingSpaces(char *str);
-void handleSerialCommands();
 
 //-----------------------------------------------------------------------------
 // Encoder Control Commands

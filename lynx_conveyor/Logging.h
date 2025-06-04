@@ -2,6 +2,10 @@
 #define LOGGING_H
 
 #include "Arduino.h"
+#include "ValveController.h"
+#include "MotorController.h"
+#include "EncoderController.h"
+#include "OutputManager.h"
 
 //=============================================================================
 // TYPE DEFINITIONS

@@ -3,6 +3,7 @@
 
 #include "Arduino.h"
 #include "ClearCore.h"
+#include "OutputManager.h"
 
 //=============================================================================
 // PIN AND HARDWARE CONFIGURATION
@@ -99,6 +100,8 @@ enum MotorState
     MOTOR_STATE_HOMING,
     MOTOR_STATE_FAULTED
 };
+
+#include "Utils.h" // Include Utils.h for utility functions and definitions here to prevent circular dependencies
 
 // State machine for non-blocking fault clearing
 enum FaultClearingState

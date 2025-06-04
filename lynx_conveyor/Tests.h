@@ -4,6 +4,10 @@
 #include "Arduino.h"
 #include "ClearCore.h"
 #include "MotorController.h"
+#include "CommandHandler.h"
+#include "Utils.h"
+#include "ValveController.h"
+#include "OutputManager.h"
 
 //=============================================================================
 // FUNCTION DECLARATIONS

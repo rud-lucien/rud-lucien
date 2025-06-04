@@ -10,9 +10,11 @@
 #include "MotorController.h"
 #include "Logging.h"
 #include "Tests.h"
+#include "CommandHandler.h"
 #include "Commands.h"
 #include "Utils.h"
 #include "EncoderController.h"
+#include "OutputManager.h"
 
 // Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
@@ -25,39 +27,44 @@ void setup()
 {
     Serial.begin(115200);
     delay(1000);
-    Serial.println(F("[MESSAGE] Lynx Conveyor Controller starting up..."));
+
+    // Initialize the output manager (must be before any Console calls)
+    initOutputManager();
+
+    Console.info(F("Lynx Conveyor Controller starting up..."));
 
     // First set up the CCIO board
-    Serial.println(F("[MESSAGE] Initializing CCIO-8 expansion boards..."));
+    Console.info(F("Initializing CCIO-8 expansion boards..."));
     CcioPort.Mode(Connector::CCIO);
     CcioPort.PortOpen();
 
     // Get count of CCIO-8 boards
     ccioBoardCount = CcioMgr.CcioCount();
-    Serial.print(F("[MESSAGE] Discovered CCIO boards: "));
-    Serial.println(ccioBoardCount);
+    Console.print(F("[INFO] Discovered CCIO boards: "));
+    Console.println(ccioBoardCount);
 
     // Now initialize sensor systems
-    Serial.println(F("[MESSAGE] Initializing sensor systems..."));
+    Console.info(F("Initializing sensor systems..."));
     initSensorSystem();
 
     // Initialize valve system with CCIO board status
-    Serial.println(F("[MESSAGE] Initializing valve controller..."));
+    Console.info(F("Initializing valve controller..."));
     initValveSystem(ccioBoardCount > 0);
 
     // Initialize encoder with default direction (modify if needed)
-    Serial.println(F("[MESSAGE] Initializing MPG handwheel interface..."));
+    Console.info(F("Initializing MPG handwheel interface..."));
     initEncoderControl(true, false);
 
     // Rest of your setup code...
-    Serial.println(F("[MESSAGE] Motor controller ready for initialization."));
-    Serial.println(F("[MESSAGE] Use 'motor init' command to initialize the motor."));
+    Console.info(F("Motor controller ready for initialization."));
+    Console.info(F("Use 'motor init' command to initialize the motor."));
 
     commander.attachTree(API_tree);
     commander.init();
+    initCommandHandler();
 
-    Serial.println(F("[MESSAGE] System ready."));
-    Serial.println(F("[MESSAGE] Type 'help' for available commands"));
+    Console.info(F("System ready."));
+    Console.info(F("Type 'help' for available commands"));
 }
 
 // The main loop
@@ -107,8 +114,8 @@ void loop()
     if (operationInProgress &&
         (!safety.operationWithinTimeout || !safety.operationSequenceValid))
     {
-        Serial.print(F("SAFETY VIOLATION: "));
-        Serial.println(safety.operationSequenceMessage);
+        Console.print(F("[SAFETY] VIOLATION: "));
+        Console.println(safety.operationSequenceMessage);
 
         // Emergency stop or other recovery action
         // Use the failureReason from safety validation
@@ -134,9 +141,6 @@ in the clearpath settings I lowered the max torque to 20%, basically if the moto
 How do I update code to handle this? when the motor is stalled what message does it send and how do we deal with it currently? how do we make sure that stalling
 prints a helpful message to the user that this is potentially a collision detection issue and not just a motor fault?
 */
-
-/* TODO: Figure out what to do when a manual command is sent while an automated operation is in progress (like tray loading or unloading). How do we handle this? Should we reject the command or allow it to interrupt the operation?
- */
 
 /* TODO: implement TCP/IP such that we can send commands to the conveyor controller over a network connection. This will allow remote control and monitoring of the conveyor system.
  */
@@ -193,30 +197,4 @@ if (operationInProgress && currentOperationStep != expectedOperationStep) {
 ## Priority
 Medium - This is important for robust operation but not blocking immediate abort functionality implementation.
 
-*/
-
-/* # TODO: Think about commands to enable/disable deceleration and scaling
-This task is about implementing a command interface for toggling deceleration and distance-based scaling features in the motor control system.
-
-
-1. **Implement Basic Toggles Only**:
-   - `motor,decel,on|off` - Enable/disable deceleration
-   - `motor,scaling,on|off` - Enable/disable distance-based scaling
-
-2. **Add a Status Command**:
-   - `motor,profile` - Display current motion profile settings (deceleration distance, thresholds, etc.)
-
-3. **Consider Advanced Configuration Later**:
-   - Only if users specifically request it
-   - Could be implemented via a configuration file approach rather than many separate commands
-
-This gives operators the ability to disable features if they're causing issues, while keeping the interface relatively simple and protecting the mechanical system from poorly chosen parameters.
-
-## Implementation Complexity
-
-The basic toggles would be straightforward to implement since you already have the flags:
-- `motorDecelConfig.enableDeceleration` for deceleration
-- You'd need to add a similar flag for distance-based scaling
-
-Would you like to proceed with this minimal implementation, or would you prefer a more comprehensive set of commands?
 */
