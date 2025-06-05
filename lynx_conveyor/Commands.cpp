@@ -54,33 +54,33 @@ bool cmd_lock(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        caller->println(F("[ERROR] Missing parameter. Usage: lock,<1|2|3|shuttle>"));
+        caller->println(F("[ERROR] Missing parameter. Usage: lock,<1|2|3|shuttle|help>"));
         return false;
     }
 
     // Parse the argument - we'll use commas as separators
-    char *target = strtok(trimmed, ",");
-    if (target == NULL)
+    char *subcommand = strtok(trimmed, ",");
+    if (subcommand == NULL)
     {
-        caller->println(F("[ERROR] Invalid format. Usage: lock,<1|2|3|shuttle>"));
+        caller->println(F("[ERROR] Invalid format. Usage: lock,<1|2|3|shuttle|help>"));
         return false;
     }
 
-    // Trim leading spaces from target
-    target = trimLeadingSpaces(target);
+    // Trim leading spaces from subcommand
+    subcommand = trimLeadingSpaces(subcommand);
 
-    // Handle locking based on target
-    if (strcmp(target, "all") == 0)
+    // Handle locking based on subcommand
+    if (strcmp(subcommand, "all") == 0)
     {
         // Removed "lock all" functionality as requested
         caller->println(F("[ERROR] 'lock,all' is not supported for safety reasons. Engage trays individually."));
         return false;
     }
-    else if (strcmp(target, "shuttle") == 0)
+    else if (strcmp(subcommand, "shuttle") == 0)
     {
         if (ccioBoardCount > 0)
         {
-            caller->println(F("[MESSAGE] Engaging shuttle with sensor verification..."));
+            caller->println(F("[INFO] Engaging shuttle with sensor verification..."));
             DoubleSolenoidValve *valve = getShuttleValve();
             CylinderSensor *sensor = getShuttleSensor();
 
@@ -89,7 +89,7 @@ bool cmd_lock(char *args, CommandCaller *caller)
                 // Check current state first
                 if (valve->position == VALVE_POSITION_LOCK)
                 {
-                    caller->println(F("[MESSAGE] Shuttle already engaged"));
+                    caller->println(F("[INFO] Shuttle already engaged"));
 
                     // Verify actual position with sensor
                     if (sensorRead(*sensor) == true)
@@ -105,10 +105,10 @@ bool cmd_lock(char *args, CommandCaller *caller)
                 else
                 {
                     // Try locking with sensor feedback
-                    caller->println(F("[MESSAGE] Locking shuttle..."));
+                    caller->println(F("[INFO] Locking shuttle..."));
                     if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
                     {
-                        caller->println(F("[MESSAGE] Shuttle engaged and confirmed by sensor"));
+                        caller->println(F("[INFO] Shuttle engaged and confirmed by sensor"));
                         return true;
                     }
                     else
@@ -137,10 +137,10 @@ bool cmd_lock(char *args, CommandCaller *caller)
     else
     {
         // Try to parse as tray number
-        int trayNum = atoi(target);
+        int trayNum = atoi(subcommand);
         if (trayNum >= 1 && trayNum <= 3)
         {
-            caller->print(F("[MESSAGE] Engaging tray "));
+            caller->print(F("[INFO] Engaging tray "));
             caller->print(trayNum);
             caller->println(F(" with sensor verification..."));
 
@@ -171,7 +171,7 @@ bool cmd_lock(char *args, CommandCaller *caller)
                 // Check current state first
                 if (valve->position == VALVE_POSITION_LOCK)
                 {
-                    caller->print(F("[MESSAGE] Tray "));
+                    caller->print(F("[INFO] Tray "));
                     caller->print(trayNum);
                     caller->println(F(" already engaged"));
 
@@ -191,7 +191,7 @@ bool cmd_lock(char *args, CommandCaller *caller)
                     // Try locking with sensor feedback
                     if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
                     {
-                        caller->print(F("[MESSAGE] Tray "));
+                        caller->print(F("[INFO] Tray "));
                         caller->print(trayNum);
                         caller->println(F(" engaged and confirmed by sensor"));
                         return true;
@@ -217,9 +217,58 @@ bool cmd_lock(char *args, CommandCaller *caller)
                 return false;
             }
         }
+        else if (strcmp(subcommand, "help") == 0)
+        {
+            caller->println(F("\n===== LOCK COMMAND HELP ====="));
+
+            caller->println(F("\nOVERVIEW:"));
+            caller->println(F("  The lock command engages pneumatic locks on trays and the shuttle,"));
+            caller->println(F("  securing them in position. All operations include sensor verification"));
+            caller->println(F("  to confirm successful locking."));
+
+            caller->println(F("\nCOMMAND REFERENCE:"));
+            caller->println(F("  lock,1 - Engage lock on tray at position 1 (loading position)"));
+            caller->println(F("    > Verified by cylinder position sensor"));
+            caller->println(F("    > Will report success only when sensor confirms lock"));
+
+            caller->println(F("  lock,2 - Engage lock on tray at position 2 (middle position)"));
+            caller->println(F("    > Verified by cylinder position sensor"));
+            caller->println(F("    > Will report success only when sensor confirms lock"));
+
+            caller->println(F("  lock,3 - Engage lock on tray at position 3 (unloading position)"));
+            caller->println(F("    > Verified by cylinder position sensor"));
+            caller->println(F("    > Will report success only when sensor confirms lock"));
+
+            caller->println(F("  lock,shuttle - Engage lock on the shuttle"));
+            caller->println(F("    > Prevents shuttle from moving between positions"));
+            caller->println(F("    > Verified by cylinder position sensor"));
+            caller->println(F("    > Required before unlocking any trays for safety"));
+
+            caller->println(F("\nSAFETY NOTES:"));
+            caller->println(F("  • 'lock,all' is not supported for safety reasons"));
+            caller->println(F("  • Always lock the shuttle before unlocking any trays"));
+            caller->println(F("  • System uses sensor verification to confirm actual locking"));
+            caller->println(F("  • Failed locking may indicate mechanical issues or low air pressure"));
+
+            caller->println(F("\nSENSOR VERIFICATION:"));
+            caller->println(F("  • Each lock has a corresponding sensor that confirms its position"));
+            caller->println(F("  • Command waits up to 1 second for sensor to confirm lock"));
+            caller->println(F("  • Returns success only when sensor confirms the lock operation"));
+            caller->println(F("  • Sensor mismatches are shown in status logs with [!] indicator"));
+
+            caller->println(F("\nTROUBLESHOOTING:"));
+            caller->println(F("  • If lock fails, check air pressure"));
+            caller->println(F("  • Verify sensor connections if lock command doesn't register"));
+            caller->println(F("  • Use 'system,state' to see detailed valve and sensor status"));
+            caller->println(F("  • For persistent issues, check valve functionality"));
+
+            return true;
+        }
         else
         {
-            caller->println(F("[ERROR] Invalid tray number. Must be 1, 2, or 3."));
+            caller->print(F("[ERROR] Unknown lock subcommand: "));
+            caller->println(subcommand);
+            caller->println(F("Valid options are '1', '2', '3', 'shuttle', or 'help'"));
             return false;
         }
     }
@@ -241,28 +290,28 @@ bool cmd_unlock(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        caller->println(F("[ERROR] Missing parameter. Usage: unlock,<1|2|3|shuttle|all>"));
+        caller->println(F("[ERROR] Missing parameter. Usage: unlock,<1|2|3|shuttle|all|help>"));
         return false;
     }
 
     // Parse the argument - we'll use commas as separators
-    char *target = strtok(trimmed, ",");
-    if (target == NULL)
+    char *subcommand = strtok(trimmed, ",");
+    if (subcommand == NULL)
     {
-        caller->println(F("[ERROR] Invalid format. Usage: unlock,<1|2|3|shuttle|all>"));
+        caller->println(F("[ERROR] Invalid format. Usage: unlock,<1|2|3|shuttle|all|help>"));
         return false;
     }
 
-    // Trim leading spaces from target
-    target = trimLeadingSpaces(target);
+    // Trim leading spaces from subcommand
+    subcommand = trimLeadingSpaces(subcommand);
 
-    // Handle unlocking based on target
-    if (strcmp(target, "all") == 0)
+    // Handle unlocking based on subcommand
+    if (strcmp(subcommand, "all") == 0)
     {
-        caller->println(F("[MESSAGE] Disengaging all valves with sensor verification..."));
+        caller->println(F("[INFO] Disengaging all valves with sensor verification..."));
         if (safeUnlockAllValves(1000))
         {
-            caller->println(F("[MESSAGE] All valves successfully disengaged"));
+            caller->println(F("[INFO] All valves successfully disengaged"));
             return true;
         }
         else
@@ -271,11 +320,11 @@ bool cmd_unlock(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(target, "shuttle") == 0)
+    else if (strcmp(subcommand, "shuttle") == 0)
     {
         if (ccioBoardCount > 0)
         {
-            caller->println(F("[MESSAGE] Disengaging shuttle with sensor verification..."));
+            caller->println(F("[INFO] Disengaging shuttle with sensor verification..."));
             DoubleSolenoidValve *valve = getShuttleValve();
             CylinderSensor *sensor = getShuttleSensor();
 
@@ -284,7 +333,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
                 // Check current state first
                 if (valve->position == VALVE_POSITION_UNLOCK)
                 {
-                    caller->println(F("[MESSAGE] Shuttle already disengaged"));
+                    caller->println(F("[INFO] Shuttle already disengaged"));
 
                     // Verify actual position with sensor
                     if (sensorRead(*sensor) == false)
@@ -300,10 +349,10 @@ bool cmd_unlock(char *args, CommandCaller *caller)
                 else
                 {
                     // Try unlocking with sensor feedback
-                    caller->println(F("[MESSAGE] Unlocking shuttle..."));
+                    caller->println(F("[INFO] Unlocking shuttle..."));
                     if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
                     {
-                        caller->println(F("[MESSAGE] Shuttle disengaged and confirmed by sensor"));
+                        caller->println(F("[INFO] Shuttle disengaged and confirmed by sensor"));
                         return true;
                     }
                     else
@@ -332,10 +381,10 @@ bool cmd_unlock(char *args, CommandCaller *caller)
     else
     {
         // Try to parse as tray number
-        int trayNum = atoi(target);
+        int trayNum = atoi(subcommand);
         if (trayNum >= 1 && trayNum <= 3)
         {
-            caller->print(F("[MESSAGE] Disengaging tray "));
+            caller->print(F("[INFO] Disengaging tray "));
             caller->print(trayNum);
             caller->println(F(" with sensor verification..."));
 
@@ -366,7 +415,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
                 // Check current state first
                 if (valve->position == VALVE_POSITION_UNLOCK)
                 {
-                    caller->print(F("[MESSAGE] Tray "));
+                    caller->print(F("[INFO] Tray "));
                     caller->print(trayNum);
                     caller->println(F(" already disengaged"));
 
@@ -386,7 +435,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
                     // Try unlocking with sensor feedback
                     if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
                     {
-                        caller->print(F("[MESSAGE] Tray "));
+                        caller->print(F("[INFO] Tray "));
                         caller->print(trayNum);
                         caller->println(F(" disengaged and confirmed by sensor"));
                         return true;
@@ -412,9 +461,61 @@ bool cmd_unlock(char *args, CommandCaller *caller)
                 return false;
             }
         }
+        else if (strcmp(subcommand, "help") == 0)
+        {
+            caller->println(F("\n===== UNLOCK COMMAND HELP ====="));
+
+            caller->println(F("\nOVERVIEW:"));
+            caller->println(F("  The unlock command disengages pneumatic locks on trays and the shuttle,"));
+            caller->println(F("  allowing them to be removed or permitting shuttle movement. All operations"));
+            caller->println(F("  include sensor verification to confirm successful unlocking."));
+
+            caller->println(F("\nCOMMAND REFERENCE:"));
+            caller->println(F("  unlock,1 - Disengage lock on tray at position 1 (loading position)"));
+            caller->println(F("    > Verified by cylinder position sensor"));
+            caller->println(F("    > Will report success only when sensor confirms unlock"));
+
+            caller->println(F("  unlock,2 - Disengage lock on tray at position 2 (middle position)"));
+            caller->println(F("    > Verified by cylinder position sensor"));
+            caller->println(F("    > Will report success only when sensor confirms unlock"));
+
+            caller->println(F("  unlock,3 - Disengage lock on tray at position 3 (unloading position)"));
+            caller->println(F("    > Verified by cylinder position sensor"));
+            caller->println(F("    > Will report success only when sensor confirms unlock"));
+
+            caller->println(F("  unlock,shuttle - Disengage lock on the shuttle"));
+            caller->println(F("    > Allows shuttle to move between positions"));
+            caller->println(F("    > Verified by cylinder position sensor"));
+
+            caller->println(F("  unlock,all - Disengage all locks in the system"));
+            caller->println(F("    > Emergency recovery function"));
+            caller->println(F("    > Uses sensor verification for all valves"));
+            caller->println(F("    > Reports success only when all sensors confirm unlock"));
+
+            caller->println(F("\nSAFETY NOTES:"));
+            caller->println(F("  • Ensure trays are properly supported before unlocking"));
+            caller->println(F("  • System uses sensor verification to confirm actual unlocking"));
+            caller->println(F("  • Failed unlocking may indicate mechanical issues"));
+
+            caller->println(F("\nSENSOR VERIFICATION:"));
+            caller->println(F("  • Each lock has a corresponding sensor that confirms its position"));
+            caller->println(F("  • Command waits up to 1 second for sensor to confirm unlock"));
+            caller->println(F("  • Returns success only when sensor confirms the unlock operation"));
+            caller->println(F("  • Sensor mismatches are shown in status logs with [!] indicator"));
+
+            caller->println(F("\nTROUBLESHOOTING:"));
+            caller->println(F("  • If unlock fails, check air pressure"));
+            caller->println(F("  • Verify sensor connections if unlock command doesn't register"));
+            caller->println(F("  • Use 'system,state' to see detailed valve and sensor status"));
+            caller->println(F("  • For persistent issues, check valve functionality"));
+
+            return true;
+        }
         else
         {
-            caller->println(F("[ERROR] Invalid tray number. Must be 1, 2, or 3."));
+            caller->print(F("[ERROR] Unknown unlock subcommand: "));
+            caller->println(subcommand);
+            caller->println(F("Valid options are '1', '2', '3', 'shuttle', 'all', or 'help'"));
             return false;
         }
     }
@@ -436,23 +537,23 @@ bool cmd_log(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        caller->println(F("[ERROR] Missing parameter. Usage: log,<on[,interval]|off|now>"));
+        caller->println(F("[ERROR] Missing parameter. Usage: log,<on[,interval]|off|now|help>"));
         return false;
     }
 
     // Parse the first argument - we'll use commas as separators
-    char *action = strtok(trimmed, " ");
-    if (action == NULL)
+    char *subcommand = strtok(trimmed, " ");
+    if (subcommand == NULL)
     {
-        caller->println(F("[ERROR] Invalid format. Usage: log,<on[,interval]|off|now>"));
+        caller->println(F("[ERROR] Invalid format. Usage: log,<on[,interval]|off|now|help>"));
         return false;
     }
 
-    // Trim leading spaces from action
-    action = trimLeadingSpaces(action);
+    // Trim leading spaces from subcommand
+    subcommand = trimLeadingSpaces(subcommand);
 
-    // Handle based on action
-    if (strcmp(action, "on") == 0)
+    // Handle based on subcommand
+    if (strcmp(subcommand, "on") == 0)
     {
         // Check if an interval was provided
         char *intervalStr = strtok(NULL, " ");
@@ -467,7 +568,7 @@ bool cmd_log(char *args, CommandCaller *caller)
             if (parsedInterval > 0)
             {
                 interval = parsedInterval;
-                caller->print(F("[MESSAGE] Logging enabled with interval of "));
+                caller->print(F("[INFO] Logging enabled with interval of "));
                 caller->print(interval);
                 caller->println(F(" ms"));
             }
@@ -480,7 +581,7 @@ bool cmd_log(char *args, CommandCaller *caller)
         else
         {
             // Use default interval
-            caller->print(F("[MESSAGE] Logging enabled with default interval of "));
+            caller->print(F("[INFO] Logging enabled with default interval of "));
             caller->print(DEFAULT_LOG_INTERVAL);
             caller->println(F(" ms"));
         }
@@ -489,22 +590,74 @@ bool cmd_log(char *args, CommandCaller *caller)
         logging.previousLogTime = millis(); // Reset the timer
         return true;
     }
-    else if (strcmp(action, "off") == 0)
+    else if (strcmp(subcommand, "off") == 0)
     {
-        caller->println(F("[MESSAGE] Logging disabled"));
+        caller->println(F("[INFO] Logging disabled"));
         logging.logInterval = 0; // Setting to 0 disables logging
         return true;
     }
-    else if (strcmp(action, "now") == 0)
+    else if (strcmp(subcommand, "now") == 0)
     {
-        caller->println(F("[MESSAGE] Logging system state now"));
+        caller->println(F("[INFO] Logging system state now"));
         // Log immediately regardless of interval
         logSystemState(); // Changed: removed the parameter
         return true;
     }
+    else if (strcmp(subcommand, "help") == 0)
+    {
+        caller->println(F("\n===== LOGGING SYSTEM HELP ====="));
+
+        caller->println(F("\nOVERVIEW:"));
+        caller->println(F("  The logging system captures complete system state at regular intervals"));
+        caller->println(F("  or on demand, providing detailed information for debugging and monitoring."));
+
+        caller->println(F("\nCOMMAND REFERENCE:"));
+        caller->println(F("  log,on[,interval] - Enable periodic logging"));
+        caller->println(F("    > interval = Optional logging frequency in milliseconds"));
+        caller->println(F("    > Default interval: 250 ms (4 logs per second)"));
+        caller->println(F("    > Example: log,on,1000 - Log every 1 second"));
+        caller->println(F("    > Example: log,on - Log every 250ms (default)"));
+
+        caller->println(F("  log,off - Disable periodic logging"));
+        caller->println(F("    > Stops the automatic logging of system state"));
+        caller->println(F("    > Does not affect manual logging with log,now"));
+
+        caller->println(F("  log,now - Log system state immediately"));
+        caller->println(F("    > Records a single log entry regardless of periodic settings"));
+        caller->println(F("    > Useful for capturing state at specific moments"));
+
+        caller->println(F("\nLOG CONTENT:"));
+        caller->println(F("  • Valves - Lock status of all trays and shuttle with sensor verification"));
+        caller->println(F("    > [!] indicator shows sensor/command mismatch"));
+        caller->println(F("  • Sensors - Tray presence detection at each position"));
+        caller->println(F("  • System - Motor state, homing status, E-Stop and HLFB status"));
+        caller->println(F("  • Position - Current, target, and last positions (mm and counts)"));
+        caller->println(F("  • Velocity - Current speed, percentage of max, and speed limits"));
+        caller->println(F("  • Jog - Current jog increment and speed settings"));
+        caller->println(F("  • MPG - Handwheel control status, multiplier, and mm/rotation"));
+
+        caller->println(F("\nPERFORMANCE CONSIDERATIONS:"));
+        caller->println(F("  • Default 250ms interval is optimal for most debugging"));
+        caller->println(F("  • Very frequent logging (< 100ms) may impact system responsiveness"));
+        caller->println(F("  • For long-term monitoring, consider 1000-5000ms intervals"));
+
+        caller->println(F("\nREADING LOG OUTPUT:"));
+        caller->println(F("  • Each section is separated by | characters for readability"));
+        caller->println(F("  • Position values shown in both mm and encoder counts"));
+        caller->println(F("  • Lock status shows ? if sensor doesn't match expected state"));
+        caller->println(F("  • Velocity shown with percentage of maximum when moving"));
+
+        caller->println(F("\nTROUBLESHOOTING TIPS:"));
+        caller->println(F("  • Use log,now before and after commands to track state changes"));
+        caller->println(F("  • Watch for sensor/valve mismatches [!] indicating hardware issues"));
+        caller->println(F("  • Compare HLFB status with motor state to identify drive problems"));
+        caller->println(F("  • Verify position values match expected targets during movements"));
+
+        return true;
+    }
     else
     {
-        caller->println(F("[ERROR] Invalid log action. Use 'on', 'off', or 'now'."));
+        caller->println(F("[ERROR] Invalid log subcommand. Use 'on', 'off', 'now', or 'help'."));
         return false;
     }
 
@@ -525,41 +678,43 @@ bool cmd_motor(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        caller->println(F("[ERROR] Missing parameter. Usage: motor,<init|status|clear|home|abort|stop>"));
+        caller->println(F("[ERROR] Missing parameter. Usage: motor,<init|status|clear|home|abort|stop|help>"));
         return false;
     }
 
     // Parse the argument - we'll use commas as separators
-    char *action = strtok(trimmed, ",");
-    if (action == NULL)
+    char *subcommand = strtok(trimmed, ",");
+    if (subcommand == NULL)
     {
-        caller->println(F("[ERROR] Invalid format. Usage: motor,<init|status|clear|home|abort|stop>"));
+        caller->println(F("[ERROR] Invalid format. Usage: motor,<init|status|clear|home|abort|stop|help>"));
         return false;
     }
 
-    // Trim leading spaces from action
-    action = trimLeadingSpaces(action);
+    // Trim leading spaces from subcommandn
+    subcommand = trimLeadingSpaces(subcommand);
 
     // Handle motor subcommands using switch for better readability
-    int actionCode = 0;
-    if (strcmp(action, "init") == 0)
-        actionCode = 1;
-    else if (strcmp(action, "status") == 0)
-        actionCode = 2;
-    else if (strcmp(action, "clear") == 0)
-        actionCode = 3;
-    else if (strcmp(action, "home") == 0)
-        actionCode = 4;
-    else if (strcmp(action, "abort") == 0)
-        actionCode = 5;
-    else if (strcmp(action, "stop") == 0)
-        actionCode = 6;
+    int subcommandCode = 0;
+    if (strcmp(subcommand, "init") == 0)
+        subcommandCode = 1;
+    else if (strcmp(subcommand, "status") == 0)
+        subcommandCode = 2;
+    else if (strcmp(subcommand, "clear") == 0)
+        subcommandCode = 3;
+    else if (strcmp(subcommand, "home") == 0)
+        subcommandCode = 4;
+    else if (strcmp(subcommand, "abort") == 0)
+        subcommandCode = 5;
+    else if (strcmp(subcommand, "stop") == 0)
+        subcommandCode = 6;
+    else if (strcmp(subcommand, "help") == 0)
+        subcommandCode = 7;
 
-    switch (actionCode)
+    switch (subcommandCode)
     {
     case 1:
     { // init
-        caller->println(F("[MESSAGE] Initializing motor..."));
+        caller->println(F("[INFO] Initializing motor..."));
 
         // Diagnostic: Print state before initialization
         caller->print(F("[DIAGNOSTIC] Motor state before init: "));
@@ -618,7 +773,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
         }
         else
         {
-            caller->println(F("[MESSAGE] Motor initialization successful"));
+            caller->println(F("[INFO] Motor initialization successful"));
             return true;
         }
         break;
@@ -626,7 +781,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
 
     case 2:
     { // status
-        caller->println(F("[MESSAGE] Motor Status:"));
+        caller->println(F("[INFO] Motor Status:"));
 
         // Display motor state
         caller->print(F("  State: "));
@@ -786,11 +941,11 @@ bool cmd_motor(char *args, CommandCaller *caller)
 
     case 3:
     { // clear
-        caller->println(F("[MESSAGE] Attempting to clear motor fault..."));
+        caller->println(F("[INFO] Attempting to clear motor fault..."));
 
         if (clearMotorFaultWithStatus())
         {
-            caller->println(F("[MESSAGE] Motor fault cleared successfully"));
+            caller->println(F("[INFO] Motor fault cleared successfully"));
             return true;
         }
         else
@@ -829,7 +984,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
             return false;
         }
 
-        caller->println(F("[MESSAGE] Starting homing sequence..."));
+        caller->println(F("[INFO] Starting homing sequence..."));
 
         // Begin homing
         initiateHomingSequence();
@@ -837,7 +992,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
         // Check if homing was initiated by examining the motor state
         if (motorState == MOTOR_STATE_HOMING)
         {
-            caller->println(F("[MESSAGE] Homing sequence initiated. Motor will move to find home position."));
+            caller->println(F("[INFO] Homing sequence initiated. Motor will move to find home position."));
             return true;
         }
         else
@@ -857,7 +1012,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
             return false;
         }
 
-        caller->println(F("[MESSAGE] Aborting current operation..."));
+        caller->println(F("[INFO] Aborting current operation..."));
 
         // Only meaningful to abort if we're moving or homing
         if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING)
@@ -874,7 +1029,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
             // Update motor state
             motorState = MOTOR_STATE_IDLE;
 
-            caller->println(F("[MESSAGE] Operation aborted successfully."));
+            caller->println(F("[INFO] Operation aborted successfully."));
             return true;
         }
         else
@@ -894,14 +1049,72 @@ bool cmd_motor(char *args, CommandCaller *caller)
             return false;
         }
 
-        caller->println(F("[MESSAGE] EMERGENCY STOP initiated!"));
+        caller->println(F("[INFO] EMERGENCY STOP initiated!"));
 
         // Execute emergency stop
         MOTOR_CONNECTOR.MoveStopAbrupt();
         motorState = MOTOR_STATE_IDLE;
 
-        caller->println(F("[MESSAGE] Motor movement halted. Position may no longer be accurate."));
+        caller->println(F("[INFO] Motor movement halted. Position may no longer be accurate."));
         caller->println(F("[WARNING] Re-homing recommended after emergency stop."));
+
+        return true;
+        break;
+    }
+
+    case 7: // help
+    {
+        caller->println(F("\n===== MOTOR CONTROL SYSTEM HELP ====="));
+
+        caller->println(F("\nCOMMAND REFERENCE:"));
+        caller->println(F("  motor,init - Initialize motor system and prepare for operation"));
+        caller->println(F("    > Must be run after power-up before any other motor commands"));
+        caller->println(F("    > Configures motor parameters and communication"));
+        caller->println(F("    > Does not move the motor or establish position reference"));
+
+        caller->println(F("  motor,home - Find home position and establish reference point"));
+        caller->println(F("    > Required before absolute positioning commands can be used"));
+        caller->println(F("    > Motor will move slowly until it contacts the home limit switch"));
+        caller->println(F("    > After contact, motor backs off to establish precise zero position"));
+        caller->println(F("    > Home position is offset 5mm from physical limit for safety"));
+
+        caller->println(F("  motor,status - Display detailed motor status and configuration"));
+        caller->println(F("    > Shows current state, position, velocity settings, and limits"));
+        caller->println(F("    > Use to verify proper operation or troubleshoot issues"));
+
+        caller->println(F("  motor,clear - Clear motor fault condition"));
+        caller->println(F("    > Use after resolving the condition that caused the fault"));
+        caller->println(F("    > Common faults: excessive load, hitting physical limit, E-Stop"));
+
+        caller->println(F("  motor,abort - Gracefully stop current movement"));
+        caller->println(F("    > Controlled deceleration to stop the motor"));
+        caller->println(F("    > Position information is maintained"));
+        caller->println(F("    > Use to cancel a movement without generating a fault"));
+
+        caller->println(F("  motor,stop - Emergency stop motor movement immediately"));
+        caller->println(F("    > Immediate halt of motor operation"));
+        caller->println(F("    > May cause position inaccuracy"));
+        caller->println(F("    > Use only when necessary to prevent damage or injury"));
+
+        caller->println(F("\nTYPICAL SEQUENCE:"));
+        caller->println(F("  1. motor,init   - Initialize the motor system"));
+        caller->println(F("  2. motor,home   - Establish reference position"));
+        caller->println(F("  3. move,X       - Move to desired positions"));
+        caller->println(F("  4. jog commands - Make fine adjustments"));
+        caller->println(F("  5. encoder      - Use handwheel for manual control"));
+
+        caller->println(F("\nTROUBLESHOOTING:"));
+        caller->println(F("  • If motor won't move: Check E-Stop, then run motor,status"));
+        caller->println(F("  • After fault: Use motor,clear to reset fault condition"));
+        caller->println(F("  • If position seems incorrect: Re-home the system"));
+        caller->println(F("  • Unexpected behavior: Check that motor is initialized"));
+        caller->println(F("  • Jerky movement: Try using slower speed or smaller increments"));
+
+        caller->println(F("\nSAFETY NOTES:"));
+        caller->println(F("  • Always ensure proper clearance before moving the shuttle"));
+        caller->println(F("  • Use E-Stop if unexpected movement occurs"));
+        caller->println(F("  • After E-Stop, clear faults before resuming operation"));
+        caller->println(F("  • Motor movements will halt automatically at travel limits"));
 
         return true;
         break;
@@ -910,8 +1123,8 @@ bool cmd_motor(char *args, CommandCaller *caller)
     default:
     {
         caller->print(F("[ERROR] Unknown motor command: "));
-        caller->println(action);
-        caller->println(F("Valid options are 'init', 'status', 'clear', 'home', 'abort', or 'stop'"));
+        caller->println(subcommand);
+        caller->println(F("Valid options are 'init', 'status', 'clear', 'home', 'abort', 'stop', or 'help'"));
         return false;
         break;
     }
@@ -934,20 +1147,20 @@ bool cmd_move(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        caller->println(F("[ERROR] Missing parameter. Usage: move,<home|1|2|3|4|counts,X|mm,X|rel,X>"));
+        caller->println(F("[ERROR] Missing parameter. Usage: move,<home|1|2|3|4|counts,X|mm,X|rel,X|help>"));
         return false;
     }
 
-    // Get the first parameter (target position)
-    char *target = strtok(trimmed, " ");
-    if (target == NULL)
+    // Get the first parameter (subcommand position)
+    char *subcommand = strtok(trimmed, " ");
+    if (subcommand == NULL)
     {
-        caller->println(F("[ERROR] Invalid format. Usage: move,<home|1|2|3|4|counts,X|mm,X|rel,X>"));
+        caller->println(F("[ERROR] Invalid format. Usage: move,<home|1|2|3|4|counts,X|mm,X|rel,X|help>"));
         return false;
     }
 
-    // Trim leading spaces from target
-    target = trimLeadingSpaces(target);
+    // Trim leading spaces from subcommand
+    subcommand = trimLeadingSpaces(subcommand);
 
     // State checks (in order of importance) for all movement commands
     // 1. Check if motor is initialized
@@ -979,15 +1192,15 @@ bool cmd_move(char *args, CommandCaller *caller)
     }
 
     // Handle predefined positions
-    if (strcmp(target, "home") == 0)
+    if (strcmp(subcommand, "home") == 0)
     {
         // Check if motor is already homed
         if (isHomed)
         {
-            caller->println(F("[MESSAGE] Moving to home position..."));
+            caller->println(F("[INFO] Moving to home position..."));
             if (moveToPositionMm(0.0))
             {
-                caller->println(F("[MESSAGE] Move to home initiated."));
+                caller->println(F("[INFO] Move to home initiated."));
                 return true;
             }
             else
@@ -1002,7 +1215,7 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(target, "1") == 0)
+    else if (strcmp(subcommand, "1") == 0)
     {
         // Check if motor is homed
         if (!isHomed)
@@ -1011,10 +1224,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
 
-        caller->println(F("[MESSAGE] Moving to position 1..."));
+        caller->println(F("[INFO] Moving to position 1..."));
         if (moveToPosition(POSITION_1))
         {
-            caller->println(F("[MESSAGE] Move to position 1 initiated."));
+            caller->println(F("[INFO] Move to position 1 initiated."));
             return true;
         }
         else
@@ -1023,7 +1236,7 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(target, "2") == 0)
+    else if (strcmp(subcommand, "2") == 0)
     {
         // Check if motor is homed
         if (!isHomed)
@@ -1032,10 +1245,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
 
-        caller->println(F("[MESSAGE] Moving to position 2..."));
+        caller->println(F("[INFO] Moving to position 2..."));
         if (moveToPosition(POSITION_2))
         {
-            caller->println(F("[MESSAGE] Move to position 2 initiated."));
+            caller->println(F("[INFO] Move to position 2 initiated."));
             return true;
         }
         else
@@ -1044,7 +1257,7 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(target, "3") == 0)
+    else if (strcmp(subcommand, "3") == 0)
     {
         // Check if motor is homed
         if (!isHomed)
@@ -1053,10 +1266,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
 
-        caller->println(F("[MESSAGE] Moving to position 3..."));
+        caller->println(F("[INFO] Moving to position 3..."));
         if (moveToPosition(POSITION_3))
         {
-            caller->println(F("[MESSAGE] Move to position 3 initiated."));
+            caller->println(F("[INFO] Move to position 3 initiated."));
             return true;
         }
         else
@@ -1065,7 +1278,7 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(target, "4") == 0)
+    else if (strcmp(subcommand, "4") == 0)
     {
         // Check if motor is homed
         if (!isHomed)
@@ -1074,10 +1287,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
 
-        caller->println(F("[MESSAGE] Moving to position 4..."));
+        caller->println(F("[INFO] Moving to position 4..."));
         if (moveToPosition(POSITION_4))
         {
-            caller->println(F("[MESSAGE] Move to position 4 initiated."));
+            caller->println(F("[INFO] Move to position 4 initiated."));
             return true;
         }
         else
@@ -1088,7 +1301,7 @@ bool cmd_move(char *args, CommandCaller *caller)
     }
 
     // Special handling for "mm" command for absolute positioning in millimeters
-    else if (strcmp(target, "mm") == 0)
+    else if (strcmp(subcommand, "mm") == 0)
     {
         // Get the mm value from the next token
         char *mmStr = strtok(NULL, " ");
@@ -1120,13 +1333,13 @@ bool cmd_move(char *args, CommandCaller *caller)
         }
 
         // Position is within bounds, proceed with movement
-        caller->print(F("[MESSAGE] Moving to absolute position: "));
+        caller->print(F("[INFO] Moving to absolute position: "));
         caller->print(targetMm, 2);
         caller->println(F(" mm"));
 
         if (moveToPositionMm(targetMm))
         {
-            caller->println(F("[MESSAGE] Movement initiated successfully."));
+            caller->println(F("[INFO] Movement initiated successfully."));
             return true;
         }
         else
@@ -1137,7 +1350,7 @@ bool cmd_move(char *args, CommandCaller *caller)
     }
 
     // Special handling for "counts" command for absolute positioning in encoder counts
-    else if (strcmp(target, "counts") == 0)
+    else if (strcmp(subcommand, "counts") == 0)
     {
         // Get the counts value from the next token
         char *countsStr = strtok(NULL, " ");
@@ -1169,13 +1382,13 @@ bool cmd_move(char *args, CommandCaller *caller)
         }
 
         // Position is within bounds, proceed with movement
-        caller->print(F("[MESSAGE] Moving to absolute position: "));
+        caller->print(F("[INFO] Moving to absolute position: "));
         caller->print(targetCounts);
         caller->println(F(" counts"));
 
         if (moveToAbsolutePosition(targetCounts))
         {
-            caller->println(F("[MESSAGE] Movement initiated successfully."));
+            caller->println(F("[INFO] Movement initiated successfully."));
             return true;
         }
         else
@@ -1186,7 +1399,7 @@ bool cmd_move(char *args, CommandCaller *caller)
     }
 
     // Special handling for "rel" command for relative positioning
-    else if (strcmp(target, "rel") == 0)
+    else if (strcmp(subcommand, "rel") == 0)
     {
         // Get the mm value from the next token
         char *relStr = strtok(NULL, " ");
@@ -1227,7 +1440,7 @@ bool cmd_move(char *args, CommandCaller *caller)
         }
 
         // Display move information
-        caller->print(F("[MESSAGE] Moving "));
+        caller->print(F("[INFO] Moving "));
         caller->print(relDistanceMm, 2);
         caller->print(F(" mm from current position ("));
         caller->print(currentPositionMm, 2);
@@ -1237,7 +1450,7 @@ bool cmd_move(char *args, CommandCaller *caller)
 
         if (moveToPositionMm(targetPositionMm))
         {
-            caller->println(F("[MESSAGE] Relative movement initiated successfully."));
+            caller->println(F("[INFO] Relative movement initiated successfully."));
             return true;
         }
         else
@@ -1246,11 +1459,58 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
     }
+    else if (strcmp(subcommand, "help") == 0)
+    {
+        caller->println(F("\n===== MOVE COMMAND HELP ====="));
+
+        caller->println(F("\nPREREQUISITES:"));
+        caller->println(F("  • Motor must be initialized (motor,init)"));
+        caller->println(F("  • Motor must be homed for accurate positioning (motor,home)"));
+        caller->println(F("  • E-Stop must be inactive"));
+        caller->println(F("  • Motor must not be in fault state"));
+        caller->println(F("  • No other movement can be in progress"));
+
+        caller->println(F("\nCOMMAND TYPES:"));
+        caller->println(F("  move,home - Move to home (zero) position"));
+        caller->println(F("    > Reference position offset 5mm from hardstop"));
+        caller->println(F("    > Always available after homing"));
+
+        caller->println(F("  move,1 through move,4 - Move to predefined positions"));
+        caller->println(F("    > Position 1: Loading position (28.7mm)"));
+        caller->println(F("    > Position 2: Middle position (456.0mm)"));
+        caller->println(F("    > Position 3: Unloading position (883.58mm)"));
+        caller->println(F("    > Position 4: Max travel (1050.0mm)"));
+
+        caller->println(F("  move,mm,X - Move to absolute position X in millimeters"));
+        caller->println(F("    > Valid range: 0 to 1050.0 mm"));
+        caller->println(F("    > Most intuitive way to specify exact positions"));
+        caller->println(F("    > Example: move,mm,500.5 - moves to 500.5mm"));
+
+        caller->println(F("  move,counts,X - Move to absolute position X in encoder counts"));
+        caller->println(F("    > Valid range: 0 to 64,333 counts"));
+        caller->println(F("    > Used for precise control or debugging"));
+        caller->println(F("    > 1mm ≈ 61.27 counts (3200 pulses/rev ÷ 52.23mm/rev)"));
+
+        caller->println(F("  move,rel,X - Move X millimeters relative to current position"));
+        caller->println(F("    > Use positive values to move forward"));
+        caller->println(F("    > Use negative values to move backward"));
+        caller->println(F("    > Example: move,rel,-10 - moves 10mm backward"));
+        caller->println(F("    > Movement is constrained to valid range (0-1050.0mm)"));
+
+        caller->println(F("\nTROUBLESHOOTING:"));
+        caller->println(F("  • If movement fails, check motor status with 'motor,status'"));
+        caller->println(F("  • If at travel limits, you can only move within the allowed range"));
+        caller->println(F("  • After E-Stop, clear faults with 'motor,clear' before moving"));
+        caller->println(F("  • For short, precise movements, consider using 'jog' commands"));
+        caller->println(F("  • For interactive positioning, use 'encoder' handwheel control"));
+
+        return true;
+    }
     else
     {
         caller->print(F("[ERROR] Invalid position: "));
-        caller->println(target);
-        caller->println(F("Valid options: home, 1, 2, 3, 4, counts, mm, rel"));
+        caller->println(subcommand);
+        caller->println(F("Valid options: home, 1, 2, 3, 4, counts, mm, rel, help"));
         return false;
     }
 
@@ -1271,23 +1531,23 @@ bool cmd_jog(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        caller->println(F("[ERROR] Missing parameter. Usage: jog,<+|-|inc|speed|status>"));
+        caller->println(F("[ERROR] Missing parameter. Usage: jog,<+|-|inc|speed|status|help>"));
         return false;
     }
 
     // Parse the argument - we'll use spaces as separators (as they've been converted from commas)
-    char *action = strtok(trimmed, " ");
-    if (action == NULL)
+    char *subcommand = strtok(trimmed, " ");
+    if (subcommand == NULL)
     {
-        caller->println(F("[ERROR] Invalid format. Usage: jog,<+|-|inc|speed|status>"));
+        caller->println(F("[ERROR] Invalid format. Usage: jog,<+|-|inc|speed|status|help>"));
         return false;
     }
 
-    // Trim leading spaces from action
-    action = trimLeadingSpaces(action);
+    // Trim leading spaces from subcommand
+    subcommand = trimLeadingSpaces(subcommand);
 
     // State checks (in order of importance) for movement commands
-    if (strcmp(action, "+") == 0 || strcmp(action, "-") == 0)
+    if (strcmp(subcommand, "+") == 0 || strcmp(subcommand, "-") == 0)
     {
         // 1. Check if motor is initialized
         if (motorState == MOTOR_STATE_NOT_READY)
@@ -1333,19 +1593,21 @@ bool cmd_jog(char *args, CommandCaller *caller)
     }
 
     // Handle jog subcommands using switch for better readability
-    int actionCode = 0;
-    if (strcmp(action, "+") == 0)
-        actionCode = 1;
-    else if (strcmp(action, "-") == 0)
-        actionCode = 2;
-    else if (strcmp(action, "inc") == 0)
-        actionCode = 3;
-    else if (strcmp(action, "speed") == 0)
-        actionCode = 4;
-    else if (strcmp(action, "status") == 0)
-        actionCode = 5;
+    int subcommandCode = 0;
+    if (strcmp(subcommand, "+") == 0)
+        subcommandCode = 1;
+    else if (strcmp(subcommand, "-") == 0)
+        subcommandCode = 2;
+    else if (strcmp(subcommand, "inc") == 0)
+        subcommandCode = 3;
+    else if (strcmp(subcommand, "speed") == 0)
+        subcommandCode = 4;
+    else if (strcmp(subcommand, "status") == 0)
+        subcommandCode = 5;
+    else if (strcmp(subcommand, "help") == 0)
+        subcommandCode = 6;
 
-    switch (actionCode)
+    switch (subcommandCode)
     {
     case 1:
     { // jog forward (+)
@@ -1366,7 +1628,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
         }
 
         // Display jog information
-        caller->print(F("[MESSAGE] Jogging forward "));
+        caller->print(F("[INFO] Jogging forward "));
         caller->print(currentJogIncrementMm, 2);
         caller->print(F(" mm from position "));
         caller->print(currentPositionMm, 2);
@@ -1377,7 +1639,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
         // Perform the jog movement using the jogMotor function
         if (jogMotor(true))
         { // true = forward direction
-            caller->println(F("[MESSAGE] Jog movement initiated"));
+            caller->println(F("[INFO] Jog movement initiated"));
             return true;
         }
         else
@@ -1405,7 +1667,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
         }
 
         // Display jog information
-        caller->print(F("[MESSAGE] Jogging backward "));
+        caller->print(F("[INFO] Jogging backward "));
         caller->print(currentJogIncrementMm, 2);
         caller->print(F(" mm from position "));
         caller->print(currentPositionMm, 2);
@@ -1416,7 +1678,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
         // Perform the jog movement using the jogMotor function
         if (jogMotor(false))
         { // false = backward direction
-            caller->println(F("[MESSAGE] Jog movement initiated"));
+            caller->println(F("[INFO] Jog movement initiated"));
             return true;
         }
         else
@@ -1434,7 +1696,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
         if (incStr == NULL)
         {
             // Just display the current increment
-            caller->print(F("[MESSAGE] Current jog increment: "));
+            caller->print(F("[INFO] Current jog increment: "));
             caller->print(currentJogIncrementMm, 2);
             caller->println(F(" mm"));
             return true;
@@ -1449,7 +1711,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
             {
                 if (setJogIncrement(DEFAULT_JOG_INCREMENT))
                 {
-                    caller->print(F("[MESSAGE] Jog increment set to default ("));
+                    caller->print(F("[INFO] Jog increment set to default ("));
                     caller->print(currentJogIncrementMm, 2);
                     caller->println(F(" mm)"));
                     return true;
@@ -1467,7 +1729,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
             // Set new jog increment
             if (setJogIncrement(newIncrement))
             {
-                caller->print(F("[MESSAGE] Jog increment set to "));
+                caller->print(F("[INFO] Jog increment set to "));
                 caller->print(currentJogIncrementMm, 2);
                 caller->println(F(" mm"));
                 return true;
@@ -1488,7 +1750,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
         if (speedStr == NULL)
         {
             // Just display the current speed
-            caller->print(F("[MESSAGE] Current jog speed: "));
+            caller->print(F("[INFO] Current jog speed: "));
             caller->print(currentJogSpeedRpm);
             caller->println(F(" RPM"));
             return true;
@@ -1503,7 +1765,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
             {
                 if (setJogSpeed(DEFAULT_JOG_SPEED, currentJogIncrementMm))
                 {
-                    caller->print(F("[MESSAGE] Jog speed set to default ("));
+                    caller->print(F("[INFO] Jog speed set to default ("));
                     caller->print(currentJogSpeedRpm);
                     caller->println(F(" RPM)"));
                     return true;
@@ -1521,7 +1783,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
             // Set new jog speed
             if (setJogSpeed(newSpeed, currentJogIncrementMm))
             {
-                caller->print(F("[MESSAGE] Jog speed set to "));
+                caller->print(F("[INFO] Jog speed set to "));
                 caller->print(currentJogSpeedRpm);
                 caller->println(F(" RPM"));
                 return true;
@@ -1538,7 +1800,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
     case 5:
     { // status
         // Display current jog settings
-        caller->println(F("[MESSAGE] Current jog settings:"));
+        caller->println(F("[INFO] Current jog settings:"));
 
         // Jog increment
         caller->print(F("  Increment: "));
@@ -1572,11 +1834,76 @@ bool cmd_jog(char *args, CommandCaller *caller)
         break;
     }
 
+    case 6: // Add the new help case here
+    {       // help
+        caller->println(F("\n===== JOG MOVEMENT SYSTEM HELP ====="));
+
+        caller->println(F("\nOVERVIEW:"));
+        caller->println(F("  The jog system provides precise, incremental movements in either direction"));
+        caller->println(F("  for accurate positioning and testing. Each jog moves the motor by a fixed"));
+        caller->println(F("  distance that you can configure."));
+
+        caller->println(F("\nCOMMAND REFERENCE:"));
+        caller->println(F("  jog,+ - Move forward by one increment"));
+        caller->println(F("    > Each press moves exactly one increment in the forward direction"));
+        caller->println(F("    > Movement stops automatically after the increment is completed"));
+        caller->println(F("  jog,- - Move backward by one increment"));
+        caller->println(F("    > Each press moves exactly one increment in the backward direction"));
+        caller->println(F("    > Movement stops automatically after the increment is completed"));
+        caller->println(F("  jog,inc,X - Set movement increment size"));
+        caller->println(F("    > X = distance in millimeters (example: jog,inc,5.0)"));
+        caller->println(F("    > Using jog,inc without a value displays the current setting"));
+        caller->println(F("    > Using jog,inc,default resets to standard increment"));
+        caller->println(F("  jog,speed,X - Set movement speed"));
+        caller->println(F("    > X = speed in RPM (example: jog,speed,300)"));
+        caller->println(F("    > Using jog,speed without a value displays the current setting"));
+        caller->println(F("    > Using jog,speed,default resets to standard speed"));
+        caller->println(F("  jog,status - Display current jog settings and position information"));
+
+        caller->println(F("\nJOG VS. HANDWHEEL COMPARISON:"));
+        caller->println(F("  Jog System (jog command):"));
+        caller->println(F("    • Fixed, precise movements with each command"));
+        caller->println(F("    • Better for repeatable, exact positioning"));
+        caller->println(F("    • Simple to use via command line"));
+        caller->println(F("    • Good for testing and calibration"));
+        caller->println(F("    • Can be used in scripts and automated sequences"));
+
+        caller->println(F("  Handwheel System (encoder command):"));
+        caller->println(F("    • Continuous, manual control with physical handwheel"));
+        caller->println(F("    • Better for interactive positioning and fine adjustments"));
+        caller->println(F("    • More intuitive for operators doing manual work"));
+        caller->println(F("    • Allows variable speed based on rotation speed"));
+        caller->println(F("    • Provides tactile feedback during positioning"));
+
+        caller->println(F("\nWHEN TO USE JOG:"));
+        caller->println(F("  • For test sequences that need repeatable movements"));
+        caller->println(F("  • When working remotely via serial connection"));
+        caller->println(F("  • When you need precisely measured movements"));
+        caller->println(F("  • For calibration procedures"));
+        caller->println(F("  • When you don't have access to the physical handwheel"));
+
+        caller->println(F("\nUSAGE TIPS:"));
+        caller->println(F("  • Set a smaller increment (1-5mm) for precise positioning"));
+        caller->println(F("  • Set a larger increment (10-50mm) for faster travel"));
+        caller->println(F("  • Use jog,status to see your current position and limits"));
+        caller->println(F("  • The motor must be homed before jogging can be used"));
+        caller->println(F("  • Jogging is automatically limited to prevent over-travel"));
+
+        caller->println(F("\nTROUBLESHOOTING:"));
+        caller->println(F("  • If jog commands fail, check if motor is initialized and homed"));
+        caller->println(F("  • If at travel limit, you can only jog in the opposite direction"));
+        caller->println(F("  • After E-Stop, clear any faults before attempting to jog"));
+        caller->println(F("  • If motor is already moving, wait for it to complete or use motor,abort"));
+
+        return true;
+        break;
+    }
+
     default:
     {
         caller->print(F("[ERROR] Unknown jog command: "));
-        caller->println(action);
-        caller->println(F("Valid options are '+', '-', 'inc', 'speed', or 'status'"));
+        caller->println(subcommand);
+        caller->println(F("Valid options are '+', '-', 'inc', 'speed', 'status', or 'help'")); // Update this line too
         return false;
         break;
     }
@@ -1600,7 +1927,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
     // If no subcommand provided, display usage
     if (subcommand == NULL || strlen(subcommand) == 0)
     {
-        caller->println(F("[MESSAGE] Usage: system,state - Display current system state"));
+        caller->println(F("[INFO] Usage: system,state - Display current system state"));
         caller->println(F("                 system,safety - Display safety validation status"));
         caller->println(F("                 system,trays - Display tray system status"));
         caller->println(F("                 system,reset - Reset system state after failure"));
@@ -1685,15 +2012,15 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         // Provide feedback on what was reset
         if (wasFaulted)
         {
-            caller->println(F("[MESSAGE] Motor fault condition cleared"));
+            caller->println(F("[INFO] Motor fault condition cleared"));
         }
 
         if (wasOperationInProgress)
         {
-            caller->println(F("[MESSAGE] Operation state cleared"));
+            caller->println(F("[INFO] Operation state cleared"));
         }
 
-        caller->println(F("[MESSAGE] System state has been reset and is ready for new commands"));
+        caller->println(F("[INFO] System state has been reset and is ready for new commands"));
 
         return true;
     }
@@ -1721,7 +2048,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        caller->println(F("[ERROR] Missing parameter. Usage: tray,<request|placed|released|status>"));
+        caller->println(F("[ERROR] Missing parameter. Usage: tray,<load|unload|placed|released|status|help>"));
         return false;
     }
 
@@ -1729,7 +2056,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
     char *subcommand = strtok(trimmed, " ");
     if (subcommand == NULL)
     {
-        caller->println(F("[ERROR] Invalid format. Usage: tray,<request|placed|released|status>"));
+        caller->println(F("[ERROR] Invalid format. Usage: tray,<load|unload|placed|released|status|help>"));
         return false;
     }
 
@@ -1743,7 +2070,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         subcommand = strtok(NULL, " ");
         if (subcommand == NULL)
         {
-            caller->println(F("[ERROR] Missing subcommand. Usage: tray,<load|unload|placed|released|status>"));
+            caller->println(F("[ERROR] Missing subcommand. Usage: tray,<load|unload|placed|released|status|help>"));
             return false;
         }
         subcommand = trimLeadingSpaces(subcommand);
@@ -1897,84 +2224,82 @@ bool cmd_tray(char *args, CommandCaller *caller)
         char *unloadPos = strstr(originalArgs, "unload");
         if (unloadPos && strstr(unloadPos + 6, "request"))
         {
-            // Command is valid, proceed with unloading
-            // Rest of your unload code...
+            // Mitsubishi robot is requesting to unload a tray
+
+            // 1. Check if there are any trays in the system to unload
+            SystemState state = captureSystemState();
+            updateTrayTrackingFromSensors(state);
+
+            if (trayTracking.totalTraysInSystem == 0)
+            {
+                caller->println(F("[INFO] No trays available to unload"));
+                caller->println(F("NO_TRAYS"));
+                return false;
+            }
+
+            // 2. Check if an operation is already in progress
+            if (operationInProgress)
+            {
+                caller->println(F("SYSTEM_BUSY"));
+                return false;
+            }
+
+            // 3. Check if there's a tray at position 1
+            if (state.tray1Present)
+            {
+                // Tray already at position 1, just need to unlock it
+                DoubleSolenoidValve *valve = getTray1Valve();
+                CylinderSensor *sensor = getTray1Sensor();
+
+                if (valve && sensor)
+                {
+                    // Unlock the tray
+                    if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
+                    {
+                        caller->println(F("[ERROR] Failed to unlock tray - sensor didn't confirm"));
+                        caller->println(F("[WARNING] Check air pressure and valve functionality"));
+                        return false;
+                    }
+
+                    caller->println(F("[NOTE] Unloading tray from position 1 (loading position)"));
+                    caller->println(F("[INFO] Tray at position 1 unlocked and ready for removal"));
+                    caller->println(F("TRAY_READY"));
+                    return true;
+                }
+                else
+                {
+                    caller->println(F("[ERROR] Failed to access tray 1 valve or sensor"));
+                    caller->println(F("VALVE_ACCESS_ERROR"));
+                    return false;
+                }
+            }
+            else
+            {
+                // Need to start unloading operation to move a tray to position 1
+                if (state.tray2Present)
+                {
+                    caller->println(F("[NOTE] Moving tray from position 2 to position 1 for unloading"));
+                }
+                else if (state.tray3Present)
+                {
+                    caller->println(F("[NOTE] Moving tray from position 3 to position 1 for unloading"));
+                }
+
+                beginOperation();
+
+                // Set the operation details
+                currentOperation.inProgress = true;
+                currentOperation.type = OPERATION_UNLOADING;
+                currentOperation.startTime = millis();
+
+                caller->println(F("PREPARING_TRAY"));
+                return true;
+            }
         }
         else
         {
             caller->println(F("[ERROR] Invalid format. Usage: tray,unload,request"));
             return false;
-        }
-        // Mitsubishi robot is requesting to unload a tray
-
-        // 1. Check if there are any trays in the system to unload
-        SystemState state = captureSystemState();
-        updateTrayTrackingFromSensors(state);
-
-        if (trayTracking.totalTraysInSystem == 0)
-        {
-            caller->println(F("[INFO] No trays available to unload"));
-            caller->println(F("NO_TRAYS"));
-            return false;
-        }
-
-        // 2. Check if an operation is already in progress
-        if (operationInProgress)
-        {
-            caller->println(F("SYSTEM_BUSY"));
-            return false;
-        }
-
-        // 3. Check if there's a tray at position 1
-        if (state.tray1Present)
-        {
-            // Tray already at position 1, just need to unlock it
-            DoubleSolenoidValve *valve = getTray1Valve();
-            CylinderSensor *sensor = getTray1Sensor();
-
-            if (valve && sensor)
-            {
-                // Unlock the tray
-                if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
-                {
-                    caller->println(F("[ERROR] Failed to unlock tray - sensor didn't confirm"));
-                    caller->println(F("[WARNING] Check air pressure and valve functionality"));
-                    return false;
-                }
-
-                caller->println(F("[NOTE] Unloading tray from position 1 (loading position)"));
-                caller->println(F("[INFO] Tray at position 1 unlocked and ready for removal"));
-                caller->println(F("TRAY_READY"));
-                return true;
-            }
-            else
-            {
-                caller->println(F("[ERROR] Failed to access tray 1 valve or sensor"));
-                caller->println(F("VALVE_ACCESS_ERROR"));
-                return false;
-            }
-        }
-        else
-        {
-            // Need to start unloading operation to move a tray to position 1
-            if (state.tray2Present)
-            {
-                caller->println(F("[NOTE] Moving tray from position 2 to position 1 for unloading"));
-            }
-            else if (state.tray3Present)
-            {
-                caller->println(F("[NOTE] Moving tray from position 3 to position 1 for unloading"));
-            }
-
-            beginOperation();
-
-            // Set the operation details
-            currentOperation.inProgress = true;
-            currentOperation.type = OPERATION_UNLOADING;
-            currentOperation.startTime = millis();
-
-            caller->println(F("PREPARING_TRAY"));
-            return true;
         }
     }
     else if (strcmp(subcommand, "removed") == 0)
@@ -2038,11 +2363,54 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         return true;
     }
+    else if (strcmp(subcommand, "help") == 0)
+    {
+        caller->println(F("\n===== TRAY SYSTEM HELP ====="));
+        caller->println(F("\nTRAY LOADING SEQUENCE:"));
+        caller->println(F("  1. tray,load,request - Request permission to load a tray"));
+        caller->println(F("     > System will validate position 1 is empty and move shuttle there"));
+        caller->println(F("     > System responds with 'READY_TO_RECEIVE' when ready"));
+        caller->println(F("  2. tray,placed - Notify system that tray has been physically placed"));
+        caller->println(F("     > System will lock the tray at position 1"));
+        caller->println(F("     > System responds with 'TRAY_SECURED' when complete"));
+        caller->println(F("  3. tray,released - Notify system to start processing the tray"));
+        caller->println(F("     > System will move tray to appropriate position based on system state"));
+        caller->println(F("     > First tray goes to position 3, second to position 2, third stays at position 1"));
+
+        caller->println(F("\nTRAY UNLOADING SEQUENCE:"));
+        caller->println(F("  1. tray,unload,request - Request permission to unload a tray"));
+        caller->println(F("     > If tray at position 1, system unlocks it and responds 'TRAY_READY'"));
+        caller->println(F("     > If tray at positions 2 or 3, system moves it to position 1 first"));
+        caller->println(F("     > System responds with 'PREPARING_TRAY' during movement"));
+        caller->println(F("  2. tray,removed - Notify system that tray has been physically removed"));
+        caller->println(F("     > System updates internal tracking"));
+        caller->println(F("     > System responds with 'TRAY_REMOVAL_CONFIRMED'"));
+
+        caller->println(F("\nTRAY STATUS COMMAND:"));
+        caller->println(F("  tray,status - Returns machine-readable status information"));
+        caller->println(F("  Returned values:"));
+        caller->println(F("    TRAYS_TOTAL:[0-3] - Total number of trays in system"));
+        caller->println(F("    POS1:[0|1] - Position 1 occupancy (0=empty, 1=occupied)"));
+        caller->println(F("    POS2:[0|1] - Position 2 occupancy (0=empty, 1=occupied)"));
+        caller->println(F("    POS3:[0|1] - Position 3 occupancy (0=empty, 1=occupied)"));
+        caller->println(F("    LOCK1:[0|1] - Position 1 lock status (0=unlocked, 1=locked)"));
+        caller->println(F("    LOCK2:[0|1] - Position 2 lock status (0=unlocked, 1=locked)"));
+        caller->println(F("    LOCK3:[0|1] - Position 3 lock status (0=unlocked, 1=locked)"));
+        caller->println(F("    LOADS:[number] - Total number of loads completed"));
+        caller->println(F("    UNLOADS:[number] - Total number of unloads completed"));
+
+        caller->println(F("\nTROUBLESHOOTING:"));
+        caller->println(F("  • If an operation fails, use 'system,reset' to reset the system state"));
+        caller->println(F("  • Use 'system,trays' for human-readable tray system status"));
+        caller->println(F("  • Use 'system,safety' to diagnose safety constraint issues"));
+
+        return true;
+    }
     else
     {
         caller->print(F("[ERROR] Unknown tray command: "));
         caller->println(subcommand);
-        caller->println(F("Valid options are 'request', 'placed', 'released', or 'status'"));
+        caller->println(F("Valid options are 'load,request', 'unload,request', 'placed', 'removed', 'released', 'status', or 'help'"));
         return false;
     }
 }
@@ -2064,20 +2432,21 @@ bool cmd_test(char *args, CommandCaller *caller)
         caller->println(F("  home     - Test homing repeatability"));
         caller->println(F("  position - Test position cycling (for tray loading)"));
         caller->println(F("  tray     - Test complete tray handling operations"));
+        caller->println(F("  help     - Display detailed test information"));
         caller->println(F("Usage: test,<test_name>"));
         return true;
     }
 
     // Parse the first argument - we'll use spaces as separators (commas converted to spaces)
-    char *testType = strtok(trimmed, " ");
-    if (testType == NULL)
+    char *subcommand = strtok(trimmed, " ");
+    if (subcommand == NULL)
     {
-        caller->println(F("[ERROR] Invalid format. Usage: test,<home|position|tray>"));
+        caller->println(F("[ERROR] Invalid format. Usage: test,<home|position|tray|help>"));
         return false;
     }
 
     // Trim leading spaces from test type
-    testType = trimLeadingSpaces(testType);
+    subcommand = trimLeadingSpaces(subcommand);
 
     // Check motor initialization first
     if (motorState == MOTOR_STATE_NOT_READY)
@@ -2094,12 +2463,12 @@ bool cmd_test(char *args, CommandCaller *caller)
     }
 
     // Run the appropriate test
-    if (strcmp(testType, "home") == 0)
+    if (strcmp(subcommand, "home") == 0)
     {
-        caller->println(F("[MESSAGE] Starting homing repeatability test..."));
+        caller->println(F("[INFO] Starting homing repeatability test..."));
         if (testHomingRepeatability())
         {
-            caller->println(F("[MESSAGE] Homing repeatability test completed successfully."));
+            caller->println(F("[INFO] Homing repeatability test completed successfully."));
             return true;
         }
         else
@@ -2108,13 +2477,13 @@ bool cmd_test(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(testType, "position") == 0)
+    else if (strcmp(subcommand, "position") == 0)
     {
-        caller->println(F("[MESSAGE] Starting position cycling test..."));
+        caller->println(F("[INFO] Starting position cycling test..."));
 
         if (testPositionCycling())
         {
-            caller->println(F("[MESSAGE] Position cycling test completed successfully."));
+            caller->println(F("[INFO] Position cycling test completed successfully."));
             return true;
         }
         else
@@ -2123,13 +2492,13 @@ bool cmd_test(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(testType, "tray") == 0)
+    else if (strcmp(subcommand, "tray") == 0)
     {
         caller->println(F("[INFO] Starting tray handling test..."));
 
         if (testTrayHandling())
         {
-            caller->println(F("[MESSAGE] Tray handling test completed successfully."));
+            caller->println(F("[INFO] Tray handling test completed successfully."));
             return true;
         }
         else
@@ -2138,11 +2507,60 @@ bool cmd_test(char *args, CommandCaller *caller)
             return false;
         }
     }
+    else if (strcmp(subcommand, "help") == 0)
+    {
+        caller->println(F("\n===== TEST SYSTEM HELP ====="));
+
+        caller->println(F("\nOVERVIEW:"));
+        caller->println(F("  The test system provides automated sequences for validating"));
+        caller->println(F("  system functionality and repeatability. Tests are designed"));
+        caller->println(F("  to verify proper operation of critical system components."));
+
+        caller->println(F("\nAVAILABLE TESTS:"));
+        caller->println(F("  test,home - Homing repeatability test"));
+        caller->println(F("    > Performs multiple homing operations to test precision"));
+        caller->println(F("    > Moves between home position and test position"));
+        caller->println(F("    > Useful for verifying encoder and limit switch reliability"));
+        caller->println(F("    > Test runs for approximately 20 cycles"));
+
+        caller->println(F("  test,position - Position cycling test"));
+        caller->println(F("    > Cycles through positions used in tray loading"));
+        caller->println(F("    > Tests movements between positions 1, 2, and 3"));
+        caller->println(F("    > Verifies motor accuracy and repeatability"));
+        caller->println(F("    > Test runs for approximately 10 cycles"));
+
+        caller->println(F("  test,tray - Comprehensive tray handling test"));
+        caller->println(F("    > Tests complete tray movement operations"));
+        caller->println(F("    > Includes valve operations for locking/unlocking"));
+        caller->println(F("    > Verifies sensors, positioning, and control sequences"));
+        caller->println(F("    > Most thorough test of the entire system"));
+
+        caller->println(F("\nRUNNING TESTS:"));
+        caller->println(F("  • Motor must be initialized (motor,init) before testing"));
+        caller->println(F("  • Home position must be established for position tests"));
+        caller->println(F("  • E-Stop must be inactive"));
+        caller->println(F("  • Tests can be aborted by typing any character"));
+        caller->println(F("  • Status messages display progress throughout the test"));
+
+        caller->println(F("\nTRAY TEST REQUIREMENTS:"));
+        caller->println(F("  • A tray must be present at position 1 to start"));
+        caller->println(F("  • Positions 2 and 3 must be clear initially"));
+        caller->println(F("  • Air system must be functioning properly"));
+        caller->println(F("  • All valves and sensors must be operational"));
+
+        caller->println(F("\nTROUBLESHOOTING:"));
+        caller->println(F("  • If a test fails, check the specific error message"));
+        caller->println(F("  • For position errors: verify motor operation with 'move' commands"));
+        caller->println(F("  • For valve errors: check air pressure and connections"));
+        caller->println(F("  • For sensor errors: verify sensor readings with 'system,state'"));
+
+        return true;
+    }
     else
     {
         caller->print(F("[ERROR] Unknown test type: "));
-        caller->println(testType);
-        caller->println(F("Available tests: 'home', 'position', 'tray'"));
+        caller->println(subcommand);
+        caller->println(F("Available tests: 'home', 'position', 'tray', or 'help'"));
         return false;
     }
 }
@@ -2161,17 +2579,11 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     if (strlen(trimmed) == 0)
     {
         // Display current encoder status
-        caller->println(F("[MESSAGE] MPG Handwheel Controls:"));
+        caller->println(F("[INFO] MPG Handwheel Controls:"));
         caller->println(F("  encoder,enable          - Enable MPG handwheel control"));
         caller->println(F("  encoder,disable         - Disable MPG handwheel control"));
         caller->println(F("  encoder,multiplier,[1|10|100] - Set movement multiplier"));
-
-        // Add the setup sequence here where users will actually see it
-        caller->println(F("\n[SETUP SEQUENCE]"));
-        caller->println(F("  1. 'motor,init' - Initialize the motor"));
-        caller->println(F("  2. 'motor,home' - Establish a reference position"));
-        caller->println(F("  3. 'encoder,enable' - Activate handwheel control"));
-        caller->println(F("  4. 'encoder,multiplier,[1|10|100]' - Set step multiplier"));
+        caller->println(F("  encoder,help            - Display detailed usage instructions"));
 
         // Show current status
         if (encoderControlActive)
@@ -2246,28 +2658,28 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         if (!motorInitialized)
         {
             caller->println(F("[ERROR] Motor must be initialized before enabling MPG control"));
-            caller->println(F("[MESSAGE] Use 'motor,init' first"));
+            caller->println(F("[INFO] Use 'motor,init' first"));
             return false;
         }
 
         if (!isHomed)
         {
             caller->println(F("[ERROR] Motor must be homed before enabling MPG control"));
-            caller->println(F("[MESSAGE] Use 'motor,home' to establish a reference position"));
+            caller->println(F("[INFO] Use 'motor,home' to establish a reference position"));
             return false;
         }
 
         if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING)
         {
             caller->println(F("[ERROR] Cannot enable MPG control while motor is moving"));
-            caller->println(F("[MESSAGE] Wait for current movement to complete or use 'motor,abort'"));
+            caller->println(F("[INFO] Wait for current movement to complete or use 'motor,abort'"));
             return false;
         }
 
         if (motorState == MOTOR_STATE_FAULTED)
         {
             caller->println(F("[ERROR] Cannot enable MPG control while motor is in fault state"));
-            caller->println(F("[MESSAGE] Use 'motor,clear' to clear fault first"));
+            caller->println(F("[INFO] Use 'motor,clear' to clear fault first"));
             return false;
         }
 
@@ -2285,15 +2697,15 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         lastEncoderPosition = 0;
         lastEncoderUpdateTime = millis();
 
-        caller->print(F("[MESSAGE] MPG handwheel control enabled - current position: "));
+        caller->print(F("[INFO] MPG handwheel control enabled - current position: "));
         caller->print(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()), 2);
         caller->println(F(" mm"));
-        caller->print(F("[MESSAGE] Using multiplier x"));
+        caller->print(F("[INFO] Using multiplier x"));
         caller->print(getMultiplierName(currentMultiplier));
         caller->print(F(" ("));
         caller->print(currentMultiplier);
         caller->println(F(")"));
-        caller->println(F("[MESSAGE] Issue 'encoder,disable' when finished with manual control"));
+        caller->println(F("[INFO] Issue 'encoder,disable' when finished with manual control"));
 
         return true;
     }
@@ -2301,7 +2713,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     {
         // Disable encoder control
         encoderControlActive = false;
-        caller->println(F("[MESSAGE] MPG handwheel control disabled"));
+        caller->println(F("[INFO] MPG handwheel control disabled"));
         return true;
     }
     else if (strcmp(subcommand, "multiplier") == 0)
@@ -2333,15 +2745,15 @@ bool cmd_encoder(char *args, CommandCaller *caller)
                 {
                 case 1:
                     setEncoderMultiplier(1);
-                    caller->println(F("[MESSAGE] Multiplier set to x1 (fine adjustment)"));
+                    caller->println(F("[INFO] Multiplier set to x1 (fine adjustment)"));
                     break;
                 case 10:
                     setEncoderMultiplier(10);
-                    caller->println(F("[MESSAGE] Multiplier set to x10 (medium adjustment)"));
+                    caller->println(F("[INFO] Multiplier set to x10 (medium adjustment)"));
                     break;
                 case 100:
                     setEncoderMultiplier(100);
-                    caller->println(F("[MESSAGE] Multiplier set to x100 (coarse adjustment)"));
+                    caller->println(F("[INFO] Multiplier set to x100 (coarse adjustment)"));
                     break;
                 default:
                     caller->println(F("[ERROR] Invalid multiplier. Use 1, 10, or 100."));
@@ -2349,10 +2761,10 @@ bool cmd_encoder(char *args, CommandCaller *caller)
                 }
 
                 // Show current multiplier and effect
-                caller->print(F("[MESSAGE] Current multiplier value: "));
+                caller->print(F("[INFO] Current multiplier value: "));
                 caller->println(currentMultiplier);
                 double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-                caller->print(F("[MESSAGE] One full rotation moves ~"));
+                caller->print(F("[INFO] One full rotation moves ~"));
                 caller->print(mmPerRotation, 2);
                 caller->println(F(" mm"));
                 return true;
@@ -2360,7 +2772,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         }
 
         // If we get here, display the current multiplier
-        caller->print(F("[MESSAGE] Current multiplier: x"));
+        caller->print(F("[INFO] Current multiplier: x"));
         caller->print(getMultiplierName(currentMultiplier));
         caller->print(F(" ("));
         caller->print(currentMultiplier);
@@ -2368,7 +2780,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
 
         // Show what one full rotation will move
         double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-        caller->print(F("[MESSAGE] One full rotation moves ~"));
+        caller->print(F("[INFO] One full rotation moves ~"));
         caller->print(mmPerRotation, 2);
         caller->println(F(" mm"));
 
@@ -2376,11 +2788,51 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     }
     else if (strcmp(subcommand, "help") == 0)
     {
-        caller->println(F("[MESSAGE] MPG Handwheel Setup & Usage:"));
-        caller->println(F("\n[SETUP SEQUENCE]"));
-        caller->println(F("  1. 'motor,init' - Initialize the motor"));
-        caller->println(F("  2. 'motor,home' - Establish a reference position"));
-        caller->println(F("  3. 'encoder,enable' - Activate handwheel control"));
+        caller->println(F("\n===== MPG HANDWHEEL SYSTEM HELP ====="));
+
+        caller->println(F("\nSETUP SEQUENCE:"));
+        caller->println(F("  1. 'motor,init' - Initialize the motor system"));
+        caller->println(F("  2. 'motor,home' - Home the motor to establish reference position"));
+        caller->println(F("  3. 'encoder,enable' - Activate MPG handwheel control"));
+        caller->println(F("  4. 'encoder,multiplier,X' - Set desired precision (X = 1, 10, or 100)"));
+
+        caller->println(F("\nCOMMAND REFERENCE:"));
+        caller->println(F("  encoder,enable - Activate handwheel control mode"));
+        caller->println(F("    > Motor position will respond directly to handwheel rotation"));
+        caller->println(F("    > One full rotation (100 pulses) moves distance based on multiplier"));
+        caller->println(F("  encoder,disable - Deactivate handwheel control mode"));
+        caller->println(F("    > Returns system to command-based position control"));
+        caller->println(F("  encoder,multiplier,X - Set movement precision"));
+        caller->println(F("    > X=1: Fine adjustment (~1.63mm per rotation)"));
+        caller->println(F("    > X=10: Medium adjustment (~16.3mm per rotation)"));
+        caller->println(F("    > X=100: Coarse adjustment (~163mm per rotation)"));
+
+        caller->println(F("\nAUTOMATIC DISABLING CONDITIONS:"));
+        caller->println(F("  • E-Stop activation - Safety override disables all motor control"));
+        caller->println(F("  • Motor fault condition - Requires 'motor,clear' to reset"));
+        caller->println(F("  • Power cycle or system reset"));
+        caller->println(F("  • When 'move' or 'jog' commands are issued"));
+
+        caller->println(F("\nMOVEMENT CONSTRAINTS:"));
+        caller->println(F("  • Hard limit at 0mm (home position)"));
+        caller->println(F("  • Hard limit at maximum travel position (~1050mm)"));
+        caller->println(F("  • Movement stops automatically at travel limits"));
+        caller->println(F("  • No movement allowed if motor is in fault state"));
+
+        caller->println(F("\nUSAGE TIPS:"));
+        caller->println(F("  • Start with x1 multiplier for precise positioning"));
+        caller->println(F("  • Use x10 or x100 for longer movements"));
+        caller->println(F("  • Monitor current position using 'motor,status' command"));
+        caller->println(F("  • Use 'encoder,disable' when finished with manual control"));
+        caller->println(F("  • Slow, steady handwheel rotation produces smoother movement"));
+
+        caller->println(F("\nTROUBLESHOOTING:"));
+        caller->println(F("  • If encoder doesn't respond: Check if motor is initialized and homed"));
+        caller->println(F("  • Erratic movement: Try lower multiplier setting"));
+        caller->println(F("  • No movement at limits: System is preventing over-travel"));
+        caller->println(F("  • After E-Stop: Must re-enable encoder control manually"));
+
+        return true;
     }
 
     return false;
@@ -2394,11 +2846,28 @@ Commander::systemCommand_t API_tree[] = {
     systemCommand("H", "Display help information for all commands", cmd_print_help),
 
     // Unified lock/unlock commands
-    systemCommand("lock", "Lock a tray or shuttle (usage: lock,1 or lock,2 or lock,3 or lock,shuttle)", cmd_lock),
-    systemCommand("unlock", "Unlock a tray, shuttle, or all valves (usage: unlock,1 or unlock,shuttle or unlock,all)", cmd_unlock), // Logging command
-    systemCommand("log", "Logging controls (usage: log,on[,interval] or log,off or log,now)", cmd_log),
+    systemCommand("lock", "Lock a tray or shuttle:\n"
+                          "  lock,1..3    - Lock specific tray position\n"
+                          "  lock,shuttle - Lock the shuttle\n"
+                          "  lock,help    - Display detailed lock instructions",
+                  cmd_lock),
 
-    // NEW: State command to display system state
+    systemCommand("unlock", "Unlock a tray, shuttle, or all valves:\n"
+                            "  unlock,1..3    - Unlock specific tray position\n"
+                            "  unlock,shuttle - Unlock the shuttle\n"
+                            "  unlock,all     - Unlock all valves\n"
+                            "  unlock,help    - Display detailed unlock instructions",
+                  cmd_unlock),
+
+    // Logging command
+    systemCommand("log", "Logging controls:\n"
+                         "  log,on[,interval] - Enable periodic logging (interval in ms)\n"
+                         "  log,off           - Disable periodic logging\n"
+                         "  log,now           - Log system state immediately\n"
+                         "  log,help          - Display detailed logging information",
+                  cmd_log),
+
+    // State command to display system state
     systemCommand("system", "System commands:\n"
                             "  system,state  - Display current system state (sensors, actuators, positions)\n"
                             "  system,safety - Display comprehensive safety validation status\n"
@@ -2413,16 +2882,18 @@ Commander::systemCommand_t API_tree[] = {
                            "  motor,clear  - Clear motor fault condition to restore operation\n"
                            "  motor,home   - Home the motor (find zero position)\n"
                            "  motor,abort  - Abort current operation gracefully\n"
-                           "  motor,stop   - Emergency stop motor movement immediately",
+                           "  motor,stop   - Emergency stop motor movement immediately\n"
+                           "  motor,help   - Display comprehensive motor control instructions",
                   cmd_motor),
 
     // Move command
     systemCommand("move", "Move motor to position:\n"
                           "  move,home      - Move to home (zero) position\n"
                           "  move,1..4      - Move to predefined positions 1 through 4\n"
-                          "  move,counts,X  - Move to absolute position X in encoder counts (0-66917)\n"
-                          "  move,mm,X      - Move to absolute position X in millimeters (0-1092.2)\n"
-                          "  move,rel,X     - Move X millimeters relative to current position (+ forward, - backward)",
+                          "  move,counts,X  - Move to absolute position X in encoder counts (0-64333)\n"
+                          "  move,mm,X      - Move to absolute position X in millimeters (0-1050.0)\n"
+                          "  move,rel,X     - Move X millimeters relative to current position (+ forward, - backward)\n"
+                          "  move,help      - Display detailed command usage and troubleshooting",
                   cmd_move),
 
     // Jog command
@@ -2431,7 +2902,8 @@ Commander::systemCommand_t API_tree[] = {
                          "  jog,-         - Jog backward by current increment\n"
                          "  jog,inc,X     - Get or set jog increment (X in mm or 'default')\n"
                          "  jog,speed,X   - Get or set jog speed (X in RPM or 'default')\n"
-                         "  jog,status    - Display current jog settings",
+                         "  jog,status    - Display current jog settings\n"
+                         "  jog,help      - Display usage instructions and comparison with handwheel",
                   cmd_jog),
 
     // Tray command
@@ -2441,14 +2913,16 @@ Commander::systemCommand_t API_tree[] = {
                           "  tray,placed    - Notify tray has been placed (Mitsubishi)\n"
                           "  tray,removed   - Notify tray has been removed (Mitsubishi)\n"
                           "  tray,released  - Notify tray has been released (Mitsubishi)\n"
-                          "  tray,status    - Get tray system status (machine-readable)",
+                          "  tray,status    - Get tray system status (machine-readable)\n"
+                          "  tray,help      - Display detailed usage instructions",
                   cmd_tray),
 
     // Test command
     systemCommand("test", "Run tests on the system:\n"
                           "  test,home     - Run homing repeatability test\n"
                           "  test,position - Run position cycling test for tray loading\n"
-                          "  test,tray     - Run tray handling test (request, place, release)",
+                          "  test,tray     - Run tray handling test (request, place, release)\n"
+                          "  test,help     - Display detailed test information and requirements",
                   cmd_test),
 
     // Encoder control commands

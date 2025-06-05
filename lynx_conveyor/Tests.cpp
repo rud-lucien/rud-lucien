@@ -965,7 +965,7 @@ bool testTrayHandling()
     // Set test flag
     testInProgress = true;
 
-    const int NUM_CYCLES = 50;                             // Number of test cycles to run
+    const int NUM_CYCLES = 100;                             // Number of test cycles to run
     const unsigned long WAIT_TIME_MS = 5000;               // Fixed 5-second wait time at each position
     const unsigned long VALVE_DELAY_MS = 1000;             // Delay between valve operations to prevent race conditions
     const unsigned long ADDITIONAL_UNLOCK_DELAY_MS = 2000; // Additional safety delay after tray unlock before moving
