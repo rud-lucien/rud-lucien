@@ -22,7 +22,7 @@ extern bool operationInProgress;
 
 // Global flag to indicate a test is running
 extern bool testInProgress;
-extern bool testAbortRequested;
+extern volatile bool testAbortRequested;
 
 // Function declarations
 void initCommandHandler();

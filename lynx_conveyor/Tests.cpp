@@ -1,5 +1,33 @@
 #include "Tests.h"
 
+bool checkSerialForAbortCommand() 
+{
+    if (Serial.available() && Serial.peek() == 'a') 
+    {
+        String cmd = Serial.readStringUntil('\n');
+        if (cmd.indexOf("abort") >= 0) 
+        {
+            testAbortRequested = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool checkForAbort()
+{
+    if (testAbortRequested)
+    {
+        Console.info(F("Test aborted by user"));
+        stopMotion();
+        motorState = MOTOR_STATE_IDLE;
+        testInProgress = false;
+        testAbortRequested = false; // Reset the flag
+        return true;                // Test should exit
+    }
+    return false; // Test can continue
+}
+
 // Test homing repeatability by performing multiple home-move cycles
 bool testHomingRepeatability()
 {
@@ -50,7 +78,7 @@ bool testHomingRepeatability()
     }
 
     Console.info(F("Starting homing repeatability test"));
-    Console.info(F("To abort, type any character"));
+    Console.info(F("To abort, type 'abort'"));
     Console.print(F("[INFO] Will perform "));
     Console.print(NUM_CYCLES);
     Console.print(F(" cycles of: home -> wait -> move to "));
@@ -62,14 +90,11 @@ bool testHomingRepeatability()
 
     while (testRunning)
     {
+        checkSerialForAbortCommand();
+
         // Check for abort command
-        if (testAbortRequested)
+        if (checkForAbort())
         {
-            Console.info(F("Test aborted by user"));
-            stopMotion();
-            motorState = MOTOR_STATE_IDLE;
-            testInProgress = false;
-            testAbortRequested = false; // Reset the flag
             return false;
         }
 
@@ -98,6 +123,10 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_INITIAL_HOMING:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Start homing
             Console.info(F("Homing..."));
             if (!initiateHomingSequence())
@@ -111,6 +140,10 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_WAIT_FOR_HOMING_COMPLETE:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Print status every 2 seconds for user feedback
             static unsigned long lastStatusPrint = 0;
             if (currentTime - lastStatusPrint > 2000)
@@ -199,7 +232,11 @@ bool testHomingRepeatability()
             }
             break;
 
-        case PHASE_PAUSE_AFTER_HOMING: // Renamed state
+        case PHASE_PAUSE_AFTER_HOMING:
+            if (checkForAbort())
+            {
+                return false;
+            }
             if (currentTime - lastActionTime >= WAIT_TIME_MS)
             {
                 currentPhase = PHASE_MOVE_TO_POSITION;
@@ -208,6 +245,10 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_MOVE_TO_POSITION:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move to test position
             Console.print(F("[INFO] Moving to "));
             Console.print(TEST_POSITION_MM);
@@ -223,6 +264,10 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_WAIT_FOR_MOVE_COMPLETE:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add diagnostic printing to track move progress
             static unsigned long lastMoveStatusPrint = 0;
             if (currentTime - lastMoveStatusPrint > 2000)
@@ -287,7 +332,11 @@ bool testHomingRepeatability()
             }
             break;
 
-        case PHASE_PAUSE_AFTER_MOVE: // Renamed state
+        case PHASE_PAUSE_AFTER_MOVE:
+            if (checkForAbort())
+            {
+                return false;
+            }
             if (currentTime - lastActionTime >= WAIT_TIME_MS)
             {
                 currentPhase = PHASE_REPEAT_HOMING;
@@ -296,6 +345,10 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_REPEAT_HOMING:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Home again
             Console.info(F("Homing again..."));
             if (!initiateHomingSequence())
@@ -309,6 +362,10 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_WAIT_FOR_REPEAT_HOME:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Print status periodically
             static unsigned long lastRepeatStatusPrint = 0;
             if (currentTime - lastRepeatStatusPrint > 2000)
@@ -387,6 +444,10 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_PAUSE_BEFORE_NEXT_CYCLE:
+            if (checkForAbort())
+            {
+                return false;
+            }
             if (currentTime - lastActionTime >= 2000)
             {                               // 2 second non-blocking pause
                 currentPhase = PHASE_START; // Move to next cycle after pause
@@ -462,7 +523,7 @@ bool testPositionCycling()
     }
 
     Console.info(F("Starting position cycling test"));
-    Console.info(F("To abort, type any character"));
+    Console.info(F("To abort, type 'abort'"));
     Console.print(F("[INFO] Will perform "));
     Console.print(NUM_CYCLES);
     Console.println(F(" cycles of: Pos1 -> Pos3 -> Pos1 -> Pos2 -> Pos1"));
@@ -474,14 +535,11 @@ bool testPositionCycling()
 
     while (testRunning)
     {
+        checkSerialForAbortCommand();
+
         // Check for abort command
-        if (testAbortRequested)
+        if (checkForAbort())
         {
-            Console.info(F("Test aborted by user"));
-            stopMotion();
-            motorState = MOTOR_STATE_IDLE;
-            testInProgress = false;
-            testAbortRequested = false; // Reset the flag
             return false;
         }
 
@@ -505,6 +563,11 @@ bool testPositionCycling()
             Console.print(cyclesCompleted + 1);
             Console.print(F(" of "));
             Console.println(NUM_CYCLES);
+
+            if (checkForAbort())
+            {
+                return false;
+            }
 
             // IMPROVEMENT 1: Replace blocking code with non-blocking state pattern
             // First check we're at position 1
@@ -533,6 +596,10 @@ bool testPositionCycling()
             break; // Exit the switch case, not the function
 
         case PHASE_MOVE_TO_POSITION_3:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move from Position 1 to Position 3
             Console.info(F("Moving: Position 1 -> Position 3"));
             if (!moveToPosition(POSITION_3))
@@ -547,6 +614,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_WAIT_FOR_MOVE_TO_3:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // IMPROVEMENT 2: Add periodic status updates during waiting
             static unsigned long lastPos3StatusPrint = 0;
             if (currentTime - lastPos3StatusPrint > 2000)
@@ -610,6 +681,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_PAUSE_AT_POSITION_3:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait at Position 3
             // IMPROVEMENT 2: Add status updates during wait phases
             static unsigned long lastWaitPos3Print = 0;
@@ -633,6 +708,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_MOVE_TO_POSITION_1:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move from Position 3 to Position 1
             Console.info(F("Moving: Position 3 -> Position 1"));
             if (!moveToPosition(POSITION_1))
@@ -647,6 +726,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_WAIT_FOR_MOVE_TO_1:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // IMPROVEMENT 2: Add periodic status updates during waiting
             static unsigned long lastPos1StatusPrint = 0;
             if (currentTime - lastPos1StatusPrint > 2000)
@@ -710,6 +793,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_PAUSE_AT_POSITION_1:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait at Position 1
             // IMPROVEMENT 2: Add status updates during wait phases
             static unsigned long lastWaitPos1Print = 0;
@@ -733,6 +820,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_MOVE_TO_POSITION_2:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move from Position 1 to Position 2
             Console.info(F("Moving: Position 1 -> Position 2"));
             if (!moveToPosition(POSITION_2))
@@ -747,6 +838,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_WAIT_FOR_MOVE_TO_2:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // IMPROVEMENT 2: Add periodic status updates during waiting
             static unsigned long lastPos2StatusPrint = 0;
             if (currentTime - lastPos2StatusPrint > 2000)
@@ -809,6 +904,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_PAUSE_AT_POSITION_2:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait at Position 2
             // IMPROVEMENT 2: Add status updates during wait phases
             static unsigned long lastWaitPos2Print = 0;
@@ -832,6 +931,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_MOVE_BACK_TO_POSITION_1:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move from Position 2 back to Position 1
             Console.info(F("Moving: Position 2 -> Position 1"));
             if (!moveToPosition(POSITION_1))
@@ -846,6 +949,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_WAIT_FOR_MOVE_BACK_TO_1:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // IMPROVEMENT 2: Add periodic status updates during waiting
             static unsigned long lastPosBack1StatusPrint = 0;
             if (currentTime - lastPosBack1StatusPrint > 2000)
@@ -920,6 +1027,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_PAUSE_BEFORE_NEXT_CYCLE:
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Short pause before next cycle
             // IMPROVEMENT 2: Add status updates during wait phases
             static unsigned long lastPauseCycleStatusPrint = 0;
@@ -965,7 +1076,7 @@ bool testTrayHandling()
     // Set test flag
     testInProgress = true;
 
-    const int NUM_CYCLES = 100;                             // Number of test cycles to run
+    const int NUM_CYCLES = 30;                             // Number of test cycles to run
     const unsigned long WAIT_TIME_MS = 5000;               // Fixed 5-second wait time at each position
     const unsigned long VALVE_DELAY_MS = 1000;             // Delay between valve operations to prevent race conditions
     const unsigned long ADDITIONAL_UNLOCK_DELAY_MS = 2000; // Additional safety delay after tray unlock before moving
@@ -1104,7 +1215,7 @@ bool testTrayHandling()
     }
 
     Console.info(F("This test includes empty shuttle returns and valve delays"));
-    Console.info(F("To abort, type any character"));
+    Console.info(F("To abort, type 'abort'"));
     Console.print(F("[INFO] Will perform "));
     Console.print(NUM_CYCLES);
     Console.println(F(" cycles of tray handling operations"));
@@ -1122,15 +1233,12 @@ bool testTrayHandling()
 
     while (testRunning)
     {
+        checkSerialForAbortCommand();
+        
         // Check for abort command
-        if (testAbortRequested)
+        if (checkForAbort())
         {
-            Console.info(F("Test aborted by user"));
-            stopMotion();
-            motorState = MOTOR_STATE_IDLE;
-            testInProgress = false;
-            testInProgress = false;
-            return false;
+            return false; // Exit the test function with failure
         }
 
         // Check for E-Stop condition
@@ -1149,18 +1257,29 @@ bool testTrayHandling()
         switch (currentPhase)
         {
         case PHASE_START:
-        {
-            Console.print(F("[INFO] Starting tray handling cycle "));
-            Console.print(cyclesCompleted + 1);
-            Console.print(F(" of "));
-            Console.println(NUM_CYCLES);
-            currentPhase = PHASE_CHECK_POSITION_1;
-            lastActionTime = currentTime;
-            break;
-        }
+
+            if (checkForAbort())
+            {
+                return false;
+            }
+
+            {
+                Console.print(F("[INFO] Starting tray handling cycle "));
+                Console.print(cyclesCompleted + 1);
+                Console.print(F(" of "));
+                Console.println(NUM_CYCLES);
+                currentPhase = PHASE_CHECK_POSITION_1;
+                lastActionTime = currentTime;
+                break;
+            }
 
         case PHASE_CHECK_POSITION_1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
+
             // First check we're at position 1
             if (abs(getMotorPositionMm() - POSITION_1_MM) > POSITION_TOLERANCE_MM)
             {
@@ -1187,6 +1306,11 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_TO_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
+
             // Monitor movement to position 1
             static unsigned long lastInitMoveStatusPrint = 0;
             if (currentTime - lastInitMoveStatusPrint > 2000)
@@ -1253,6 +1377,10 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if tray is present at position 1
             Console.info(F("Checking for tray at Position 1..."));
             if (!isTrayPresentAtPosition(1))
@@ -1272,6 +1400,10 @@ bool testTrayHandling()
         // Add new case for tray settling
         case PHASE_TRAY_SETTLING_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
@@ -1291,6 +1423,10 @@ bool testTrayHandling()
 
         case PHASE_LOCK_TRAY_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Lock tray at position 1
             Console.info(F("Locking tray at Position 1..."));
             DoubleSolenoidValve *valve1 = getTray1Valve();
@@ -1324,6 +1460,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_TRAY_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay between valve operations to prevent race conditions
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -1336,6 +1476,10 @@ bool testTrayHandling()
 
         case PHASE_LOCK_SHUTTLE_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Lock shuttle (position 1)
             Console.info(F("Locking shuttle at Position 1..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
@@ -1369,6 +1513,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay between valve operations to prevent race conditions
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -1381,6 +1529,10 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_TRAY_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Unlock tray at position 1
             Console.info(F("Unlocking tray at Position 1..."));
             DoubleSolenoidValve *valve1 = getTray1Valve();
@@ -1414,6 +1566,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -1426,6 +1582,10 @@ bool testTrayHandling()
 
         case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Additional delay before checking if we can move
             if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
@@ -1438,6 +1598,10 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_STILL_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if tray is still present before moving
             Console.info(F("Verifying tray is still at Position 1..."));
             if (!isTrayPresentAtPosition(1))
@@ -1455,6 +1619,10 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if there's already a tray at position 3 (collision risk)
             Console.info(F("Checking if Position 3 is clear..."));
             if (isTrayPresentAtPosition(3))
@@ -1472,6 +1640,10 @@ bool testTrayHandling()
 
         case PHASE_MOVE_TO_POSITION_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move from Position 1 to Position 3
             Console.info(F("Moving: Position 1 -> Position 3"));
             if (!moveToPosition(POSITION_3))
@@ -1488,6 +1660,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_TO_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Monitor movement to position 3
             static unsigned long lastPos3StatusPrint = 0;
             if (currentTime - lastPos3StatusPrint > 2000)
@@ -1553,6 +1729,10 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_AT_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if tray moved with shuttle to position 3
             Console.info(F("Checking for tray at Position 3..."));
             if (!isTrayPresentAtPosition(3))
@@ -1572,6 +1752,10 @@ bool testTrayHandling()
         // Add new case for tray settling at position 3
         case PHASE_TRAY_SETTLING_AT_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
@@ -1591,6 +1775,10 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_SHUTTLE_AT_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Unlock shuttle at position 3
             Console.info(F("Unlocking shuttle at Position 3..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
@@ -1624,6 +1812,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -1636,6 +1828,10 @@ bool testTrayHandling()
 
         case PHASE_LOCK_TRAY_AT_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Lock tray at position 3
             Console.info(F("Locking tray at Position 3..."));
             DoubleSolenoidValve *valve3 = getTray3Valve();
@@ -1669,6 +1865,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_TRAY_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay between operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -1681,6 +1881,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait at Position 3
             static unsigned long lastWaitPos3Print = 0;
             if (currentTime - lastWaitPos3Print > 2000)
@@ -1704,6 +1908,10 @@ bool testTrayHandling()
 
         case PHASE_RETURN_TO_POS1_FROM_POS3_EMPTY:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Return empty shuttle to position 1
             Console.info(F("Moving empty shuttle: Position 3 -> Position 1"));
             if (!moveToPosition(POSITION_1))
@@ -1720,6 +1928,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_RETURN_TO_POS1_EMPTY:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait for empty return move to complete
             static unsigned long lastEmptyReturnStatusPrint = 0;
             if (currentTime - lastEmptyReturnStatusPrint > 2000)
@@ -1784,6 +1996,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS1_EMPTY:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait at position 1 with empty shuttle
             static unsigned long lastWaitPos1EmptyPrint = 0;
             if (currentTime - lastWaitPos1EmptyPrint > 2000)
@@ -1807,6 +2023,10 @@ bool testTrayHandling()
 
         case PHASE_RETURN_TO_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Return to position 3 to pick up tray
             Console.info(F("Moving empty shuttle back: Position 1 -> Position 3"));
             if (!moveToPosition(POSITION_3))
@@ -1823,6 +2043,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_RETURN_TO_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait for move back to position 3
             static unsigned long lastReturnToPos3StatusPrint = 0;
             if (currentTime - lastReturnToPos3StatusPrint > 2000)
@@ -1897,6 +2121,10 @@ bool testTrayHandling()
 
         case PHASE_LOCK_SHUTTLE_AT_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Lock shuttle at position 3
             Console.info(F("Locking shuttle at Position 3..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
@@ -1930,6 +2158,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -1942,6 +2174,10 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_TRAY_AT_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Unlock tray at position 3
             Console.info(F("Unlocking tray at Position 3..."));
             DoubleSolenoidValve *valve3 = getTray3Valve();
@@ -1975,6 +2211,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay between operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -1987,6 +2227,10 @@ bool testTrayHandling()
 
         case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Additional delay before checking if we can move
             if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
@@ -1999,6 +2243,10 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS1_AGAIN:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if there's already a tray at position 1 (collision risk)
             Console.info(F("Checking if Position 1 is clear for return..."));
             if (isTrayPresentAtPosition(1))
@@ -2016,6 +2264,10 @@ bool testTrayHandling()
 
         case PHASE_MOVE_TO_POSITION_1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move from Position 3 to Position 1
             Console.info(F("Moving: Position 3 â†’ Position 1"));
             if (!moveToPosition(POSITION_1))
@@ -2032,6 +2284,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_TO_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Monitor movement back to position 1
             static unsigned long lastPos1From3StatusPrint = 0;
             if (currentTime - lastPos1From3StatusPrint > 2000)
@@ -2096,6 +2352,10 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_AT_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if tray is at position 1 after return from position 3
             Console.info(F("Checking for tray at Position 1..."));
             if (!isTrayPresentAtPosition(1))
@@ -2115,6 +2375,10 @@ bool testTrayHandling()
         // Add new case for tray settling
         case PHASE_TRAY_SETTLING_AT_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
@@ -2134,6 +2398,10 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_SHUTTLE_AT_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Unlock shuttle at position 1 after return from position 3
             Console.info(F("Unlocking shuttle at Position 1..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
@@ -2167,6 +2435,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -2179,6 +2451,10 @@ bool testTrayHandling()
 
         case PHASE_LOCK_TRAY_AT_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Lock tray at position 1 after return from position 3
             Console.info(F("Locking tray at Position 1..."));
             DoubleSolenoidValve *valve1 = getTray1Valve();
@@ -2212,6 +2488,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_TRAY_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -2224,6 +2504,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait at Position 1
             static unsigned long lastWaitPos1Print = 0;
             if (currentTime - lastWaitPos1Print > 2000)
@@ -2246,6 +2530,10 @@ bool testTrayHandling()
 
         case PHASE_LOCK_SHUTTLE_AT_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Lock shuttle at position 1 before moving to position 2
             Console.info(F("Locking shuttle at Position 1..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
@@ -2279,6 +2567,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1_FROM_3:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -2291,6 +2583,10 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_TRAY_AT_POS1_AGAIN:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Unlock tray at position 1 before moving to position 2
             Console.info(F("Unlocking tray at Position 1..."));
             DoubleSolenoidValve *valve1 = getTray1Valve();
@@ -2325,6 +2621,10 @@ bool testTrayHandling()
         // Implementation for Position 1 (again)
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1_AGAIN:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -2337,6 +2637,10 @@ bool testTrayHandling()
 
         case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1_AGAIN:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Additional delay before checking if we can move
             if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
@@ -2349,6 +2653,10 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_STILL_AT_POS1_AGAIN:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if tray is still present before moving to position 2
             Console.info(F("Verifying tray is still at Position 1..."));
             if (!isTrayPresentAtPosition(1))
@@ -2366,6 +2674,10 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if there's already a tray at position 2 (collision risk)
             Console.info(F("Checking if Position 2 is clear..."));
             if (isTrayPresentAtPosition(2))
@@ -2383,6 +2695,10 @@ bool testTrayHandling()
 
         case PHASE_MOVE_TO_POSITION_2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move from Position 1 to Position 2
             Console.info(F("Moving: Position 1 -> Position 2"));
             if (!moveToPosition(POSITION_2))
@@ -2399,6 +2715,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_TO_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Monitor movement to position 2
             static unsigned long lastPos2StatusPrint = 0;
             if (currentTime - lastPos2StatusPrint > 2000)
@@ -2464,6 +2784,10 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_AT_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if tray is at position 2
             Console.info(F("Checking for tray at Position 2..."));
             if (!isTrayPresentAtPosition(2))
@@ -2483,6 +2807,10 @@ bool testTrayHandling()
         // Add new case for tray settling
         case PHASE_TRAY_SETTLING_AT_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
@@ -2502,6 +2830,10 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_SHUTTLE_AT_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Unlock shuttle at position 2
             Console.info(F("Unlocking shuttle at Position 2..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
@@ -2535,6 +2867,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -2547,6 +2883,10 @@ bool testTrayHandling()
 
         case PHASE_LOCK_TRAY_AT_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Lock tray at position 2
             Console.info(F("Locking tray at Position 2..."));
             DoubleSolenoidValve *valve2 = getTray2Valve();
@@ -2580,6 +2920,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_TRAY_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -2592,6 +2936,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait at Position 2
             static unsigned long lastWaitPos2Print = 0;
             if (currentTime - lastWaitPos2Print > 2000)
@@ -2615,6 +2963,10 @@ bool testTrayHandling()
 
         case PHASE_RETURN_TO_POS1_FROM_POS2_EMPTY:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Return empty shuttle to position 1 from position 2
             Console.info(F("Moving empty shuttle: Position 2 -> Position 1"));
             if (!moveToPosition(POSITION_1))
@@ -2631,6 +2983,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_RETURN_TO_POS1_FROM_POS2_EMPTY:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait for empty return move to complete from position 2
             static unsigned long lastEmptyReturnFromPos2StatusPrint = 0;
             if (currentTime - lastEmptyReturnFromPos2StatusPrint > 2000)
@@ -2695,6 +3051,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS1_EMPTY_FROM_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait at position 1 with empty shuttle from position 2
             static unsigned long lastWaitPos1EmptyFromPos2Print = 0;
             if (currentTime - lastWaitPos1EmptyFromPos2Print > 2000)
@@ -2718,6 +3078,10 @@ bool testTrayHandling()
 
         case PHASE_RETURN_TO_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Return to position 2 to pick up tray
             Console.info(F("Moving empty shuttle back: Position 1 -> Position 2"));
             if (!moveToPosition(POSITION_2))
@@ -2734,6 +3098,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_RETURN_TO_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait for move back to position 2
             static unsigned long lastReturnToPos2StatusPrint = 0;
             if (currentTime - lastReturnToPos2StatusPrint > 2000)
@@ -2808,6 +3176,10 @@ bool testTrayHandling()
 
         case PHASE_LOCK_SHUTTLE_AT_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Lock shuttle at position 2
             Console.info(F("Locking shuttle at Position 2..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
@@ -2841,6 +3213,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -2853,6 +3229,10 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_TRAY_AT_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Unlock tray at position 2
             Console.info(F("Unlocking tray at Position 2..."));
             DoubleSolenoidValve *valve2 = getTray2Valve();
@@ -2886,6 +3266,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -2898,6 +3282,10 @@ bool testTrayHandling()
 
         case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS2:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Additional delay before checking if we can move
             if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
@@ -2910,6 +3298,10 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS1_BEFORE_RETURN:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Check if there's already a tray at position 1 (collision risk)
             Console.info(F("Checking if Position 1 is clear for final return..."));
             if (isTrayPresentAtPosition(1))
@@ -2927,6 +3319,10 @@ bool testTrayHandling()
 
         case PHASE_MOVE_BACK_TO_POSITION_1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Move from Position 2 back to Position 1
             Console.info(F("Moving: Position 2 -> Position 1"));
             if (!moveToPosition(POSITION_1))
@@ -2943,6 +3339,10 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_BACK_TO_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Monitor movement back to position 1
             static unsigned long lastMoveBackPos1StatusPrint = 0;
             if (currentTime - lastMoveBackPos1StatusPrint > 2000)
@@ -3022,6 +3422,10 @@ bool testTrayHandling()
         // Verification phase - checks tray is present before settling
         case PHASE_VERIFY_TRAY_BACK_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Double-check tray is present at position 1
             if (!isTrayPresentAtPosition(1))
             {
@@ -3040,6 +3444,10 @@ bool testTrayHandling()
         // Tray settling phase - adds delay before continuing
         case PHASE_TRAY_SETTLING_BACK_AT_POS1:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
@@ -3078,6 +3486,10 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_SHUTTLE_END_OF_CYCLE:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Unlock shuttle at the end of cycle
             Console.info(F("Unlocking shuttle at end of cycle..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
@@ -3111,6 +3523,10 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_END_OF_CYCLE:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
@@ -3122,6 +3538,10 @@ bool testTrayHandling()
 
         case PHASE_PAUSE_BEFORE_NEXT_CYCLE:
         {
+            if (checkForAbort())
+            {
+                return false;
+            }
             // Short pause before next cycle
             static unsigned long lastPauseCycleStatusPrint = 0;
             if (currentTime - lastPauseCycleStatusPrint > 2000)
@@ -3153,13 +3573,10 @@ bool testTrayHandling()
             return true;
             break; // Note: This break is never reached because of the return
         }
-        } 
+        }
 
-        
         delayMicroseconds(100);
+    }
 
-    } 
-
-    
     return false;
-} 
+}

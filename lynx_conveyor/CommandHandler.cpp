@@ -2,7 +2,7 @@
 
 // Global test control flags
 bool testInProgress = false;
-bool testAbortRequested = false;
+volatile bool testAbortRequested = false;
 
 void initCommandHandler()
 {
@@ -152,22 +152,6 @@ void handleSerialCommands()
     while (Serial.available())
     {
         char c = Serial.read();
-
-        // Special handling for test mode - any input aborts
-        if (testInProgress && c != '\r' && c != '\n')
-        {
-            // Set the abort flag instead of just returning
-            testAbortRequested = true;
-
-            // Clear the entire buffer to prevent multiple abort triggers
-            while (Serial.available() > 0)
-            {
-                Serial.read();
-            }
-
-            // Don't process the character as a command
-            return;
-        }
 
         if (c == '\n')
         {

@@ -70,6 +70,7 @@ void setup()
 // The main loop
 void loop()
 {
+    
     unsigned long currentTime = millis();
 
     // Check for E-stop condition (highest priority)
@@ -132,6 +133,18 @@ void loop()
     if (encoderControlActive)
     {
         processEncoderInput();
+    }
+
+    // Check for test abort requested
+    if (testAbortRequested && testInProgress) {
+        Console.info(F("Test abort detected in main loop - forcing immediate stop"));
+        stopMotion();  // Stop any motor movement
+        motorState = MOTOR_STATE_IDLE;
+        testInProgress = false;
+        testAbortRequested = false;        
+        // Reset any valve operations in progress
+        // Add other test cleanup as needed
+        Console.info(F("Test aborted successfully"));
     }
 }
 

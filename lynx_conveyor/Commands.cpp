@@ -2488,7 +2488,7 @@ bool cmd_test(char *args, CommandCaller *caller)
         }
         else
         {
-            caller->println(F("[ERROR] Position cycling test failed or was aborted."));
+            caller->println(F("[INFO] Position cycling test failed or was aborted."));
             return false;
         }
     }
@@ -2539,7 +2539,7 @@ bool cmd_test(char *args, CommandCaller *caller)
         caller->println(F("  • Motor must be initialized (motor,init) before testing"));
         caller->println(F("  • Home position must be established for position tests"));
         caller->println(F("  • E-Stop must be inactive"));
-        caller->println(F("  • Tests can be aborted by typing any character"));
+        caller->println(F("  • Tests can be aborted by typing 'abort' during execution"));
         caller->println(F("  • Status messages display progress throughout the test"));
 
         caller->println(F("\nTRAY TEST REQUIREMENTS:"));
@@ -2564,6 +2564,7 @@ bool cmd_test(char *args, CommandCaller *caller)
         return false;
     }
 }
+
 
 bool cmd_encoder(char *args, CommandCaller *caller)
 {
@@ -2924,6 +2925,8 @@ Commander::systemCommand_t API_tree[] = {
                           "  test,tray     - Run tray handling test (request, place, release)\n"
                           "  test,help     - Display detailed test information and requirements",
                   cmd_test),
+
+
 
     // Encoder control commands
     systemCommand("encoder", "Encoder handwheel control:\n"
