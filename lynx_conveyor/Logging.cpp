@@ -104,6 +104,10 @@ void logSystemState()
     bool hlfbAsserted = MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED;
     Console.print(hlfbAsserted ? F("ASSERTED") : F("NOT_ASSERTED"));
 
+    Console.print(F(", Clients="));
+    int clientCount = getConnectedClientCount();
+    Console.print(clientCount);
+
     // 4. POSITION GROUP with improved naming
     Console.print(F(" | Position: "));
     double calculatedPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());

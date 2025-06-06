@@ -166,3 +166,13 @@ bool sendToAllClients(const char *message)
 
     return success;
 }
+
+int getConnectedClientCount() {
+    int count = 0;
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++) {
+        if (clients[i] && clients[i].connected()) {
+            count++;
+        }
+    }
+    return count;
+}

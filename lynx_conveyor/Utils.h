@@ -10,6 +10,7 @@
 #include "Commands.h"
 #include "EncoderController.h"
 #include "OutputManager.h"
+#include "EthernetController.h"
 
 // Forward declarations of types from other headers
 // to avoid circular dependencies

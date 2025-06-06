@@ -22,5 +22,6 @@ extern char ethernetCommandBuffer[MAX_PACKET_LENGTH];
 void initEthernetController(bool useDhcp = true);
 void processEthernetConnections();
 bool sendToAllClients(const char* message);
+int getConnectedClientCount();
 
 #endif // ETHERNET_CONTROLLER_H

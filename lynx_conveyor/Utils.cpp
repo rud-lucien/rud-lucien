@@ -1,6 +1,5 @@
 #include "Utils.h"
 
-
 // Define variables that were declared in Utils.h
 // Position tracking
 double commandedPositionMm = -1; // Initialize to -1
@@ -399,6 +398,11 @@ void printSystemState(const SystemState &state)
     Console.println(F("\n  Hardware Status:"));
     Console.print(F("    CCIO Board: "));
     Console.println(state.ccioBoardPresent ? F("PRESENT") : F("NOT DETECTED"));
+
+    // Add this new section for network status
+    Console.print(F("    Network Clients: "));
+    Console.print(getConnectedClientCount());
+    Console.println(F(" connected"));
 
     // Add summary of critical safety conditions
     Console.println(F("\n  Safety Summary:"));
