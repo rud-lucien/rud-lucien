@@ -3,6 +3,9 @@
 
 #include <Arduino.h>
 
+// Forward declaration of persistentClient
+extern Stream* persistentClient;
+
 // Class to handle output to multiple destinations (Serial, Ethernet, etc.)
 class MultiPrint : public Stream
 {
@@ -11,14 +14,32 @@ private:
     Print *outputs[MAX_OUTPUTS];
     int outputCount;
     Stream *primaryInput; // Designated input source (usually Serial)
+    Stream *currentClient; // Current client connection for command output
 
 public:
-    MultiPrint() : outputCount(0), primaryInput(nullptr) {}
+    MultiPrint() : outputCount(0), primaryInput(nullptr), currentClient(nullptr) {}
 
     // Set the primary input source for reading operations
     void setPrimaryInput(Stream *input)
     {
         primaryInput = input;
+    }
+
+    // Set the current client for temporary output redirection
+    void setCurrentClient(Stream *client)
+    {
+        currentClient = client;
+        
+        // When setting a new client, also update persistent client
+        if (client != nullptr) {
+            persistentClient = client;
+        }
+    }
+
+    // Get the current client
+    Stream* getCurrentClient()
+    {
+        return currentClient;
     }
 
     // Add/remove output destinations
@@ -60,6 +81,13 @@ public:
     // Legacy method (now maps to info)
     void message(const char *msg) { info(msg); }
     void message(const __FlashStringHelper *msg) { info(msg); }
+
+    // Set the client if none is currently set
+    void setClientIfNone(Stream* client) {
+        if (currentClient == nullptr) {
+            currentClient = client;
+        }
+    }
 };
 
 // Global instance
@@ -71,7 +99,7 @@ extern MultiPrint Console;
 #define LOG_DIAG(msg) Console.diagnostic(F(msg))
 #define LOG_SAFETY(msg) Console.safety(F(msg))
 #define LOG_WARN(msg) Console.warning(F(msg))
-#define LOG_MSG(msg) Console.log(F(msg)) // General logging
+#define LOG_MSG(msg) Console.info(F(msg)) // Fixed from log to info
 #define LOG_SERIAL_CMD(msg) Console.serialCommand(F(msg))
 #define LOG_ETH_CMD(msg) Console.ethernetCommand(F(msg))
 

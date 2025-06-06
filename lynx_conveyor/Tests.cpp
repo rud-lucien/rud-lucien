@@ -1,17 +1,55 @@
 #include "Tests.h"
 
-bool checkSerialForAbortCommand() 
+bool checkSerialForAbortCommand()
 {
-    if (Serial.available() && Serial.peek() == 'a') 
+    if (Serial.available() && Serial.peek() == 'a')
     {
         String cmd = Serial.readStringUntil('\n');
-        if (cmd.indexOf("abort") >= 0) 
+        if (cmd.indexOf("abort") >= 0)
         {
             testAbortRequested = true;
             return true;
         }
     }
     return false;
+}
+
+// Check all Ethernet clients for abort commands
+void checkEthernetForAbortCommand()
+{
+    if (!ethernetInitialized)
+    {
+        return;
+    }
+
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+    {
+        if (clients[i] && clients[i].connected() && clients[i].available())
+        {
+            // Peek at first character
+            char c = clients[i].peek();
+
+            if (c == 'a')
+            {
+                // Could be an abort command, read the whole line
+                String cmd = "";
+                while (clients[i].available())
+                {
+                    char c = clients[i].read();
+                    if (c == '\n' || c == '\r')
+                        break;
+                    cmd += c;
+                }
+
+                // Check if it's the abort command
+                if (cmd.indexOf("abort") >= 0)
+                {
+                    testAbortRequested = true;
+                    clients[i].println(F("[INFO] Test abort requested"));
+                }
+            }
+        }
+    }
 }
 
 bool checkForAbort()
@@ -91,6 +129,7 @@ bool testHomingRepeatability()
     while (testRunning)
     {
         checkSerialForAbortCommand();
+        checkEthernetForAbortCommand();
 
         // Check for abort command
         if (checkForAbort())
@@ -455,6 +494,10 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_COMPLETE:
+            if (checkForAbort())
+            {
+                return false; // Exit the test function with failure
+            }
             Console.info(F("Homing repeatability test completed successfully."));
             Console.print(F("[INFO] Completed "));
             Console.print(cyclesCompleted);
@@ -536,6 +579,7 @@ bool testPositionCycling()
     while (testRunning)
     {
         checkSerialForAbortCommand();
+        checkEthernetForAbortCommand();
 
         // Check for abort command
         if (checkForAbort())
@@ -1050,6 +1094,10 @@ bool testPositionCycling()
             break;
 
         case PHASE_COMPLETE:
+            if (checkForAbort())
+            {
+                return false; // Exit the test function with failure
+            }
             // IMPROVEMENT 4: Standardize status messages
             Console.println(F("----------------------------------------"));
             Console.info(F("Position cycling test completed successfully."));
@@ -1234,7 +1282,8 @@ bool testTrayHandling()
     while (testRunning)
     {
         checkSerialForAbortCommand();
-        
+        checkEthernetForAbortCommand();
+
         // Check for abort command
         if (checkForAbort())
         {
@@ -3561,6 +3610,10 @@ bool testTrayHandling()
         }
 
         case PHASE_COMPLETE:
+        if (checkForAbort())
+        {
+            return false; // Exit the test function with failure
+        }
         {
             Console.println(F("----------------------------------------"));
             Console.info(F("Enhanced tray handling test completed successfully."));

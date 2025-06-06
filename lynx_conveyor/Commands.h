@@ -9,10 +9,11 @@
 #include "ValveController.h"
 #include "Logging.h"
 #include "Tests.h"
-#include "CommandHandler.h"
+#include "CommandController.h"
 #include "Tests.h"
 #include "Utils.h"
 #include "EncoderController.h"
+#include "EthernetController.h"
 
 //=============================================================================
 // COMMAND CONSTANTS

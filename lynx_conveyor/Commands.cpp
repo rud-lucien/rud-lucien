@@ -1930,6 +1930,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         caller->println(F("[INFO] Usage: system,state - Display current system state"));
         caller->println(F("                 system,safety - Display safety validation status"));
         caller->println(F("                 system,trays - Display tray system status"));
+        caller->println(F("                 system,network - Display Ethernet interface status"));
         caller->println(F("                 system,reset - Reset system state after failure"));
         return false;
     }
@@ -1993,6 +1994,76 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         }
         return true;
     }
+    else if (strcmp(subcommand, "network") == 0)
+    {
+        caller->println(F("\n===== ETHERNET INTERFACE STATUS ====="));
+
+        // Show initialization status
+        caller->print(F("Ethernet Status: "));
+        caller->println(ethernetInitialized ? F("INITIALIZED") : F("NOT INITIALIZED"));
+
+        if (ethernetInitialized)
+        {
+            // Display IP address
+            IPAddress ip = Ethernet.localIP();
+            caller->print(F("IP Address: "));
+            caller->print(ip[0]);
+            caller->print(F("."));
+            caller->print(ip[1]);
+            caller->print(F("."));
+            caller->print(ip[2]);
+            caller->print(F("."));
+            caller->println(ip[3]);
+
+            // Display MAC address
+            byte mac[6];
+            Ethernet.MACAddress(mac);
+            caller->print(F("MAC Address: "));
+            for (int i = 0; i < 6; i++)
+            {
+                if (mac[i] < 16)
+                    caller->print(F("0"));
+                caller->print(mac[i], HEX);
+                if (i < 5)
+                    caller->print(F(":"));
+            }
+            caller->println();
+
+            // Display port
+            caller->print(F("Server Port: "));
+            caller->println(ETHERNET_PORT);
+
+            // Display connected clients
+            caller->println(F("\nConnected Clients:"));
+            int connectedCount = 0;
+
+            for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+            {
+                if (clients[i] && clients[i].connected())
+                {
+                    connectedCount++;
+                    caller->print(F("  Client "));
+                    caller->print(i + 1);
+                    caller->print(F(": "));
+                    caller->print(clients[i].remoteIP());
+                    caller->print(F(":"));
+                    caller->println(clients[i].remotePort());
+                }
+            }
+
+            if (connectedCount == 0)
+            {
+                caller->println(F("  No clients connected"));
+            }
+
+            caller->print(F("Total Connections: "));
+            caller->print(connectedCount);
+            caller->print(F(" of "));
+            caller->println(MAX_ETHERNET_CLIENTS);
+        }
+
+        return true;
+    }
     else if (strcmp(subcommand, "reset") == 0)
     {
         // Reset the system state after a failure
@@ -2029,7 +2100,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         // Unknown subcommand
         caller->print(F("[ERROR] Unknown system command: "));
         caller->println(subcommand);
-        caller->println(F("Valid options are 'system,state', 'system,safety', 'system,trays', or 'system,reset'"));
+        caller->println(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,trays', or 'system,reset'"));
         return false;
     }
 }
@@ -2565,7 +2636,6 @@ bool cmd_test(char *args, CommandCaller *caller)
     }
 }
 
-
 bool cmd_encoder(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
@@ -2870,10 +2940,11 @@ Commander::systemCommand_t API_tree[] = {
 
     // State command to display system state
     systemCommand("system", "System commands:\n"
-                            "  system,state  - Display current system state (sensors, actuators, positions)\n"
-                            "  system,safety - Display comprehensive safety validation status\n"
-                            "  system,trays  - Display tray tracking and statistics\n"
-                            "  system,reset  - Reset system state after failure to retry operation",
+                            "  system,state    - Display current system state (sensors, actuators, positions)\n"
+                            "  system,safety   - Display comprehensive safety validation status\n"
+                            "  system,trays    - Display tray tracking and statistics\n"
+                            "  system,network  - Display Ethernet connection status and IP address\n"
+                            "  system,reset    - Reset system state after failure to retry operation",
                   cmd_system_state),
 
     // Motor control commands
@@ -2925,8 +2996,6 @@ Commander::systemCommand_t API_tree[] = {
                           "  test,tray     - Run tray handling test (request, place, release)\n"
                           "  test,help     - Display detailed test information and requirements",
                   cmd_test),
-
-
 
     // Encoder control commands
     systemCommand("encoder", "Encoder handwheel control:\n"

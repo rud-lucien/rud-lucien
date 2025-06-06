@@ -10,11 +10,12 @@
 #include "MotorController.h"
 #include "Logging.h"
 #include "Tests.h"
-#include "CommandHandler.h"
+#include "CommandController.h"
 #include "Commands.h"
 #include "Utils.h"
 #include "EncoderController.h"
 #include "OutputManager.h"
+#include "EthernetController.h"
 
 // Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
@@ -27,6 +28,9 @@ void setup()
 {
     Serial.begin(115200);
     delay(1000);
+
+    Console.info(F("Initializing Ethernet interface..."));
+    initEthernetController(true);  // true = use DHCP
 
     // Initialize the output manager (must be before any Console calls)
     initOutputManager();
@@ -61,7 +65,7 @@ void setup()
 
     commander.attachTree(API_tree);
     commander.init();
-    initCommandHandler();
+    initTestFlags();
 
     Console.info(F("System ready."));
     Console.info(F("Type 'help' for available commands"));
@@ -84,6 +88,11 @@ void loop()
 
     // Handle incoming serial commands using Commander API
     handleSerialCommands();
+
+    // Process Ethernet connections and commands
+    // This will handle both incoming connections and command processing
+    processEthernetConnections();
+    handleEthernetCommands();
 
     // Process fault clearing if in progress
     processFaultClearing();

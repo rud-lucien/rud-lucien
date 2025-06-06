@@ -4,7 +4,8 @@
 #include "Arduino.h"
 #include "ClearCore.h"
 #include "MotorController.h"
-#include "CommandHandler.h"
+#include "EthernetController.h"
+#include "CommandController.h"
 #include "Utils.h"
 #include "ValveController.h"
 #include "OutputManager.h"
@@ -21,6 +22,7 @@ extern bool testInProgress;
 extern volatile bool testAbortRequested;
 
 bool checkSerialForAbortCommand() ; // Check for 'abort' command in serial buffer
+void checkEthernetForAbortCommand();
 bool checkForAbort();               // Check if test has been aborted
 bool testHomingRepeatability(); // Test homing repeatability over multiple cycles
 bool testPositionCycling();     // Test cycling through all positions
