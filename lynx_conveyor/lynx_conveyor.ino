@@ -30,7 +30,7 @@ void setup()
     delay(1000);
 
     Console.info(F("Initializing Ethernet interface..."));
-    initEthernetController(true);  // true = use DHCP
+    initEthernetController(true); // true = use DHCP
 
     // Initialize the output manager (must be before any Console calls)
     initOutputManager();
@@ -74,11 +74,19 @@ void setup()
 // The main loop
 void loop()
 {
-    
+
     unsigned long currentTime = millis();
 
     // Check for E-stop condition (highest priority)
     handleEStop();
+
+    // Check for test abort requested
+    if (testAbortRequested && testInProgress)
+    {
+        Console.info(F("Test abort detected in main loop"));
+        handleTestAbort();
+        Console.info(F("Test aborted successfully"));
+    }
 
     // Always capture current system state - it's the foundation of safety
     SystemState currentState = captureSystemState();
@@ -144,16 +152,14 @@ void loop()
         processEncoderInput();
     }
 
-    // Check for test abort requested
-    if (testAbortRequested && testInProgress) {
-        Console.info(F("Test abort detected in main loop - forcing immediate stop"));
-        stopMotion();  // Stop any motor movement
-        motorState = MOTOR_STATE_IDLE;
-        testInProgress = false;
-        testAbortRequested = false;        
-        // Reset any valve operations in progress
-        // Add other test cleanup as needed
-        Console.info(F("Test aborted successfully"));
+    static unsigned long lastPressureCheckTime = 0;
+    if (currentTime - lastPressureCheckTime > 10000)
+    { // Check every 10 seconds
+        if (!isPressureSufficient())
+        {
+            Console.warning(F("System pressure below minimum threshold (21.75 PSI)"));
+        }
+        lastPressureCheckTime = currentTime;
     }
 }
 
@@ -164,11 +170,6 @@ How do I update code to handle this? when the motor is stalled what message does
 prints a helpful message to the user that this is potentially a collision detection issue and not just a motor fault?
 */
 
-/* TODO: implement TCP/IP such that we can send commands to the conveyor controller over a network connection. This will allow remote control and monitoring of the conveyor system.
- */
-
-/* TODO: update all functions that send messages such that outputs can go to serial and client at the same time.
- */
 /* # TODO: Implement Operation Step Sequence Validation
 
 This TODO task should focus on improving the operation step sequence validation system. Here's what should be included:

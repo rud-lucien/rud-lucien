@@ -1,58 +1,17 @@
 #include "Tests.h"
 
-bool checkSerialForAbortCommand()
+void requestTestAbort(const char *source)
 {
-    if (Serial.available() && Serial.peek() == 'a')
+    // Only set the flag if not already set
+    if (!testAbortRequested)
     {
-        String cmd = Serial.readStringUntil('\n');
-        if (cmd.indexOf("abort") >= 0)
-        {
-            testAbortRequested = true;
-            return true;
-        }
-    }
-    return false;
-}
-
-// Check all Ethernet clients for abort commands
-void checkEthernetForAbortCommand()
-{
-    if (!ethernetInitialized)
-    {
-        return;
-    }
-
-    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
-    {
-        if (clients[i] && clients[i].connected() && clients[i].available())
-        {
-            // Peek at first character
-            char c = clients[i].peek();
-
-            if (c == 'a')
-            {
-                // Could be an abort command, read the whole line
-                String cmd = "";
-                while (clients[i].available())
-                {
-                    char c = clients[i].read();
-                    if (c == '\n' || c == '\r')
-                        break;
-                    cmd += c;
-                }
-
-                // Check if it's the abort command
-                if (cmd.indexOf("abort") >= 0)
-                {
-                    testAbortRequested = true;
-                    clients[i].println(F("[INFO] Test abort requested"));
-                }
-            }
-        }
+        testAbortRequested = true;
+        Console.info(F("Test abort requested via "));
+        Console.println(source);
     }
 }
 
-bool checkForAbort()
+bool handleTestAbort()
 {
     if (testAbortRequested)
     {
@@ -61,9 +20,86 @@ bool checkForAbort()
         motorState = MOTOR_STATE_IDLE;
         testInProgress = false;
         testAbortRequested = false; // Reset the flag
-        return true;                // Test should exit
+        return true;
     }
-    return false; // Test can continue
+    return false;
+}
+
+bool checkSerialForAbortCommand()
+{
+    if (Serial.available() && Serial.peek() == 'a')
+    {
+        String cmd = Serial.readStringUntil('\n');
+        if (cmd.indexOf("abort") >= 0)
+        {
+            requestTestAbort("serial input");
+            return true;
+        }
+    }
+    return false;
+}
+
+bool checkEthernetForAbortCommand()
+{
+    if (!ethernetInitialized)
+    {
+        return false;
+    }
+
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+    {
+        EthernetClient &client = clients[i]; // Use reference to avoid copying
+
+        if (client && client.connected() && client.available())
+        {
+            // Peek at the data without consuming it
+            char buffer[10]; // Just need enough to check for "abort"
+            int len = 0;
+
+            // Peek at the available data (don't consume it yet)
+            while (client.available() && len < sizeof(buffer) - 1)
+            {
+                buffer[len] = client.read();
+                len++;
+
+                // Check if we've already found "abort"
+                buffer[len] = '\0'; // Null terminate
+                if (strstr(buffer, "abort") != NULL)
+                {
+                    // Found "abort", consume the rest of the line
+                    while (client.available())
+                    {
+                        char c = client.read();
+                        if (c == '\n' || c == '\r')
+                            break;
+                    }
+
+                    // Set the abort flag
+                    requestTestAbort("ethernet client");
+                    client.println(F("[INFO] Test abort requested"));
+                    return true;
+                }
+
+                // If we've found a newline, stop looking in this chunk
+                if (buffer[len - 1] == '\n' || buffer[len - 1] == '\r')
+                {
+                    break;
+                }
+            }
+
+            // If we didn't find "abort", consume this line so we don't check it again
+            if (len > 0)
+            {
+                while (client.available())
+                {
+                    char c = client.read();
+                    if (c == '\n' || c == '\r')
+                        break;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 // Test homing repeatability by performing multiple home-move cycles
@@ -132,7 +168,7 @@ bool testHomingRepeatability()
         checkEthernetForAbortCommand();
 
         // Check for abort command
-        if (checkForAbort())
+        if (handleTestAbort())
         {
             return false;
         }
@@ -162,7 +198,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_INITIAL_HOMING:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -179,7 +215,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_WAIT_FOR_HOMING_COMPLETE:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -272,7 +308,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_PAUSE_AFTER_HOMING:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -284,7 +320,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_MOVE_TO_POSITION:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -303,7 +339,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_WAIT_FOR_MOVE_COMPLETE:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -372,7 +408,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_PAUSE_AFTER_MOVE:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -384,7 +420,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_REPEAT_HOMING:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -401,7 +437,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_WAIT_FOR_REPEAT_HOME:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -483,7 +519,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_PAUSE_BEFORE_NEXT_CYCLE:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -494,7 +530,7 @@ bool testHomingRepeatability()
             break;
 
         case PHASE_COMPLETE:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false; // Exit the test function with failure
             }
@@ -582,7 +618,7 @@ bool testPositionCycling()
         checkEthernetForAbortCommand();
 
         // Check for abort command
-        if (checkForAbort())
+        if (handleTestAbort())
         {
             return false;
         }
@@ -608,7 +644,7 @@ bool testPositionCycling()
             Console.print(F(" of "));
             Console.println(NUM_CYCLES);
 
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -640,7 +676,7 @@ bool testPositionCycling()
             break; // Exit the switch case, not the function
 
         case PHASE_MOVE_TO_POSITION_3:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -658,7 +694,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_WAIT_FOR_MOVE_TO_3:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -725,7 +761,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_PAUSE_AT_POSITION_3:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -752,7 +788,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_MOVE_TO_POSITION_1:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -770,7 +806,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_WAIT_FOR_MOVE_TO_1:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -837,7 +873,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_PAUSE_AT_POSITION_1:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -864,7 +900,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_MOVE_TO_POSITION_2:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -882,7 +918,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_WAIT_FOR_MOVE_TO_2:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -948,7 +984,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_PAUSE_AT_POSITION_2:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -975,7 +1011,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_MOVE_BACK_TO_POSITION_1:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -993,7 +1029,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_WAIT_FOR_MOVE_BACK_TO_1:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1071,7 +1107,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_PAUSE_BEFORE_NEXT_CYCLE:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1094,7 +1130,7 @@ bool testPositionCycling()
             break;
 
         case PHASE_COMPLETE:
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false; // Exit the test function with failure
             }
@@ -1285,7 +1321,7 @@ bool testTrayHandling()
         checkEthernetForAbortCommand();
 
         // Check for abort command
-        if (checkForAbort())
+        if (handleTestAbort())
         {
             return false; // Exit the test function with failure
         }
@@ -1307,7 +1343,7 @@ bool testTrayHandling()
         {
         case PHASE_START:
 
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1324,7 +1360,7 @@ bool testTrayHandling()
 
         case PHASE_CHECK_POSITION_1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1355,7 +1391,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_TO_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1426,7 +1462,7 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1449,7 +1485,7 @@ bool testTrayHandling()
         // Add new case for tray settling
         case PHASE_TRAY_SETTLING_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1472,7 +1508,7 @@ bool testTrayHandling()
 
         case PHASE_LOCK_TRAY_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1509,7 +1545,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_TRAY_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1525,7 +1561,7 @@ bool testTrayHandling()
 
         case PHASE_LOCK_SHUTTLE_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1562,7 +1598,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1578,7 +1614,7 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_TRAY_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1615,7 +1651,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1631,7 +1667,7 @@ bool testTrayHandling()
 
         case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1647,7 +1683,7 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_STILL_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1668,7 +1704,7 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1689,7 +1725,7 @@ bool testTrayHandling()
 
         case PHASE_MOVE_TO_POSITION_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1709,7 +1745,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_TO_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1778,7 +1814,7 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_AT_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1801,7 +1837,7 @@ bool testTrayHandling()
         // Add new case for tray settling at position 3
         case PHASE_TRAY_SETTLING_AT_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1824,7 +1860,7 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_SHUTTLE_AT_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1861,7 +1897,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1877,7 +1913,7 @@ bool testTrayHandling()
 
         case PHASE_LOCK_TRAY_AT_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1914,7 +1950,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_TRAY_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1930,7 +1966,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1957,7 +1993,7 @@ bool testTrayHandling()
 
         case PHASE_RETURN_TO_POS1_FROM_POS3_EMPTY:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -1977,7 +2013,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_RETURN_TO_POS1_EMPTY:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2045,7 +2081,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS1_EMPTY:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2072,7 +2108,7 @@ bool testTrayHandling()
 
         case PHASE_RETURN_TO_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2092,7 +2128,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_RETURN_TO_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2170,7 +2206,7 @@ bool testTrayHandling()
 
         case PHASE_LOCK_SHUTTLE_AT_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2207,7 +2243,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2223,7 +2259,7 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_TRAY_AT_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2260,7 +2296,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2276,7 +2312,7 @@ bool testTrayHandling()
 
         case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2292,7 +2328,7 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS1_AGAIN:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2313,7 +2349,7 @@ bool testTrayHandling()
 
         case PHASE_MOVE_TO_POSITION_1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2333,7 +2369,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_TO_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2401,7 +2437,7 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_AT_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2424,7 +2460,7 @@ bool testTrayHandling()
         // Add new case for tray settling
         case PHASE_TRAY_SETTLING_AT_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2447,7 +2483,7 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_SHUTTLE_AT_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2484,7 +2520,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2500,7 +2536,7 @@ bool testTrayHandling()
 
         case PHASE_LOCK_TRAY_AT_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2537,7 +2573,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_TRAY_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2553,7 +2589,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2579,7 +2615,7 @@ bool testTrayHandling()
 
         case PHASE_LOCK_SHUTTLE_AT_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2616,7 +2652,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1_FROM_3:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2632,7 +2668,7 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_TRAY_AT_POS1_AGAIN:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2670,7 +2706,7 @@ bool testTrayHandling()
         // Implementation for Position 1 (again)
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1_AGAIN:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2686,7 +2722,7 @@ bool testTrayHandling()
 
         case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1_AGAIN:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2702,7 +2738,7 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_STILL_AT_POS1_AGAIN:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2723,7 +2759,7 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2744,7 +2780,7 @@ bool testTrayHandling()
 
         case PHASE_MOVE_TO_POSITION_2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2764,7 +2800,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_TO_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2833,7 +2869,7 @@ bool testTrayHandling()
 
         case PHASE_VERIFY_TRAY_AT_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2856,7 +2892,7 @@ bool testTrayHandling()
         // Add new case for tray settling
         case PHASE_TRAY_SETTLING_AT_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2879,7 +2915,7 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_SHUTTLE_AT_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2916,7 +2952,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2932,7 +2968,7 @@ bool testTrayHandling()
 
         case PHASE_LOCK_TRAY_AT_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2969,7 +3005,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_TRAY_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -2985,7 +3021,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3012,7 +3048,7 @@ bool testTrayHandling()
 
         case PHASE_RETURN_TO_POS1_FROM_POS2_EMPTY:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3032,7 +3068,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_RETURN_TO_POS1_FROM_POS2_EMPTY:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3100,7 +3136,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_AT_POS1_EMPTY_FROM_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3127,7 +3163,7 @@ bool testTrayHandling()
 
         case PHASE_RETURN_TO_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3147,7 +3183,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_RETURN_TO_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3225,7 +3261,7 @@ bool testTrayHandling()
 
         case PHASE_LOCK_SHUTTLE_AT_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3262,7 +3298,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3278,7 +3314,7 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_TRAY_AT_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3315,7 +3351,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_TRAY_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3331,7 +3367,7 @@ bool testTrayHandling()
 
         case PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS2:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3347,7 +3383,7 @@ bool testTrayHandling()
 
         case PHASE_CHECK_TRAY_AT_POS1_BEFORE_RETURN:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3368,7 +3404,7 @@ bool testTrayHandling()
 
         case PHASE_MOVE_BACK_TO_POSITION_1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3388,7 +3424,7 @@ bool testTrayHandling()
 
         case PHASE_WAIT_FOR_MOVE_BACK_TO_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3471,7 +3507,7 @@ bool testTrayHandling()
         // Verification phase - checks tray is present before settling
         case PHASE_VERIFY_TRAY_BACK_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3493,7 +3529,7 @@ bool testTrayHandling()
         // Tray settling phase - adds delay before continuing
         case PHASE_TRAY_SETTLING_BACK_AT_POS1:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3535,7 +3571,7 @@ bool testTrayHandling()
 
         case PHASE_UNLOCK_SHUTTLE_END_OF_CYCLE:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3572,7 +3608,7 @@ bool testTrayHandling()
 
         case PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_END_OF_CYCLE:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3587,7 +3623,7 @@ bool testTrayHandling()
 
         case PHASE_PAUSE_BEFORE_NEXT_CYCLE:
         {
-            if (checkForAbort())
+            if (handleTestAbort())
             {
                 return false;
             }
@@ -3610,22 +3646,22 @@ bool testTrayHandling()
         }
 
         case PHASE_COMPLETE:
-        if (checkForAbort())
-        {
-            return false; // Exit the test function with failure
-        }
-        {
-            Console.println(F("----------------------------------------"));
-            Console.info(F("Enhanced tray handling test completed successfully."));
-            Console.print(F("[INFO] Completed "));
-            Console.print(cyclesCompleted);
-            Console.println(F(" cycles of tray handling operations."));
-            Console.println(F("----------------------------------------"));
-            testRunning = false;
-            testInProgress = false;
-            return true;
-            break; // Note: This break is never reached because of the return
-        }
+            if (handleTestAbort())
+            {
+                return false; // Exit the test function with failure
+            }
+            {
+                Console.println(F("----------------------------------------"));
+                Console.info(F("Enhanced tray handling test completed successfully."));
+                Console.print(F("[INFO] Completed "));
+                Console.print(cyclesCompleted);
+                Console.println(F(" cycles of tray handling operations."));
+                Console.println(F("----------------------------------------"));
+                testRunning = false;
+                testInProgress = false;
+                return true;
+                break; // Note: This break is never reached because of the return
+            }
         }
 
         delayMicroseconds(100);

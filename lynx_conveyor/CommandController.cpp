@@ -1,5 +1,5 @@
 #include "CommandController.h"
-#include <Ethernet.h> // For EthernetClient type
+#include <Ethernet.h>      // For EthernetClient type
 #include "OutputManager.h" // Make sure this is included
 
 //-------------------------------------------------------------------------
@@ -19,7 +19,7 @@ volatile bool testAbortRequested = false;
 extern char ethernetCommandBuffer[];
 
 // Add this global variable at the top of the file
-Stream* persistentClient = nullptr;
+Stream *persistentClient = nullptr;
 
 //-------------------------------------------------------------------------
 // Core Command Processing Functions
@@ -127,20 +127,29 @@ void handleEthernetCommands()
     }
 }
 
-bool processCommand(const char *rawCommand, Stream *output) {
+bool processCommand(const char *rawCommand, Stream *output)
+{
     // Set current client
     Console.setCurrentClient(output);
-    
+
+    // Check for abort command with priority
+    if (strncmp(rawCommand, "abort", 5) == 0)
+    {
+        requestTestAbort("command interface");
+        output->println(F("[INFO] Test abort requested"));
+        return true;
+    }
+
     // Check if this is a potentially async command
-    bool isAsyncCommand = 
-    (strncmp(rawCommand, "motor,", 6) == 0) ||
-    (strncmp(rawCommand, "move,", 5) == 0) ||
-    (strncmp(rawCommand, "test,", 5) == 0) ||
-    (strncmp(rawCommand, "jog,", 4) == 0) ||
-    (strncmp(rawCommand, "tray,", 5) == 0) ||
-    (strncmp(rawCommand, "encoder,", 8) == 0) ||
-    (strncmp(rawCommand, "lock,", 5) == 0) ||
-    (strncmp(rawCommand, "unlock,", 7) == 0);
+    bool isAsyncCommand =
+        (strncmp(rawCommand, "motor,", 6) == 0) ||
+        (strncmp(rawCommand, "move,", 5) == 0) ||
+        (strncmp(rawCommand, "test,", 5) == 0) ||
+        (strncmp(rawCommand, "jog,", 4) == 0) ||
+        (strncmp(rawCommand, "tray,", 5) == 0) ||
+        (strncmp(rawCommand, "encoder,", 8) == 0) ||
+        (strncmp(rawCommand, "lock,", 5) == 0) ||
+        (strncmp(rawCommand, "unlock,", 7) == 0);
 
     // Make a copy of the original command for permission checking
     char originalCommand[64];
@@ -190,10 +199,11 @@ bool processCommand(const char *rawCommand, Stream *output) {
         }
 
         // Only reset currentClient if it's not an async command
-        if (!isAsyncCommand) {
+        if (!isAsyncCommand)
+        {
             Console.setCurrentClient(nullptr);
         }
-        
+
         return success;
     }
 
@@ -203,12 +213,14 @@ bool processCommand(const char *rawCommand, Stream *output) {
 }
 
 // Add a function to get the persistent client
-Stream* getPersistentClient() {
+Stream *getPersistentClient()
+{
     return persistentClient;
 }
 
 // Add function to clear persistent client at the end of async operations
-void clearPersistentClient() {
+void clearPersistentClient()
+{
     persistentClient = nullptr;
 }
 

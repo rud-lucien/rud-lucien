@@ -143,6 +143,7 @@ enum AbortReason
     ABORT_REASON_OPERATION_TIMEOUT,
     ABORT_REASON_SENSOR_MISMATCH,
     ABORT_REASON_COMMUNICATION_LOSS,
+    ABORT_REASON_PNEUMATIC_FAILURE,
     ABORT_REASON_UNKNOWN
 };
 
@@ -166,6 +167,9 @@ struct SafetyValidationResult
     bool safeToUnlockShuttle;
     String shuttleLockUnsafeReason;
     String shuttleUnlockUnsafeReason;
+
+    bool pneumaticPressureSufficient;
+    String pressureUnsafeReason;
 
     // Tray loading safety flags
     bool safeToLoadTrayToPos1;

@@ -34,6 +34,10 @@ const int cylinderSensorCount = 4;
 // CCIO Board status
 bool hasCCIO = false;
 
+PressureSensor airPressureSensor;
+const float MIN_SAFE_PRESSURE = 21.75f; // Minimum pressure in PSI for valve operation (1.5 bar)
+const float MAX_PRESSURE = 87.0f;       // Maximum pressure range (87 PSI)
+
 // ----------------- Initialization functions -----------------
 
 // Rename and refactor the initialization functions
@@ -52,13 +56,76 @@ void initSensorSystem()
     sensorInit(tray2DetectSensor, TRAY_2_DETECT_PIN);
     sensorInit(tray3DetectSensor, TRAY_3_DETECT_PIN);
 
+    // Initialize the pressure sensor
+    airPressureSensor.analogPin = PRESSURE_SENSOR_PIN;
+    airPressureSensor.minPressure = 0.0f;
+    airPressureSensor.maxPressure = MAX_PRESSURE;
+
     Console.info(F("Sensor system initialized"));
+}
+
+void initPressureSensor() {
+    // Initialize the pressure sensor
+    airPressureSensor.analogPin = PRESSURE_SENSOR_PIN;
+    airPressureSensor.minPressure = 0.0f;
+    airPressureSensor.maxPressure = MAX_PRESSURE;
+    
+    // Set the resolution of the ADC for better precision
+    analogReadResolution(12); // 12-bit resolution for more precise readings
+    
+    Console.info(F("Pressure sensor initialized on pin A11"));
+    
+    // Read and report the initial pressure
+    float initialPressure = readPressure(airPressureSensor);
+    Console.print(F("[INFO] Initial system pressure: "));
+    Console.print(initialPressure);
+    Console.println(F(" PSI"));
+    
+    // Check if pressure is sufficient for valve operation
+    if (!isPressureSufficient()) {
+        Console.warning(F("System pressure below minimum threshold (21.75 PSI) - Valve operations may be unreliable"));
+    }
+}
+
+// Implement the pressure reading functions:
+float readPressureVoltage(const PressureSensor &sensor) {
+    int analogValue = analogRead(sensor.analogPin);
+    return (analogValue / 4095.0) * 10.0;  // For 12-bit resolution (4095)
+}
+
+float readPressure(const PressureSensor &sensor) {
+    float voltage = readPressureVoltage(sensor);
+    return (voltage / 10.0) * sensor.maxPressure;
+}
+
+float getPressurePsi() {
+    return readPressure(airPressureSensor);
+}
+
+bool isPressureSufficient() {
+    float currentPressure = readPressure(airPressureSensor);
+    return currentPressure >= MIN_SAFE_PRESSURE;
+}
+
+void printPressureStatus() {
+    float currentPressure = readPressure(airPressureSensor);
+    Console.print(F("Air Pressure: "));
+    Console.print(currentPressure);
+    Console.println(F(" PSI"));
+    
+    if (currentPressure < MIN_SAFE_PRESSURE) {
+        Console.warning(F("Pressure below minimum threshold for safe valve operation (21.75 PSI)"));
+    }
 }
 
 void initValveSystem(bool hasCCIOBoard)
 {
     // Store CCIO status
     hasCCIO = hasCCIOBoard;
+
+    // Initialize the pressure sensor regardless of CCIO status
+    initPressureSensor();
+
 
     if (!hasCCIO)
     {
@@ -134,6 +201,17 @@ void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target)
     // Don't do anything if already in the requested position
     if (valve.position == target)
     {
+        return;
+    }
+
+    // Check if pressure is sufficient before actuating the valve
+    if (!isPressureSufficient()) {
+        Console.error(F("Cannot actuate valve - System pressure too low"));
+        Console.print(F("[INFO] Current pressure: "));
+        Console.print(readPressure(airPressureSensor));
+        Console.print(F(" PSI, Minimum required: "));
+        Console.print(MIN_SAFE_PRESSURE);
+        Console.println(F(" PSI"));
         return;
     }
 
@@ -230,6 +308,18 @@ void withAllValves(void (*operation)(DoubleSolenoidValve &))
 void printAllValveStatus()
 {
     Console.diagnostic(F(" Current valve positions:"));
+
+    // First print pressure status
+    float currentPressure = readPressure(airPressureSensor);
+    Console.print(F(" System Pressure: "));
+    Console.print(currentPressure);
+    Console.print(F(" PSI "));
+    if (currentPressure < MIN_SAFE_PRESSURE) {
+        Console.println(F("(INSUFFICIENT)"));
+    } else {
+        Console.println(F("(OK)"));
+    }
+
     for (int i = 0; i < valveCount; i++)
     {
         // Skip shuttle valve if no CCIO board

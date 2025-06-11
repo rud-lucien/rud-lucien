@@ -30,6 +30,13 @@ struct CylinderSensor
     bool lastState;
 };
 
+// Pressure Sensor Structure
+struct PressureSensor {
+    uint8_t analogPin;            // Analog input pin
+    float minPressure;            // Minimum pressure in PSI
+    float maxPressure;            // Maximum pressure in PSI
+};
+
 //=============================================================================
 // PIN MAPPING CONSTANTS
 //=============================================================================
@@ -49,6 +56,7 @@ struct CylinderSensor
 #define TRAY_2_CYLINDER_SENSOR_PIN 5    // ClearCore IO-5 - Detects Tray 2 cylinder position
 #define TRAY_3_CYLINDER_SENSOR_PIN A9   // ClearCore A9 - Detects Tray 3 cylinder position
 #define SHUTTLE_CYLINDER_SENSOR_PIN A10 // ClearCore A10 - Detects Shuttle cylinder position
+#define PRESSURE_SENSOR_PIN A11 // ClearCore A11 - Air pressure sensor
 
 // Tray detection sensors on IO pins of ClearCore main board
 #define TRAY_1_DETECT_PIN 1 // ClearCore IO-1 - Detects tray at position 1
@@ -57,6 +65,8 @@ struct CylinderSensor
 
 // Other constants
 #define PULSE_DURATION 100 // Minimum recommended pulse duration in milliseconds
+
+
 
 //=============================================================================
 // GLOBAL VARIABLES
@@ -92,6 +102,10 @@ extern const int trayDetectSensorCount;
 
 // CCIO Board status
 extern bool hasCCIO;
+
+extern PressureSensor airPressureSensor;
+extern const float MIN_SAFE_PRESSURE; // Minimum pressure in PSI for safe valve operation
+extern const float MAX_PRESSURE;      // Maximum pressure range of the sensor in PSI
 
 //=============================================================================
 // FUNCTION DECLARATIONS
@@ -178,5 +192,16 @@ CylinderSensor *getShuttleSensor();
 CylinderSensor *getTray1DetectionSensor();
 CylinderSensor *getTray2DetectionSensor();
 CylinderSensor *getTray3DetectionSensor();
+
+//-----------------------------------------------------------------------------
+// Pressure Sensor Operations
+// Initialize and read pressure sensor
+//-----------------------------------------------------------------------------
+void initPressureSensor();
+float readPressureVoltage(const PressureSensor &sensor);
+float readPressure(const PressureSensor &sensor);
+float getPressurePsi();
+bool isPressureSufficient(); // Returns true if pressure is above MIN_SAFE_PRESSURE
+void printPressureStatus();  // Prints the current pressure reading
 
 #endif // VALVE_CONTROLLER_H

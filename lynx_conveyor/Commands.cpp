@@ -33,7 +33,7 @@ bool cmd_print_help(char *args, CommandCaller *caller)
         Console.println(F("Lynx Conveyor System Command Help:"));
         Console.println(F("--------------------------------------------------"));
 
-        commander.printHelp(caller, true, false);
+        commander.printHelp(caller, true, true);
 
         Console.println(F("--------------------------------------------------"));
         return true;
@@ -248,6 +248,7 @@ bool cmd_lock(char *args, CommandCaller *caller)
             Console.println(F("  • 'lock,all' is not supported for safety reasons"));
             Console.println(F("  • Always lock the shuttle before unlocking any trays"));
             Console.println(F("  • System uses sensor verification to confirm actual locking"));
+            Console.println(F("  • Sufficient pneumatic pressure is required for all valve operations"));
             Console.println(F("  • Failed locking may indicate mechanical issues or low air pressure"));
 
             Console.println(F("\nSENSOR VERIFICATION:"));
@@ -497,6 +498,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
             Console.println(F("  • Ensure trays are properly supported before unlocking"));
             Console.println(F("  • System uses sensor verification to confirm actual unlocking"));
             Console.println(F("  • Failed unlocking may indicate mechanical issues"));
+            Console.println(F("  • Sufficient pneumatic pressure is required for all valve operations"));
 
             Console.println(F("\nSENSOR VERIFICATION:"));
             Console.println(F("  • Each lock has a corresponding sensor that confirms its position"));
@@ -631,6 +633,8 @@ bool cmd_log(char *args, CommandCaller *caller)
         Console.println(F("\nLOG CONTENT:"));
         Console.println(F("  • Valves - Lock status of all trays and shuttle with sensor verification"));
         Console.println(F("    > [!] indicator shows sensor/command mismatch"));
+        Console.println(F("  • Pneumatics - Air pressure status (sufficient/insufficient)"));
+        Console.println(F("    > Critical for valve actuation and safe operations"));
         Console.println(F("  • Sensors - Tray presence detection at each position"));
         Console.println(F("  • System - Motor state, homing status, E-Stop and HLFB status"));
         Console.println(F("  • Position - Current, target, and last positions (mm and counts)"));
@@ -2436,6 +2440,10 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Console.print(F("LOCK3:"));
         Console.println(state.tray3Locked ? 1 : 0);
 
+        // Add pneumatic pressure status (1=sufficient, 0=insufficient)
+        Console.print(F("PRESSURE:"));
+        Console.println(isPressureSufficient() ? 1 : 0);
+
         // Output operation statistics
         Console.print(F("LOADS:"));
         Console.println(trayTracking.totalLoadsCompleted);
@@ -2477,6 +2485,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Console.println(F("    LOCK1:[0|1] - Position 1 lock status (0=unlocked, 1=locked)"));
         Console.println(F("    LOCK2:[0|1] - Position 2 lock status (0=unlocked, 1=locked)"));
         Console.println(F("    LOCK3:[0|1] - Position 3 lock status (0=unlocked, 1=locked)"));
+        Console.println(F("    PRESSURE:[0|1] - Pneumatic pressure status (0=insufficient, 1=sufficient)"));
         Console.println(F("    LOADS:[number] - Total number of loads completed"));
         Console.println(F("    UNLOADS:[number] - Total number of unloads completed"));
 
@@ -2577,6 +2586,15 @@ bool cmd_test(char *args, CommandCaller *caller)
     else if (strcmp(subcommand, "tray") == 0)
     {
         Console.info(F("Starting tray handling test..."));
+
+        // Add pneumatic pressure validation before starting the test
+        if (!isPressureSufficient())
+        {
+            Console.error(F("Cannot run tray test - pneumatic pressure insufficient"));
+            Console.println(F("[WARNING] Ensure air supply is connected and pressure is adequate"));
+            Console.println(F("[INFO] Use 'tray,status' to check PRESSURE status"));
+            return false;
+        }
 
         if (testTrayHandling())
         {
@@ -2922,6 +2940,11 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     return false;
 }
 
+bool cmd_abort(char *args, CommandCaller *caller) {
+    requestTestAbort("abort command");
+    return true;
+}
+
 Commander commander;
 
 Commander::systemCommand_t API_tree[] = {
@@ -2930,93 +2953,96 @@ Commander::systemCommand_t API_tree[] = {
     systemCommand("H", "Display help information for all commands", cmd_print_help),
 
     // Unified lock/unlock commands
-    systemCommand("lock", "Lock a tray or shuttle:\n"
-                          "  lock,1..3    - Lock specific tray position\n"
-                          "  lock,shuttle - Lock the shuttle\n"
+    systemCommand("lock", "Lock a tray or shuttle:\r\n"
+                          "  lock,1..3    - Lock specific tray position\r\n"
+                          "  lock,shuttle - Lock the shuttle\r\n"
                           "  lock,help    - Display detailed lock instructions",
                   cmd_lock),
 
-    systemCommand("unlock", "Unlock a tray, shuttle, or all valves:\n"
-                            "  unlock,1..3    - Unlock specific tray position\n"
-                            "  unlock,shuttle - Unlock the shuttle\n"
-                            "  unlock,all     - Unlock all valves\n"
+    systemCommand("unlock", "Unlock a tray, shuttle, or all valves:\r\n"
+                            "  unlock,1..3    - Unlock specific tray position\r\n"
+                            "  unlock,shuttle - Unlock the shuttle\r\n"
+                            "  unlock,all     - Unlock all valves\r\n"
                             "  unlock,help    - Display detailed unlock instructions",
                   cmd_unlock),
 
     // Logging command
-    systemCommand("log", "Logging controls:\n"
-                         "  log,on[,interval] - Enable periodic logging (interval in ms)\n"
-                         "  log,off           - Disable periodic logging\n"
-                         "  log,now           - Log system state immediately\n"
+    systemCommand("log", "Logging controls:\r\n"
+                         "  log,on[,interval] - Enable periodic logging (interval in ms)\r\n"
+                         "  log,off           - Disable periodic logging\r\n"
+                         "  log,now           - Log system state immediately\r\n"
                          "  log,help          - Display detailed logging information",
                   cmd_log),
 
     // State command to display system state
-    systemCommand("system", "System commands:\n"
-                            "  system,state    - Display current system state (sensors, actuators, positions)\n"
-                            "  system,safety   - Display comprehensive safety validation status\n"
-                            "  system,trays    - Display tray tracking and statistics\n"
-                            "  system,network  - Display Ethernet connection status and IP address\n"
+    systemCommand("system", "System commands:\r\n"
+                            "  system,state    - Display current system state (sensors, actuators, positions)\r\n"
+                            "  system,safety   - Display comprehensive safety validation status\r\n"
+                            "  system,trays    - Display tray tracking and statistics\r\n"
+                            "  system,network  - Display Ethernet connection status and IP address\r\n"
                             "  system,reset    - Reset system state after failure to retry operation",
                   cmd_system_state),
 
     // Motor control commands
-    systemCommand("motor", "Motor control:\n"
-                           "  motor,init   - Initialize motor system and prepare for operation\n"
-                           "  motor,status - Display detailed motor status and configuration\n"
-                           "  motor,clear  - Clear motor fault condition to restore operation\n"
-                           "  motor,home   - Home the motor (find zero position)\n"
-                           "  motor,abort  - Abort current operation gracefully\n"
-                           "  motor,stop   - Emergency stop motor movement immediately\n"
+    systemCommand("motor", "Motor control:\r\n"
+                           "  motor,init   - Initialize motor system and prepare for operation\r\n"
+                           "  motor,status - Display detailed motor status and configuration\r\n"
+                           "  motor,clear  - Clear motor fault condition to restore operation\r\n"
+                           "  motor,home   - Home the motor (find zero position)\r\n"
+                           "  motor,abort  - Abort current operation gracefully\r\n"
+                           "  motor,stop   - Emergency stop motor movement immediately\r\n"
                            "  motor,help   - Display comprehensive motor control instructions",
                   cmd_motor),
 
     // Move command
-    systemCommand("move", "Move motor to position:\n"
-                          "  move,home      - Move to home (zero) position\n"
-                          "  move,1..4      - Move to predefined positions 1 through 4\n"
-                          "  move,counts,X  - Move to absolute position X in encoder counts (0-64333)\n"
-                          "  move,mm,X      - Move to absolute position X in millimeters (0-1050.0)\n"
-                          "  move,rel,X     - Move X millimeters relative to current position (+ forward, - backward)\n"
+    systemCommand("move", "Move motor to position:\r\n"
+                          "  move,home      - Move to home (zero) position\r\n"
+                          "  move,1..4      - Move to predefined positions 1 through 4\r\n"
+                          "  move,counts,X  - Move to absolute position X in encoder counts (0-64333)\r\n"
+                          "  move,mm,X      - Move to absolute position X in millimeters (0-1050.0)\r\n"
+                          "  move,rel,X     - Move X millimeters relative to current position (+ forward, - backward)\r\n"
                           "  move,help      - Display detailed command usage and troubleshooting",
                   cmd_move),
 
     // Jog command
-    systemCommand("jog", "Jog motor:\n"
-                         "  jog,+         - Jog forward by current increment\n"
-                         "  jog,-         - Jog backward by current increment\n"
-                         "  jog,inc,X     - Get or set jog increment (X in mm or 'default')\n"
-                         "  jog,speed,X   - Get or set jog speed (X in RPM or 'default')\n"
-                         "  jog,status    - Display current jog settings\n"
+    systemCommand("jog", "Jog motor:\r\n"
+                         "  jog,+         - Jog forward by current increment\r\n"
+                         "  jog,-         - Jog backward by current increment\r\n"
+                         "  jog,inc,X     - Get or set jog increment (X in mm or 'default')\r\n"
+                         "  jog,speed,X   - Get or set jog speed (X in RPM or 'default')\r\n"
+                         "  jog,status    - Display current jog settings\r\n"
                          "  jog,help      - Display usage instructions and comparison with handwheel",
                   cmd_jog),
 
     // Tray command
-    systemCommand("tray", "Tray operations:\n"
-                          "  tray,load,request   - Request to load a tray (Mitsubishi)\n"
-                          "  tray,unload,request - Request to unload a tray (Mitsubishi)\n"
-                          "  tray,placed    - Notify tray has been placed (Mitsubishi)\n"
-                          "  tray,removed   - Notify tray has been removed (Mitsubishi)\n"
-                          "  tray,released  - Notify tray has been released (Mitsubishi)\n"
-                          "  tray,status    - Get tray system status (machine-readable)\n"
+    systemCommand("tray", "Tray operations:\r\n"
+                          "  tray,load,request   - Request to load a tray (Mitsubishi)\r\n"
+                          "  tray,unload,request - Request to unload a tray (Mitsubishi)\r\n"
+                          "  tray,placed    - Notify tray has been placed (Mitsubishi)\r\n"
+                          "  tray,removed   - Notify tray has been removed (Mitsubishi)\r\n"
+                          "  tray,released  - Notify tray has been released (Mitsubishi)\r\n"
+                          "  tray,status    - Get tray system status (machine-readable)\r\n"
                           "  tray,help      - Display detailed usage instructions",
                   cmd_tray),
 
     // Test command
-    systemCommand("test", "Run tests on the system:\n"
-                          "  test,home     - Run homing repeatability test\n"
-                          "  test,position - Run position cycling test for tray loading\n"
-                          "  test,tray     - Run tray handling test (request, place, release)\n"
+    systemCommand("test", "Run tests on the system:\r\n"
+                          "  test,home     - Run homing repeatability test\r\n"
+                          "  test,position - Run position cycling test for tray loading\r\n"
+                          "  test,tray     - Run tray handling test (request, place, release)\r\n"
                           "  test,help     - Display detailed test information and requirements",
                   cmd_test),
 
     // Encoder control commands
-    systemCommand("encoder", "Encoder handwheel control:\n"
-                             "  encoder,enable  - Enable encoder control\n"
-                             "  encoder,disable - Disable encoder control\n"
-                             "  encoder,multiplier,X - Set encoder multiplier (X = 1, 10, or 100)\n"
+    systemCommand("encoder", "Encoder handwheel control:\r\n"
+                             "  encoder,enable  - Enable encoder control\r\n"
+                             "  encoder,disable - Disable encoder control\r\n"
+                             "  encoder,multiplier,X - Set encoder multiplier (X = 1, 10, or 100)\r\n"
                              "  encoder,help    - Display setup instructions and usage tips",
                   cmd_encoder),
+
+    // Abort command
+    systemCommand("abort", "Abort any running test", cmd_abort),
 };
 
 const size_t API_tree_size = sizeof(API_tree) / sizeof(Commander::systemCommand_t);

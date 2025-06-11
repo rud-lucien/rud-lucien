@@ -399,12 +399,26 @@ void printSystemState(const SystemState &state)
     Console.print(F("    CCIO Board: "));
     Console.println(state.ccioBoardPresent ? F("PRESENT") : F("NOT DETECTED"));
 
-    // Add this new section for network status
+    // network status
     Console.print(F("    Network Clients: "));
     Console.print(getConnectedClientCount());
     Console.println(F(" connected"));
 
-    // Add summary of critical safety conditions
+    // Pneumatic system status
+    Console.print(F("    Pneumatic System: "));
+    float pressure = getPressurePsi();
+    Console.print(pressure);
+    Console.print(F(" PSI "));
+    if (pressure < MIN_SAFE_PRESSURE)
+    {
+        Console.println(F("(INSUFFICIENT)"));
+    }
+    else
+    {
+        Console.println(F("(OK)"));
+    }
+
+    // summary of critical safety conditions
     Console.println(F("\n  Safety Summary:"));
 
     // Check if any tray is locked while motor is moving
@@ -441,12 +455,15 @@ void printSystemState(const SystemState &state)
 }
 
 // Validate safety conditions based on the current system state
+// Returns a SafetyValidationResult with all validation checks and their results
 SafetyValidationResult validateSafety(const SystemState &state)
 {
     SafetyValidationResult result;
 
-    // Initialize all flags to safe by default
+    // Initialize all safety flags to safe by default
+    // Each will be set to false if a safety condition is not met
     result.safeToMove = true;
+    result.pneumaticPressureSufficient = true;
     result.safeToLockTray1 = true;
     result.safeToLockTray2 = true;
     result.safeToLockTray3 = true;
@@ -464,29 +481,55 @@ SafetyValidationResult validateSafety(const SystemState &state)
     result.safeToAcceptNewCommand = true;
     result.operationWithinTimeout = true;
     result.operationSequenceValid = true;
-    result.failureReason = ABORT_REASON_UNKNOWN; // Add this line
+    result.failureReason = ABORT_REASON_UNKNOWN;
 
     //=============================================================================
-    // Table 1: Basic Movement Safety Rules
+    // PNEUMATIC SYSTEM VALIDATION
     //=============================================================================
+    // Validates that pneumatic pressure is sufficient for safe valve operations
+    // This is critical for all pneumatic actions including locking/unlocking trays
 
-    // No movement with locked trays
+    // Check if pressure is sufficient for valve actuation
+    if (!isPressureSufficient())
+    {
+        result.pneumaticPressureSufficient = false;
+        result.pressureUnsafeReason = F("Pneumatic pressure below minimum threshold");
+
+        // Set abort reason during operations requiring pneumatics
+        // This will cause active operations to abort if pressure is lost
+        if (operationInProgress &&
+            (currentOperation.type == OPERATION_LOADING || currentOperation.type == OPERATION_UNLOADING))
+        {
+            result.failureReason = ABORT_REASON_PNEUMATIC_FAILURE;
+        }
+    }
+
+    //=============================================================================
+    // MOTOR MOVEMENT SAFETY
+    //=============================================================================
+    // Validates conditions that must be met before motor movement is allowed
+    // Movement is blocked if any of these conditions are not satisfied
+
+    // Mechanical Safety Constraints
+    // Prevents movement if any tray is locked, which could damage hardware
     if (state.tray1Locked || state.tray2Locked || state.tray3Locked)
     {
         result.safeToMove = false;
         result.moveUnsafeReason = F("Tray locks engaged");
-        // No abort reason - this is a prerequisite safety check
+        // This is a prerequisite safety check, not an abort condition
     }
 
-    // No movement without homing
+    // System State Requirements
+    // Motor must be homed before movement to ensure position accuracy
     if (!state.isHomed)
     {
         result.safeToMove = false;
         result.moveUnsafeReason = F("Motor not homed");
-        // No abort reason - this is a prerequisite safety check
+        // This is a prerequisite safety check, not an abort condition
     }
 
-    // No movement during E-stop
+    // Emergency Conditions
+    // E-stop immediately prevents all movement and triggers abort
     if (state.eStopActive)
     {
         result.safeToMove = false;
@@ -494,7 +537,8 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.failureReason = ABORT_REASON_ESTOP; // E-stop is an immediate abort condition
     }
 
-    // No movement if CCIO board is not present
+    // Hardware Presence Verification
+    // CCIO board must be present for safe I/O operations
     if (!state.ccioBoardPresent)
     {
         result.safeToMove = false;
@@ -502,7 +546,8 @@ SafetyValidationResult validateSafety(const SystemState &state)
         // No abort reason - this is a hardware presence check
     }
 
-    // No movement if motor is faulted
+    // Motor Fault Detection
+    // Prevents movement when motor is in fault state
     if (state.motorState == MOTOR_STATE_FAULTED)
     {
         result.safeToMove = false;
@@ -511,10 +556,13 @@ SafetyValidationResult validateSafety(const SystemState &state)
     }
 
     //=============================================================================
-    // Table 2: Lock/Unlock Safety Rules
+    // CYLINDER LOCK/UNLOCK SAFETY
     //=============================================================================
+    // Validates conditions for safely locking and unlocking tray cylinders
+    // Prevents valve actuation in unsafe conditions
 
-    // No locking without tray present
+    // Tray Presence Verification
+    // Cannot lock cylinders if no tray is present at position
     if (!state.tray1Present)
     {
         result.safeToLockTray1 = false;
@@ -536,7 +584,8 @@ SafetyValidationResult validateSafety(const SystemState &state)
         // No abort reason - this is a prerequisite check
     }
 
-    // No locking during movement
+    // Movement Status Safety
+    // Cannot lock trays while motor is moving
     if (state.motorState == MOTOR_STATE_MOVING)
     {
         result.safeToLockTray1 = false;
@@ -544,20 +593,22 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.safeToLockTray3 = false;
         result.tray1LockUnsafeReason = F("Motor is moving");
         result.tray2LockUnsafeReason = F("Motor is moving");
-        result.tray3LockUnsafeReason = F("Motor is moving"); // Only flag unexpected movement if we're in a lock/unlock operation step
+        result.tray3LockUnsafeReason = F("Motor is moving");
+
+        // Sequence validation: Detect unexpected movement during lock/unlock steps
         // For tray loading, steps 0-7 involve lock/unlock ops, while 8+ are for movement
         if (operationInProgress &&
             (previousState.motorState != MOTOR_STATE_MOVING) &&
             ((currentOperation.type == OPERATION_LOADING && currentOperationStep < 8) ||
              (currentOperation.type == OPERATION_UNLOADING && currentOperationStep < 3)))
         {
-            // This means movement started during a lock/unlock operation
+            // This means movement started during a lock/unlock operation - sequence violation
             result.operationSequenceValid = false;
 
-            // Enhance the error message with operation-specific context
+            // Provide detailed error message with operation-specific context
             result.operationSequenceMessage = F("Motor unexpectedly started moving during ");
 
-            // Add specific step information
+            // Add specific step information for clearer diagnostics
             if (currentOperation.type == OPERATION_LOADING)
             {
                 switch (currentOperationStep)
@@ -621,7 +672,8 @@ SafetyValidationResult validateSafety(const SystemState &state)
         }
     }
 
-    // No tray locking when shuttle is locked
+    // Shuttle/Tray Lock Exclusivity
+    // Cannot lock trays when shuttle is locked (mechanical interference)
     if (state.shuttleLocked)
     {
         result.safeToLockTray1 = false;
@@ -629,8 +681,10 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.safeToLockTray3 = false;
         result.tray1LockUnsafeReason = F("Shuttle is locked");
         result.tray2LockUnsafeReason = F("Shuttle is locked");
-        result.tray3LockUnsafeReason = F("Shuttle is locked"); // Only flag unexpected shuttle locking when not in the shuttle locking step
-        // We expect the shuttle to lock during the tray loading process step 2->3
+        result.tray3LockUnsafeReason = F("Shuttle is locked");
+
+        // Sequence validation: Detect unexpected shuttle locking
+        // We expect the shuttle to lock during specific operation steps only
         if (operationInProgress &&
             !previousState.shuttleLocked && state.shuttleLocked &&
             (currentOperation.type != OPERATION_LOADING ||
@@ -639,10 +693,10 @@ SafetyValidationResult validateSafety(const SystemState &state)
             // This means shuttle was locked unexpectedly outside the expected step
             result.operationSequenceValid = false;
 
-            // Provide more detailed information about the unexpected shuttle locking
+            // Provide detailed error message with operation context
             result.operationSequenceMessage = F("Shuttle unexpectedly locked during ");
 
-            // Add operation-specific context
+            // Add operation-specific context for clearer diagnostics
             if (currentOperation.type == OPERATION_LOADING)
             {
                 result.operationSequenceMessage += F("tray loading operation at step ");
@@ -680,10 +734,13 @@ SafetyValidationResult validateSafety(const SystemState &state)
     }
 
     //=============================================================================
-    // Table 3: Tray Loading Sequence Rules
+    // TRAY LOADING VALIDATION
     //=============================================================================
+    // Validates conditions required for safely loading new trays
+    // Prevents loading trays into occupied positions or exceeding capacity
 
-    // No loading to occupied positions
+    // Position Occupancy Checks
+    // Cannot load trays into already occupied positions
     if (state.tray1Present)
     {
         result.safeToLoadTrayToPos1 = false;
@@ -704,18 +761,9 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.loadTrayPos3UnsafeReason = F("Position already occupied");
         // No abort reason - this is a prerequisite check
     }
-    // Loading sequence validation
-    // All trays are initially placed at position 1, then moved automatically
-    // No special validation needed when no trays are present - first tray is loaded normally at position 1
-    // and then moved to position 3 during the automated sequence
-    // When position 3 occupied, second tray can be loaded at position 1
-    // No special validation needed - second tray is loaded normally at position 1
-    // and then moved to position 2 during the automated sequence
 
-    // When positions 2 and 3 occupied, third tray stays at loading position (pos 1)
-    // (This is handled by default since we don't need special validation)
-
-    // Cannot load more than 3 trays
+    // System Capacity Constraint
+    // Cannot load more than 3 trays into the system
     if (state.tray1Present && state.tray2Present && state.tray3Present)
     {
         result.safeToLoadTrayToPos1 = false;
@@ -728,9 +776,12 @@ SafetyValidationResult validateSafety(const SystemState &state)
     }
 
     //=============================================================================
-    // Table 4: Tray Unloading Sequence Rules
+    // TRAY UNLOADING VALIDATION
     //=============================================================================
+    // Validates conditions required for safely unloading trays
+    // Enforces FILO (First-In-Last-Out) sequence for tray removal
 
+    // Tray Presence Requirement
     // Cannot unload from empty positions
     if (!state.tray1Present)
     {
@@ -753,8 +804,10 @@ SafetyValidationResult validateSafety(const SystemState &state)
         // No abort reason - this is a prerequisite check
     }
 
-    // First-in-last-out sequence validation
-    // Tray 1 must be unloaded first
+    // FILO (First-In-Last-Out) Sequence Enforcement
+    // Trays must be unloaded in reverse order of loading
+
+    // Position 1 must be unloaded first (most recently loaded)
     if (state.tray1Present)
     {
         result.safeToUnloadTrayFromPos2 = false;
@@ -764,7 +817,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
         // No abort reason - this is a prerequisite check
     }
 
-    // Tray 2 must be unloaded second
+    // Position 2 must be unloaded before position 3
     if (state.tray2Present && !state.tray1Present)
     {
         result.safeToUnloadTrayFromPos3 = false;
@@ -773,16 +826,20 @@ SafetyValidationResult validateSafety(const SystemState &state)
     }
 
     //=============================================================================
-    // Table 5: System State Validation
+    // POSITION AND STATE VALIDATION
     //=============================================================================
-    // 1. Command vs. actual state mismatch - enhanced with detailed position information
+    // Validates that motor position and system state match expectations
+    // Detects position errors and unexpected conditions
+
+    // Motor Position Accuracy Validation
+    // Verifies that motor has reached commanded position within tolerance
     if (commandedPositionMm >= 0)
     {
         if (abs(state.currentPositionMm - commandedPositionMm) > POSITION_TOLERANCE_MM)
         {
             result.commandStateValid = false;
 
-            // Enhanced error message with specific position values
+            // Create detailed error message with position values
             result.stateValidationMessage = F("Position mismatch: current position ");
             result.stateValidationMessage += String(state.currentPositionMm);
             result.stateValidationMessage += F(" mm vs. commanded ");
@@ -791,7 +848,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
             result.stateValidationMessage += String(abs(state.currentPositionMm - commandedPositionMm));
             result.stateValidationMessage += F(" mm)");
 
-            // Add more context about the potential issue
+            // Add motor state context for better diagnostics
             if (state.motorState == MOTOR_STATE_MOVING)
             {
                 result.stateValidationMessage += F(" - Motor still moving");
@@ -805,13 +862,13 @@ SafetyValidationResult validateSafety(const SystemState &state)
                 result.stateValidationMessage += F(" - Motor stopped before reaching target");
             }
 
-            // Add abort reason - this could indicate motor failure or blockage
+            // Set abort reason during operations - motor timeout or blockage
             if (operationInProgress)
             {
                 result.failureReason = ABORT_REASON_MOTOR_TIMEOUT;
                 result.operationSequenceValid = false;
 
-                // Add operation context
+                // Add operation context for more detailed error reporting
                 result.stateValidationMessage += F(" during ");
                 if (currentOperation.type == OPERATION_LOADING)
                 {
@@ -833,12 +890,13 @@ SafetyValidationResult validateSafety(const SystemState &state)
         }
     }
 
-    // 2. Tray position validation
+    // Tray Position Validation
+    // Verifies that trays are present at expected positions based on motor position
     bool tray1ExpectedPresent = isAtPosition(state.currentPositionMm, POSITION_1_MM);
     bool tray2ExpectedPresent = isAtPosition(state.currentPositionMm, POSITION_2_MM);
     bool tray3ExpectedPresent = isAtPosition(state.currentPositionMm, POSITION_3_MM);
 
-    // Skip tray position validation during active tray movement operations
+    // Skip validation during active tray movement operations
     bool inTrayMovementOperation = (operationInProgress &&
                                     ((currentOperation.type == OPERATION_LOADING &&
                                       (currentOperationStep == 8 || currentOperationStep == 14)) ||
@@ -846,14 +904,15 @@ SafetyValidationResult validateSafety(const SystemState &state)
                                       currentOperationStep == 9)) &&
                                     state.motorState == MOTOR_STATE_MOVING);
 
-    // Skip validation at start of unloading operations
+    // Skip validation during unloading preparation steps
     bool startingUnloadOperation = (operationInProgress &&
                                     currentOperation.type == OPERATION_UNLOADING &&
                                     currentOperationStep <= 3);
 
+    // Only validate when not in movement or special operations
     if (!inTrayMovementOperation && !startingUnloadOperation)
     {
-        // Only validate that expected trays ARE present (safety critical)
+        // Safety critical: Verify expected trays are present
         if (tray1ExpectedPresent && !state.tray1Present)
         {
             result.trayPositionValid = false;
@@ -863,21 +922,19 @@ SafetyValidationResult validateSafety(const SystemState &state)
             result.stateValidationMessage += String(state.currentPositionMm);
             result.stateValidationMessage += F(" mm)");
 
-            // Append operation context if in progress
+            // Add operation context and set failure reason
             if (operationInProgress)
             {
-                // IMPORTANT: Add this line to copy the detailed message
+                // Copy message to operation sequence for consistency
                 result.operationSequenceMessage = result.stateValidationMessage;
-
-                // Existing operation context code...
                 result.operationSequenceValid = false;
                 result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
             }
         }
     }
 
-    // 4. Position target validation
-    // Check if the target position is within allowed range
+    // Target Position Validation
+    // Verifies that commanded target position is within allowed range
     bool skipTargetValidation = (operationInProgress &&
                                  currentOperation.type == OPERATION_UNLOADING &&
                                  (currentOperationStep >= 4 && currentOperationStep <= 7));
@@ -891,19 +948,22 @@ SafetyValidationResult validateSafety(const SystemState &state)
             result.operationSequenceMessage = result.stateValidationMessage;
         }
     }
-    else if (!skipTargetValidation) // Only fail if we shouldn't skip validation
+    else if (!skipTargetValidation) // Only fail if validation isn't temporarily disabled
     {
-        // No target set yet
+        // Only a problem if we expect a target position
         result.targetPositionValid = false;
         result.stateValidationMessage = F("No target position set");
         result.operationSequenceMessage = result.stateValidationMessage;
     }
 
     //=============================================================================
-    // Table 6: Operational Sequence Validation
+    // OPERATION SEQUENCE VALIDATION
     //=============================================================================
-    // 1. No new commands during operations
-    // Check if a new command was received while an operation is in progress
+    // Validates that operations follow correct sequence and timing
+    // Prevents command conflicts and detects sequence errors
+
+    // Command Exclusivity Check
+    // No new commands allowed during active operations
     if (operationInProgress)
     {
         if (newCommandReceived)
@@ -914,25 +974,25 @@ SafetyValidationResult validateSafety(const SystemState &state)
         }
     }
 
-    // 2. Operation timeout
-    // Check if the current operation has exceeded its timeout
+    // Operation Timeout Detection
+    // Detects and reports operations that exceed their timeout
     if (operationInProgress && millis() - operationStartTime > operationTimeoutMs)
     {
         result.operationWithinTimeout = false;
         result.operationSequenceMessage = F("Operation exceeded timeout");
-        result.failureReason = ABORT_REASON_OPERATION_TIMEOUT; // Add this line
+        result.failureReason = ABORT_REASON_OPERATION_TIMEOUT;
     }
 
-    // 3. Operation state mismatch
-    // Check if the current operation is in the expected step of its sequence with more detailed error message
+    // Operation Step Sequence Validation
+    // Verifies that operation steps are executed in correct sequence
     if (operationInProgress && currentOperationStep != expectedOperationStep)
     {
         result.operationSequenceValid = false;
 
-        // Provide more detailed information about the sequence mismatch
+        // Create detailed error message with operation context
         result.operationSequenceMessage = F("Operation sequence mismatch: ");
 
-        // Add operation specific context to the message
+        // Add operation-specific type information
         switch (currentOperation.type)
         {
         case OPERATION_LOADING:
@@ -946,7 +1006,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
             break;
         }
 
-        // Add step information
+        // Add step information for debugging
         result.operationSequenceMessage += F(" at step ");
         result.operationSequenceMessage += String(currentOperationStep);
         result.operationSequenceMessage += F(" (expected: ");
@@ -975,6 +1035,25 @@ void printSafetyStatus(const SafetyValidationResult &result)
         Console.print(F("UNSAFE - "));
         Console.println(result.moveUnsafeReason);
     }
+
+    // Pneumatic pressure safety status
+    Console.print(F("  Pneumatic System: "));
+    if (result.pneumaticPressureSufficient)
+    {
+        Console.print(F("SAFE - "));
+        Console.print(getPressurePsi());
+        Console.println(F(" PSI (sufficient pressure for valve operations)"));
+    }
+    else
+    {
+        Console.print(F("UNSAFE - "));
+        Console.println(result.pressureUnsafeReason);
+        Console.print(F("    Current pressure: "));
+        Console.print(getPressurePsi());
+        Console.print(F(" PSI, Minimum required: "));
+        Console.println(MIN_SAFE_PRESSURE);
+    }
+
     // Tray locking safety with enhanced safety messages
     Console.println(F("  Tray Locking:"));
     Console.print(F("    Tray 1: "));
@@ -1360,7 +1439,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         }
         else if (!result.commandStateValid)
         {
-            Console.println(F("    Reason: Command/state mismatch detected"));
+            Console.println(F("    Reason: Motor position error detected"));
             Console.print(F("            "));
             Console.println(result.stateValidationMessage);
         }
@@ -2823,6 +2902,8 @@ const char *getAbortReasonString(AbortReason reason)
         return "Unexpected Sensor Reading";
     case ABORT_REASON_COMMUNICATION_LOSS:
         return "Robot Communication Loss";
+    case ABORT_REASON_PNEUMATIC_FAILURE:
+        return "Insufficient Pneumatic Pressure";
     default:
         return "Unknown Reason";
     }

@@ -108,6 +108,15 @@ void logSystemState()
     int clientCount = getConnectedClientCount();
     Console.print(clientCount);
 
+    Console.print(F(", Pressure="));
+    float pressure = getPressurePsi();
+    Console.print(pressure);
+    Console.print(F(" PSI"));
+    if (pressure < MIN_SAFE_PRESSURE)
+    {
+        Console.print(F(" (LOW)"));
+    }
+
     // 4. POSITION GROUP with improved naming
     Console.print(F(" | Position: "));
     double calculatedPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
