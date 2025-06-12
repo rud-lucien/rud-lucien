@@ -163,12 +163,7 @@ void loop()
     }
 }
 
-/* TODO: Figure out how to implement collision detection
-This task is about implementing a collision detection system for the conveyor controller to prevent mechanical damage during operations.
-in the clearpath settings I lowered the max torque to 20%, basically if the motor is stalled it will not try to push through the stall, it will just stop.
-How do I update code to handle this? when the motor is stalled what message does it send and how do we deal with it currently? how do we make sure that stalling
-prints a helpful message to the user that this is potentially a collision detection issue and not just a motor fault?
-*/
+
 
 /* # TODO: Implement Operation Step Sequence Validation
 

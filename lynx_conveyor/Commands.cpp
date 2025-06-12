@@ -69,213 +69,214 @@ bool cmd_lock(char *args, CommandCaller *caller)
     // Trim leading spaces from subcommand
     subcommand = trimLeadingSpaces(subcommand);
 
-    // Handle locking based on subcommand
+    // Declare all variables at the beginning before switch
+    DoubleSolenoidValve *valve = NULL;
+    CylinderSensor *sensor = NULL;
+    DoubleSolenoidValve *trayValve = NULL;
+    CylinderSensor *traySensor = NULL;
+    int trayNum = 0;
+
+    // Helper function to map subcommand to an integer for switch
+    int cmdCode = 0;
     if (strcmp(subcommand, "all") == 0)
+        cmdCode = 1;
+    else if (strcmp(subcommand, "shuttle") == 0)
+        cmdCode = 2;
+    else if (strcmp(subcommand, "help") == 0)
+        cmdCode = 3;
+    else if (strcmp(subcommand, "1") == 0 ||
+             strcmp(subcommand, "2") == 0 ||
+             strcmp(subcommand, "3") == 0)
     {
+        cmdCode = 4;
+        trayNum = atoi(subcommand);
+    }
+    // If none of the above, leave cmdCode as 0 (unknown command)
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "all"
         // Removed "lock all" functionality as requested
         Console.error(F("'lock,all' is not supported for safety reasons. Engage trays individually."));
         return false;
-    }
-    else if (strcmp(subcommand, "shuttle") == 0)
-    {
-        if (ccioBoardCount > 0)
-        {
-            Console.info(F("Engaging shuttle with sensor verification..."));
-            DoubleSolenoidValve *valve = getShuttleValve();
-            CylinderSensor *sensor = getShuttleSensor();
 
-            if (valve && sensor)
-            {
-                // Check current state first
-                if (valve->position == VALVE_POSITION_LOCK)
-                {
-                    Console.info(F("Shuttle already engaged"));
-
-                    // Verify actual position with sensor
-                    if (sensorRead(*sensor) == true)
-                    { // Sensor true = locked
-                        Console.println(F("[OK] Shuttle lock confirmed by sensor"));
-                    }
-                    else
-                    {
-                        Console.println(F("[WARNING] Shuttle should be locked but sensor doesn't confirm - check air pressure"));
-                    }
-                    return true;
-                }
-                else
-                {
-                    // Try locking with sensor feedback
-                    Console.info(F("Locking shuttle..."));
-                    if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
-                    {
-                        Console.info(F("Shuttle engaged and confirmed by sensor"));
-                        return true;
-                    }
-                    else
-                    {
-                        Console.error(F("Failed to engage shuttle - sensor did not confirm lock"));
-                        Console.println(F("[WARNING] Check air pressure and valve functionality"));
-                        return false;
-                    }
-                }
-            }
-            else
-            {
-                Console.error(F("Failed to access shuttle valve or sensor. Possible causes:"));
-                Console.println(F("  - CCIO board detected but shuttle valve not configured"));
-                Console.println(F("  - System memory corruption"));
-                Console.println(F("Try restarting the system or run 'status' to check valve configuration"));
-                return false;
-            }
-        }
-        else
+    case 2: // "shuttle"
+        if (ccioBoardCount <= 0)
         {
             Console.error(F("No CCIO-8 board detected. Shuttle valve not available."));
             return false;
         }
-    }
-    else
-    {
-        // Try to parse as tray number
-        int trayNum = atoi(subcommand);
-        if (trayNum >= 1 && trayNum <= 3)
+
+        Console.info(F("Engaging shuttle with sensor verification..."));
+        valve = getShuttleValve();
+        sensor = getShuttleSensor();
+
+        if (!valve || !sensor)
         {
-            Console.print(F("[INFO] Engaging tray "));
-            Console.print(trayNum);
-            Console.println(F(" with sensor verification..."));
+            Console.error(F("Failed to access shuttle valve or sensor. Possible causes:"));
+            Console.println(F("  - CCIO board detected but shuttle valve not configured"));
+            Console.println(F("  - System memory corruption"));
+            Console.println(F("Try restarting the system or run 'status' to check valve configuration"));
+            return false;
+        }
 
-            DoubleSolenoidValve *valve = NULL;
-            CylinderSensor *sensor = NULL;
+        // Check current state first
+        if (valve->position == VALVE_POSITION_LOCK)
+        {
+            Console.info(F("Shuttle already engaged"));
 
-            // Get the appropriate valve and sensor
-            switch (trayNum)
-            {
-            case 1:
-                valve = getTray1Valve();
-                sensor = getTray1Sensor();
-                break;
-            case 2:
-                valve = getTray2Valve();
-                sensor = getTray2Sensor();
-                break;
-            case 3:
-                valve = getTray3Valve();
-                sensor = getTray3Sensor();
-                break;
-            default:
-                return false;
-            }
-
-            if (valve && sensor)
-            {
-                // Check current state first
-                if (valve->position == VALVE_POSITION_LOCK)
-                {
-                    Console.print(F("[INFO] Tray "));
-                    Console.print(trayNum);
-                    Console.println(F(" already engaged"));
-
-                    // Verify actual position with sensor
-                    if (sensorRead(*sensor) == true)
-                    { // Sensor true = locked
-                        Console.println(F("[OK] Tray lock confirmed by sensor"));
-                    }
-                    else
-                    {
-                        Console.println(F("[WARNING] Tray should be locked but sensor doesn't confirm - check air pressure"));
-                    }
-                    return true;
-                }
-                else
-                {
-                    // Try locking with sensor feedback
-                    if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
-                    {
-                        Console.print(F("[INFO] Tray "));
-                        Console.print(trayNum);
-                        Console.println(F(" engaged and confirmed by sensor"));
-                        return true;
-                    }
-                    else
-                    {
-                        Console.print(F("[ERROR] Failed to engage tray "));
-                        Console.println(trayNum);
-                        Console.println(F("[WARNING] Check air pressure and valve functionality"));
-                        return false;
-                    }
-                }
+            // Verify actual position with sensor
+            if (sensorRead(*sensor) == true)
+            { // Sensor true = locked
+                Console.println(F("[OK] Shuttle lock confirmed by sensor"));
             }
             else
             {
-                Console.print(F("[ERROR] Failed to access tray "));
-                Console.print(trayNum);
-                Console.println(F(" valve or sensor. Possible causes:"));
-                Console.println(F("  - Hardware initialization issue"));
-                Console.println(F("  - Valve controller not properly initialized"));
-                Console.println(F("  - System memory corruption"));
-                Console.println(F("Try restarting the system or run 'status' to check valve configuration"));
-                return false;
+                Console.println(F("[WARNING] Shuttle should be locked but sensor doesn't confirm - check air pressure"));
             }
-        }
-        else if (strcmp(subcommand, "help") == 0)
-        {
-            Console.println(F("\n===== LOCK COMMAND HELP ====="));
-
-            Console.println(F("\nOVERVIEW:"));
-            Console.println(F("  The lock command engages pneumatic locks on trays and the shuttle,"));
-            Console.println(F("  securing them in position. All operations include sensor verification"));
-            Console.println(F("  to confirm successful locking."));
-
-            Console.println(F("\nCOMMAND REFERENCE:"));
-            Console.println(F("  lock,1 - Engage lock on tray at position 1 (loading position)"));
-            Console.println(F("    > Verified by cylinder position sensor"));
-            Console.println(F("    > Will report success only when sensor confirms lock"));
-
-            Console.println(F("  lock,2 - Engage lock on tray at position 2 (middle position)"));
-            Console.println(F("    > Verified by cylinder position sensor"));
-            Console.println(F("    > Will report success only when sensor confirms lock"));
-
-            Console.println(F("  lock,3 - Engage lock on tray at position 3 (unloading position)"));
-            Console.println(F("    > Verified by cylinder position sensor"));
-            Console.println(F("    > Will report success only when sensor confirms lock"));
-
-            Console.println(F("  lock,shuttle - Engage lock on the shuttle"));
-            Console.println(F("    > Prevents shuttle from moving between positions"));
-            Console.println(F("    > Verified by cylinder position sensor"));
-            Console.println(F("    > Required before unlocking any trays for safety"));
-
-            Console.println(F("\nSAFETY NOTES:"));
-            Console.println(F("  • 'lock,all' is not supported for safety reasons"));
-            Console.println(F("  • Always lock the shuttle before unlocking any trays"));
-            Console.println(F("  • System uses sensor verification to confirm actual locking"));
-            Console.println(F("  • Sufficient pneumatic pressure is required for all valve operations"));
-            Console.println(F("  • Failed locking may indicate mechanical issues or low air pressure"));
-
-            Console.println(F("\nSENSOR VERIFICATION:"));
-            Console.println(F("  • Each lock has a corresponding sensor that confirms its position"));
-            Console.println(F("  • Command waits up to 1 second for sensor to confirm lock"));
-            Console.println(F("  • Returns success only when sensor confirms the lock operation"));
-            Console.println(F("  • Sensor mismatches are shown in status logs with [!] indicator"));
-
-            Console.println(F("\nTROUBLESHOOTING:"));
-            Console.println(F("  • If lock fails, check air pressure"));
-            Console.println(F("  • Verify sensor connections if lock command doesn't register"));
-            Console.println(F("  • Use 'system,state' to see detailed valve and sensor status"));
-            Console.println(F("  • For persistent issues, check valve functionality"));
-            Console.println(F("-------------------------------------------"));
-
             return true;
         }
-        else
+
+        // Try locking with sensor feedback
+        Console.info(F("Locking shuttle..."));
+        if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
         {
-            Console.print(F("[ERROR] Unknown lock subcommand: "));
-            Console.println(subcommand);
-            Console.println(F("Valid options are '1', '2', '3', 'shuttle', or 'help'"));
+            Console.info(F("Shuttle engaged and confirmed by sensor"));
+            return true;
+        }
+
+        Console.error(F("Failed to engage shuttle - sensor did not confirm lock"));
+        Console.println(F("[WARNING] Check air pressure and valve functionality"));
+        return false;
+
+    case 3: // "help"
+        Console.println(F("\n===== LOCK COMMAND HELP ====="));
+
+        Console.println(F("\nOVERVIEW:"));
+        Console.println(F("  The lock command engages pneumatic locks on trays and the shuttle,"));
+        Console.println(F("  securing them in position. All operations include sensor verification"));
+        Console.println(F("  to confirm successful locking."));
+
+        Console.println(F("\nCOMMAND REFERENCE:"));
+        Console.println(F("  lock,1 - Engage lock on tray at position 1 (loading position)"));
+        Console.println(F("    > Verified by cylinder position sensor"));
+        Console.println(F("    > Will report success only when sensor confirms lock"));
+
+        Console.println(F("  lock,2 - Engage lock on tray at position 2 (middle position)"));
+        Console.println(F("    > Verified by cylinder position sensor"));
+        Console.println(F("    > Will report success only when sensor confirms lock"));
+
+        Console.println(F("  lock,3 - Engage lock on tray at position 3 (unloading position)"));
+        Console.println(F("    > Verified by cylinder position sensor"));
+        Console.println(F("    > Will report success only when sensor confirms lock"));
+
+        Console.println(F("  lock,shuttle - Engage lock on the shuttle"));
+        Console.println(F("    > Prevents shuttle from moving between positions"));
+        Console.println(F("    > Verified by cylinder position sensor"));
+        Console.println(F("    > Required before unlocking any trays for safety"));
+
+        Console.println(F("\nSAFETY NOTES:"));
+        Console.println(F("  • 'lock,all' is not supported for safety reasons"));
+        Console.println(F("  • Always lock the shuttle before unlocking any trays"));
+        Console.println(F("  • System uses sensor verification to confirm actual locking"));
+        Console.println(F("  • Sufficient pneumatic pressure is required for all valve operations"));
+        Console.println(F("  • Failed locking may indicate mechanical issues or low air pressure"));
+
+        Console.println(F("\nSENSOR VERIFICATION:"));
+        Console.println(F("  • Each lock has a corresponding sensor that confirms its position"));
+        Console.println(F("  • Command waits up to 1 second for sensor to confirm lock"));
+        Console.println(F("  • Returns success only when sensor confirms the lock operation"));
+        Console.println(F("  • Sensor mismatches are shown in status logs with [!] indicator"));
+
+        Console.println(F("\nTROUBLESHOOTING:"));
+        Console.println(F("  • If lock fails, check air pressure"));
+        Console.println(F("  • Verify sensor connections if lock command doesn't register"));
+        Console.println(F("  • Use 'system,state' to see detailed valve and sensor status"));
+        Console.println(F("  • For persistent issues, check valve functionality"));
+        Console.println(F("-------------------------------------------"));
+        return true;
+
+    case 4: // Tray numbers (1, 2, or 3)
+        // Try to parse as tray number
+        trayNum = atoi(subcommand);
+
+        Console.print(F("[INFO] Engaging tray "));
+        Console.print(trayNum);
+        Console.println(F(" with sensor verification..."));
+
+        // Get the appropriate valve and sensor
+        switch (trayNum)
+        {
+        case 1:
+            trayValve = getTray1Valve();
+            traySensor = getTray1Sensor();
+            break;
+        case 2:
+            trayValve = getTray2Valve();
+            traySensor = getTray2Sensor();
+            break;
+        case 3:
+            trayValve = getTray3Valve();
+            traySensor = getTray3Sensor();
+            break;
+        default:
             return false;
         }
+
+        if (!trayValve || !traySensor)
+        {
+            Console.print(F("[ERROR] Failed to access tray "));
+            Console.print(trayNum);
+            Console.println(F(" valve or sensor. Possible causes:"));
+            Console.println(F("  - Hardware initialization issue"));
+            Console.println(F("  - Valve controller not properly initialized"));
+            Console.println(F("  - System memory corruption"));
+            Console.println(F("Try restarting the system or run 'status' to check valve configuration"));
+            return false;
+        }
+
+        // Check current state first
+        if (trayValve->position == VALVE_POSITION_LOCK)
+        {
+            Console.print(F("[INFO] Tray "));
+            Console.print(trayNum);
+            Console.println(F(" already engaged"));
+
+            // Verify actual position with sensor
+            if (sensorRead(*traySensor) == true)
+            { // Sensor true = locked
+                Console.println(F("[OK] Tray lock confirmed by sensor"));
+            }
+            else
+            {
+                Console.println(F("[WARNING] Tray should be locked but sensor doesn't confirm - check air pressure"));
+            }
+            return true;
+        }
+
+        // Try locking with sensor feedback
+        if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_LOCK, 1000))
+        {
+            Console.print(F("[INFO] Tray "));
+            Console.print(trayNum);
+            Console.println(F(" engaged and confirmed by sensor"));
+            return true;
+        }
+
+        Console.print(F("[ERROR] Failed to engage tray "));
+        Console.println(trayNum);
+        Console.println(F("[WARNING] Check air pressure and valve functionality"));
+        return false;
+
+    default: // Unknown command
+        Console.print(F("[ERROR] Unknown lock subcommand: "));
+        Console.println(subcommand);
+        Console.println(F("Valid options are '1', '2', '3', 'shuttle', or 'help'"));
+        return false;
     }
 
-    return false;
+    return false; // Should never reach here
 }
 
 // Unlock a tray or shuttle
@@ -307,9 +308,34 @@ bool cmd_unlock(char *args, CommandCaller *caller)
     // Trim leading spaces from subcommand
     subcommand = trimLeadingSpaces(subcommand);
 
-    // Handle unlocking based on subcommand
+    // Declare all variables at the beginning before switch
+    DoubleSolenoidValve *valve = NULL;
+    CylinderSensor *sensor = NULL;
+    DoubleSolenoidValve *trayValve = NULL;
+    CylinderSensor *traySensor = NULL;
+    int trayNum = 0;
+
+    // Helper function to map subcommand to an integer for switch
+    int cmdCode = 0;
     if (strcmp(subcommand, "all") == 0)
+        cmdCode = 1;
+    else if (strcmp(subcommand, "shuttle") == 0)
+        cmdCode = 2;
+    else if (strcmp(subcommand, "help") == 0)
+        cmdCode = 3;
+    else if (strcmp(subcommand, "1") == 0 ||
+             strcmp(subcommand, "2") == 0 ||
+             strcmp(subcommand, "3") == 0)
     {
+        cmdCode = 4;
+        trayNum = atoi(subcommand);
+    }
+    // If none of the above, leave cmdCode as 0 (unknown command)
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "all"
         Console.info(F("Disengaging all valves with sensor verification..."));
         if (safeUnlockAllValves(1000))
         {
@@ -321,210 +347,192 @@ bool cmd_unlock(char *args, CommandCaller *caller)
             Console.println(F("[WARNING] Some valves could not be disengaged - check air pressure"));
             return false;
         }
-    }
-    else if (strcmp(subcommand, "shuttle") == 0)
-    {
-        if (ccioBoardCount > 0)
-        {
-            Console.info(F("Disengaging shuttle with sensor verification..."));
-            DoubleSolenoidValve *valve = getShuttleValve();
-            CylinderSensor *sensor = getShuttleSensor();
+        break;
 
-            if (valve && sensor)
-            {
-                // Check current state first
-                if (valve->position == VALVE_POSITION_UNLOCK)
-                {
-                    Console.info(F("Shuttle already disengaged"));
-
-                    // Verify actual position with sensor
-                    if (sensorRead(*sensor) == false)
-                    { // Sensor false = unlocked
-                        Console.println(F("[OK] Shuttle unlock confirmed by sensor"));
-                    }
-                    else
-                    {
-                        Console.println(F("[WARNING] Shuttle should be unlocked but sensor doesn't confirm - check air pressure"));
-                    }
-                    return true;
-                }
-                else
-                {
-                    // Try unlocking with sensor feedback
-                    Console.info(F("Unlocking shuttle..."));
-                    if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
-                    {
-                        Console.info(F("Shuttle disengaged and confirmed by sensor"));
-                        return true;
-                    }
-                    else
-                    {
-                        Console.error(F("Failed to disengage shuttle - sensor did not confirm unlock"));
-                        Console.println(F("[WARNING] Check air pressure and valve functionality"));
-                        return false;
-                    }
-                }
-            }
-            else
-            {
-                Console.error(F("Failed to access shuttle valve or sensor. Possible causes:"));
-                Console.println(F("  - CCIO board detected but shuttle valve not configured"));
-                Console.println(F("  - System memory corruption"));
-                Console.println(F("Try restarting the system or run 'status' to check valve configuration"));
-                return false;
-            }
-        }
-        else
+    case 2: // "shuttle"
+        if (ccioBoardCount <= 0)
         {
             Console.error(F("No CCIO-8 board detected. Shuttle valve not available."));
             return false;
         }
-    }
-    else
-    {
-        // Try to parse as tray number
-        int trayNum = atoi(subcommand);
-        if (trayNum >= 1 && trayNum <= 3)
+
+        Console.info(F("Disengaging shuttle with sensor verification..."));
+        valve = getShuttleValve();
+        sensor = getShuttleSensor();
+
+        if (!valve || !sensor)
         {
-            Console.print(F("[INFO] Disengaging tray "));
-            Console.print(trayNum);
-            Console.println(F(" with sensor verification..."));
+            Console.error(F("Failed to access shuttle valve or sensor. Possible causes:"));
+            Console.println(F("  - CCIO board detected but shuttle valve not configured"));
+            Console.println(F("  - System memory corruption"));
+            Console.println(F("Try restarting the system or run 'status' to check valve configuration"));
+            return false;
+        }
 
-            DoubleSolenoidValve *valve = NULL;
-            CylinderSensor *sensor = NULL;
+        // Check current state first
+        if (valve->position == VALVE_POSITION_UNLOCK)
+        {
+            Console.info(F("Shuttle already disengaged"));
 
-            // Get the appropriate valve and sensor
-            switch (trayNum)
-            {
-            case 1:
-                valve = getTray1Valve();
-                sensor = getTray1Sensor();
-                break;
-            case 2:
-                valve = getTray2Valve();
-                sensor = getTray2Sensor();
-                break;
-            case 3:
-                valve = getTray3Valve();
-                sensor = getTray3Sensor();
-                break;
-            default:
-                return false;
-            }
-
-            if (valve && sensor)
-            {
-                // Check current state first
-                if (valve->position == VALVE_POSITION_UNLOCK)
-                {
-                    Console.print(F("[INFO] Tray "));
-                    Console.print(trayNum);
-                    Console.println(F(" already disengaged"));
-
-                    // Verify actual position with sensor
-                    if (sensorRead(*sensor) == false)
-                    { // Sensor false = unlocked
-                        Console.println(F("[OK] Tray unlock confirmed by sensor"));
-                    }
-                    else
-                    {
-                        Console.println(F("[WARNING] Tray should be unlocked but sensor doesn't confirm - check air pressure"));
-                    }
-                    return true;
-                }
-                else
-                {
-                    // Try unlocking with sensor feedback
-                    if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
-                    {
-                        Console.print(F("[INFO] Tray "));
-                        Console.print(trayNum);
-                        Console.println(F(" disengaged and confirmed by sensor"));
-                        return true;
-                    }
-                    else
-                    {
-                        Console.print(F("[ERROR] Failed to disengage tray "));
-                        Console.println(trayNum);
-                        Console.println(F("[WARNING] Check air pressure and valve functionality"));
-                        return false;
-                    }
-                }
+            // Verify actual position with sensor
+            if (sensorRead(*sensor) == false)
+            { // Sensor false = unlocked
+                Console.println(F("[OK] Shuttle unlock confirmed by sensor"));
             }
             else
             {
-                Console.print(F("[ERROR] Failed to access tray "));
-                Console.print(trayNum);
-                Console.println(F(" valve or sensor. Possible causes:"));
-                Console.println(F("  - Hardware initialization issue"));
-                Console.println(F("  - Valve controller not properly initialized"));
-                Console.println(F("  - System memory corruption"));
-                Console.println(F("Try restarting the system or run 'status' to check valve configuration"));
-                return false;
+                Console.println(F("[WARNING] Shuttle should be unlocked but sensor doesn't confirm - check air pressure"));
             }
-        }
-        else if (strcmp(subcommand, "help") == 0)
-        {
-            Console.println(F("\n===== UNLOCK COMMAND HELP ====="));
-
-            Console.println(F("\nOVERVIEW:"));
-            Console.println(F("  The unlock command disengages pneumatic locks on trays and the shuttle,"));
-            Console.println(F("  allowing them to be removed or permitting shuttle movement. All operations"));
-            Console.println(F("  include sensor verification to confirm successful unlocking."));
-
-            Console.println(F("\nCOMMAND REFERENCE:"));
-            Console.println(F("  unlock,1 - Disengage lock on tray at position 1 (loading position)"));
-            Console.println(F("    > Verified by cylinder position sensor"));
-            Console.println(F("    > Will report success only when sensor confirms unlock"));
-
-            Console.println(F("  unlock,2 - Disengage lock on tray at position 2 (middle position)"));
-            Console.println(F("    > Verified by cylinder position sensor"));
-            Console.println(F("    > Will report success only when sensor confirms unlock"));
-
-            Console.println(F("  unlock,3 - Disengage lock on tray at position 3 (unloading position)"));
-            Console.println(F("    > Verified by cylinder position sensor"));
-            Console.println(F("    > Will report success only when sensor confirms unlock"));
-
-            Console.println(F("  unlock,shuttle - Disengage lock on the shuttle"));
-            Console.println(F("    > Allows shuttle to move between positions"));
-            Console.println(F("    > Verified by cylinder position sensor"));
-
-            Console.println(F("  unlock,all - Disengage all locks in the system"));
-            Console.println(F("    > Emergency recovery function"));
-            Console.println(F("    > Uses sensor verification for all valves"));
-            Console.println(F("    > Reports success only when all sensors confirm unlock"));
-
-            Console.println(F("\nSAFETY NOTES:"));
-            Console.println(F("  • Ensure trays are properly supported before unlocking"));
-            Console.println(F("  • System uses sensor verification to confirm actual unlocking"));
-            Console.println(F("  • Failed unlocking may indicate mechanical issues"));
-            Console.println(F("  • Sufficient pneumatic pressure is required for all valve operations"));
-
-            Console.println(F("\nSENSOR VERIFICATION:"));
-            Console.println(F("  • Each lock has a corresponding sensor that confirms its position"));
-            Console.println(F("  • Command waits up to 1 second for sensor to confirm unlock"));
-            Console.println(F("  • Returns success only when sensor confirms the unlock operation"));
-            Console.println(F("  • Sensor mismatches are shown in status logs with [!] indicator"));
-
-            Console.println(F("\nTROUBLESHOOTING:"));
-            Console.println(F("  • If unlock fails, check air pressure"));
-            Console.println(F("  • Verify sensor connections if unlock command doesn't register"));
-            Console.println(F("  • Use 'system,state' to see detailed valve and sensor status"));
-            Console.println(F("  • For persistent issues, check valve functionality"));
-            Console.println(F("-------------------------------------------"));
-
             return true;
         }
-        else
+
+        // Try unlocking with sensor feedback
+        Console.info(F("Unlocking shuttle..."));
+        if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
         {
-            Console.print(F("[ERROR] Unknown unlock subcommand: "));
-            Console.println(subcommand);
-            Console.println(F("Valid options are '1', '2', '3', 'shuttle', 'all', or 'help'"));
+            Console.info(F("Shuttle disengaged and confirmed by sensor"));
+            return true;
+        }
+
+        Console.error(F("Failed to disengage shuttle - sensor did not confirm unlock"));
+        Console.println(F("[WARNING] Check air pressure and valve functionality"));
+        return false;
+        break;
+
+    case 3: // "help"
+        Console.println(F("\n===== UNLOCK COMMAND HELP ====="));
+
+        Console.println(F("\nOVERVIEW:"));
+        Console.println(F("  The unlock command disengages pneumatic locks on trays and the shuttle,"));
+        Console.println(F("  allowing them to be removed or permitting shuttle movement. All operations"));
+        Console.println(F("  include sensor verification to confirm successful unlocking."));
+
+        Console.println(F("\nCOMMAND REFERENCE:"));
+        Console.println(F("  unlock,1 - Disengage lock on tray at position 1 (loading position)"));
+        Console.println(F("    > Verified by cylinder position sensor"));
+        Console.println(F("    > Will report success only when sensor confirms unlock"));
+
+        Console.println(F("  unlock,2 - Disengage lock on tray at position 2 (middle position)"));
+        Console.println(F("    > Verified by cylinder position sensor"));
+        Console.println(F("    > Will report success only when sensor confirms unlock"));
+
+        Console.println(F("  unlock,3 - Disengage lock on tray at position 3 (unloading position)"));
+        Console.println(F("    > Verified by cylinder position sensor"));
+        Console.println(F("    > Will report success only when sensor confirms unlock"));
+
+        Console.println(F("  unlock,shuttle - Disengage lock on the shuttle"));
+        Console.println(F("    > Allows shuttle to move between positions"));
+        Console.println(F("    > Verified by cylinder position sensor"));
+
+        Console.println(F("  unlock,all - Disengage all locks in the system"));
+        Console.println(F("    > Emergency recovery function"));
+        Console.println(F("    > Uses sensor verification for all valves"));
+        Console.println(F("    > Reports success only when all sensors confirm unlock"));
+
+        Console.println(F("\nSAFETY NOTES:"));
+        Console.println(F("  • Ensure trays are properly supported before unlocking"));
+        Console.println(F("  • System uses sensor verification to confirm actual unlocking"));
+        Console.println(F("  • Failed unlocking may indicate mechanical issues"));
+        Console.println(F("  • Sufficient pneumatic pressure is required for all valve operations"));
+
+        Console.println(F("\nSENSOR VERIFICATION:"));
+        Console.println(F("  • Each lock has a corresponding sensor that confirms its position"));
+        Console.println(F("  • Command waits up to 1 second for sensor to confirm unlock"));
+        Console.println(F("  • Returns success only when sensor confirms the unlock operation"));
+        Console.println(F("  • Sensor mismatches are shown in status logs with [!] indicator"));
+
+        Console.println(F("\nTROUBLESHOOTING:"));
+        Console.println(F("  • If unlock fails, check air pressure"));
+        Console.println(F("  • Verify sensor connections if unlock command doesn't register"));
+        Console.println(F("  • Use 'system,state' to see detailed valve and sensor status"));
+        Console.println(F("  • For persistent issues, check valve functionality"));
+        Console.println(F("-------------------------------------------"));
+
+        return true;
+        break;
+
+    case 4: // Tray numbers (1, 2, or 3)
+        // Try to parse as tray number
+        trayNum = atoi(subcommand);
+
+        Console.print(F("[INFO] Disengaging tray "));
+        Console.print(trayNum);
+        Console.println(F(" with sensor verification..."));
+
+        // Get the appropriate valve and sensor
+        switch (trayNum)
+        {
+        case 1:
+            trayValve = getTray1Valve();
+            traySensor = getTray1Sensor();
+            break;
+        case 2:
+            trayValve = getTray2Valve();
+            traySensor = getTray2Sensor();
+            break;
+        case 3:
+            trayValve = getTray3Valve();
+            traySensor = getTray3Sensor();
+            break;
+        default:
             return false;
         }
+
+        if (!trayValve || !traySensor)
+        {
+            Console.print(F("[ERROR] Failed to access tray "));
+            Console.print(trayNum);
+            Console.println(F(" valve or sensor. Possible causes:"));
+            Console.println(F("  - Hardware initialization issue"));
+            Console.println(F("  - Valve controller not properly initialized"));
+            Console.println(F("  - System memory corruption"));
+            Console.println(F("Try restarting the system or run 'status' to check valve configuration"));
+            return false;
+        }
+
+        // Check current state first
+        if (trayValve->position == VALVE_POSITION_UNLOCK)
+        {
+            Console.print(F("[INFO] Tray "));
+            Console.print(trayNum);
+            Console.println(F(" already disengaged"));
+
+            // Verify actual position with sensor
+            if (sensorRead(*traySensor) == false)
+            { // Sensor false = unlocked
+                Console.println(F("[OK] Tray unlock confirmed by sensor"));
+            }
+            else
+            {
+                Console.println(F("[WARNING] Tray should be unlocked but sensor doesn't confirm - check air pressure"));
+            }
+            return true;
+        }
+
+        // Try unlocking with sensor feedback
+        if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_UNLOCK, 1000))
+        {
+            Console.print(F("[INFO] Tray "));
+            Console.print(trayNum);
+            Console.println(F(" disengaged and confirmed by sensor"));
+            return true;
+        }
+
+        Console.print(F("[ERROR] Failed to disengage tray "));
+        Console.println(trayNum);
+        Console.println(F("[WARNING] Check air pressure and valve functionality"));
+        return false;
+        break;
+
+    default: // Unknown command
+        Console.print(F("[ERROR] Unknown unlock subcommand: "));
+        Console.println(subcommand);
+        Console.println(F("Valid options are '1', '2', '3', 'shuttle', 'all', or 'help'"));
+        return false;
+        break;
     }
 
-    return false;
+    return false; // Should never reach here
 }
 
 // Log command handler
@@ -556,8 +564,21 @@ bool cmd_log(char *args, CommandCaller *caller)
     // Trim leading spaces from subcommand
     subcommand = trimLeadingSpaces(subcommand);
 
-    // Handle based on subcommand
+    // Map subcommand to integer for switch statement
+    int cmdCode = 0;
     if (strcmp(subcommand, "on") == 0)
+        cmdCode = 1;
+    else if (strcmp(subcommand, "off") == 0)
+        cmdCode = 2;
+    else if (strcmp(subcommand, "now") == 0)
+        cmdCode = 3;
+    else if (strcmp(subcommand, "help") == 0)
+        cmdCode = 4;
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "on"
     {
         // Check if an interval was provided
         char *intervalStr = strtok(NULL, " ");
@@ -594,20 +615,23 @@ bool cmd_log(char *args, CommandCaller *caller)
         logging.previousLogTime = millis(); // Reset the timer
         return true;
     }
-    else if (strcmp(subcommand, "off") == 0)
+
+    case 2: // "off"
     {
         Console.info(F("Logging disabled"));
         logging.logInterval = 0; // Setting to 0 disables logging
         return true;
     }
-    else if (strcmp(subcommand, "now") == 0)
+
+    case 3: // "now"
     {
         Console.info(F("Logging system state now"));
         // Log immediately regardless of interval
-        logSystemState(); // Changed: removed the parameter
+        logSystemState();
         return true;
     }
-    else if (strcmp(subcommand, "help") == 0)
+
+    case 4: // "help"
     {
         Console.println(F("\n===== LOGGING SYSTEM HELP ====="));
 
@@ -662,13 +686,15 @@ bool cmd_log(char *args, CommandCaller *caller)
 
         return true;
     }
-    else
+
+    default: // Unknown command
     {
         Console.error(F("Invalid log subcommand. Use 'on', 'off', 'now', or 'help'."));
         return false;
     }
+    }
 
-    return false;
+    return false; // Should never reach here
 }
 
 // Motor command handler for consolidated motor operations
@@ -1199,8 +1225,31 @@ bool cmd_move(char *args, CommandCaller *caller)
         return false;
     }
 
-    // Handle predefined positions
+    // Map subcommand to integer for switch statement
+    int cmdCode = 0;
     if (strcmp(subcommand, "home") == 0)
+        cmdCode = 1;
+    else if (strcmp(subcommand, "1") == 0)
+        cmdCode = 2;
+    else if (strcmp(subcommand, "2") == 0)
+        cmdCode = 3;
+    else if (strcmp(subcommand, "3") == 0)
+        cmdCode = 4;
+    else if (strcmp(subcommand, "4") == 0)
+        cmdCode = 5;
+    else if (strcmp(subcommand, "mm") == 0)
+        cmdCode = 6;
+    else if (strcmp(subcommand, "counts") == 0)
+        cmdCode = 7;
+    else if (strcmp(subcommand, "rel") == 0)
+        cmdCode = 8;
+    else if (strcmp(subcommand, "help") == 0)
+        cmdCode = 9;
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "home"
     {
         // Check if motor is already homed
         if (isHomed)
@@ -1222,8 +1271,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Motor is not homed. Use 'motor,home' command first to establish home position."));
             return false;
         }
+        break;
     }
-    else if (strcmp(subcommand, "1") == 0)
+
+    case 2: // "1" (Position 1)
     {
         // Check if motor is homed
         if (!isHomed)
@@ -1243,8 +1294,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to position 1."));
             return false;
         }
+        break;
     }
-    else if (strcmp(subcommand, "2") == 0)
+
+    case 3: // "2" (Position 2)
     {
         // Check if motor is homed
         if (!isHomed)
@@ -1264,8 +1317,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to position 2."));
             return false;
         }
+        break;
     }
-    else if (strcmp(subcommand, "3") == 0)
+
+    case 4: // "3" (Position 3)
     {
         // Check if motor is homed
         if (!isHomed)
@@ -1285,8 +1340,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to position 3."));
             return false;
         }
+        break;
     }
-    else if (strcmp(subcommand, "4") == 0)
+
+    case 5: // "4" (Position 4)
     {
         // Check if motor is homed
         if (!isHomed)
@@ -1306,10 +1363,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to position 4."));
             return false;
         }
+        break;
     }
 
-    // Special handling for "mm" command for absolute positioning in millimeters
-    else if (strcmp(subcommand, "mm") == 0)
+    case 6: // "mm" (absolute position in mm)
     {
         // Get the mm value from the next token
         char *mmStr = strtok(NULL, " ");
@@ -1355,10 +1412,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to requested position."));
             return false;
         }
+        break;
     }
 
-    // Special handling for "counts" command for absolute positioning in encoder counts
-    else if (strcmp(subcommand, "counts") == 0)
+    case 7: // "counts" (absolute position in encoder counts)
     {
         // Get the counts value from the next token
         char *countsStr = strtok(NULL, " ");
@@ -1404,10 +1461,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to requested position."));
             return false;
         }
+        break;
     }
 
-    // Special handling for "rel" command for relative positioning
-    else if (strcmp(subcommand, "rel") == 0)
+    case 8: // "rel" (relative position in mm)
     {
         // Get the mm value from the next token
         char *relStr = strtok(NULL, " ");
@@ -1466,8 +1523,10 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start relative movement."));
             return false;
         }
+        break;
     }
-    else if (strcmp(subcommand, "help") == 0)
+
+    case 9: // "help"
     {
         Console.println(F("\n===== MOVE COMMAND HELP ====="));
 
@@ -1514,13 +1573,17 @@ bool cmd_move(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
+        break;
     }
-    else
+
+    default: // Unknown command
     {
         Console.print(F("[ERROR] Invalid position: "));
         Console.println(subcommand);
         Console.println(F("Valid options: home, 1, 2, 3, 4, counts, mm, rel, help"));
         return false;
+        break;
+    }
     }
 
     return false; // Should never reach here, but included for completeness
@@ -1945,16 +2008,31 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         return false;
     }
 
-    // Handle subcommands
+    // Map subcommand to integer for switch statement
+    int cmdCode = 0;
     if (strcmp(subcommand, "state") == 0)
+        cmdCode = 1;
+    else if (strcmp(subcommand, "safety") == 0)
+        cmdCode = 2;
+    else if (strcmp(subcommand, "trays") == 0)
+        cmdCode = 3;
+    else if (strcmp(subcommand, "network") == 0)
+        cmdCode = 4;
+    else if (strcmp(subcommand, "reset") == 0)
+        cmdCode = 5;
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "state"
     {
         // Capture and print system state
         SystemState currentState = captureSystemState();
         printSystemState(currentState);
         return true;
     }
-    // Add this new section to display safety validation
-    else if (strcmp(subcommand, "safety") == 0)
+
+    case 2: // "safety"
     {
         // Capture system state, validate safety, and print results
         SystemState currentState = captureSystemState();
@@ -1965,7 +2043,8 @@ bool cmd_system_state(char *args, CommandCaller *caller)
 
         return true;
     }
-    else if (strcmp(subcommand, "trays") == 0)
+
+    case 3: // "trays"
     {
         // Display tray system status
         SystemState currentState = captureSystemState();
@@ -2004,7 +2083,8 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         }
         return true;
     }
-    else if (strcmp(subcommand, "network") == 0)
+
+    case 4: // "network"
     {
         Console.println(F("\n===== ETHERNET INTERFACE STATUS ====="));
 
@@ -2078,7 +2158,8 @@ bool cmd_system_state(char *args, CommandCaller *caller)
 
         return true;
     }
-    else if (strcmp(subcommand, "reset") == 0)
+
+    case 5: // "reset"
     {
         // Reset the system state after a failure
         Console.println(F("\n===== RESETTING SYSTEM STATE ====="));
@@ -2109,14 +2190,18 @@ bool cmd_system_state(char *args, CommandCaller *caller)
 
         return true;
     }
-    else
+
+    default: // Unknown subcommand
     {
         // Unknown subcommand
         Console.print(F("[ERROR] Unknown system command: "));
         Console.println(subcommand);
-        Console.println(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,trays', or 'system,reset'"));
+        Console.println(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,network', or 'system,reset'"));
         return false;
     }
+    }
+
+    return false; // Should never reach here
 }
 
 // Tray command handler
@@ -2161,8 +2246,27 @@ bool cmd_tray(char *args, CommandCaller *caller)
         subcommand = trimLeadingSpaces(subcommand);
     }
 
-    // Now process the actual command
+    // Map subcommand to integer for switch statement
+    int cmdCode = 0;
     if (strcmp(subcommand, "load") == 0)
+        cmdCode = 1;
+    else if (strcmp(subcommand, "placed") == 0)
+        cmdCode = 2;
+    else if (strcmp(subcommand, "released") == 0)
+        cmdCode = 3;
+    else if (strcmp(subcommand, "unload") == 0)
+        cmdCode = 4;
+    else if (strcmp(subcommand, "removed") == 0)
+        cmdCode = 5;
+    else if (strcmp(subcommand, "status") == 0)
+        cmdCode = 6;
+    else if (strcmp(subcommand, "help") == 0)
+        cmdCode = 7;
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "load"
     {
         // Check for second parameter "request"
         char *action = strtok(NULL, " ");
@@ -2215,7 +2319,8 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // 5. System is ready to receive tray                Console.println(F("READY_TO_RECEIVE"));
+        // 5. System is ready to receive tray
+        Console.println(F("READY_TO_RECEIVE"));
 
         // Add helpful message about the overall loading process
         if (trayTracking.totalTraysInSystem == 0)
@@ -2233,7 +2338,8 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         return true;
     }
-    else if (strcmp(subcommand, "placed") == 0)
+
+    case 2: // "placed"
     {
         // Mitsubishi robot has placed the tray
         // Just mark position 1 as occupied without incrementing total
@@ -2285,7 +2391,8 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(subcommand, "released") == 0)
+
+    case 3: // "released"
     {
         // Start the automated operation
         beginOperation();
@@ -2300,7 +2407,8 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Console.println(F("STARTING_PROCESSING"));
         return true;
     }
-    else if (strcmp(subcommand, "unload") == 0)
+
+    case 4: // "unload"
     {
         // Use direct string search approach instead of strtok()
         char *originalArgs = args; // Original command string
@@ -2387,7 +2495,8 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
     }
-    else if (strcmp(subcommand, "removed") == 0)
+
+    case 5: // "removed"
     {
         // Mitsubishi robot has removed the tray from position 1
 
@@ -2414,7 +2523,8 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         return true;
     }
-    else if (strcmp(subcommand, "status") == 0)
+
+    case 6: // "status"
     {
         // Return machine-readable status of tray system
         SystemState state = captureSystemState();
@@ -2452,7 +2562,8 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         return true;
     }
-    else if (strcmp(subcommand, "help") == 0)
+
+    case 7: // "help"
     {
         Console.println(F("\n===== TRAY SYSTEM HELP ====="));
         Console.println(F("\nTRAY LOADING SEQUENCE:"));
@@ -2497,13 +2608,17 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         return true;
     }
-    else
+
+    default: // Unknown command
     {
         Console.print(F("[ERROR] Unknown tray command: "));
         Console.println(subcommand);
         Console.println(F("Valid options are 'load,request', 'unload,request', 'placed', 'removed', 'released', 'status', or 'help'"));
         return false;
     }
+    }
+
+    return false; // Should never reach here
 }
 
 bool cmd_test(char *args, CommandCaller *caller)
@@ -2539,22 +2654,35 @@ bool cmd_test(char *args, CommandCaller *caller)
     // Trim leading spaces from test type
     subcommand = trimLeadingSpaces(subcommand);
 
-    // Check motor initialization first
-    if (motorState == MOTOR_STATE_NOT_READY)
+    // Check motor initialization first (except for help command)
+    if (strcmp(subcommand, "help") != 0 && motorState == MOTOR_STATE_NOT_READY)
     {
         Console.error(F("Motor not initialized. Run 'motor,init' first."));
         return false;
     }
 
-    // Check E-Stop condition
-    if (isEStopActive())
+    // Check E-Stop condition (except for help command)
+    if (strcmp(subcommand, "help") != 0 && isEStopActive())
     {
         Console.error(F("Cannot run tests while E-Stop is active."));
         return false;
     }
 
-    // Run the appropriate test
+    // Map subcommand to integer for switch statement
+    int cmdCode = 0;
     if (strcmp(subcommand, "home") == 0)
+        cmdCode = 1;
+    else if (strcmp(subcommand, "position") == 0)
+        cmdCode = 2;
+    else if (strcmp(subcommand, "tray") == 0)
+        cmdCode = 3;
+    else if (strcmp(subcommand, "help") == 0)
+        cmdCode = 4;
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "home"
     {
         Console.info(F("Starting homing repeatability test..."));
         if (testHomingRepeatability())
@@ -2567,8 +2695,10 @@ bool cmd_test(char *args, CommandCaller *caller)
             Console.error(F("Homing repeatability test failed or was aborted."));
             return false;
         }
+        break;
     }
-    else if (strcmp(subcommand, "position") == 0)
+
+    case 2: // "position"
     {
         Console.info(F("Starting position cycling test..."));
 
@@ -2582,8 +2712,10 @@ bool cmd_test(char *args, CommandCaller *caller)
             Console.info(F("Position cycling test failed or was aborted."));
             return false;
         }
+        break;
     }
-    else if (strcmp(subcommand, "tray") == 0)
+
+    case 3: // "tray"
     {
         Console.info(F("Starting tray handling test..."));
 
@@ -2606,8 +2738,10 @@ bool cmd_test(char *args, CommandCaller *caller)
             Console.error(F("Tray handling test failed or was aborted."));
             return false;
         }
+        break;
     }
-    else if (strcmp(subcommand, "help") == 0)
+
+    case 4: // "help"
     {
         Console.println(F("\n===== TEST SYSTEM HELP ====="));
 
@@ -2656,14 +2790,20 @@ bool cmd_test(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
+        break;
     }
-    else
+
+    default: // Unknown command
     {
         Console.print(F("[ERROR] Unknown test type: "));
         Console.println(subcommand);
         Console.println(F("Available tests: 'home', 'position', 'tray', or 'help'"));
         return false;
+        break;
     }
+    }
+
+    return false; // Should never reach here
 }
 
 bool cmd_encoder(char *args, CommandCaller *caller)
@@ -2752,8 +2892,21 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     // Trim leading spaces from subcommand
     subcommand = trimLeadingSpaces(subcommand);
 
-    // Handle commands
+    // Map subcommand to integer for switch statement
+    int cmdCode = 0;
     if (strcmp(subcommand, "enable") == 0)
+        cmdCode = 1;
+    else if (strcmp(subcommand, "disable") == 0)
+        cmdCode = 2;
+    else if (strcmp(subcommand, "multiplier") == 0)
+        cmdCode = 3;
+    else if (strcmp(subcommand, "help") == 0)
+        cmdCode = 4;
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "enable"
     {
         // Check preconditions
         if (!motorInitialized)
@@ -2809,15 +2962,19 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.info(F("Issue 'encoder,disable' when finished with manual control"));
 
         return true;
+        break;
     }
-    else if (strcmp(subcommand, "disable") == 0)
+
+    case 2: // "disable"
     {
         // Disable encoder control
         encoderControlActive = false;
         Console.info(F("MPG handwheel control disabled"));
         return true;
+        break;
     }
-    else if (strcmp(subcommand, "multiplier") == 0)
+
+    case 3: // "multiplier"
     {
         // Look for the NEXT argument - this is the same approach used in move,mm,X
         char *originalArgs = args; // Save the original args string
@@ -2886,8 +3043,10 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.println(F(" mm"));
 
         return true;
+        break;
     }
-    else if (strcmp(subcommand, "help") == 0)
+
+    case 4: // "help"
     {
         Console.println(F("\n===== MPG HANDWHEEL SYSTEM HELP ====="));
 
@@ -2935,12 +3094,24 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
+        break;
     }
 
-    return false;
+    default: // Unknown command
+    {
+        Console.print(F("[ERROR] Unknown encoder command: "));
+        Console.println(subcommand);
+        Console.println(F("Valid options are 'enable', 'disable', 'multiplier', or 'help'"));
+        return false;
+        break;
+    }
+    }
+
+    return false; // Should never reach here
 }
 
-bool cmd_abort(char *args, CommandCaller *caller) {
+bool cmd_abort(char *args, CommandCaller *caller)
+{
     requestTestAbort("abort command");
     return true;
 }
