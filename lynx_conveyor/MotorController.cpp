@@ -95,18 +95,18 @@ int32_t normalizeEncoderValue(int32_t rawValue)
 
 void initMotorSystem()
 {
-    Console.info(F("Initializing motor system..."));
+    Console.serialInfo(F("Initializing motor system..."));
 
     // Set up E-stop input pin with internal pull-up
     pinMode(E_STOP_PIN, INPUT_PULLUP);
-    Console.print(F("[INFO] Checking E-Stop state: "));
+    Serial.print(F("[INFO] Checking E-Stop state: "));
     if (isEStopActive())
     {
-        Console.error(F("E-STOP ACTIVE! Please reset E-stop before continuing."));
+        Console.serialError(F("E-STOP ACTIVE! Please reset E-stop before continuing."));
     }
     else
     {
-        Console.info(F("E-stop inactive, system ready."));
+        Console.serialInfo(F("E-stop inactive, system ready."));
     }
 
     // Set the input clocking rate
@@ -122,27 +122,27 @@ void initMotorSystem()
     MOTOR_CONNECTOR.HlfbCarrier(MotorDriver::HLFB_CARRIER_482_HZ);
 
     // Set velocity and acceleration limits using RPM values
-    Console.print(F("[INFO] Setting velocity limit to "));
-    Console.print(MOTOR_VELOCITY_RPM); // CHANGED: Using consolidated constant
-    Console.println(F(" RPM"));
+    Serial.print(F("[INFO] Setting velocity limit to "));
+    Serial.print(MOTOR_VELOCITY_RPM); // CHANGED: Using consolidated constant
+    Serial.println(F(" RPM"));
 
     currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM); // CHANGED
     MOTOR_CONNECTOR.VelMax(currentVelMax);
 
     // Set acceleration limit
-    Console.print(F("[INFO] Motor enable requested"));
-    Console.print(MAX_ACCEL_RPM_PER_SEC);
-    Console.println(F(" RPM"));
+    Serial.print(F("[INFO] Motor enable requested"));
+    Serial.print(MAX_ACCEL_RPM_PER_SEC);
+    Serial.println(F(" RPM"));
 
     currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
     MOTOR_CONNECTOR.AccelMax(currentAccelMax);
 
     // Enable the motor
     MOTOR_CONNECTOR.EnableRequest(true);
-    Console.info(F("Motor enable requested"));
+    Console.serialInfo(F("Motor enable requested"));
 
     // Wait for HLFB to assert (up to 2 seconds)
-    Console.info(F("Waiting for HLFB..."));
+    Console.serialInfo(F("Waiting for HLFB..."));
     unsigned long startTime = millis();
     bool ready = false;
 
@@ -154,7 +154,7 @@ void initMotorSystem()
         }
         else if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
         {
-            Console.error(F("Motor alert detected:"));
+            Console.serialError(F("Motor alert detected:"));
             printMotorAlerts();
             break;
         }
@@ -163,15 +163,15 @@ void initMotorSystem()
 
     if (ready)
     {
-        Console.info(F("Motor initialized and ready"));
+        Console.serialInfo(F("Motor initialized and ready"));
         motorInitialized = true;
         motorState = MOTOR_STATE_IDLE;
     }
     else
     {
-        Console.error(F("Motor initialization timed out or failed"));
-        Console.print("HLFB State: ");
-        Console.println(MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED ? "ASSERTED" : "NOT ASSERTED");
+        Console.serialError(F("Motor initialization timed out or failed"));
+        Serial.print("HLFB State: ");
+        Serial.println(MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED ? "ASSERTED" : "NOT ASSERTED");
     }
 }
 
@@ -184,30 +184,30 @@ bool moveToAbsolutePosition(int32_t position)
     if ((MOTION_DIRECTION * position < 0) ||
         (MOTION_DIRECTION * position > MAX_TRAVEL_PULSES))
     {
-        Console.print(F("[ERROR] Requested position "));
-        Console.print(position);
-        Console.print(F(" pulses is outside valid range (0 to "));
-        Console.print(MOTION_DIRECTION * MAX_TRAVEL_PULSES);
-        Console.println(F(" pulses)"));
+        Serial.print(F("[ERROR] Requested position "));
+        Serial.print(position);
+        Serial.print(F(" pulses is outside valid range (0 to "));
+        Serial.print(MOTION_DIRECTION * MAX_TRAVEL_PULSES);
+        Serial.println(F(" pulses)"));
         return false;
     }
 
     // Check if motor has alerts
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
     {
-        Console.error(F("Motor alert detected. Cannot move."));
+        Console.serialError(F("Motor alert detected. Cannot move."));
         printMotorAlerts();
         return false;
     }
 
-    Console.print(F("[INFO] Moving to absolute position: "));
-    Console.println(normalizeEncoderValue(position));
+    Serial.print(F("[INFO] Moving to absolute position: "));
+    Serial.println(normalizeEncoderValue(position));
 
     // Command the absolute move
     MOTOR_CONNECTOR.Move(position, MotorDriver::MOVE_TARGET_ABSOLUTE);
 
     // Report initial status
-    Console.info(F("Move commanded. Motor in motion..."));
+    Console.serialInfo(F("Move commanded. Motor in motion..."));
 
     return true;
 }
@@ -259,56 +259,56 @@ bool moveToPosition(PositionTarget position)
     currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
 
     // Debug print to show the actual positions being used
-    Console.print(F("[DIAGNOSTIC] Current position: "));
-    Console.print(currentPositionMm);
-    Console.print(F("mm, Target position: "));
-    Console.print(targetPositionMm);
-    Console.println(F("mm"));
+    Serial.print(F("[DIAGNOSTIC] Current position: "));
+    Serial.print(currentPositionMm);
+    Serial.print(F("mm, Target position: "));
+    Serial.print(targetPositionMm);
+    Serial.println(F("mm"));
 
     // Calculate distance to move with updated position value
     double distanceToMoveMm = fabs(targetPositionMm - currentPositionMm);
 
-    Console.print(F("[DIAGNOSTIC] Calculated move distance: "));
-    Console.print(distanceToMoveMm);
-    Console.println(F("mm"));
+    Serial.print(F("[DIAGNOSTIC] Calculated move distance: "));
+    Serial.print(distanceToMoveMm);
+    Serial.println(F("mm"));
 
     // Apply velocity scaling based on move distance
     if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Very short move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Very short move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Short move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(SHORT_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Short move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(SHORT_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Medium move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(MEDIUM_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Medium move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else
     {
         // For long moves, explicitly set to maximum velocity
         currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-        Console.print(F("[INFO] Long move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using full speed: "));
-        Console.print(MOTOR_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Long move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using full speed: "));
+        Serial.print(MOTOR_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
 
     // Rest of function remains the same
@@ -347,11 +347,11 @@ bool moveToPositionMm(double positionMm)
     // Safety check - prevent movement beyond physical limits
     if (positionMm < 0 || positionMm > MAX_TRAVEL_MM)
     {
-        Console.print(F("[ERROR] Requested position "));
-        Console.print(positionMm);
-        Console.print(F(" mm is outside valid range (0 to "));
-        Console.print(MAX_TRAVEL_MM);
-        Console.println(F(" mm)"));
+        Serial.print(F("[ERROR] Requested position "));
+        Serial.print(positionMm);
+        Serial.print(F(" mm is outside valid range (0 to "));
+        Serial.print(MAX_TRAVEL_MM);
+        Serial.println(F(" mm)"));
         return false;
     }
 
@@ -359,18 +359,18 @@ bool moveToPositionMm(double positionMm)
     currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
 
     // Debug print to show the actual positions being used
-    Console.print(F("[DIAGNOSTIC] Current position: "));
-    Console.print(currentPositionMm);
-    Console.print(F("mm, Target position: "));
-    Console.print(positionMm);
-    Console.println(F("mm"));
+    Serial.print(F("[DIAGNOSTIC] Current position: "));
+    Serial.print(currentPositionMm);
+    Serial.print(F("mm, Target position: "));
+    Serial.print(positionMm);
+    Serial.println(F("mm"));
 
     // Calculate distance to move
     double distanceToMoveMm = fabs(positionMm - currentPositionMm);
 
-    Console.print(F("[DIAGNOSTIC] Calculated move distance: "));
-    Console.print(distanceToMoveMm);
-    Console.println(F("mm"));
+    Serial.print(F("[DIAGNOSTIC] Calculated move distance: "));
+    Serial.print(distanceToMoveMm);
+    Serial.println(F("mm"));
 
     // Save original velocity
     int32_t originalVelMax = currentVelMax;
@@ -379,39 +379,39 @@ bool moveToPositionMm(double positionMm)
     if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Very short move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Very short move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Short move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(SHORT_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Short move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(SHORT_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Medium move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(MEDIUM_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Medium move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else
     {
         // For long moves, explicitly set to maximum velocity
         currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-        Console.print(F("[INFO] Long move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using full speed: "));
-        Console.print(MOTOR_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Long move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using full speed: "));
+        Serial.print(MOTOR_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
 
     // Apply the new velocity limit to the motor
@@ -455,34 +455,34 @@ bool moveRelative(double relativeMm)
     double targetPositionMm = currentPositionMm + relativeMm;
 
     // Debug print to show the actual positions being used
-    Console.print(F("[DIAGNOSTIC] Current position: "));
-    Console.print(currentPositionMm);
-    Console.print(F("mm, Target position: "));
-    Console.print(targetPositionMm);
-    Console.println(F("mm"));
+    Serial.print(F("[DIAGNOSTIC] Current position: "));
+    Serial.print(currentPositionMm);
+    Serial.print(F("mm, Target position: "));
+    Serial.print(targetPositionMm);
+    Serial.println(F("mm"));
 
     // Check if the target position would be out of bounds
     if (targetPositionMm < 0 || targetPositionMm > MAX_TRAVEL_MM)
     {
-        Console.print(F("[ERROR] Relative move would exceed valid range (0 to "));
-        Console.print(MAX_TRAVEL_MM);
-        Console.println(F(" mm)"));
-        Console.print(F("[ERROR] Current position: "));
-        Console.print(currentPositionMm);
-        Console.print(F(" mm, Requested move: "));
-        Console.print(relativeMm);
-        Console.print(F(" mm, Target would be: "));
-        Console.print(targetPositionMm);
-        Console.println(F(" mm"));
+        Serial.print(F("[ERROR] Relative move would exceed valid range (0 to "));
+        Serial.print(MAX_TRAVEL_MM);
+        Serial.println(F(" mm)"));
+        Serial.print(F("[ERROR] Current position: "));
+        Serial.print(currentPositionMm);
+        Serial.print(F(" mm, Requested move: "));
+        Serial.print(relativeMm);
+        Serial.print(F(" mm, Target would be: "));
+        Serial.print(targetPositionMm);
+        Serial.println(F(" mm"));
         return false;
     }
 
     // Calculate distance to move (use absolute value for velocity scaling)
     double distanceToMoveMm = fabs(relativeMm);
 
-    Console.print(F("[DIAGNOSTIC] Calculated move distance: "));
-    Console.print(distanceToMoveMm);
-    Console.println(F("mm"));
+    Serial.print(F("[DIAGNOSTIC] Calculated move distance: "));
+    Serial.print(distanceToMoveMm);
+    Serial.println(F("mm"));
 
     // Save original velocity for restoration later
     int32_t originalVelMax = currentVelMax;
@@ -491,39 +491,39 @@ bool moveRelative(double relativeMm)
     if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Very short move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Very short move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Short move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(SHORT_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Short move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(SHORT_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
     {
         currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-        Console.print(F("[INFO] Medium move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using reduced speed: "));
-        Console.print(MEDIUM_MOVE_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Medium move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using reduced speed: "));
+        Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
     else
     {
         // For long moves, explicitly set to maximum velocity
         currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-        Console.print(F("[INFO] Long move detected ("));
-        Console.print(distanceToMoveMm);
-        Console.print(F("mm) - Using full speed: "));
-        Console.print(MOTOR_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[INFO] Long move detected ("));
+        Serial.print(distanceToMoveMm);
+        Serial.print(F("mm) - Using full speed: "));
+        Serial.print(MOTOR_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
     }
 
     // Apply the new velocity limit to the motor
@@ -545,11 +545,11 @@ bool moveRelative(double relativeMm)
     motorState = MOTOR_STATE_MOVING;
     currentPosition = POSITION_CUSTOM;
 
-    Console.print(F("[INFO] Moving "));
-    Console.print(relativeMm);
-    Console.print(F(" mm from current position ("));
-    Console.print(normalizeEncoderValue(relativePulses));
-    Console.println(F(" pulses)"));
+    Serial.print(F("[INFO] Moving "));
+    Serial.print(relativeMm);
+    Serial.print(F(" mm from current position ("));
+    Serial.print(normalizeEncoderValue(relativePulses));
+    Serial.println(F(" pulses)"));
 
     // Note: We DON'T restore velocity here - let deceleration system handle it
     // checkMoveProgress() will restore velocity when move completes
@@ -566,7 +566,7 @@ void stopMotion()
 {
     // Stop the motor abruptly
     MOTOR_CONNECTOR.MoveStopAbrupt();
-    Console.info(F("Motion stopped"));
+    Console.serialInfo(F("Motion stopped"));
 }
 
 // ----------------- Jogging Functions -----------------
@@ -606,13 +606,13 @@ bool jogMotor(bool direction, double customIncrement)
     MOTOR_CONNECTOR.VelMax(currentVelMax);
 
     // Log the jog operation
-    Console.print(F("[INFO] Jogging "));
-    Console.print(direction ? F("forward") : F("backward"));
-    Console.print(F(" by "));
-    Console.print(increment);
-    Console.print(F(" mm at "));
-    Console.print(currentJogSpeedRpm);
-    Console.println(F(" RPM"));
+    Serial.print(F("[INFO] Jogging "));
+    Serial.print(direction ? F("forward") : F("backward"));
+    Serial.print(F(" by "));
+    Serial.print(increment);
+    Serial.print(F(" mm at "));
+    Serial.print(currentJogSpeedRpm);
+    Serial.println(F(" RPM"));
 
     // Use the existing moveRelative function (which now handles distance-based scaling too)
     bool result = moveRelative(moveMm);
@@ -635,15 +635,15 @@ bool setJogIncrement(double increment)
     // Validate increment is reasonable
     if (increment <= 0 || increment > 100)
     {
-        Console.error(F("Jog increment must be between 0 and 100mm"));
+        Console.serialError(F("Jog increment must be between 0 and 100mm"));
         return false;
     }
 
     // Set the increment
     currentJogIncrementMm = increment;
-    Console.print(F("[INFO] Jog increment set to "));
-    Console.print(currentJogIncrementMm);
-    Console.println(F(" mm"));
+    Serial.print(F("[INFO] Jog increment set to "));
+    Serial.print(currentJogIncrementMm);
+    Serial.println(F(" mm"));
 
     // Re-validate jog speed with the new distance
     setJogSpeed(currentJogSpeedRpm, increment);
@@ -659,9 +659,9 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
     // Validate speed is reasonable
     if (speedRpm < 10 || speedRpm > MOTOR_VELOCITY_RPM)
     {
-        Console.print(F("[ERROR] Jog speed must be between 10 and "));
-        Console.print(MOTOR_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        Serial.print(F("[ERROR] Jog speed must be between 10 and "));
+        Serial.print(MOTOR_VELOCITY_RPM);
+        Serial.println(F(" RPM"));
         return false;
     }
 
@@ -675,11 +675,11 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
 
         if (cappedSpeed != speedRpm)
         {
-            Console.print(F("[INFO] Speed capped to "));
-            Console.print(cappedSpeed);
-            Console.print(F(" RPM for short distance ("));
-            Console.print(distanceToMoveMm);
-            Console.println(F("mm)"));
+            Serial.print(F("[INFO] Speed capped to "));
+            Serial.print(cappedSpeed);
+            Serial.print(F(" RPM for short distance ("));
+            Serial.print(distanceToMoveMm);
+            Serial.println(F("mm)"));
         }
     }
     else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
@@ -689,11 +689,11 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
 
         if (cappedSpeed != speedRpm)
         {
-            Console.print(F("[INFO] Speed capped to "));
-            Console.print(cappedSpeed);
-            Console.print(F(" RPM for short distance ("));
-            Console.print(distanceToMoveMm);
-            Console.println(F("mm)"));
+            Serial.print(F("[INFO] Speed capped to "));
+            Serial.print(cappedSpeed);
+            Serial.print(F(" RPM for short distance ("));
+            Serial.print(distanceToMoveMm);
+            Serial.println(F("mm)"));
         }
     }
     else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
@@ -703,11 +703,11 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
 
         if (cappedSpeed != speedRpm)
         {
-            Console.print(F("[INFO] Speed capped to "));
-            Console.print(cappedSpeed);
-            Console.print(F(" RPM for medium distance ("));
-            Console.print(distanceToMoveMm);
-            Console.println(F("mm)"));
+            Serial.print(F("[INFO] Speed capped to "));
+            Serial.print(cappedSpeed);
+            Serial.print(F(" RPM for medium distance ("));
+            Serial.print(distanceToMoveMm);
+            Serial.println(F("mm)"));
         }
     }
     else
@@ -717,19 +717,19 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
 
         if (cappedSpeed != speedRpm)
         {
-            Console.print(F("[INFO] Speed capped to "));
-            Console.print(cappedSpeed);
-            Console.print(F(" RPM for long distance ("));
-            Console.print(distanceToMoveMm);
-            Console.println(F("mm)"));
+            Serial.print(F("[INFO] Speed capped to "));
+            Serial.print(cappedSpeed);
+            Serial.print(F(" RPM for long distance ("));
+            Serial.print(distanceToMoveMm);
+            Serial.println(F("mm)"));
         }
     }
 
     // Set the speed with the potentially capped value
     currentJogSpeedRpm = cappedSpeed;
-    Console.print(F("[INFO] Jog speed set to "));
-    Console.print(currentJogSpeedRpm);
-    Console.println(F(" RPM"));
+    Serial.print(F("[INFO] Jog speed set to "));
+    Serial.print(currentJogSpeedRpm);
+    Serial.println(F(" RPM"));
 
     return true;
 }
@@ -883,12 +883,12 @@ void clearMotorFaults()
     // If we're not already in the process of clearing faults, start the process
     if (!faultClearInProgress)
     {
-        Console.println(F("[DIAGNOSTIC] Attempting to clear motor faults..."));
+        Serial.println(F("[DIAGNOSTIC] Attempting to clear motor faults..."));
 
         // First check if there are faults present
         if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
         {
-            Console.println(F("[DIAGNOSTIC] Alerts detected:"));
+            Serial.println(F("[DIAGNOSTIC] Alerts detected:"));
             printMotorAlerts();
 
             // Start the fault clearing state machine
@@ -898,7 +898,7 @@ void clearMotorFaults()
         }
         else
         {
-            Console.info(F("No alerts to clear."));
+            Console.serialInfo(F("No alerts to clear."));
         }
     }
 }
@@ -919,7 +919,7 @@ void processFaultClearing()
         // Disable the motor
         if (MOTOR_CONNECTOR.AlertReg().bit.MotorFaulted)
         {
-            Console.println(F("[DIAGNOSTIC] Motor faulted. Cycling enable signal..."));
+            Serial.println(F("[DIAGNOSTIC] Motor faulted. Cycling enable signal..."));
             MOTOR_CONNECTOR.EnableRequest(false);
         }
         faultClearTimer = currentTime;
@@ -951,18 +951,18 @@ void processFaultClearing()
 
     case FAULT_CLEAR_ALERTS:
         // Clear alerts
-        Console.println(F("[DIAGNOSTIC] Clearing motor alerts..."));
+        Serial.println(F("[DIAGNOSTIC] Clearing motor alerts..."));
         MOTOR_CONNECTOR.ClearAlerts();
 
         // Check if alerts were cleared
         if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
         {
-            Console.error(F("Alerts are still present after clearing."));
+            Console.serialError(F("Alerts are still present after clearing."));
             printMotorAlerts();
         }
         else
         {
-            Console.info(F("Alerts successfully cleared."));
+            Console.serialInfo(F("Alerts successfully cleared."));
         }
 
         faultClearState = FAULT_CLEAR_FINISHED;
@@ -991,7 +991,7 @@ bool clearMotorFaultWithStatus()
     // If fault clearing is already in progress, return false
     if (faultClearInProgress)
     {
-        Console.info(F("Fault clearing already in progress"));
+        Console.serialInfo(F("Fault clearing already in progress"));
         return false;
     }
 
@@ -1012,14 +1012,14 @@ bool initiateHomingSequence()
     // Check if motor is initialized
     if (!motorInitialized)
     {
-        Console.error(F("Motor not initialized"));
+        Console.serialError(F("Motor not initialized"));
         return false;
     }
 
     // Check for faults
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
     {
-        Console.error(F("Motor has active alerts - clear faults before homing"));
+        Console.serialError(F("Motor has active alerts - clear faults before homing"));
         return false;
     }
 
@@ -1030,7 +1030,7 @@ bool initiateHomingSequence()
     if (encoderControlActive)
     {
         encoderControlActive = false;
-        Console.println(F("[INFO] MPG handwheel control disabled during homing"));
+        Serial.println(F("[INFO] MPG handwheel control disabled during homing"));
     }
 
     // Reset homing state first - this clears variables and captures starting position
@@ -1053,7 +1053,7 @@ bool initiateHomingSequence()
     motorState = MOTOR_STATE_HOMING;
     homingStartTime = millis();
 
-    Console.info(F("Homing sequence initiated. Motor will move to find home position."));
+    Console.serialInfo(F("Homing sequence initiated. Motor will move to find home position."));
     return true;
 }
 
@@ -1086,12 +1086,12 @@ void checkHomingProgress()
         // Log movement data when in detail when we've crossed the minimum distance threshold
         if (homing_minDistanceTraveled)
         {
-            Console.print(F("[HOMING] Position: "));
-            Console.print(currentPosition);
-            Console.print(F(", Movement: "));
-            Console.print(movementSinceLastCheck);
-            Console.print(F(" pulses, HLFB: "));
-            Console.println(currentHlfbState == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT_ASSERTED"));
+            Serial.print(F("[HOMING] Position: "));
+            Serial.print(currentPosition);
+            Serial.print(F(", Movement: "));
+            Serial.print(movementSinceLastCheck);
+            Serial.print(F(" pulses, HLFB: "));
+            Serial.println(currentHlfbState == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT_ASSERTED"));
         }
 
         if (movementSinceLastCheck < 10 && homing_hlfbWentNonAsserted)
@@ -1107,14 +1107,14 @@ void checkHomingProgress()
     // Check for timeout first
     if (currentTime - homingStartTime > 30000)
     { // 30 seconds timeout
-        Console.error(F("Homing operation timed out"));
-        Console.print(F("[DIAGNOSTIC] Final HLFB state: "));
-        Console.println(currentHlfbState == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT ASSERTED"));
+        Console.serialError(F("Homing operation timed out"));
+        Serial.print(F("[DIAGNOSTIC] Final HLFB state: "));
+        Serial.println(currentHlfbState == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT ASSERTED"));
 
         MOTOR_CONNECTOR.MoveStopAbrupt();
 
         // Set current position as home despite timeout
-        Console.info(F("Setting current position as home reference despite timeout"));
+        Console.serialInfo(F("Setting current position as home reference despite timeout"));
         MOTOR_CONNECTOR.PositionRefSet(0);
 
         // Complete homing setup
@@ -1125,7 +1125,7 @@ void checkHomingProgress()
     // Check for alerts during homing
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
     {
-        Console.error(F("Motor alert during homing"));
+        Console.serialError(F("Motor alert during homing"));
         printMotorAlerts();
 
         // Stop motion and abort homing
@@ -1143,9 +1143,9 @@ void checkHomingProgress()
         homing_minDistanceTraveled = true;
         minTimeAfterDistanceReached = currentTime; // Start the minimum time timer
         positionAtMinDistance = currentPosition;   // Remember position at minimum distance
-        Console.print(F("[INFO] Minimum travel distance reached ("));
-        Console.print(pulsesMovedThisHoming); // Log actual travel for this homing
-        Console.println(F(" pulses) - Hardstop detection enabled"));
+        Serial.print(F("[INFO] Minimum travel distance reached ("));
+        Serial.print(pulsesMovedThisHoming); // Log actual travel for this homing
+        Serial.println(F(" pulses) - Hardstop detection enabled"));
     }
 
     // After min distance reached, track additional travel
@@ -1161,7 +1161,7 @@ void checkHomingProgress()
         {
             homing_hlfbWentNonAsserted = true;
             homing_hlfbNonAssertedTime = currentTime;
-            Console.info(F("HLFB went non-asserted - approaching hardstop"));
+            Console.serialInfo(F("HLFB went non-asserted - approaching hardstop"));
         }
     }
 
@@ -1180,11 +1180,11 @@ void checkHomingProgress()
         pulsesTraveledAfterMinDistance >= minimumAdditionalPulses)
     { // NEW condition
 
-        Console.print(F("[INFO] Hardstop reached - HLFB reasserted after "));
-        Console.print(currentTime - minTimeAfterDistanceReached);
-        Console.print(F("ms from minimum distance, additional travel: "));
-        Console.print(pulsesTraveledAfterMinDistance);
-        Console.println(F(" pulses"));
+        Serial.print(F("[INFO] Hardstop reached - HLFB reasserted after "));
+        Serial.print(currentTime - minTimeAfterDistanceReached);
+        Serial.print(F("ms from minimum distance, additional travel: "));
+        Serial.print(pulsesTraveledAfterMinDistance);
+        Serial.println(F(" pulses"));
 
         // Stop the velocity move
         MOTOR_CONNECTOR.MoveStopAbrupt();
@@ -1195,9 +1195,9 @@ void checkHomingProgress()
         // Move away from hardstop to complete homing
         if (HOME_OFFSET_DISTANCE_MM > 0)
         {
-            Console.print(F("[INFO] Moving "));
-            Console.print(HOME_OFFSET_DISTANCE_MM);
-            Console.println(F("mm away from hardstop"));
+            Serial.print(F("[INFO] Moving "));
+            Serial.print(HOME_OFFSET_DISTANCE_MM);
+            Serial.println(F("mm away from hardstop"));
 
             // Reset velocity to normal (or a specific offset velocity if desired)
             int32_t normalVelPps = rpmToPps(MOTOR_VELOCITY_RPM); // Or a slower offset speed
@@ -1209,7 +1209,7 @@ void checkHomingProgress()
             MOTOR_CONNECTOR.Move(-HOMING_DIRECTION * offsetPulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
 
             // Wait for offset move to complete
-            Console.info(F("Waiting for offset move to complete..."));
+            Console.serialInfo(F("Waiting for offset move to complete..."));
             unsigned long offsetMoveStartTime = millis(); // Use a fresh start time for this wait
             while (!MOTOR_CONNECTOR.StepsComplete() &&
                    (millis() - offsetMoveStartTime < 5000))
@@ -1219,25 +1219,25 @@ void checkHomingProgress()
                 // Check for alerts during offset move
                 if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
                 {
-                    Console.error(F("Alert during offset move"));
+                    Console.serialError(F("Alert during offset move"));
                     abortHoming(); // abortHoming should call the updated resetHomingState
                     return;
                 }
             }
             if (!MOTOR_CONNECTOR.StepsComplete())
             {
-                Console.error(F("Offset move timed out or failed to complete."));
+                Console.serialError(F("Offset move timed out or failed to complete."));
                 // Decide how to handle this: abort or try to complete homing anyway?
                 // For now, we'll proceed to set home, but this is a potential issue.
             }
 
             // Re-zero at offset position
             MOTOR_CONNECTOR.PositionRefSet(0);
-            Console.info(F("Home offset established as zero position"));
+            Console.serialInfo(F("Home offset established as zero position"));
         }
         else
         {
-            Console.info(F("Hardstop established as zero position (no offset)"));
+            Console.serialInfo(F("Hardstop established as zero position (no offset)"));
         }
 
         // Complete the homing sequence
@@ -1266,13 +1266,13 @@ void completeHomingSequence()
     if (homingEncoderState)
     {
         encoderControlActive = true;
-        Console.println(F("[INFO] MPG handwheel control re-enabled after homing"));
+        Serial.println(F("[INFO] MPG handwheel control re-enabled after homing"));
     }
 
-    Console.info(F("Homing sequence completed successfully"));
+    Console.serialInfo(F("Homing sequence completed successfully"));
 
     // Now automatically move to position 1 (loading position)
-    Console.info(F("Moving to position 1 (loading position)..."));
+    Console.serialInfo(F("Moving to position 1 (loading position)..."));
     moveToPosition(POSITION_1);
 }
 
@@ -1302,7 +1302,7 @@ void resetHomingState()
     // Capture the current position AFTER resetting variables
     homing_startPulses = MOTOR_CONNECTOR.PositionRefCommanded();
 
-    Console.println(F("[DIAGNOSTIC] Homing internal state variables reset."));
+    Serial.println(F("[DIAGNOSTIC] Homing internal state variables reset."));
 }
 
 // Then update abortHoming() to use it:
@@ -1310,7 +1310,7 @@ void abortHoming()
 {
     if (homingInProgress) // Check if homing was actually in progress
     {
-        Console.info(F("Aborting homing operation"));
+        Console.serialInfo(F("Aborting homing operation"));
         MOTOR_CONNECTOR.MoveStopAbrupt();
 
         // Reset to normal operation parameters
@@ -1323,11 +1323,11 @@ void abortHoming()
         resetHomingState();
 
         // motorState will be set by resetHomingState or subsequent updateMotorState()
-        Console.info(F("Homing operation aborted successfully"));
+        Console.serialInfo(F("Homing operation aborted successfully"));
     }
     else
     {
-        Console.info(F("No homing operation in progress to abort"));
+        Console.serialInfo(F("No homing operation in progress to abort"));
     }
 }
 
@@ -1352,7 +1352,7 @@ void checkMoveProgress()
     if (motorState == MOTOR_STATE_MOVING && previousState != MOTOR_STATE_MOVING)
     {
         wasMoving = true;
-        // Console.println(F("[DIAGNOSTIC] Movement started - tracking for LastTarget update"));
+        // Serial.println(F("[DIAGNOSTIC] Movement started - tracking for LastTarget update"));
     }
 
     // Update the current position when moving
@@ -1376,25 +1376,25 @@ void checkMoveProgress()
                 lastSetVelocity = newVelocity;
 
                 // Optional: Log velocity changes (for debugging)
-                // Console.print(F("[DECEL] Distance: "));
-                // Console.print(distanceToTargetMm);
-                // Console.print(F("mm, Velocity: "));
-                // Console.print(ppsToRpm(newVelocity));
-                // Console.print(F(" RPM, Position: "));
-                // Console.print(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()));
-                // Console.print(F("mm ("));
-                // Console.print(MOTOR_CONNECTOR.PositionRefCommanded());
-                // Console.print(F(" pulses), Target: "));
-                // Console.print(currentTargetPositionMm);
-                // Console.print(F("mm, HLFB: "));
-                // Console.print(MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT_ASSERTED"));
-                // Console.print(F(", Moving: "));
-                // Console.print(MOTOR_CONNECTOR.StepsComplete() ? F("NO") : F("YES"));
-                // Console.print(F(", Direction: ")); // Fixed: removed "mm"
-                // Console.print(currentTargetPulses > MOTOR_CONNECTOR.PositionRefCommanded() ? F("POS") : F("NEG"));
-                // Console.print(F(", Delta: "));
-                // Console.print(ppsToRpm(abs(newVelocity - lastSetVelocity)));
-                // Console.println();
+                // Serial.print(F("[DECEL] Distance: "));
+                // Serial.print(distanceToTargetMm);
+                // Serial.print(F("mm, Velocity: "));
+                // Serial.print(ppsToRpm(newVelocity));
+                // Serial.print(F(" RPM, Position: "));
+                // Serial.print(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()));
+                // Serial.print(F("mm ("));
+                // Serial.print(MOTOR_CONNECTOR.PositionRefCommanded());
+                // Serial.print(F(" pulses), Target: "));
+                // Serial.print(currentTargetPositionMm);
+                // Serial.print(F("mm, HLFB: "));
+                // Serial.print(MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT_ASSERTED"));
+                // Serial.print(F(", Moving: "));
+                // Serial.print(MOTOR_CONNECTOR.StepsComplete() ? F("NO") : F("YES"));
+                // Serial.print(F(", Direction: ")); // Fixed: removed "mm"
+                // Serial.print(currentTargetPulses > MOTOR_CONNECTOR.PositionRefCommanded() ? F("POS") : F("NEG"));
+                // Serial.print(F(", Delta: "));
+                // Serial.print(ppsToRpm(abs(newVelocity - lastSetVelocity)));
+                // Serial.println();
             }
         }
     }
@@ -1402,7 +1402,7 @@ void checkMoveProgress()
     // Check if the move has just completed (transition from wasMoving to not moving)
     if (wasMoving && !isMoving)
     {
-        // Console.println(F("[DIAGNOSTIC] Move completed successfully"));
+        // Serial.println(F("[DIAGNOSTIC] Move completed successfully"));
 
         // Reset to normal velocity for future movements
         if (lastSetVelocity != currentVelMax)
@@ -1414,9 +1414,9 @@ void checkMoveProgress()
         // Movement completed successfully, update last target
         if (hasCurrentTarget)
         {
-            // Console.print(F("[DIAGNOSTIC] Updating LastTarget to: "));
-            // Console.print(currentTargetPositionMm);
-            // Console.println(F(" mm"));
+            // Serial.print(F("[DIAGNOSTIC] Updating LastTarget to: "));
+            // Serial.print(currentTargetPositionMm);
+            // Serial.println(F(" mm"));
 
             hasLastTarget = true;
             lastTargetType = currentTargetType;
@@ -1426,7 +1426,7 @@ void checkMoveProgress()
         }
         else
         {
-            // Console.println(F("[DIAGNOSTIC] Move completed but no current target was set!"));
+            // Serial.println(F("[DIAGNOSTIC] Move completed but no current target was set!"));
         }
 
         // Reset the wasMoving flag
@@ -1465,7 +1465,7 @@ void handleEStop()
     // Only take action if E-stop state changes from inactive to active
     if (eStopActive && !eStopWasActive)
     {
-        Console.error(F("E-STOP TRIGGERED!"));
+        Console.serialError(F("E-STOP TRIGGERED!"));
 
         // If an automated operation is in progress, abort it
         if (currentOperation.inProgress)
@@ -1482,7 +1482,7 @@ void handleEStop()
         // If homing was in progress, abort it
         if (homingInProgress)
         {
-            Console.info(F("Aborting homing operation"));
+            Console.serialInfo(F("Aborting homing operation"));
             homingInProgress = false;
         }
 
@@ -1492,7 +1492,7 @@ void handleEStop()
     // Report when E-stop is released
     else if (!eStopActive && eStopWasActive)
     {
-        Console.info(F("E-STOP RELEASED - System remains in fault state until cleared"));
+        Console.serialInfo(F("E-STOP RELEASED - System remains in fault state until cleared"));
     }
 
     eStopWasActive = eStopActive;
@@ -1542,18 +1542,18 @@ int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVeloci
         isLongMoveDecelerating = false;
 
         // Log debug info for any move
-        // Console.print(F("[DECEL] New move detected: "));
-        // Console.print(moveDistance);
-        // Console.println(F("mm"));
+        // Serial.print(F("[DECEL] New move detected: "));
+        // Serial.print(moveDistance);
+        // Serial.println(F("mm"));
 
         // Check if this is a very short move
         if (moveDistance < motorDecelConfig.decelerationDistanceMm * VERY_SHORT_MOVE_RATIO)
         {
             isVeryShortMove = true;
 
-            // Console.print(F("[DECEL] Very short move detected ("));
-            // Console.print(totalMoveDistance);
-            // Console.println(F("mm) - Using special deceleration profile"));
+            // Serial.print(F("[DECEL] Very short move detected ("));
+            // Serial.print(totalMoveDistance);
+            // Serial.println(F("mm) - Using special deceleration profile"));
         }
         // Handle long moves specifically
         else if (moveDistance > 100.0f)
@@ -1563,11 +1563,11 @@ int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVeloci
             // For long moves, use a longer deceleration distance (2x normal)
             longMoveDecelStartDistance = min(moveDistance * 0.3f, 150.0f);
 
-            // Console.print(F("[DECEL] Long move detected ("));
-            // Console.print(totalMoveDistance);
-            // Console.print(F("mm) - Deceleration starts at "));
-            // Console.print(longMoveDecelStartDistance);
-            // Console.println(F("mm from target"));
+            // Serial.print(F("[DECEL] Long move detected ("));
+            // Serial.print(totalMoveDistance);
+            // Serial.print(F("mm) - Deceleration starts at "));
+            // Serial.print(longMoveDecelStartDistance);
+            // Serial.println(F("mm from target"));
         }
         // Normal moves (between very short and long) use default behavior
         // Both flags remain false from reset above
@@ -1590,11 +1590,11 @@ int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVeloci
 
             // Additional logging to track deceleration
             // if (distanceToTargetMm < 50.0f && (int)distanceToTargetMm % 10 == 0) {
-            //     Console.print(F("[DECEL] Long move: "));
-            //     Console.print(distanceToTargetMm);
-            //     Console.print(F("mm to target, Velocity: "));
-            //     Console.print(ppsToRpm(targetVelocity));
-            //     Console.println(F(" RPM"));
+            //     Serial.print(F("[DECEL] Long move: "));
+            //     Serial.print(distanceToTargetMm);
+            //     Serial.print(F("mm to target, Velocity: "));
+            //     Serial.print(ppsToRpm(targetVelocity));
+            //     Serial.println(F(" RPM"));
             // }
 
             return targetVelocity;

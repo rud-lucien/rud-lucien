@@ -186,6 +186,8 @@ struct SafetyValidationResult
     String unloadTrayPos1UnsafeReason;
     String unloadTrayPos2UnsafeReason;
     String unloadTrayPos3UnsafeReason;
+    bool safeToUnlockGrippedTray;
+    String grippedTrayUnlockUnsafeReason;
 
     // System state validation
     bool commandStateValid;

@@ -122,6 +122,17 @@ void MultiPrint::flush() {
     // Don't try to flush outputs - Print class doesn't have flush()
 }
 
+// Add to OutputManager.cpp
+void MultiPrint::acknowledge(const char *msg) {
+    print(F("[ACK], "));
+    println(msg);
+}
+
+void MultiPrint::acknowledge(const __FlashStringHelper *msg) {
+    print(F("[ACK], "));
+    println(msg);
+}
+
 // Helper methods implementation for formatted messages
 void MultiPrint::info(const char *msg) {
     print(F("[INFO] "));
@@ -134,12 +145,12 @@ void MultiPrint::info(const __FlashStringHelper *msg) {
 }
 
 void MultiPrint::error(const char *msg) {
-    print(F("[ERROR] "));
+    print(F("[ERROR], "));
     println(msg);
 }
 
 void MultiPrint::error(const __FlashStringHelper *msg) {
-    print(F("[ERROR] "));
+    print(F("[ERROR], "));
     println(msg);
 }
 
@@ -192,3 +203,56 @@ void MultiPrint::safety(const __FlashStringHelper *msg) {
     print(F("[SAFETY] "));
     println(msg);
 }
+
+void MultiPrint::serialInfo(const char *msg) {
+    Serial.print(F("[INFO] "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialInfo(const __FlashStringHelper *msg) {
+    Serial.print(F("[INFO] "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialError(const char *msg) {
+    Serial.print(F("[ERROR], "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialError(const __FlashStringHelper *msg) {
+    Serial.print(F("[ERROR], "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialDiagnostic(const char *msg) {
+    Serial.print(F("[DIAGNOSTIC] "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialDiagnostic(const __FlashStringHelper *msg) {
+    Serial.print(F("[DIAGNOSTIC] "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialWarning(const char *msg) {
+    Serial.print(F("[WARNING] "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialWarning(const __FlashStringHelper *msg) {
+    Serial.print(F("[WARNING] "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialSafety(const char *msg) {
+    Serial.print(F("[SAFETY] "));
+    Serial.println(msg);
+}
+
+void MultiPrint::serialSafety(const __FlashStringHelper *msg) {
+    Serial.print(F("[SAFETY] "));
+    Serial.println(msg);
+}
+
+
+

@@ -48,7 +48,7 @@ void handleSerialCommands()
             commandBuffer[commandIndex] = '\0'; // Null-terminate the command
 
             // Print the received command for debugging
-            Console.serialCommand(commandBuffer);
+            Serial.println(commandBuffer);
 
             // Process the command using the shared function
             processCommand(commandBuffer, &Serial); // Or whatever Stream object Console is
@@ -66,7 +66,7 @@ void handleSerialCommands()
                 // Command too long - prevent buffer overflow
                 commandIndex = sizeof(commandBuffer) - 1;
                 // Add notification of truncation
-                Console.warning(F("Command truncated - exceeded maximum length"));
+                Console.serialError(F("Command truncated - exceeded maximum length"));
             }
         }
     }
@@ -98,10 +98,10 @@ void handleEthernetCommands()
                     if (j > 0)
                     {
                         // Log the received command
-                        Console.print(F("[NETWORK] Command from "));
-                        Console.print(clients[i].remoteIP());
-                        Console.print(F(": "));
-                        Console.println(ethernetCommandBuffer);
+                        Serial.print(F("[NETWORK] Command from "));
+                        Serial.print(clients[i].remoteIP());
+                        Serial.print(F(": "));
+                        Serial.println(ethernetCommandBuffer);
 
                         // Use the shared process function instead of duplicating logic
                         processCommand(ethernetCommandBuffer, &clients[i]);
@@ -120,7 +120,7 @@ void handleEthernetCommands()
             if (j == 63)
             {
                 ethernetCommandBuffer[j] = '\0';
-                clients[i].println(F("[WARNING] Command too long - truncated"));
+                clients[i].println(F("[ERROR], Command too long - truncated"));
                 j = 0;
             }
         }
@@ -136,7 +136,7 @@ bool processCommand(const char *rawCommand, Stream *output)
     if (strncmp(rawCommand, "abort", 5) == 0)
     {
         requestTestAbort("command interface");
-        output->println(F("[INFO] Test abort requested"));
+        Console.acknowledge(F("Test abort requested"));
         return true;
     }
 
@@ -194,7 +194,7 @@ bool processCommand(const char *rawCommand, Stream *output)
             // Only print generic error if command wasn't found at all
             if (!isKnownCommand)
             {
-                output->println(F("[ERROR] Command not found"));
+                Console.serialError(F("Command not found"));
             }
         }
 

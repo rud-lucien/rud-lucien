@@ -7,10 +7,10 @@ const unsigned long DEFAULT_LOG_INTERVAL = 250; // Default interval of 500ms
 
 void logSystemState()
 {
-    Console.print(F("[LOG] "));
+    Serial.print(F("[LOG] "));
 
     // 1. VALVES section - Enhanced to include sensor feedback
-    Console.print(F("Valves: "));
+    Serial.print(F("Valves: "));
     const char *updatedValveNames[4] = {"Lock1", "Lock2", "Lock3", "Shuttle"};
 
     // Get the appropriate valves and sensors
@@ -24,8 +24,8 @@ void logSystemState()
     {
         if (valves[i])
         {
-            Console.print(updatedValveNames[i]);
-            Console.print(F("="));
+            Serial.print(updatedValveNames[i]);
+            Serial.print(F("="));
 
             // Determine commanded position
             bool isLocked = (valves[i]->position == VALVE_POSITION_LOCK);
@@ -39,172 +39,172 @@ void logSystemState()
             // Display position with verification indicator
             if (isLocked)
             {
-                Console.print(positionVerified ? F("LOCKED") : F("LOCKED?"));
+                Serial.print(positionVerified ? F("LOCKED") : F("LOCKED?"));
             }
             else
             {
-                Console.print(positionVerified ? F("UNLOCKED") : F("UNLOCKED?"));
+                Serial.print(positionVerified ? F("UNLOCKED") : F("UNLOCKED?"));
             }
 
             // Add ? indicator for mismatches
             if (!positionVerified)
             {
-                Console.print(F("[!]"));
+                Serial.print(F("[!]"));
             }
 
             // Add comma except after last item
             if (i < valveCount - 1)
             {
-                Console.print(F(", "));
+                Serial.print(F(", "));
             }
         }
     }
 
     // 2. SENSORS section
-    Console.print(F(" | Sensors: "));
-    Console.print(F("Tray1="));
-    Console.print(sensorRead(tray1DetectSensor) ? F("PRESENT") : F("EMPTY"));
-    Console.print(F(", Tray2="));
-    Console.print(sensorRead(tray2DetectSensor) ? F("PRESENT") : F("EMPTY"));
-    Console.print(F(", Tray3="));
-    Console.print(sensorRead(tray3DetectSensor) ? F("PRESENT") : F("EMPTY"));
+    Serial.print(F(" | Sensors: "));
+    Serial.print(F("Tray1="));
+    Serial.print(sensorRead(tray1DetectSensor) ? F("PRESENT") : F("EMPTY"));
+    Serial.print(F(", Tray2="));
+    Serial.print(sensorRead(tray2DetectSensor) ? F("PRESENT") : F("EMPTY"));
+    Serial.print(F(", Tray3="));
+    Serial.print(sensorRead(tray3DetectSensor) ? F("PRESENT") : F("EMPTY"));
 
     // 3. SYSTEM section
-    Console.print(F(" | System: "));
-    Console.print(F("Motor="));
+    Serial.print(F(" | System: "));
+    Serial.print(F("Motor="));
     switch (motorState)
     {
     case MOTOR_STATE_IDLE:
-        Console.print(F("IDLE"));
+        Serial.print(F("IDLE"));
         break;
     case MOTOR_STATE_MOVING:
-        Console.print(F("MOVING"));
+        Serial.print(F("MOVING"));
         break;
     case MOTOR_STATE_HOMING:
-        Console.print(F("HOMING"));
+        Serial.print(F("HOMING"));
         break;
     case MOTOR_STATE_FAULTED:
-        Console.print(F("FAULTED"));
+        Serial.print(F("FAULTED"));
         break;
     case MOTOR_STATE_NOT_READY:
-        Console.print(F("NOT_READY"));
+        Serial.print(F("NOT_READY"));
         break;
     default:
-        Console.print(F("UNKNOWN"));
+        Serial.print(F("UNKNOWN"));
         break;
     }
 
-    Console.print(F(", Homed="));
-    Console.print(isHomed ? F("YES") : F("NO"));
+    Serial.print(F(", Homed="));
+    Serial.print(isHomed ? F("YES") : F("NO"));
 
-    Console.print(F(", E-Stop="));
-    Console.print(isEStopActive() ? F("TRIGGERED") : F("RELEASED"));
+    Serial.print(F(", E-Stop="));
+    Serial.print(isEStopActive() ? F("TRIGGERED") : F("RELEASED"));
 
-    Console.print(F(", HLFB="));
+    Serial.print(F(", HLFB="));
     bool hlfbAsserted = MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED;
-    Console.print(hlfbAsserted ? F("ASSERTED") : F("NOT_ASSERTED"));
+    Serial.print(hlfbAsserted ? F("ASSERTED") : F("NOT_ASSERTED"));
 
-    Console.print(F(", Clients="));
+    Serial.print(F(", Clients="));
     int clientCount = getConnectedClientCount();
-    Console.print(clientCount);
+    Serial.print(clientCount);
 
-    Console.print(F(", Pressure="));
+    Serial.print(F(", Pressure="));
     float pressure = getPressurePsi();
-    Console.print(pressure);
-    Console.print(F(" PSI"));
+    Serial.print(pressure);
+    Serial.print(F(" PSI"));
     if (pressure < MIN_SAFE_PRESSURE)
     {
-        Console.print(F(" (LOW)"));
+        Serial.print(F(" (LOW)"));
     }
 
     // 4. POSITION GROUP with improved naming
-    Console.print(F(" | Position: "));
+    Serial.print(F(" | Position: "));
     double calculatedPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
     int32_t currentPulses = normalizeEncoderValue(MOTOR_CONNECTOR.PositionRefCommanded());
-    Console.print(calculatedPositionMm, 2);
-    Console.print(F("mm ("));
-    Console.print(currentPulses);
-    Console.print(F(" counts)"));
+    Serial.print(calculatedPositionMm, 2);
+    Serial.print(F("mm ("));
+    Serial.print(currentPulses);
+    Serial.print(F(" counts)"));
 
     // Target information
-    Console.print(F(", Target="));
+    Serial.print(F(", Target="));
     if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING)
     {
         if (hasCurrentTarget)
         {
-            Console.print(currentTargetPositionMm, 2);
-            Console.print(F("mm ("));
-            Console.print(normalizeEncoderValue(currentTargetPulses));
-            Console.print(F(" counts)"));
+            Serial.print(currentTargetPositionMm, 2);
+            Serial.print(F("mm ("));
+            Serial.print(normalizeEncoderValue(currentTargetPulses));
+            Serial.print(F(" counts)"));
         }
         else
         {
-            Console.print(F("None"));
+            Serial.print(F("None"));
         }
     }
     else
     {
-        Console.print(F("None"));
+        Serial.print(F("None"));
     }
 
     // Last target position
-    Console.print(F(", LastTarget="));
+    Serial.print(F(", LastTarget="));
     if (hasLastTarget)
     {
-        Console.print(lastTargetPositionMm, 2);
-        Console.print(F("mm ("));
-        Console.print(normalizeEncoderValue(lastTargetPulses));
-        Console.print(F(" counts)"));
+        Serial.print(lastTargetPositionMm, 2);
+        Serial.print(F("mm ("));
+        Serial.print(normalizeEncoderValue(lastTargetPulses));
+        Serial.print(F(" counts)"));
     }
     else
     {
-        Console.print(F("None"));
+        Serial.print(F("None"));
     }
 
     // 5. VELOCITY GROUP with improved naming
-    Console.print(F(" | Velocity: "));
+    Serial.print(F(" | Velocity: "));
     double currentVelocityRpm = abs((double)MOTOR_CONNECTOR.VelocityRefCommanded() * 60.0 / PULSES_PER_REV);
-    Console.print(currentVelocityRpm, 1);
-    Console.print(F("RPM"));
+    Serial.print(currentVelocityRpm, 1);
+    Serial.print(F("RPM"));
     if (currentVelocityRpm > 0)
     {
-        Console.print(F(" ("));
-        Console.print((int)(currentVelocityRpm * 100 / ppsToRpm(currentVelMax)));
-        Console.print(F("%)"));
+        Serial.print(F(" ("));
+        Serial.print((int)(currentVelocityRpm * 100 / ppsToRpm(currentVelMax)));
+        Serial.print(F("%)"));
     }
 
     // Limits (condensed)
-    Console.print(F(", Limits: "));
-    Console.print(ppsToRpm(currentVelMax), 0);
-    Console.print(F("RPM/"));
-    Console.print((double)currentAccelMax * 60.0 / PULSES_PER_REV, 0);
-    Console.print(F("RPM/s"));
+    Serial.print(F(", Limits: "));
+    Serial.print(ppsToRpm(currentVelMax), 0);
+    Serial.print(F("RPM/"));
+    Serial.print((double)currentAccelMax * 60.0 / PULSES_PER_REV, 0);
+    Serial.print(F("RPM/s"));
 
     // 6. JOG SETTINGS GROUP - removed (D) indicators
-    Console.print(F(" | Jog: "));
-    Console.print(currentJogIncrementMm, 1);
-    Console.print(F("mm/"));
-    Console.print(currentJogSpeedRpm);
-    Console.print(F("RPM"));
+    Serial.print(F(" | Jog: "));
+    Serial.print(currentJogIncrementMm, 1);
+    Serial.print(F("mm/"));
+    Serial.print(currentJogSpeedRpm);
+    Serial.print(F("RPM"));
 
     // Encoder status
-    Console.print(F(" | MPG: "));
+    Serial.print(F(" | MPG: "));
     if (encoderControlActive)
     {
-        Console.print(F("ON x"));
-        Console.print(getMultiplierName(currentMultiplier));
+        Serial.print(F("ON x"));
+        Serial.print(getMultiplierName(currentMultiplier));
 
         // Add mm/rotation information in a compact format
         double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-        Console.print(F(" ("));
-        Console.print(mmPerRotation, 2);
-        Console.print(F("mm/rot)"));
+        Serial.print(F(" ("));
+        Serial.print(mmPerRotation, 2);
+        Serial.print(F("mm/rot)"));
     }
     else
     {
-        Console.print(F("OFF"));
+        Serial.print(F("OFF"));
     }
 
     // End the line
-    Console.println();
+    Serial.println();
 }

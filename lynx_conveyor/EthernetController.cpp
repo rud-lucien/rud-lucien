@@ -16,15 +16,15 @@ void initEthernetController(bool useDhcp)
     Console.info(F("Starting Ethernet initialization..."));
 
     // Print link status for debugging
-    Console.print(F("Ethernet physical link status: "));
+    Serial.print(F("Ethernet physical link status: "));
     if (Ethernet.linkStatus() == LinkOFF)
     {
-        Console.warning(F("DISCONNECTED - cable may not be connected"));
+        Console.serialWarning(F("DISCONNECTED - cable may not be connected"));
         // Important: Continue anyway to initialize the Ethernet chip
     }
     else
     {
-        Console.info(F("CONNECTED"));
+        Console.serialInfo(F("CONNECTED"));
     }
 
     // Initialize Ethernet interface
@@ -32,7 +32,7 @@ void initEthernetController(bool useDhcp)
     if (useDhcp)
     {
         // Try DHCP
-        Console.info(F("Attempting to get IP from DHCP..."));
+        Console.serialInfo(F("Attempting to get IP from DHCP..."));
         result = Ethernet.begin(mac);
         if (result == 0)
         {
@@ -48,7 +48,7 @@ void initEthernetController(bool useDhcp)
     else
     {
         // Use static IP
-        Console.info(F("Using static IP configuration"));
+        Console.serialInfo(F("Using static IP configuration"));
         IPAddress ip(192, 168, 0, 177);
         IPAddress dns(8, 8, 8, 8);
         IPAddress gateway(192, 168, 0, 1);
@@ -58,18 +58,18 @@ void initEthernetController(bool useDhcp)
 
     // Print assigned IP address
     IPAddress ip = Ethernet.localIP();
-    Console.print(F("Ethernet IP address: "));
-    Console.println(ip);
+    Serial.print(F("Ethernet IP address: "));
+    Serial.println(ip);
 
     // Start the server
     server.begin();
-    Console.print(F("Server started on port "));
-    Console.println(ETHERNET_PORT);
+    Serial.print(F("Server started on port "));
+    Serial.println(ETHERNET_PORT);
 
     // Mark as initialized regardless of link status
     ethernetInitialized = true;
 
-    Console.info(F("Ethernet initialization complete"));
+    Console.serialInfo(F("Ethernet initialization complete"));
 }
 
 void processEthernetConnections()
@@ -83,13 +83,13 @@ void processEthernetConnections()
     static bool warningPrinted = false;
     if (Ethernet.linkStatus() == LinkOFF) {
         if (ethernetInitialized && !warningPrinted) {
-            Console.warning(F("Ethernet cable disconnected."));
+            Console.serialWarning(F("Ethernet cable disconnected."));
             warningPrinted = true;
         }
     } else {
         // Reset warning flag when cable is reconnected
         if (warningPrinted) {
-            Console.info(F("Ethernet cable reconnected."));
+            Console.serialInfo(F("Ethernet cable reconnected."));
             warningPrinted = false;
         }
     }
@@ -106,18 +106,18 @@ void processEthernetConnections()
             if (!clients[i] || !clients[i].connected())
             {
                 // Found a free slot
-                Console.print(F("[NETWORK] New client connected from "));
-                Console.print(newClient.remoteIP());
-                Console.print(F(":"));
-                Console.println(newClient.remotePort());
+                Serial.print(F("[NETWORK] New client connected from "));
+                Serial.print(newClient.remoteIP());
+                Serial.print(F(":"));
+                Serial.println(newClient.remotePort());
 
                 // Replace client in this slot
                 clients[i] = newClient;
                 clientAdded = true;
 
                 // Send welcome message
-                clients[i].println(F("Welcome to Lynx Conveyor Controller"));
-                clients[i].println(F("Type 'help' for available commands"));
+                // clients[i].println(F("Welcome to Lynx Conveyor Controller"));
+                // clients[i].println(F("Type 'help' for available commands"));
                 break;
             }
         }
@@ -125,7 +125,7 @@ void processEthernetConnections()
         // If no free slots, reject connection
         if (!clientAdded)
         {
-            Console.warning(F("[NETWORK] Rejected client - no free slots"));
+            Console.serialWarning(F("[NETWORK] Rejected client - no free slots"));
             newClient.println(F("ERROR: Too many connections"));
             newClient.stop();
         }
@@ -136,8 +136,8 @@ void processEthernetConnections()
     {
         if (clients[i] && !clients[i].connected())
         {
-            Console.print(F("[NETWORK] Client disconnected: "));
-            Console.println(i);
+            Serial.print(F("[NETWORK] Client disconnected: "));
+            Serial.println(i);
             clients[i].stop();
         }
     }

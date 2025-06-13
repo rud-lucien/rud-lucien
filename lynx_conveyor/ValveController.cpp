@@ -61,7 +61,7 @@ void initSensorSystem()
     airPressureSensor.minPressure = 0.0f;
     airPressureSensor.maxPressure = MAX_PRESSURE;
 
-    Console.info(F("Sensor system initialized"));
+    Console.serialInfo(F("Sensor system initialized"));
 }
 
 void initPressureSensor() {
@@ -73,17 +73,17 @@ void initPressureSensor() {
     // Set the resolution of the ADC for better precision
     analogReadResolution(12); // 12-bit resolution for more precise readings
     
-    Console.info(F("Pressure sensor initialized on pin A11"));
+    Console.serialInfo(F("Pressure sensor initialized on pin A11"));
     
     // Read and report the initial pressure
     float initialPressure = readPressure(airPressureSensor);
-    Console.print(F("[INFO] Initial system pressure: "));
-    Console.print(initialPressure);
-    Console.println(F(" PSI"));
+    Serial.print(F("[INFO] Initial system pressure: "));
+    Serial.print(initialPressure);
+    Serial.println(F(" PSI"));
     
     // Check if pressure is sufficient for valve operation
     if (!isPressureSufficient()) {
-        Console.warning(F("System pressure below minimum threshold (21.75 PSI) - Valve operations may be unreliable"));
+        Console.serialWarning(F("System pressure below minimum threshold (21.75 PSI) - Valve operations may be unreliable"));
     }
 }
 
@@ -109,12 +109,12 @@ bool isPressureSufficient() {
 
 void printPressureStatus() {
     float currentPressure = readPressure(airPressureSensor);
-    Console.print(F("Air Pressure: "));
-    Console.print(currentPressure);
-    Console.println(F(" PSI"));
+    Serial.print(F("Air Pressure: "));
+    Serial.print(currentPressure);
+    Serial.println(F(" PSI"));
     
     if (currentPressure < MIN_SAFE_PRESSURE) {
-        Console.warning(F("Pressure below minimum threshold for safe valve operation (21.75 PSI)"));
+        Console.serialWarning(F("Pressure below minimum threshold for safe valve operation (21.75 PSI)"));
     }
 }
 
@@ -129,11 +129,11 @@ void initValveSystem(bool hasCCIOBoard)
 
     if (!hasCCIO)
     {
-        Console.error(F("No CCIO board detected - valve control unavailable"));
+        Console.serialError(F("No CCIO board detected - valve control unavailable"));
         return;
     }
 
-    Console.info(F("Initializing valves with CCIO board..."));
+    Console.serialInfo(F("Initializing valves with CCIO board..."));
 
     // Configure all valve pins on the CCIO board
     pinMode(TRAY_1_LOCK_PIN, OUTPUT);
@@ -167,7 +167,7 @@ void initValveSystem(bool hasCCIOBoard)
     valveInit(tray3Valve);
     valveInit(shuttleValve);
 
-    Console.info(F("Valve system initialized"));
+    Console.serialInfo(F("Valve system initialized"));
 }
 
 // ----------------- Low-level hardware functions -----------------
@@ -206,12 +206,12 @@ void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target)
 
     // Check if pressure is sufficient before actuating the valve
     if (!isPressureSufficient()) {
-        Console.error(F("Cannot actuate valve - System pressure too low"));
-        Console.print(F("[INFO] Current pressure: "));
-        Console.print(readPressure(airPressureSensor));
-        Console.print(F(" PSI, Minimum required: "));
-        Console.print(MIN_SAFE_PRESSURE);
-        Console.println(F(" PSI"));
+        Console.serialError(F("Cannot actuate valve - System pressure too low"));
+        Serial.print(F("[INFO] Current pressure: "));
+        Serial.print(readPressure(airPressureSensor));
+        Serial.print(F(" PSI, Minimum required: "));
+        Serial.print(MIN_SAFE_PRESSURE);
+        Serial.println(F(" PSI"));
         return;
     }
 
@@ -240,13 +240,13 @@ void withValve(DoubleSolenoidValve &valve, void (*operation)(DoubleSolenoidValve
 
 void unsafeUnlockValve(DoubleSolenoidValve &valve)
 {
-    Console.warning(F("Using unsafe unlock - no sensor verification"));
+    Console.serialWarning(F("Using unsafe unlock - no sensor verification"));
     valveSetPosition(valve, VALVE_POSITION_UNLOCK);
 }
 
 void unsafeLockValve(DoubleSolenoidValve &valve)
 {
-    Console.warning(F("Using unsafe lock - no sensor verification"));
+    Console.serialWarning(F("Using unsafe lock - no sensor verification"));
     valveSetPosition(valve, VALVE_POSITION_LOCK);
 }
 
@@ -271,21 +271,21 @@ bool sensorRead(CylinderSensor &sensor)
 void printValveStatus(const DoubleSolenoidValve &valve, const char *valveName)
 {
     Console.diagnostic(F(" "));
-    Console.print(valveName);
-    Console.print(F(": "));
-    Console.println(valve.position == VALVE_POSITION_UNLOCK ? F("Unlocked") : F("Locked"));
+    Serial.print(valveName);
+    Serial.print(F(": "));
+    Serial.println(valve.position == VALVE_POSITION_UNLOCK ? F("Unlocked") : F("Locked"));
 }
 
 void printSensorStatus(const CylinderSensor &sensor, const char *sensorName)
 {
-    Console.diagnostic(F(" "));
-    Console.print(sensorName);
-    Console.print(F(" Sensor: "));
+    Console.serialDiagnostic(F(" "));
+    Serial.print(sensorName);
+    Serial.print(F(" Sensor: "));
     bool sensorState = sensorRead(const_cast<CylinderSensor &>(sensor));
 
     // IMPORTANT: TRUE means UNLOCKED, FALSE means LOCKED
-    Console.print(sensorState ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
-    Console.println();
+    Serial.print(sensorState ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
+    Serial.println();
 }
 
 // ----------------- Batch operations -----------------
@@ -295,7 +295,7 @@ void withAllValves(void (*operation)(DoubleSolenoidValve &))
     // Only perform operations if CCIO is present since all valves are on CCIO now
     if (!hasCCIO)
     {
-        Console.error(F("Cannot operate valves: CCIO-8 board not initialized"));
+        Console.serialError(F("Cannot operate valves: CCIO-8 board not initialized"));
         return;
     }
 
@@ -307,17 +307,17 @@ void withAllValves(void (*operation)(DoubleSolenoidValve &))
 
 void printAllValveStatus()
 {
-    Console.diagnostic(F(" Current valve positions:"));
+    Console.serialDiagnostic(F(" Current valve positions:"));
 
     // First print pressure status
     float currentPressure = readPressure(airPressureSensor);
-    Console.print(F(" System Pressure: "));
-    Console.print(currentPressure);
-    Console.print(F(" PSI "));
+    Serial.print(F(" System Pressure: "));
+    Serial.print(currentPressure);
+    Serial.print(F(" PSI "));
     if (currentPressure < MIN_SAFE_PRESSURE) {
-        Console.println(F("(INSUFFICIENT)"));
+        Serial.println(F("(INSUFFICIENT)"));
     } else {
-        Console.println(F("(OK)"));
+        Serial.println(F("(OK)"));
     }
 
     for (int i = 0; i < valveCount; i++)
@@ -331,7 +331,7 @@ void printAllValveStatus()
 
 void printAllSensorStatus()
 {
-    Console.diagnostic(F(" Current sensor readings:"));
+    Console.serialDiagnostic(F(" Current sensor readings:"));
     for (int i = 0; i < cylinderSensorCount; i++)
     {
         printSensorStatus(*allCylinderSensors[i], valveNames[i]);
@@ -347,9 +347,9 @@ bool waitForSensor(CylinderSensor &sensor, bool expectedState, unsigned long tim
     {
         if (millis() - startTime > timeoutMs)
         {
-            Console.print(F("[ERROR] Sensor timeout: waited "));
-            Console.print(timeoutMs);
-            Console.println(F("ms for expected state"));
+            Serial.print(F("[ERROR] Sensor timeout: waited "));
+            Serial.print(timeoutMs);
+            Serial.println(F("ms for expected state"));
             return false; // Timeout occurred
         }
         delay(10); // Short delay to prevent excessive CPU usage
@@ -375,30 +375,30 @@ bool safeValveOperation(DoubleSolenoidValve &valve, CylinderSensor &sensor,
 // 2. Add safe unlock all valves function
 bool safeUnlockAllValves(unsigned long timeoutMs)
 {
-    Console.info(F("Safely unlocking all valves with sensor verification..."));
+    Console.serialInfo(F("Safely unlocking all valves with sensor verification..."));
     bool allSucceeded = true;
 
     if (!safeValveOperation(*getTray1Valve(), *getTray1Sensor(), VALVE_POSITION_UNLOCK, timeoutMs))
     {
-        Console.error(F("Failed to unlock Tray 1 valve - sensor did not confirm"));
+        Console.serialError(F("Failed to unlock Tray 1 valve - sensor did not confirm"));
         allSucceeded = false;
     }
 
     if (!safeValveOperation(*getTray2Valve(), *getTray2Sensor(), VALVE_POSITION_UNLOCK, timeoutMs))
     {
-        Console.error(F("Failed to unlock Tray 2 valve - sensor did not confirm"));
+        Console.serialError(F("Failed to unlock Tray 2 valve - sensor did not confirm"));
         allSucceeded = false;
     }
 
     if (!safeValveOperation(*getTray3Valve(), *getTray3Sensor(), VALVE_POSITION_UNLOCK, timeoutMs))
     {
-        Console.error(F("Failed to unlock Tray 3 valve - sensor did not confirm"));
+        Console.serialError(F("Failed to unlock Tray 3 valve - sensor did not confirm"));
         allSucceeded = false;
     }
 
     if (!safeValveOperation(*getShuttleValve(), *getShuttleSensor(), VALVE_POSITION_UNLOCK, timeoutMs))
     {
-        Console.error(F("Failed to unlock Shuttle valve - sensor did not confirm"));
+        Console.serialError(F("Failed to unlock Shuttle valve - sensor did not confirm"));
         allSucceeded = false;
     }
 
@@ -412,14 +412,14 @@ const int trayDetectSensorCount = 3;
 
 void printTrayDetectionStatus()
 {
-    Console.diagnostic(F(" Tray Detection Status:"));
+    Console.serialDiagnostic(F(" Tray Detection Status:"));
     for (int i = 0; i < trayDetectSensorCount; i++)
     {
         bool trayDetected = sensorRead(*allTrayDetectSensors[i]);
-        Console.print(F("  Tray "));
-        Console.print(i + 1);
-        Console.print(F(": "));
-        Console.println(trayDetected ? F("DETECTED") : F("Not Present"));
+        Serial.print(F("  Tray "));
+        Serial.print(i + 1);
+        Serial.print(F(": "));
+        Serial.println(trayDetected ? F("DETECTED") : F("Not Present"));
     }
 }
 
@@ -428,7 +428,7 @@ DoubleSolenoidValve *getShuttleValve()
 {
     if (!hasCCIO)
     {
-        Console.error(F("Cannot access shuttle valve: CCIO board not detected"));
+        Console.serialError(F("Cannot access shuttle valve: CCIO board not detected"));
         return NULL;
     }
     // Shuttle valve is the fourth valve in the allValves array (index 3)
@@ -440,7 +440,7 @@ DoubleSolenoidValve *getTray1Valve()
 {
     if (!hasCCIO)
     {
-        Console.error(F("Cannot access tray 1 valve: CCIO board not detected"));
+        Console.serialError(F("Cannot access tray 1 valve: CCIO board not detected"));
         return NULL;
     }
     return &tray1Valve;
@@ -451,7 +451,7 @@ DoubleSolenoidValve *getTray2Valve()
 {
     if (!hasCCIO)
     {
-        Console.error(F("Cannot access tray 2 valve: CCIO board not detected"));
+        Console.serialError(F("Cannot access tray 2 valve: CCIO board not detected"));
         return NULL;
     }
     return &tray2Valve;
@@ -462,7 +462,7 @@ DoubleSolenoidValve *getTray3Valve()
 {
     if (!hasCCIO)
     {
-        Console.error(F("Cannot access tray 3 valve: CCIO board not detected"));
+        Console.serialError(F("Cannot access tray 3 valve: CCIO board not detected"));
         return NULL;
     }
     return &tray3Valve;

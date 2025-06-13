@@ -6,8 +6,8 @@ void requestTestAbort(const char *source)
     if (!testAbortRequested)
     {
         testAbortRequested = true;
-        Console.info(F("Test abort requested via "));
-        Console.println(source);
+        Console.serialInfo(F("Test abort requested via "));
+        Serial.println(source);
     }
 }
 
@@ -15,7 +15,7 @@ bool handleTestAbort()
 {
     if (testAbortRequested)
     {
-        Console.info(F("Test aborted by user"));
+        Console.serialInfo(F("Test aborted by user"));
         stopMotion();
         motorState = MOTOR_STATE_IDLE;
         testInProgress = false;
@@ -76,7 +76,7 @@ bool checkEthernetForAbortCommand()
 
                     // Set the abort flag
                     requestTestAbort("ethernet client");
-                    client.println(F("[INFO] Test abort requested"));
+                    client.println(F("[ACK], Test abort requested"));
                     return true;
                 }
 
@@ -137,7 +137,7 @@ bool testHomingRepeatability()
     // Check for motor alerts
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
     {
-        Console.error(F("Motor has active alerts - clear faults before testing"));
+        Console.serialError(F("Motor has active alerts - clear faults before testing"));
         printMotorAlerts();
         testInProgress = false;
         return false;
@@ -146,19 +146,19 @@ bool testHomingRepeatability()
     // Check if motor is initialized
     if (!motorInitialized)
     {
-        Console.error(F("Motor not initialized - run 'motor init' first"));
+        Console.serialError(F("Motor not initialized - run 'motor init' first"));
         testInProgress = false;
         return false;
     }
 
-    Console.info(F("Starting homing repeatability test"));
-    Console.info(F("To abort, type 'abort'"));
-    Console.print(F("[INFO] Will perform "));
-    Console.print(NUM_CYCLES);
-    Console.print(F(" cycles of: home -> wait -> move to "));
-    Console.print(TEST_POSITION_MM);
-    Console.println(F("mm -> wait -> repeat"));
-    Console.info(F("Press any key to abort test"));
+    Console.serialInfo(F("Starting homing repeatability test"));
+    Console.serialInfo(F("To abort, type 'abort'"));
+    Serial.print(F("[INFO] Will perform "));
+    Serial.print(NUM_CYCLES);
+    Serial.print(F(" cycles of: home -> wait -> move to "));
+    Serial.print(TEST_POSITION_MM);
+    Serial.println(F("mm -> wait -> repeat"));
+    Console.serialInfo(F("Press any key to abort test"));
 
     lastActionTime = millis();
 
@@ -176,7 +176,7 @@ bool testHomingRepeatability()
         // Check for E-Stop condition
         if (isEStopActive())
         {
-            Console.error(F("E-STOP detected during test! Aborting immediately."));
+            Console.serialError(F("E-STOP detected during test! Aborting immediately."));
             // No need to call stopMotion() as the main handleEStop() will handle it
             testRunning = false;
             testInProgress = false;
@@ -189,10 +189,10 @@ bool testHomingRepeatability()
         switch (currentPhase)
         {
         case PHASE_START:
-            Console.print(F("[INFO] Starting cycle "));
-            Console.print(cyclesCompleted + 1);
-            Console.print(F(" of "));
-            Console.println(NUM_CYCLES);
+            Serial.print(F("[INFO] Starting cycle "));
+            Serial.print(cyclesCompleted + 1);
+            Serial.print(F(" of "));
+            Serial.println(NUM_CYCLES);
             currentPhase = PHASE_INITIAL_HOMING;
             lastActionTime = currentTime;
             break;
@@ -203,10 +203,10 @@ bool testHomingRepeatability()
                 return false;
             }
             // Start homing
-            Console.info(F("Homing..."));
+            Console.serialInfo(F("Homing..."));
             if (!initiateHomingSequence())
             {
-                Console.error(F("Error starting homing operation. Aborting test."));
+                Console.serialError(F("Error starting homing operation. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -223,29 +223,29 @@ bool testHomingRepeatability()
             static unsigned long lastStatusPrint = 0;
             if (currentTime - lastStatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Waiting for homing to complete. Current state: "));
+                Serial.print(F("[DIAGNOSTIC] Waiting for homing to complete. Current state: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", Homed: "));
-                Console.println(isHomed ? F("YES") : F("NO"));
+                Serial.print(F(", Homed: "));
+                Serial.println(isHomed ? F("YES") : F("NO"));
                 lastStatusPrint = currentTime;
             }
 
@@ -259,13 +259,13 @@ bool testHomingRepeatability()
             // Wait for homing to complete successfully
             if (motorState == MOTOR_STATE_IDLE && isHomed)
             {
-                Console.info(F("Homing complete. Waiting..."));
+                Console.serialInfo(F("Homing complete. Waiting..."));
                 lastActionTime = currentTime;
                 currentPhase = PHASE_PAUSE_AFTER_HOMING; // Use explicit state
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Homing failed. Aborting test."));
+                Console.serialError(F("Homing failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -274,32 +274,32 @@ bool testHomingRepeatability()
             // But DO NOT proceed if homing hasn't completed successfully
             else if (currentTime - lastActionTime > 70000)
             { // 70 seconds (longer than the 60-second internal timeout)
-                Console.error(F("Timeout waiting for homing to complete."));
-                Console.print(F("[DIAGNOSTIC] Current state: "));
+                Console.serialError(F("Timeout waiting for homing to complete."));
+                Serial.print(F("[DIAGNOSTIC] Current state: "));
 
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.println(F("IDLE"));
+                    Serial.println(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.println(F("MOVING"));
+                    Serial.println(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.println(F("HOMING"));
+                    Serial.println(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.println(F("FAULTED"));
+                    Serial.println(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.println(F("NOT_READY"));
+                    Serial.println(F("NOT_READY"));
                     break;
                 default:
-                    Console.println(F("UNKNOWN"));
+                    Serial.println(F("UNKNOWN"));
                 }
 
                 // Safety critical: NEVER proceed without successful homing
-                Console.error(F("CRITICAL: Cannot proceed without successful homing. Aborting test."));
+                Console.serialError(F("CRITICAL: Cannot proceed without successful homing. Aborting test."));
                 stopMotion();        // Stop any motion to be safe
                 testRunning = false; // Abort the test
                 testInProgress = false;
@@ -325,12 +325,12 @@ bool testHomingRepeatability()
                 return false;
             }
             // Move to test position
-            Console.print(F("[INFO] Moving to "));
-            Console.print(TEST_POSITION_MM);
-            Console.println(F("mm..."));
+            Serial.print(F("[INFO] Moving to "));
+            Serial.print(TEST_POSITION_MM);
+            Serial.println(F("mm..."));
             if (!moveToPositionMm(TEST_POSITION_MM))
             {
-                Console.error(F("Error during movement. Aborting test."));
+                Console.serialError(F("Error during movement. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -347,33 +347,33 @@ bool testHomingRepeatability()
             static unsigned long lastMoveStatusPrint = 0;
             if (currentTime - lastMoveStatusPrint > 2000)
             { // Print every 2 seconds
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(TEST_POSITION_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(TEST_POSITION_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastMoveStatusPrint = currentTime;
             }
 
@@ -381,16 +381,16 @@ bool testHomingRepeatability()
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
                 // This is a more reliable way to check for move completion
-                Console.print(F("[INFO] Position reached: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm. Waiting..."));
+                Serial.print(F("[INFO] Position reached: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm. Waiting..."));
                 motorState = MOTOR_STATE_IDLE; // Force the state update if needed
                 lastActionTime = currentTime;
                 currentPhase = PHASE_PAUSE_AFTER_MOVE;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement failed. Aborting test."));
+                Console.serialError(F("Movement failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -398,8 +398,8 @@ bool testHomingRepeatability()
             // Add a timeout after a reasonable amount of time
             else if (currentTime - lastActionTime > 60000)
             { // Increased to 60 seconds
-                Console.error(F("Timeout waiting for move to complete."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for move to complete."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -425,10 +425,10 @@ bool testHomingRepeatability()
                 return false;
             }
             // Home again
-            Console.info(F("Homing again..."));
+            Console.serialInfo(F("Homing again..."));
             if (!initiateHomingSequence())
             {
-                Console.error(F("Error starting repeat homing operation. Aborting test."));
+                Console.serialError(F("Error starting repeat homing operation. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -445,29 +445,29 @@ bool testHomingRepeatability()
             static unsigned long lastRepeatStatusPrint = 0;
             if (currentTime - lastRepeatStatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Waiting for repeat homing to complete. State: "));
+                Serial.print(F("[DIAGNOSTIC] Waiting for repeat homing to complete. State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", Homed: "));
-                Console.println(isHomed ? F("YES") : F("NO"));
+                Serial.print(F(", Homed: "));
+                Serial.println(isHomed ? F("YES") : F("NO"));
                 lastRepeatStatusPrint = currentTime;
             }
 
@@ -482,11 +482,11 @@ bool testHomingRepeatability()
             if (motorState == MOTOR_STATE_IDLE && isHomed)
             {
                 cyclesCompleted++;
-                Console.print(F("[INFO] Cycle "));
-                Console.print(cyclesCompleted);
-                Console.print(F(" completed. Position after homing: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Cycle "));
+                Serial.print(cyclesCompleted);
+                Serial.print(F(" completed. Position after homing: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
 
                 if (cyclesCompleted >= NUM_CYCLES)
                 {
@@ -501,7 +501,7 @@ bool testHomingRepeatability()
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Repeat homing failed. Aborting test."));
+                Console.serialError(F("Repeat homing failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -509,8 +509,8 @@ bool testHomingRepeatability()
             // Use a timeout longer than the internal one
             else if (currentTime - lastActionTime > 70000)
             {
-                Console.error(F("Timeout waiting for repeat homing to complete."));
-                Console.error(F("Cannot proceed without successful homing. Aborting test."));
+                Console.serialError(F("Timeout waiting for repeat homing to complete."));
+                Console.serialError(F("Cannot proceed without successful homing. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -534,10 +534,10 @@ bool testHomingRepeatability()
             {
                 return false; // Exit the test function with failure
             }
-            Console.info(F("Homing repeatability test completed successfully."));
-            Console.print(F("[INFO] Completed "));
-            Console.print(cyclesCompleted);
-            Console.println(F(" cycles."));
+            Console.serialInfo(F("Homing repeatability test completed successfully."));
+            Serial.print(F("[INFO] Completed "));
+            Serial.print(cyclesCompleted);
+            Serial.println(F(" cycles."));
             testRunning = false;
             testInProgress = false;
             return true; // Success! All cycles completed.
@@ -589,26 +589,26 @@ bool testPositionCycling()
     // Check if motor is initialized and homed
     if (!motorInitialized)
     {
-        Console.error(F("Motor not initialized - run 'motor init' first"));
+        Console.serialError(F("Motor not initialized - run 'motor init' first"));
         testInProgress = false;
         return false;
     }
 
     if (!isHomed)
     {
-        Console.error(F("Motor not homed - run 'home' command first"));
+        Console.serialError(F("Motor not homed - run 'home' command first"));
         testInProgress = false;
         return false;
     }
 
-    Console.info(F("Starting position cycling test"));
-    Console.info(F("To abort, type 'abort'"));
-    Console.print(F("[INFO] Will perform "));
-    Console.print(NUM_CYCLES);
-    Console.println(F(" cycles of: Pos1 -> Pos3 -> Pos1 -> Pos2 -> Pos1"));
-    Console.print(F("[INFO] Wait time at each position: "));
-    Console.print(WAIT_TIME_MS);
-    Console.println(F("ms"));
+    Console.serialInfo(F("Starting position cycling test"));
+    Console.serialInfo(F("To abort, type 'abort'"));
+    Serial.print(F("[INFO] Will perform "));
+    Serial.print(NUM_CYCLES);
+    Serial.println(F(" cycles of: Pos1 -> Pos3 -> Pos1 -> Pos2 -> Pos1"));
+    Serial.print(F("[INFO] Wait time at each position: "));
+    Serial.print(WAIT_TIME_MS);
+    Serial.println(F("ms"));
 
     lastActionTime = millis();
 
@@ -626,7 +626,7 @@ bool testPositionCycling()
         // Check for E-Stop condition
         if (isEStopActive())
         {
-            Console.error(F("E-STOP detected during test! Aborting immediately."));
+            Console.serialError(F("E-STOP detected during test! Aborting immediately."));
             // No need to call stopMotion() as the main handleEStop() will handle it
             testRunning = false;
             testInProgress = false;
@@ -639,10 +639,10 @@ bool testPositionCycling()
         switch (currentPhase)
         {
         case PHASE_START:
-            Console.print(F("[INFO] Starting cycle "));
-            Console.print(cyclesCompleted + 1);
-            Console.print(F(" of "));
-            Console.println(NUM_CYCLES);
+            Serial.print(F("[INFO] Starting cycle "));
+            Serial.print(cyclesCompleted + 1);
+            Serial.print(F(" of "));
+            Serial.println(NUM_CYCLES);
 
             if (handleTestAbort())
             {
@@ -653,10 +653,10 @@ bool testPositionCycling()
             // First check we're at position 1
             if (abs(getMotorPositionMm() - POSITION_1_MM) > POSITION_TOLERANCE_MM)
             {
-                Console.info(F("Moving to Position 1 to begin test"));
+                Console.serialInfo(F("Moving to Position 1 to begin test"));
                 if (!moveToPosition(POSITION_1))
                 {
-                    Console.error(F("Failed to move to Position 1. Aborting test."));
+                    Console.serialError(F("Failed to move to Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -681,10 +681,10 @@ bool testPositionCycling()
                 return false;
             }
             // Move from Position 1 to Position 3
-            Console.info(F("Moving: Position 1 -> Position 3"));
+            Console.serialInfo(F("Moving: Position 1 -> Position 3"));
             if (!moveToPosition(POSITION_3))
             {
-                Console.error(F("Failed to move to Position 3. Aborting test."));
+                Console.serialError(F("Failed to move to Position 3. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -702,48 +702,48 @@ bool testPositionCycling()
             static unsigned long lastPos3StatusPrint = 0;
             if (currentTime - lastPos3StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_3_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_3_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastPos3StatusPrint = currentTime;
             }
 
             // Wait for move to complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Reached Position 3: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Reached Position 3: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 lastActionTime = currentTime;
                 currentPhase = PHASE_PAUSE_AT_POSITION_3;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement to Position 3 failed. Aborting test."));
+                Console.serialError(F("Movement to Position 3 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -751,8 +751,8 @@ bool testPositionCycling()
             // IMPROVEMENT 3: Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             { // 60-second timeout
-                Console.error(F("Timeout waiting for movement to Position 3."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement to Position 3."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -770,13 +770,13 @@ bool testPositionCycling()
             static unsigned long lastWaitPos3Print = 0;
             if (currentTime - lastWaitPos3Print > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Pausing at Position 3: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Waiting: "));
-                Console.print((currentTime - lastActionTime) / 1000);
-                Console.print(F("/"));
-                Console.print(WAIT_TIME_MS / 1000);
-                Console.println(F(" seconds"));
+                Serial.print(F("[DIAGNOSTIC] Pausing at Position 3: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Waiting: "));
+                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(F("/"));
+                Serial.print(WAIT_TIME_MS / 1000);
+                Serial.println(F(" seconds"));
                 lastWaitPos3Print = currentTime;
             }
 
@@ -793,10 +793,10 @@ bool testPositionCycling()
                 return false;
             }
             // Move from Position 3 to Position 1
-            Console.info(F("Moving: Position 3 -> Position 1"));
+            Console.serialInfo(F("Moving: Position 3 -> Position 1"));
             if (!moveToPosition(POSITION_1))
             {
-                Console.error(F("Failed to move to Position 1. Aborting test."));
+                Console.serialError(F("Failed to move to Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -814,48 +814,48 @@ bool testPositionCycling()
             static unsigned long lastPos1StatusPrint = 0;
             if (currentTime - lastPos1StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_1_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_1_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastPos1StatusPrint = currentTime;
             }
 
             // Wait for move to complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Reached Position 1: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Reached Position 1: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 lastActionTime = currentTime;
                 currentPhase = PHASE_PAUSE_AT_POSITION_1;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement to Position 1 failed. Aborting test."));
+                Console.serialError(F("Movement to Position 1 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -863,8 +863,8 @@ bool testPositionCycling()
             // IMPROVEMENT 3: Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             { // 60-second timeout
-                Console.error(F("Timeout waiting for movement to Position 1."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement to Position 1."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -882,13 +882,13 @@ bool testPositionCycling()
             static unsigned long lastWaitPos1Print = 0;
             if (currentTime - lastWaitPos1Print > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Pausing at Position 1: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Waiting: "));
-                Console.print((currentTime - lastActionTime) / 1000);
-                Console.print(F("/"));
-                Console.print(WAIT_TIME_MS / 1000);
-                Console.println(F(" seconds"));
+                Serial.print(F("[DIAGNOSTIC] Pausing at Position 1: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Waiting: "));
+                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(F("/"));
+                Serial.print(WAIT_TIME_MS / 1000);
+                Serial.println(F(" seconds"));
                 lastWaitPos1Print = currentTime;
             }
 
@@ -905,10 +905,10 @@ bool testPositionCycling()
                 return false;
             }
             // Move from Position 1 to Position 2
-            Console.info(F("Moving: Position 1 -> Position 2"));
+            Console.serialInfo(F("Moving: Position 1 -> Position 2"));
             if (!moveToPosition(POSITION_2))
             {
-                Console.error(F("Failed to move to Position 2. Aborting test."));
+                Console.serialError(F("Failed to move to Position 2. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -926,56 +926,56 @@ bool testPositionCycling()
             static unsigned long lastPos2StatusPrint = 0;
             if (currentTime - lastPos2StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_2_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_2_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastPos2StatusPrint = currentTime;
             }
 
             // Wait for move to complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Reached Position 2: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Reached Position 2: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 lastActionTime = currentTime;
                 currentPhase = PHASE_PAUSE_AT_POSITION_2;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement to Position 2 failed. Aborting test."));
+                Console.serialError(F("Movement to Position 2 failed. Aborting test."));
                 testRunning = false;
                 return false;
             }
             // IMPROVEMENT 3: Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             { // 60-second timeout
-                Console.error(F("Timeout waiting for movement to Position 2."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement to Position 2."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -993,13 +993,13 @@ bool testPositionCycling()
             static unsigned long lastWaitPos2Print = 0;
             if (currentTime - lastWaitPos2Print > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Pausing at Position 2: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Waiting: "));
-                Console.print((currentTime - lastActionTime) / 1000);
-                Console.print(F("/"));
-                Console.print(WAIT_TIME_MS / 1000);
-                Console.println(F(" seconds"));
+                Serial.print(F("[DIAGNOSTIC] Pausing at Position 2: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Waiting: "));
+                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(F("/"));
+                Serial.print(WAIT_TIME_MS / 1000);
+                Serial.println(F(" seconds"));
                 lastWaitPos2Print = currentTime;
             }
 
@@ -1016,10 +1016,10 @@ bool testPositionCycling()
                 return false;
             }
             // Move from Position 2 back to Position 1
-            Console.info(F("Moving: Position 2 -> Position 1"));
+            Console.serialInfo(F("Moving: Position 2 -> Position 1"));
             if (!moveToPosition(POSITION_1))
             {
-                Console.error(F("Failed to move back to Position 1. Aborting test."));
+                Console.serialError(F("Failed to move back to Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1037,42 +1037,42 @@ bool testPositionCycling()
             static unsigned long lastPosBack1StatusPrint = 0;
             if (currentTime - lastPosBack1StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_1_MM);
-                Console.print(F("mm), State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_1_MM);
+                Serial.print(F("mm), State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastPosBack1StatusPrint = currentTime;
             }
 
             // Wait for move to complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Back at Position 1: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Back at Position 1: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
 
                 // Cycle complete
                 cyclesCompleted++;
@@ -1089,7 +1089,7 @@ bool testPositionCycling()
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement back to Position 1 failed. Aborting test."));
+                Console.serialError(F("Movement back to Position 1 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1097,8 +1097,8 @@ bool testPositionCycling()
             // IMPROVEMENT 3: Add timeout handling
             else if (currentTime - lastActionTime > 30000)
             { // 30-second timeout
-                Console.error(F("Timeout waiting for movement back to Position 1."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement back to Position 1."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -1116,10 +1116,10 @@ bool testPositionCycling()
             static unsigned long lastPauseCycleStatusPrint = 0;
             if (currentTime - lastPauseCycleStatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Preparing for next cycle. Completed: "));
-                Console.print(cyclesCompleted);
-                Console.print(F("/"));
-                Console.println(NUM_CYCLES);
+                Serial.print(F("[DIAGNOSTIC] Preparing for next cycle. Completed: "));
+                Serial.print(cyclesCompleted);
+                Serial.print(F("/"));
+                Serial.println(NUM_CYCLES);
                 lastPauseCycleStatusPrint = currentTime;
             }
 
@@ -1135,12 +1135,12 @@ bool testPositionCycling()
                 return false; // Exit the test function with failure
             }
             // IMPROVEMENT 4: Standardize status messages
-            Console.println(F("----------------------------------------"));
-            Console.info(F("Position cycling test completed successfully."));
-            Console.print(F("[INFO] Completed "));
-            Console.print(cyclesCompleted);
-            Console.print(F(" cycles of position movement (Pos1 -> Pos3 -> Pos1 -> Pos2 -> Pos1)"));
-            Console.println(F("\n----------------------------------------"));
+            Serial.println(F("----------------------------------------"));
+            Console.serialInfo(F("Position cycling test completed successfully."));
+            Serial.print(F("[INFO] Completed "));
+            Serial.print(cyclesCompleted);
+            Serial.print(F(" cycles of position movement (Pos1 -> Pos3 -> Pos1 -> Pos2 -> Pos1)"));
+            Serial.println(F("\n----------------------------------------"));
             testRunning = false;
             testInProgress = false;
             return true;
@@ -1286,32 +1286,32 @@ bool testTrayHandling()
     // Check if motor is initialized and homed
     if (!motorInitialized)
     {
-        Console.error(F("Motor not initialized - run 'motor init' first"));
+        Console.serialError(F("Motor not initialized - run 'motor init' first"));
         testInProgress = false;
         return false;
     }
 
     if (!isHomed)
     {
-        Console.error(F("Motor not homed - run 'home' command first"));
+        Console.serialError(F("Motor not homed - run 'home' command first"));
         testInProgress = false;
         return false;
     }
 
-    Console.info(F("This test includes empty shuttle returns and valve delays"));
-    Console.info(F("To abort, type 'abort'"));
-    Console.print(F("[INFO] Will perform "));
-    Console.print(NUM_CYCLES);
-    Console.println(F(" cycles of tray handling operations"));
-    Console.print(F("[INFO] Wait time at each position: "));
-    Console.print(WAIT_TIME_MS);
-    Console.println(F("ms"));
-    Console.print(F("[INFO] Delay between valve operations: "));
-    Console.print(VALVE_DELAY_MS);
-    Console.println(F("ms"));
-    Console.print(F("[INFO] Additional safety delay after tray unlock: "));
-    Console.print(ADDITIONAL_UNLOCK_DELAY_MS);
-    Console.println(F("ms"));
+    Console.serialInfo(F("This test includes empty shuttle returns and valve delays"));
+    Console.serialInfo(F("To abort, type 'abort'"));
+    Serial.print(F("[INFO] Will perform "));
+    Serial.print(NUM_CYCLES);
+    Serial.println(F(" cycles of tray handling operations"));
+    Serial.print(F("[INFO] Wait time at each position: "));
+    Serial.print(WAIT_TIME_MS);
+    Serial.println(F("ms"));
+    Serial.print(F("[INFO] Delay between valve operations: "));
+    Serial.print(VALVE_DELAY_MS);
+    Serial.println(F("ms"));
+    Serial.print(F("[INFO] Additional safety delay after tray unlock: "));
+    Serial.print(ADDITIONAL_UNLOCK_DELAY_MS);
+    Serial.println(F("ms"));
 
     lastActionTime = millis();
 
@@ -1329,7 +1329,7 @@ bool testTrayHandling()
         // Check for E-Stop condition
         if (isEStopActive())
         {
-            Console.error(F("E-STOP detected during test! Aborting immediately."));
+            Console.serialError(F("E-STOP detected during test! Aborting immediately."));
             // No need to call stopMotion() as the main handleEStop() will handle it
             testRunning = false;
             testInProgress = false;
@@ -1349,10 +1349,10 @@ bool testTrayHandling()
             }
 
             {
-                Console.print(F("[INFO] Starting tray handling cycle "));
-                Console.print(cyclesCompleted + 1);
-                Console.print(F(" of "));
-                Console.println(NUM_CYCLES);
+                Serial.print(F("[INFO] Starting tray handling cycle "));
+                Serial.print(cyclesCompleted + 1);
+                Serial.print(F(" of "));
+                Serial.println(NUM_CYCLES);
                 currentPhase = PHASE_CHECK_POSITION_1;
                 lastActionTime = currentTime;
                 break;
@@ -1368,10 +1368,10 @@ bool testTrayHandling()
             // First check we're at position 1
             if (abs(getMotorPositionMm() - POSITION_1_MM) > POSITION_TOLERANCE_MM)
             {
-                Console.info(F("Moving to Position 1 to begin test"));
+                Console.serialInfo(F("Moving to Position 1 to begin test"));
                 if (!moveToPosition(POSITION_1))
                 {
-                    Console.error(F("Failed to move to Position 1. Aborting test."));
+                    Console.serialError(F("Failed to move to Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -1400,49 +1400,49 @@ bool testTrayHandling()
             static unsigned long lastInitMoveStatusPrint = 0;
             if (currentTime - lastInitMoveStatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_1_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_1_MM);
+                Serial.print(F("mm, State: "));
                 // Print motor state
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastInitMoveStatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Reached Position 1: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Reached Position 1: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 currentPhase = PHASE_CHECK_TRAY_AT_POS1;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement to Position 1 failed. Aborting test."));
+                Console.serialError(F("Movement to Position 1 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1450,8 +1450,8 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             { // 60-second timeout
-                Console.error(F("Timeout waiting for movement to Position 1."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement to Position 1."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -1467,15 +1467,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if tray is present at position 1
-            Console.info(F("Checking for tray at Position 1..."));
+            Console.serialInfo(F("Checking for tray at Position 1..."));
             if (!isTrayPresentAtPosition(1))
             {
-                Console.error(F("No tray detected at Position 1. Aborting test."));
+                Console.serialError(F("No tray detected at Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray detected at Position 1. Waiting for tray to settle..."));
+            Console.serialInfo(F("Tray detected at Position 1. Waiting for tray to settle..."));
             // Change to settling phase instead of going directly to lock
             currentPhase = PHASE_TRAY_SETTLING_AT_POS1;
             lastActionTime = currentTime;
@@ -1493,13 +1493,13 @@ bool testTrayHandling()
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
             {
-                Console.info(F("Waiting for tray to settle at Position 1..."));
+                Console.serialInfo(F("Waiting for tray to settle at Position 1..."));
                 lastSettlingPrint = currentTime;
             }
 
             if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
             {
-                Console.info(F("Tray settling complete at Position 1. Proceeding to lock tray."));
+                Console.serialInfo(F("Tray settling complete at Position 1. Proceeding to lock tray."));
                 currentPhase = PHASE_LOCK_TRAY_AT_POS1;
                 lastActionTime = currentTime;
             }
@@ -1513,7 +1513,7 @@ bool testTrayHandling()
                 return false;
             }
             // Lock tray at position 1
-            Console.info(F("Locking tray at Position 1..."));
+            Console.serialInfo(F("Locking tray at Position 1..."));
             DoubleSolenoidValve *valve1 = getTray1Valve();
             CylinderSensor *sensor1 = getTray1Sensor();
 
@@ -1521,13 +1521,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*valve1, *sensor1, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.info(F("Tray locked at Position 1."));
+                    Console.serialInfo(F("Tray locked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_TRAY_POS1;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to lock tray at Position 1. Aborting test."));
+                    Console.serialError(F("Failed to lock tray at Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -1535,7 +1535,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access valve or sensor for Position 1. Aborting test."));
+                Console.serialError(F("Failed to access valve or sensor for Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1552,7 +1552,7 @@ bool testTrayHandling()
             // Add delay between valve operations to prevent race conditions
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Proceeding to lock shuttle."));
+                Console.serialInfo(F("Proceeding to lock shuttle."));
                 currentPhase = PHASE_LOCK_SHUTTLE_AT_POS1;
                 lastActionTime = currentTime;
             }
@@ -1566,7 +1566,7 @@ bool testTrayHandling()
                 return false;
             }
             // Lock shuttle (position 1)
-            Console.info(F("Locking shuttle at Position 1..."));
+            Console.serialInfo(F("Locking shuttle at Position 1..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
             CylinderSensor *shuttleSensor = getShuttleSensor();
 
@@ -1574,13 +1574,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*shuttleValve, *shuttleSensor, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.info(F("Shuttle locked at Position 1."));
+                    Console.serialInfo(F("Shuttle locked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to lock shuttle at Position 1. Aborting test."));
+                    Console.serialError(F("Failed to lock shuttle at Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -1588,7 +1588,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access shuttle valve or sensor. Aborting test."));
+                Console.serialError(F("Failed to access shuttle valve or sensor. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1605,7 +1605,7 @@ bool testTrayHandling()
             // Add delay between valve operations to prevent race conditions
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Proceeding to unlock tray."));
+                Console.serialInfo(F("Proceeding to unlock tray."));
                 currentPhase = PHASE_UNLOCK_TRAY_AT_POS1;
                 lastActionTime = currentTime;
             }
@@ -1619,7 +1619,7 @@ bool testTrayHandling()
                 return false;
             }
             // Unlock tray at position 1
-            Console.info(F("Unlocking tray at Position 1..."));
+            Console.serialInfo(F("Unlocking tray at Position 1..."));
             DoubleSolenoidValve *valve1 = getTray1Valve();
             CylinderSensor *sensor1 = getTray1Sensor();
 
@@ -1627,13 +1627,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*valve1, *sensor1, VALVE_POSITION_UNLOCK, 1000))
                 {
-                    Console.info(F("Tray unlocked at Position 1."));
+                    Console.serialInfo(F("Tray unlocked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to unlock tray at Position 1. Aborting test."));
+                    Console.serialError(F("Failed to unlock tray at Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -1641,7 +1641,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access valve or sensor for Position 1. Aborting test."));
+                Console.serialError(F("Failed to access valve or sensor for Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1658,7 +1658,7 @@ bool testTrayHandling()
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Adding additional safety delay before movement..."));
+                Console.serialInfo(F("Adding additional safety delay before movement..."));
                 currentPhase = PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1;
                 lastActionTime = currentTime;
             }
@@ -1674,7 +1674,7 @@ bool testTrayHandling()
             // Additional delay before checking if we can move
             if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
-                Console.info(F("Verifying tray is still at Position 1..."));
+                Console.serialInfo(F("Verifying tray is still at Position 1..."));
                 currentPhase = PHASE_VERIFY_TRAY_STILL_AT_POS1;
                 lastActionTime = currentTime;
             }
@@ -1688,15 +1688,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if tray is still present before moving
-            Console.info(F("Verifying tray is still at Position 1..."));
+            Console.serialInfo(F("Verifying tray is still at Position 1..."));
             if (!isTrayPresentAtPosition(1))
             {
-                Console.error(F("Tray not detected at Position 1 after unlock. Aborting test."));
+                Console.serialError(F("Tray not detected at Position 1 after unlock. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray confirmed at Position 1. Checking Position 3 before moving."));
+            Console.serialInfo(F("Tray confirmed at Position 1. Checking Position 3 before moving."));
             currentPhase = PHASE_CHECK_TRAY_AT_POS3;
             lastActionTime = currentTime;
             break;
@@ -1709,15 +1709,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if there's already a tray at position 3 (collision risk)
-            Console.info(F("Checking if Position 3 is clear..."));
+            Console.serialInfo(F("Checking if Position 3 is clear..."));
             if (isTrayPresentAtPosition(3))
             {
-                Console.error(F("Tray detected at Position 3. Cannot move - collision risk. Aborting test."));
+                Console.serialError(F("Tray detected at Position 3. Cannot move - collision risk. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Position 3 is clear. Proceeding with move."));
+            Console.serialInfo(F("Position 3 is clear. Proceeding with move."));
             currentPhase = PHASE_MOVE_TO_POSITION_3;
             lastActionTime = currentTime;
             break;
@@ -1730,10 +1730,10 @@ bool testTrayHandling()
                 return false;
             }
             // Move from Position 1 to Position 3
-            Console.info(F("Moving: Position 1 -> Position 3"));
+            Console.serialInfo(F("Moving: Position 1 -> Position 3"));
             if (!moveToPosition(POSITION_3))
             {
-                Console.error(F("Failed to move to Position 3. Aborting test."));
+                Console.serialError(F("Failed to move to Position 3. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1753,48 +1753,48 @@ bool testTrayHandling()
             static unsigned long lastPos3StatusPrint = 0;
             if (currentTime - lastPos3StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_3_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_3_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastPos3StatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Reached Position 3: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Reached Position 3: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 currentPhase = PHASE_VERIFY_TRAY_AT_POS3;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement to Position 3 failed. Aborting test."));
+                Console.serialError(F("Movement to Position 3 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1802,8 +1802,8 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             { // 60-second timeout
-                Console.error(F("Timeout waiting for movement to Position 3."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement to Position 3."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -1819,15 +1819,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if tray moved with shuttle to position 3
-            Console.info(F("Checking for tray at Position 3..."));
+            Console.serialInfo(F("Checking for tray at Position 3..."));
             if (!isTrayPresentAtPosition(3))
             {
-                Console.error(F("No tray detected at Position 3. Tray was lost during movement. Aborting test."));
+                Console.serialError(F("No tray detected at Position 3. Tray was lost during movement. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray successfully moved to Position 3. Waiting for tray to settle..."));
+            Console.serialInfo(F("Tray successfully moved to Position 3. Waiting for tray to settle..."));
             // Change to settling phase instead of going directly to unlock shuttle
             currentPhase = PHASE_TRAY_SETTLING_AT_POS3;
             lastActionTime = currentTime;
@@ -1845,13 +1845,13 @@ bool testTrayHandling()
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
             {
-                Console.info(F("Waiting for tray to settle at Position 3..."));
+                Console.serialInfo(F("Waiting for tray to settle at Position 3..."));
                 lastSettlingPrint = currentTime;
             }
 
             if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
             {
-                Console.info(F("Tray settling complete at Position 3. Proceeding to unlock shuttle."));
+                Console.serialInfo(F("Tray settling complete at Position 3. Proceeding to unlock shuttle."));
                 currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS3;
                 lastActionTime = currentTime;
             }
@@ -1865,7 +1865,7 @@ bool testTrayHandling()
                 return false;
             }
             // Unlock shuttle at position 3
-            Console.info(F("Unlocking shuttle at Position 3..."));
+            Console.serialInfo(F("Unlocking shuttle at Position 3..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
             CylinderSensor *shuttleSensor = getShuttleSensor();
 
@@ -1873,13 +1873,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*shuttleValve, *shuttleSensor, VALVE_POSITION_UNLOCK, 1000))
                 {
-                    Console.info(F("Shuttle unlocked at Position 3."));
+                    Console.serialInfo(F("Shuttle unlocked at Position 3."));
                     currentPhase = PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS3;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to unlock shuttle at Position 3. Aborting test."));
+                    Console.serialError(F("Failed to unlock shuttle at Position 3. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -1887,7 +1887,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access shuttle valve or sensor. Aborting test."));
+                Console.serialError(F("Failed to access shuttle valve or sensor. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1904,7 +1904,7 @@ bool testTrayHandling()
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Proceeding to lock tray."));
+                Console.serialInfo(F("Proceeding to lock tray."));
                 currentPhase = PHASE_LOCK_TRAY_AT_POS3;
                 lastActionTime = currentTime;
             }
@@ -1918,7 +1918,7 @@ bool testTrayHandling()
                 return false;
             }
             // Lock tray at position 3
-            Console.info(F("Locking tray at Position 3..."));
+            Console.serialInfo(F("Locking tray at Position 3..."));
             DoubleSolenoidValve *valve3 = getTray3Valve();
             CylinderSensor *sensor3 = getTray3Sensor();
 
@@ -1926,13 +1926,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*valve3, *sensor3, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.info(F("Tray locked at Position 3."));
+                    Console.serialInfo(F("Tray locked at Position 3."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_TRAY_POS3;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to lock tray at Position 3. Aborting test."));
+                    Console.serialError(F("Failed to lock tray at Position 3. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -1940,7 +1940,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access valve or sensor for Position 3. Aborting test."));
+                Console.serialError(F("Failed to access valve or sensor for Position 3. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -1957,7 +1957,7 @@ bool testTrayHandling()
             // Add delay between operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Tray locked at Position 3. Waiting for 5 seconds..."));
+                Console.serialInfo(F("Tray locked at Position 3. Waiting for 5 seconds..."));
                 currentPhase = PHASE_WAIT_AT_POS3;
                 lastActionTime = currentTime;
             }
@@ -1974,17 +1974,17 @@ bool testTrayHandling()
             static unsigned long lastWaitPos3Print = 0;
             if (currentTime - lastWaitPos3Print > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Waiting at Position 3 with tray locked. Elapsed: "));
-                Console.print((currentTime - lastActionTime) / 1000);
-                Console.print(F("/"));
-                Console.print(WAIT_TIME_MS / 1000);
-                Console.println(F(" seconds"));
+                Serial.print(F("[DIAGNOSTIC] Waiting at Position 3 with tray locked. Elapsed: "));
+                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(F("/"));
+                Serial.print(WAIT_TIME_MS / 1000);
+                Serial.println(F(" seconds"));
                 lastWaitPos3Print = currentTime;
             }
 
             if (currentTime - lastActionTime >= WAIT_TIME_MS)
             {
-                Console.info(F("Moving empty shuttle back to Position 1..."));
+                Console.serialInfo(F("Moving empty shuttle back to Position 1..."));
                 currentPhase = PHASE_RETURN_TO_POS1_FROM_POS3_EMPTY;
                 lastActionTime = currentTime;
             }
@@ -1998,10 +1998,10 @@ bool testTrayHandling()
                 return false;
             }
             // Return empty shuttle to position 1
-            Console.info(F("Moving empty shuttle: Position 3 -> Position 1"));
+            Console.serialInfo(F("Moving empty shuttle: Position 3 -> Position 1"));
             if (!moveToPosition(POSITION_1))
             {
-                Console.error(F("Failed to move empty shuttle to Position 1. Aborting test."));
+                Console.serialError(F("Failed to move empty shuttle to Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2021,48 +2021,48 @@ bool testTrayHandling()
             static unsigned long lastEmptyReturnStatusPrint = 0;
             if (currentTime - lastEmptyReturnStatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Empty return status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_1_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Empty return status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_1_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastEmptyReturnStatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Empty shuttle reached Position 1: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Empty shuttle reached Position 1: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 currentPhase = PHASE_WAIT_AT_POS1_EMPTY;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Empty shuttle movement to Position 1 failed. Aborting test."));
+                Console.serialError(F("Empty shuttle movement to Position 1 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2070,7 +2070,7 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             {
-                Console.error(F("Timeout waiting for empty shuttle return to Position 1."));
+                Console.serialError(F("Timeout waiting for empty shuttle return to Position 1."));
                 stopMotion();
                 testRunning = false;
                 testInProgress = false;
@@ -2089,17 +2089,17 @@ bool testTrayHandling()
             static unsigned long lastWaitPos1EmptyPrint = 0;
             if (currentTime - lastWaitPos1EmptyPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Waiting at Position 1 with empty shuttle. Elapsed: "));
-                Console.print((currentTime - lastActionTime) / 1000);
-                Console.print(F("/"));
-                Console.print(WAIT_TIME_MS / 1000);
-                Console.println(F(" seconds"));
+                Serial.print(F("[DIAGNOSTIC] Waiting at Position 1 with empty shuttle. Elapsed: "));
+                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(F("/"));
+                Serial.print(WAIT_TIME_MS / 1000);
+                Serial.println(F(" seconds"));
                 lastWaitPos1EmptyPrint = currentTime;
             }
 
             if (currentTime - lastActionTime >= WAIT_TIME_MS)
             {
-                Console.info(F("Returning to Position 3 to pick up tray..."));
+                Console.serialInfo(F("Returning to Position 3 to pick up tray..."));
                 currentPhase = PHASE_RETURN_TO_POS3;
                 lastActionTime = currentTime;
             }
@@ -2113,10 +2113,10 @@ bool testTrayHandling()
                 return false;
             }
             // Return to position 3 to pick up tray
-            Console.info(F("Moving empty shuttle back: Position 1 -> Position 3"));
+            Console.serialInfo(F("Moving empty shuttle back: Position 1 -> Position 3"));
             if (!moveToPosition(POSITION_3))
             {
-                Console.error(F("Failed to return empty shuttle to Position 3. Aborting test."));
+                Console.serialError(F("Failed to return empty shuttle to Position 3. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2136,58 +2136,58 @@ bool testTrayHandling()
             static unsigned long lastReturnToPos3StatusPrint = 0;
             if (currentTime - lastReturnToPos3StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Return status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_3_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Return status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_3_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastReturnToPos3StatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Returned to Position 3: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Returned to Position 3: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
 
                 // Verify tray is still at position 3
                 if (!isTrayPresentAtPosition(3))
                 {
-                    Console.error(F("No tray detected at Position 3 after return. Aborting test."));
+                    Console.serialError(F("No tray detected at Position 3 after return. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
                 }
-                Console.info(F("Tray confirmed still at Position 3. Proceeding to pick it up."));
+                Console.serialInfo(F("Tray confirmed still at Position 3. Proceeding to pick it up."));
                 currentPhase = PHASE_LOCK_SHUTTLE_AT_POS3;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Return to Position 3 failed. Aborting test."));
+                Console.serialError(F("Return to Position 3 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2195,7 +2195,7 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             {
-                Console.error(F("Timeout waiting for return to Position 3."));
+                Console.serialError(F("Timeout waiting for return to Position 3."));
                 stopMotion();
                 testRunning = false;
                 testInProgress = false;
@@ -2211,7 +2211,7 @@ bool testTrayHandling()
                 return false;
             }
             // Lock shuttle at position 3
-            Console.info(F("Locking shuttle at Position 3..."));
+            Console.serialInfo(F("Locking shuttle at Position 3..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
             CylinderSensor *shuttleSensor = getShuttleSensor();
 
@@ -2219,13 +2219,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*shuttleValve, *shuttleSensor, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.info(F("Shuttle locked at Position 3."));
+                    Console.serialInfo(F("Shuttle locked at Position 3."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS3;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to lock shuttle at Position 3. Aborting test."));
+                    Console.serialError(F("Failed to lock shuttle at Position 3. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -2233,7 +2233,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access shuttle valve or sensor. Aborting test."));
+                Console.serialError(F("Failed to access shuttle valve or sensor. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2250,7 +2250,7 @@ bool testTrayHandling()
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Proceeding to unlock tray."));
+                Console.serialInfo(F("Proceeding to unlock tray."));
                 currentPhase = PHASE_UNLOCK_TRAY_AT_POS3;
                 lastActionTime = currentTime;
             }
@@ -2264,7 +2264,7 @@ bool testTrayHandling()
                 return false;
             }
             // Unlock tray at position 3
-            Console.info(F("Unlocking tray at Position 3..."));
+            Console.serialInfo(F("Unlocking tray at Position 3..."));
             DoubleSolenoidValve *valve3 = getTray3Valve();
             CylinderSensor *sensor3 = getTray3Sensor();
 
@@ -2272,13 +2272,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*valve3, *sensor3, VALVE_POSITION_UNLOCK, 1000))
                 {
-                    Console.info(F("Tray unlocked at Position 3."));
+                    Console.serialInfo(F("Tray unlocked at Position 3."));
                     currentPhase = PHASE_DELAY_AFTER_UNLOCK_TRAY_POS3;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to unlock tray at Position 3. Aborting test."));
+                    Console.serialError(F("Failed to unlock tray at Position 3. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -2286,7 +2286,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access valve or sensor for Position 3. Aborting test."));
+                Console.serialError(F("Failed to access valve or sensor for Position 3. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2303,7 +2303,7 @@ bool testTrayHandling()
             // Add delay between operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Adding additional safety delay before movement..."));
+                Console.serialInfo(F("Adding additional safety delay before movement..."));
                 currentPhase = PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS3;
                 lastActionTime = currentTime;
             }
@@ -2319,7 +2319,7 @@ bool testTrayHandling()
             // Additional delay before checking if we can move
             if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
-                Console.info(F("Checking Position 1 before moving."));
+                Console.serialInfo(F("Checking Position 1 before moving."));
                 currentPhase = PHASE_CHECK_TRAY_AT_POS1_AGAIN;
                 lastActionTime = currentTime;
             }
@@ -2333,15 +2333,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if there's already a tray at position 1 (collision risk)
-            Console.info(F("Checking if Position 1 is clear for return..."));
+            Console.serialInfo(F("Checking if Position 1 is clear for return..."));
             if (isTrayPresentAtPosition(1))
             {
-                Console.error(F("Tray detected at Position 1. Cannot move - collision risk. Aborting test."));
+                Console.serialError(F("Tray detected at Position 1. Cannot move - collision risk. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Position 1 is clear. Proceeding with move."));
+            Console.serialInfo(F("Position 1 is clear. Proceeding with move."));
             currentPhase = PHASE_MOVE_TO_POSITION_1_FROM_3;
             lastActionTime = currentTime;
             break;
@@ -2354,10 +2354,10 @@ bool testTrayHandling()
                 return false;
             }
             // Move from Position 3 to Position 1
-            Console.info(F("Moving: Position 3 â†’ Position 1"));
+            Console.serialInfo(F("Moving: Position 3 â†’ Position 1"));
             if (!moveToPosition(POSITION_1))
             {
-                Console.error(F("Failed to move to Position 1. Aborting test."));
+                Console.serialError(F("Failed to move to Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2377,48 +2377,48 @@ bool testTrayHandling()
             static unsigned long lastPos1From3StatusPrint = 0;
             if (currentTime - lastPos1From3StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_1_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_1_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastPos1From3StatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Reached Position 1 from Position 3: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Reached Position 1 from Position 3: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 currentPhase = PHASE_VERIFY_TRAY_AT_POS1_FROM_3;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement to Position 1 from Position 3 failed. Aborting test."));
+                Console.serialError(F("Movement to Position 1 from Position 3 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2426,8 +2426,8 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             { // 60-second timeout
-                Console.error(F("Timeout waiting for movement to Position 1 from Position 3."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement to Position 1 from Position 3."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 return false;
@@ -2442,15 +2442,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if tray is at position 1 after return from position 3
-            Console.info(F("Checking for tray at Position 1..."));
+            Console.serialInfo(F("Checking for tray at Position 1..."));
             if (!isTrayPresentAtPosition(1))
             {
-                Console.error(F("No tray detected at Position 1 after return from Position 3. Aborting test."));
+                Console.serialError(F("No tray detected at Position 1 after return from Position 3. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray confirmed at Position 1. Waiting for tray to settle..."));
+            Console.serialInfo(F("Tray confirmed at Position 1. Waiting for tray to settle..."));
             // Change to settling phase instead of going directly to unlock shuttle
             currentPhase = PHASE_TRAY_SETTLING_AT_POS1_FROM_3;
             lastActionTime = currentTime;
@@ -2468,13 +2468,13 @@ bool testTrayHandling()
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
             {
-                Console.info(F("Waiting for tray to settle at Position 1 after return from Position 3..."));
+                Console.serialInfo(F("Waiting for tray to settle at Position 1 after return from Position 3..."));
                 lastSettlingPrint = currentTime;
             }
 
             if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
             {
-                Console.info(F("Tray settling complete at Position 1. Proceeding to unlock shuttle."));
+                Console.serialInfo(F("Tray settling complete at Position 1. Proceeding to unlock shuttle."));
                 currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS1_FROM_3;
                 lastActionTime = currentTime;
             }
@@ -2488,7 +2488,7 @@ bool testTrayHandling()
                 return false;
             }
             // Unlock shuttle at position 1 after return from position 3
-            Console.info(F("Unlocking shuttle at Position 1..."));
+            Console.serialInfo(F("Unlocking shuttle at Position 1..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
             CylinderSensor *shuttleSensor = getShuttleSensor();
 
@@ -2496,13 +2496,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*shuttleValve, *shuttleSensor, VALVE_POSITION_UNLOCK, 1000))
                 {
-                    Console.info(F("Shuttle unlocked at Position 1."));
+                    Console.serialInfo(F("Shuttle unlocked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS1_FROM_3;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to unlock shuttle at Position 1. Aborting test."));
+                    Console.serialError(F("Failed to unlock shuttle at Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -2510,7 +2510,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access shuttle valve or sensor. Aborting test."));
+                Console.serialError(F("Failed to access shuttle valve or sensor. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2527,7 +2527,7 @@ bool testTrayHandling()
             // Add delay between valve operations
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Proceeding to lock tray."));
+                Console.serialInfo(F("Proceeding to lock tray."));
                 currentPhase = PHASE_LOCK_TRAY_AT_POS1_FROM_3;
                 lastActionTime = currentTime;
             }
@@ -2541,7 +2541,7 @@ bool testTrayHandling()
                 return false;
             }
             // Lock tray at position 1 after return from position 3
-            Console.info(F("Locking tray at Position 1..."));
+            Console.serialInfo(F("Locking tray at Position 1..."));
             DoubleSolenoidValve *valve1 = getTray1Valve();
             CylinderSensor *sensor1 = getTray1Sensor();
 
@@ -2549,13 +2549,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*valve1, *sensor1, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.info(F("Tray locked at Position 1."));
+                    Console.serialInfo(F("Tray locked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_TRAY_POS1_FROM_3;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to lock tray at Position 1. Aborting test."));
+                    Console.serialError(F("Failed to lock tray at Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -2563,7 +2563,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access valve or sensor for Position 1. Aborting test."));
+                Console.serialError(F("Failed to access valve or sensor for Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2580,7 +2580,7 @@ bool testTrayHandling()
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Tray locked at Position 1. Waiting for 5 seconds..."));
+                Console.serialInfo(F("Tray locked at Position 1. Waiting for 5 seconds..."));
                 currentPhase = PHASE_WAIT_AT_POS1;
                 lastActionTime = currentTime;
             }
@@ -2597,11 +2597,11 @@ bool testTrayHandling()
             static unsigned long lastWaitPos1Print = 0;
             if (currentTime - lastWaitPos1Print > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Waiting at Position 1 with tray locked. Elapsed: "));
-                Console.print((currentTime - lastActionTime) / 1000);
-                Console.print(F("/"));
-                Console.print(WAIT_TIME_MS / 1000);
-                Console.println(F(" seconds"));
+                Serial.print(F("[DIAGNOSTIC] Waiting at Position 1 with tray locked. Elapsed: "));
+                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(F("/"));
+                Serial.print(WAIT_TIME_MS / 1000);
+                Serial.println(F(" seconds"));
                 lastWaitPos1Print = currentTime;
             }
 
@@ -2620,7 +2620,7 @@ bool testTrayHandling()
                 return false;
             }
             // Lock shuttle at position 1 before moving to position 2
-            Console.info(F("Locking shuttle at Position 1..."));
+            Console.serialInfo(F("Locking shuttle at Position 1..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
             CylinderSensor *shuttleSensor = getShuttleSensor();
 
@@ -2628,13 +2628,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*shuttleValve, *shuttleSensor, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.info(F("Shuttle locked at Position 1."));
+                    Console.serialInfo(F("Shuttle locked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS1_FROM_3;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to lock shuttle at Position 1. Aborting test."));
+                    Console.serialError(F("Failed to lock shuttle at Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -2642,7 +2642,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access shuttle valve or sensor. Aborting test."));
+                Console.serialError(F("Failed to access shuttle valve or sensor. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2659,7 +2659,7 @@ bool testTrayHandling()
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Proceeding to unlock tray."));
+                Console.serialInfo(F("Proceeding to unlock tray."));
                 currentPhase = PHASE_UNLOCK_TRAY_AT_POS1_AGAIN;
                 lastActionTime = currentTime;
             }
@@ -2673,7 +2673,7 @@ bool testTrayHandling()
                 return false;
             }
             // Unlock tray at position 1 before moving to position 2
-            Console.info(F("Unlocking tray at Position 1..."));
+            Console.serialInfo(F("Unlocking tray at Position 1..."));
             DoubleSolenoidValve *valve1 = getTray1Valve();
             CylinderSensor *sensor1 = getTray1Sensor();
 
@@ -2681,13 +2681,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*valve1, *sensor1, VALVE_POSITION_UNLOCK, 1000))
                 {
-                    Console.info(F("Tray unlocked at Position 1."));
+                    Console.serialInfo(F("Tray unlocked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_UNLOCK_TRAY_POS1_AGAIN;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to unlock tray at Position 1. Aborting test."));
+                    Console.serialError(F("Failed to unlock tray at Position 1. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -2695,7 +2695,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access valve or sensor for Position 1. Aborting test."));
+                Console.serialError(F("Failed to access valve or sensor for Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2713,7 +2713,7 @@ bool testTrayHandling()
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Adding additional safety delay before movement..."));
+                Console.serialInfo(F("Adding additional safety delay before movement..."));
                 currentPhase = PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS1_AGAIN;
                 lastActionTime = currentTime;
             }
@@ -2729,7 +2729,7 @@ bool testTrayHandling()
             // Additional delay before checking if we can move
             if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
-                Console.info(F("Verifying tray is still at Position 1..."));
+                Console.serialInfo(F("Verifying tray is still at Position 1..."));
                 currentPhase = PHASE_VERIFY_TRAY_STILL_AT_POS1_AGAIN;
                 lastActionTime = currentTime;
             }
@@ -2743,15 +2743,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if tray is still present before moving to position 2
-            Console.info(F("Verifying tray is still at Position 1..."));
+            Console.serialInfo(F("Verifying tray is still at Position 1..."));
             if (!isTrayPresentAtPosition(1))
             {
-                Console.error(F("Tray not detected at Position 1 after unlock. Aborting test."));
+                Console.serialError(F("Tray not detected at Position 1 after unlock. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray confirmed at Position 1. Checking Position 2 before moving."));
+            Console.serialInfo(F("Tray confirmed at Position 1. Checking Position 2 before moving."));
             currentPhase = PHASE_CHECK_TRAY_AT_POS2;
             lastActionTime = currentTime;
             break;
@@ -2764,15 +2764,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if there's already a tray at position 2 (collision risk)
-            Console.info(F("Checking if Position 2 is clear..."));
+            Console.serialInfo(F("Checking if Position 2 is clear..."));
             if (isTrayPresentAtPosition(2))
             {
-                Console.error(F("Tray detected at Position 2. Cannot move - collision risk. Aborting test."));
+                Console.serialError(F("Tray detected at Position 2. Cannot move - collision risk. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Position 2 is clear. Proceeding with move."));
+            Console.serialInfo(F("Position 2 is clear. Proceeding with move."));
             currentPhase = PHASE_MOVE_TO_POSITION_2;
             lastActionTime = currentTime;
             break;
@@ -2785,10 +2785,10 @@ bool testTrayHandling()
                 return false;
             }
             // Move from Position 1 to Position 2
-            Console.info(F("Moving: Position 1 -> Position 2"));
+            Console.serialInfo(F("Moving: Position 1 -> Position 2"));
             if (!moveToPosition(POSITION_2))
             {
-                Console.error(F("Failed to move to Position 2. Aborting test."));
+                Console.serialError(F("Failed to move to Position 2. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2808,48 +2808,48 @@ bool testTrayHandling()
             static unsigned long lastPos2StatusPrint = 0;
             if (currentTime - lastPos2StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_2_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_2_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastPos2StatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Reached Position 2: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Reached Position 2: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 currentPhase = PHASE_VERIFY_TRAY_AT_POS2;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement to Position 2 failed. Aborting test."));
+                Console.serialError(F("Movement to Position 2 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2857,8 +2857,8 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             { // 60-second timeout
-                Console.error(F("Timeout waiting for movement to Position 2."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement to Position 2."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -2874,15 +2874,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if tray is at position 2
-            Console.info(F("Checking for tray at Position 2..."));
+            Console.serialInfo(F("Checking for tray at Position 2..."));
             if (!isTrayPresentAtPosition(2))
             {
-                Console.error(F("No tray detected at Position 2. Tray was lost during movement. Aborting test."));
+                Console.serialError(F("No tray detected at Position 2. Tray was lost during movement. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Tray successfully moved to Position 2. Waiting for tray to settle..."));
+            Console.serialInfo(F("Tray successfully moved to Position 2. Waiting for tray to settle..."));
             // Change to settling phase instead of going directly to unlock shuttle
             currentPhase = PHASE_TRAY_SETTLING_AT_POS2;
             lastActionTime = currentTime;
@@ -2900,13 +2900,13 @@ bool testTrayHandling()
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
             {
-                Console.info(F("Waiting for tray to settle at Position 2..."));
+                Console.serialInfo(F("Waiting for tray to settle at Position 2..."));
                 lastSettlingPrint = currentTime;
             }
 
             if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
             {
-                Console.info(F("Tray settling complete at Position 2. Proceeding to unlock shuttle."));
+                Console.serialInfo(F("Tray settling complete at Position 2. Proceeding to unlock shuttle."));
                 currentPhase = PHASE_UNLOCK_SHUTTLE_AT_POS2;
                 lastActionTime = currentTime;
             }
@@ -2920,7 +2920,7 @@ bool testTrayHandling()
                 return false;
             }
             // Unlock shuttle at position 2
-            Console.info(F("Unlocking shuttle at Position 2..."));
+            Console.serialInfo(F("Unlocking shuttle at Position 2..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
             CylinderSensor *shuttleSensor = getShuttleSensor();
 
@@ -2928,13 +2928,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*shuttleValve, *shuttleSensor, VALVE_POSITION_UNLOCK, 1000))
                 {
-                    Console.info(F("Shuttle unlocked at Position 2."));
+                    Console.serialInfo(F("Shuttle unlocked at Position 2."));
                     currentPhase = PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_POS2;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to unlock shuttle at Position 2. Aborting test."));
+                    Console.serialError(F("Failed to unlock shuttle at Position 2. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -2942,7 +2942,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access shuttle valve or sensor. Aborting test."));
+                Console.serialError(F("Failed to access shuttle valve or sensor. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -2959,7 +2959,7 @@ bool testTrayHandling()
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Proceeding to lock tray."));
+                Console.serialInfo(F("Proceeding to lock tray."));
                 currentPhase = PHASE_LOCK_TRAY_AT_POS2;
                 lastActionTime = currentTime;
             }
@@ -2973,7 +2973,7 @@ bool testTrayHandling()
                 return false;
             }
             // Lock tray at position 2
-            Console.info(F("Locking tray at Position 2..."));
+            Console.serialInfo(F("Locking tray at Position 2..."));
             DoubleSolenoidValve *valve2 = getTray2Valve();
             CylinderSensor *sensor2 = getTray2Sensor();
 
@@ -2981,13 +2981,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*valve2, *sensor2, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.info(F("Tray locked at Position 2."));
+                    Console.serialInfo(F("Tray locked at Position 2."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_TRAY_POS2;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to lock tray at Position 2. Aborting test."));
+                    Console.serialError(F("Failed to lock tray at Position 2. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -2995,7 +2995,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access valve or sensor for Position 2. Aborting test."));
+                Console.serialError(F("Failed to access valve or sensor for Position 2. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3012,7 +3012,7 @@ bool testTrayHandling()
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Tray locked at Position 2. Waiting for 5 seconds..."));
+                Console.serialInfo(F("Tray locked at Position 2. Waiting for 5 seconds..."));
                 currentPhase = PHASE_WAIT_AT_POS2;
                 lastActionTime = currentTime;
             }
@@ -3029,17 +3029,17 @@ bool testTrayHandling()
             static unsigned long lastWaitPos2Print = 0;
             if (currentTime - lastWaitPos2Print > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Waiting at Position 2 with tray locked. Elapsed: "));
-                Console.print((currentTime - lastActionTime) / 1000);
-                Console.print(F("/"));
-                Console.print(WAIT_TIME_MS / 1000);
-                Console.println(F(" seconds"));
+                Serial.print(F("[DIAGNOSTIC] Waiting at Position 2 with tray locked. Elapsed: "));
+                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(F("/"));
+                Serial.print(WAIT_TIME_MS / 1000);
+                Serial.println(F(" seconds"));
                 lastWaitPos2Print = currentTime;
             }
 
             if (currentTime - lastActionTime >= WAIT_TIME_MS)
             {
-                Console.info(F("Moving empty shuttle back to Position 1..."));
+                Console.serialInfo(F("Moving empty shuttle back to Position 1..."));
                 currentPhase = PHASE_RETURN_TO_POS1_FROM_POS2_EMPTY;
                 lastActionTime = currentTime;
             }
@@ -3053,10 +3053,10 @@ bool testTrayHandling()
                 return false;
             }
             // Return empty shuttle to position 1 from position 2
-            Console.info(F("Moving empty shuttle: Position 2 -> Position 1"));
+            Console.serialInfo(F("Moving empty shuttle: Position 2 -> Position 1"));
             if (!moveToPosition(POSITION_1))
             {
-                Console.error(F("Failed to move empty shuttle to Position 1. Aborting test."));
+                Console.serialError(F("Failed to move empty shuttle to Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3076,48 +3076,48 @@ bool testTrayHandling()
             static unsigned long lastEmptyReturnFromPos2StatusPrint = 0;
             if (currentTime - lastEmptyReturnFromPos2StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Empty return status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_1_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Empty return status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_1_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastEmptyReturnFromPos2StatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Empty shuttle reached Position 1 from Position 2: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Empty shuttle reached Position 1 from Position 2: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
                 currentPhase = PHASE_WAIT_AT_POS1_EMPTY_FROM_POS2;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Empty shuttle movement to Position 1 from Position 2 failed. Aborting test."));
+                Console.serialError(F("Empty shuttle movement to Position 1 from Position 2 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3125,7 +3125,7 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             {
-                Console.error(F("Timeout waiting for empty shuttle return to Position 1."));
+                Console.serialError(F("Timeout waiting for empty shuttle return to Position 1."));
                 stopMotion();
                 testRunning = false;
                 testInProgress = false;
@@ -3144,17 +3144,17 @@ bool testTrayHandling()
             static unsigned long lastWaitPos1EmptyFromPos2Print = 0;
             if (currentTime - lastWaitPos1EmptyFromPos2Print > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Waiting at Position 1 with empty shuttle from Position 2. Elapsed: "));
-                Console.print((currentTime - lastActionTime) / 1000);
-                Console.print(F("/"));
-                Console.print(WAIT_TIME_MS / 1000);
-                Console.println(F(" seconds"));
+                Serial.print(F("[DIAGNOSTIC] Waiting at Position 1 with empty shuttle from Position 2. Elapsed: "));
+                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(F("/"));
+                Serial.print(WAIT_TIME_MS / 1000);
+                Serial.println(F(" seconds"));
                 lastWaitPos1EmptyFromPos2Print = currentTime;
             }
 
             if (currentTime - lastActionTime >= WAIT_TIME_MS)
             {
-                Console.info(F("Returning to Position 2 to pick up tray..."));
+                Console.serialInfo(F("Returning to Position 2 to pick up tray..."));
                 currentPhase = PHASE_RETURN_TO_POS2;
                 lastActionTime = currentTime;
             }
@@ -3168,10 +3168,10 @@ bool testTrayHandling()
                 return false;
             }
             // Return to position 2 to pick up tray
-            Console.info(F("Moving empty shuttle back: Position 1 -> Position 2"));
+            Console.serialInfo(F("Moving empty shuttle back: Position 1 -> Position 2"));
             if (!moveToPosition(POSITION_2))
             {
-                Console.error(F("Failed to return empty shuttle to Position 2. Aborting test."));
+                Console.serialError(F("Failed to return empty shuttle to Position 2. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3191,58 +3191,58 @@ bool testTrayHandling()
             static unsigned long lastReturnToPos2StatusPrint = 0;
             if (currentTime - lastReturnToPos2StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Return status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_2_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Return status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_2_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastReturnToPos2StatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Returned to Position 2: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Returned to Position 2: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
 
                 // Verify tray is still at position 2
                 if (!isTrayPresentAtPosition(2))
                 {
-                    Console.error(F("No tray detected at Position 2 after return. Aborting test."));
+                    Console.serialError(F("No tray detected at Position 2 after return. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
                 }
-                Console.info(F("Tray confirmed still at Position 2. Proceeding to pick it up."));
+                Console.serialInfo(F("Tray confirmed still at Position 2. Proceeding to pick it up."));
                 currentPhase = PHASE_LOCK_SHUTTLE_AT_POS2;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Return to Position 2 failed. Aborting test."));
+                Console.serialError(F("Return to Position 2 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3250,7 +3250,7 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000)
             {
-                Console.error(F("Timeout waiting for return to Position 2."));
+                Console.serialError(F("Timeout waiting for return to Position 2."));
                 stopMotion();
                 testRunning = false;
                 testInProgress = false;
@@ -3266,7 +3266,7 @@ bool testTrayHandling()
                 return false;
             }
             // Lock shuttle at position 2
-            Console.info(F("Locking shuttle at Position 2..."));
+            Console.serialInfo(F("Locking shuttle at Position 2..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
             CylinderSensor *shuttleSensor = getShuttleSensor();
 
@@ -3274,13 +3274,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*shuttleValve, *shuttleSensor, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.info(F("Shuttle locked at Position 2."));
+                    Console.serialInfo(F("Shuttle locked at Position 2."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_SHUTTLE_POS2;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to lock shuttle at Position 2. Aborting test."));
+                    Console.serialError(F("Failed to lock shuttle at Position 2. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -3288,7 +3288,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access shuttle valve or sensor. Aborting test."));
+                Console.serialError(F("Failed to access shuttle valve or sensor. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3305,7 +3305,7 @@ bool testTrayHandling()
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Proceeding to unlock tray."));
+                Console.serialInfo(F("Proceeding to unlock tray."));
                 currentPhase = PHASE_UNLOCK_TRAY_AT_POS2;
                 lastActionTime = currentTime;
             }
@@ -3319,7 +3319,7 @@ bool testTrayHandling()
                 return false;
             }
             // Unlock tray at position 2
-            Console.info(F("Unlocking tray at Position 2..."));
+            Console.serialInfo(F("Unlocking tray at Position 2..."));
             DoubleSolenoidValve *valve2 = getTray2Valve();
             CylinderSensor *sensor2 = getTray2Sensor();
 
@@ -3327,13 +3327,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*valve2, *sensor2, VALVE_POSITION_UNLOCK, 1000))
                 {
-                    Console.info(F("Tray unlocked at Position 2."));
+                    Console.serialInfo(F("Tray unlocked at Position 2."));
                     currentPhase = PHASE_DELAY_AFTER_UNLOCK_TRAY_POS2;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to unlock tray at Position 2. Aborting test."));
+                    Console.serialError(F("Failed to unlock tray at Position 2. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -3341,7 +3341,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access valve or sensor for Position 2. Aborting test."));
+                Console.serialError(F("Failed to access valve or sensor for Position 2. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3358,7 +3358,7 @@ bool testTrayHandling()
             // Add delay after valve operation
             if (currentTime - lastActionTime >= VALVE_DELAY_MS)
             {
-                Console.info(F("Adding additional safety delay before movement..."));
+                Console.serialInfo(F("Adding additional safety delay before movement..."));
                 currentPhase = PHASE_ADDITIONAL_DELAY_AFTER_UNLOCK_POS2;
                 lastActionTime = currentTime;
             }
@@ -3374,7 +3374,7 @@ bool testTrayHandling()
             // Additional delay before checking if we can move
             if (currentTime - lastActionTime >= ADDITIONAL_UNLOCK_DELAY_MS)
             {
-                Console.info(F("Checking Position 1 before final return."));
+                Console.serialInfo(F("Checking Position 1 before final return."));
                 currentPhase = PHASE_CHECK_TRAY_AT_POS1_BEFORE_RETURN;
                 lastActionTime = currentTime;
             }
@@ -3388,15 +3388,15 @@ bool testTrayHandling()
                 return false;
             }
             // Check if there's already a tray at position 1 (collision risk)
-            Console.info(F("Checking if Position 1 is clear for final return..."));
+            Console.serialInfo(F("Checking if Position 1 is clear for final return..."));
             if (isTrayPresentAtPosition(1))
             {
-                Console.error(F("Tray detected at Position 1. Cannot move - collision risk. Aborting test."));
+                Console.serialError(F("Tray detected at Position 1. Cannot move - collision risk. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
-            Console.info(F("Position 1 is clear. Proceeding with final move back to Position 1."));
+            Console.serialInfo(F("Position 1 is clear. Proceeding with final move back to Position 1."));
             currentPhase = PHASE_MOVE_BACK_TO_POSITION_1;
             lastActionTime = currentTime;
             break;
@@ -3409,10 +3409,10 @@ bool testTrayHandling()
                 return false;
             }
             // Move from Position 2 back to Position 1
-            Console.info(F("Moving: Position 2 -> Position 1"));
+            Console.serialInfo(F("Moving: Position 2 -> Position 1"));
             if (!moveToPosition(POSITION_1))
             {
-                Console.error(F("Failed to move back to Position 1. Aborting test."));
+                Console.serialError(F("Failed to move back to Position 1. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3432,47 +3432,47 @@ bool testTrayHandling()
             static unsigned long lastMoveBackPos1StatusPrint = 0;
             if (currentTime - lastMoveBackPos1StatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Move status - Position: "));
-                Console.print(getMotorPositionMm());
-                Console.print(F("mm, Target: "));
-                Console.print(POSITION_1_MM);
-                Console.print(F("mm, State: "));
+                Serial.print(F("[DIAGNOSTIC] Move status - Position: "));
+                Serial.print(getMotorPositionMm());
+                Serial.print(F("mm, Target: "));
+                Serial.print(POSITION_1_MM);
+                Serial.print(F("mm, State: "));
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
-                    Console.print(F("IDLE"));
+                    Serial.print(F("IDLE"));
                     break;
                 case MOTOR_STATE_MOVING:
-                    Console.print(F("MOVING"));
+                    Serial.print(F("MOVING"));
                     break;
                 case MOTOR_STATE_HOMING:
-                    Console.print(F("HOMING"));
+                    Serial.print(F("HOMING"));
                     break;
                 case MOTOR_STATE_FAULTED:
-                    Console.print(F("FAULTED"));
+                    Serial.print(F("FAULTED"));
                     break;
                 case MOTOR_STATE_NOT_READY:
-                    Console.print(F("NOT_READY"));
+                    Serial.print(F("NOT_READY"));
                     break;
                 default:
-                    Console.print(F("UNKNOWN"));
+                    Serial.print(F("UNKNOWN"));
                 }
-                Console.print(F(", StepsComplete: "));
-                Console.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
+                Serial.print(F(", StepsComplete: "));
+                Serial.println(MOTOR_CONNECTOR.StepsComplete() ? F("YES") : F("NO"));
                 lastMoveBackPos1StatusPrint = currentTime;
             }
 
             // Check if move is complete
             if (MOTOR_CONNECTOR.StepsComplete() && motorState != MOTOR_STATE_FAULTED)
             {
-                Console.print(F("[INFO] Back at Position 1: "));
-                Console.print(getMotorPositionMm());
-                Console.println(F("mm"));
+                Serial.print(F("[INFO] Back at Position 1: "));
+                Serial.print(getMotorPositionMm());
+                Serial.println(F("mm"));
 
                 // Verify tray made it back to position 1
                 if (!isTrayPresentAtPosition(1))
                 {
-                    Console.error(F("No tray detected at Position 1 after return from Position 2. Aborting test."));
+                    Console.serialError(F("No tray detected at Position 1 after return from Position 2. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -3480,13 +3480,13 @@ bool testTrayHandling()
 
                 // REMOVED: Don't increment cycle count here
                 // Instead, proceed to verification and settling phase
-                Console.info(F("Tray detected at Position 1. Moving to verification phase."));
+                Console.serialInfo(F("Tray detected at Position 1. Moving to verification phase."));
                 currentPhase = PHASE_VERIFY_TRAY_BACK_AT_POS1;
                 lastActionTime = currentTime;
             }
             else if (motorState == MOTOR_STATE_FAULTED)
             {
-                Console.error(F("Movement back to Position 1 failed. Aborting test."));
+                Console.serialError(F("Movement back to Position 1 failed. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3494,8 +3494,8 @@ bool testTrayHandling()
             // Add timeout handling
             else if (currentTime - lastActionTime > 60000) // 60-second timeout
             {
-                Console.error(F("Timeout waiting for movement back to Position 1."));
-                Console.error(F("Movement took too long. Aborting test."));
+                Console.serialError(F("Timeout waiting for movement back to Position 1."));
+                Console.serialError(F("Movement took too long. Aborting test."));
                 stopMotion(); // Safety stop
                 testRunning = false;
                 testInProgress = false;
@@ -3514,13 +3514,13 @@ bool testTrayHandling()
             // Double-check tray is present at position 1
             if (!isTrayPresentAtPosition(1))
             {
-                Console.error(F("Tray not detected at Position 1 during final verification. Aborting test."));
+                Console.serialError(F("Tray not detected at Position 1 during final verification. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
             }
 
-            Console.info(F("Tray confirmed at Position 1. Waiting for tray to settle..."));
+            Console.serialInfo(F("Tray confirmed at Position 1. Waiting for tray to settle..."));
             currentPhase = PHASE_TRAY_SETTLING_BACK_AT_POS1;
             lastActionTime = currentTime;
             break;
@@ -3537,23 +3537,23 @@ bool testTrayHandling()
             static unsigned long lastSettlingPrint = 0;
             if (currentTime - lastSettlingPrint > 2000)
             {
-                Console.info(F("Waiting for tray to settle at Position 1 after cycle completion..."));
+                Console.serialInfo(F("Waiting for tray to settle at Position 1 after cycle completion..."));
                 lastSettlingPrint = currentTime;
             }
 
             if (currentTime - lastActionTime >= TRAY_SETTLING_DELAY_MS)
             {
-                Console.info(F("Tray settling complete at Position 1."));
+                Console.serialInfo(F("Tray settling complete at Position 1."));
 
                 // NOW increment cycle count after tray has fully settled
                 cyclesCompleted++;
 
                 // Report cycle status
-                Console.print(F("[INFO] Cycle "));
-                Console.print(cyclesCompleted);
-                Console.print(F(" of "));
-                Console.print(NUM_CYCLES);
-                Console.println(F(" completed"));
+                Serial.print(F("[INFO] Cycle "));
+                Serial.print(cyclesCompleted);
+                Serial.print(F(" of "));
+                Serial.print(NUM_CYCLES);
+                Serial.println(F(" completed"));
 
                 lastActionTime = currentTime;
 
@@ -3576,7 +3576,7 @@ bool testTrayHandling()
                 return false;
             }
             // Unlock shuttle at the end of cycle
-            Console.info(F("Unlocking shuttle at end of cycle..."));
+            Console.serialInfo(F("Unlocking shuttle at end of cycle..."));
             DoubleSolenoidValve *shuttleValve = getShuttleValve();
             CylinderSensor *shuttleSensor = getShuttleSensor();
 
@@ -3584,13 +3584,13 @@ bool testTrayHandling()
             {
                 if (safeValveOperation(*shuttleValve, *shuttleSensor, VALVE_POSITION_UNLOCK, 1000))
                 {
-                    Console.info(F("Shuttle unlocked at end of cycle."));
+                    Console.serialInfo(F("Shuttle unlocked at end of cycle."));
                     currentPhase = PHASE_DELAY_AFTER_UNLOCK_SHUTTLE_END_OF_CYCLE;
                     lastActionTime = currentTime;
                 }
                 else
                 {
-                    Console.error(F("Failed to unlock shuttle at end of cycle. Aborting test."));
+                    Console.serialError(F("Failed to unlock shuttle at end of cycle. Aborting test."));
                     testRunning = false;
                     testInProgress = false;
                     return false;
@@ -3598,7 +3598,7 @@ bool testTrayHandling()
             }
             else
             {
-                Console.error(F("Failed to access shuttle valve or sensor. Aborting test."));
+                Console.serialError(F("Failed to access shuttle valve or sensor. Aborting test."));
                 testRunning = false;
                 testInProgress = false;
                 return false;
@@ -3631,10 +3631,10 @@ bool testTrayHandling()
             static unsigned long lastPauseCycleStatusPrint = 0;
             if (currentTime - lastPauseCycleStatusPrint > 2000)
             {
-                Console.print(F("[DIAGNOSTIC] Preparing for next cycle. Completed: "));
-                Console.print(cyclesCompleted);
-                Console.print(F("/"));
-                Console.println(NUM_CYCLES);
+                Serial.print(F("[DIAGNOSTIC] Preparing for next cycle. Completed: "));
+                Serial.print(cyclesCompleted);
+                Serial.print(F("/"));
+                Serial.println(NUM_CYCLES);
                 lastPauseCycleStatusPrint = currentTime;
             }
 
@@ -3651,12 +3651,12 @@ bool testTrayHandling()
                 return false; // Exit the test function with failure
             }
             {
-                Console.println(F("----------------------------------------"));
-                Console.info(F("Enhanced tray handling test completed successfully."));
-                Console.print(F("[INFO] Completed "));
-                Console.print(cyclesCompleted);
-                Console.println(F(" cycles of tray handling operations."));
-                Console.println(F("----------------------------------------"));
+                Serial.println(F("----------------------------------------"));
+                Console.serialInfo(F("Enhanced tray handling test completed successfully."));
+                Serial.print(F("[INFO] Completed "));
+                Serial.print(cyclesCompleted);
+                Serial.println(F(" cycles of tray handling operations."));
+                Serial.println(F("----------------------------------------"));
                 testRunning = false;
                 testInProgress = false;
                 return true;

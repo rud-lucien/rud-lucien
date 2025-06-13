@@ -96,7 +96,7 @@ bool moveTray(int fromPosition, int toPosition)
 // Load first tray (moves from position 1 to position 3)
 bool loadFirstTray()
 {
-    Console.info(F("Moving first tray from position 1 to position 3"));
+    Console.serialInfo(F("Moving first tray from position 1 to position 3"));
 
     // Increment counter regardless - this is a successful loading operation
     trayTracking.totalLoadsCompleted++;
@@ -127,7 +127,7 @@ bool loadFirstTray()
 // Load second tray (moves from position 1 to position 2)
 bool loadSecondTray()
 {
-    Console.info(F("Moving second tray from position 1 to position 2"));
+    Console.serialInfo(F("Moving second tray from position 1 to position 2"));
 
     // Increment counter regardless - this is a successful loading operation
     trayTracking.totalLoadsCompleted++;
@@ -158,7 +158,7 @@ bool loadSecondTray()
 // Load third tray (stays at position 1)
 bool loadThirdTray()
 {
-    Console.info(F("Third tray remains at position 1"));
+    Console.serialInfo(F("Third tray remains at position 1"));
 
     // Always increment counters - this is a successful loading operation
     trayTracking.totalLoadsCompleted++;
@@ -177,7 +177,7 @@ bool loadThirdTray()
 // Unload first tray (directly from position 1)
 bool unloadFirstTray()
 {
-    Console.info(F("Unloading tray from position 1"));
+    Console.serialInfo(F("Unloading tray from position 1"));
     if (trayTracking.position1Occupied)
     {
         trayTracking.position1Occupied = false;
@@ -191,14 +191,14 @@ bool unloadFirstTray()
 // Unload second tray (moves from position 2 to position 1)
 bool unloadSecondTray()
 {
-    Console.info(F("Moving tray from position 2 to position 1 for unloading"));
+    Console.serialInfo(F("Moving tray from position 2 to position 1 for unloading"));
     return moveTray(2, 1);
 }
 
 // Unload third tray (moves from position 3 to position 1)
 bool unloadThirdTray()
 {
-    Console.info(F("Moving tray from position 3 to position 1 for unloading"));
+    Console.serialInfo(F("Moving tray from position 3 to position 1 for unloading"));
     return moveTray(3, 1);
 }
 
@@ -475,6 +475,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     result.safeToUnloadTrayFromPos1 = true;
     result.safeToUnloadTrayFromPos2 = true;
     result.safeToUnloadTrayFromPos3 = true;
+    result.safeToUnlockGrippedTray = true;
     result.commandStateValid = true;
     result.trayPositionValid = true;
     result.targetPositionValid = true;
@@ -823,6 +824,68 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.safeToUnloadTrayFromPos3 = false;
         result.unloadTrayPos3UnsafeReason = F("Tray 2 must be unloaded first");
         // No abort reason - this is a prerequisite check
+    }
+
+    //=============================================================================
+    // GRIPPED TRAY UNLOCK VALIDATION
+    //=============================================================================
+    // Validates conditions required for safely unlocking a tray that is being gripped
+    // by the Mitsubishi robot during the unloading process
+
+    // Tray presence check - can only unlock at position 1
+    if (!state.tray1Present)
+    {
+        result.safeToUnlockGrippedTray = false;
+        result.grippedTrayUnlockUnsafeReason = F("No tray at position 1");
+        // No abort reason - this is a prerequisite check
+    }
+
+    // Tray lock check - must be locked before unlocking
+    if (!state.tray1Locked)
+    {
+        result.safeToUnlockGrippedTray = false;
+        result.grippedTrayUnlockUnsafeReason = F("Tray not locked");
+        // No abort reason - this is a prerequisite check
+    }
+
+    // Shuttle retraction check - shuttle must be retracted for robot access
+    if (state.shuttleLocked)
+    {
+        result.safeToUnlockGrippedTray = false;
+        result.grippedTrayUnlockUnsafeReason = F("Shuttle must be retracted");
+        // No abort reason - this is a prerequisite check
+    }
+
+    // Operation state check - can't unlock during active operations
+    if (operationInProgress)
+    {
+        result.safeToUnlockGrippedTray = false;
+        result.grippedTrayUnlockUnsafeReason = F("Operation in progress");
+        // No abort reason - this is a prerequisite check
+    }
+
+    // Motor movement check - can't unlock while motor is moving
+    if (state.motorState == MOTOR_STATE_MOVING)
+    {
+        result.safeToUnlockGrippedTray = false;
+        result.grippedTrayUnlockUnsafeReason = F("Motor is moving");
+        // No abort reason - this is a prerequisite check
+    }
+
+    // E-Stop check - can't unlock when E-Stop is active
+    if (state.eStopActive)
+    {
+        result.safeToUnlockGrippedTray = false;
+        result.grippedTrayUnlockUnsafeReason = F("E-stop active");
+        // This is consistent with other E-stop handling
+    }
+
+    // Pneumatic pressure check - can't unlock without sufficient pressure
+    if (!result.pneumaticPressureSufficient)
+    {
+        result.safeToUnlockGrippedTray = false;
+        result.grippedTrayUnlockUnsafeReason = F("Insufficient pneumatic pressure");
+        // This uses the existing pneumatic pressure validation
     }
 
     //=============================================================================
@@ -1555,7 +1618,7 @@ void processTrayOperations()
     if (currentTime - currentOperation.startTime > operationTimeoutMs)
     {
         // Handle timeout
-        Console.error(F("Tray operation timeout"));
+        Console.serialError(F("Tray operation timeout"));
         currentOperation.inProgress = false;
         currentOperation.success = false;
         strncpy(currentOperation.message, "TIMEOUT", sizeof(currentOperation.message));
@@ -1601,12 +1664,12 @@ void processTrayLoading()
         // Capture system state to get latest sensor readings
         SystemState state = captureSystemState();
 
-        Console.info(F("Starting tray loading process - initial checks"));
+        Console.serialInfo(F("Starting tray loading process - initial checks"));
 
         // Verify tray is at position 1 and locked
         if (!state.tray1Present)
         {
-            Console.error(F("No tray detected at position 1"));
+            Console.serialError(F("No tray detected at position 1"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "NO_TRAY", sizeof(currentOperation.message));
@@ -1615,7 +1678,7 @@ void processTrayLoading()
 
         if (!state.tray1Locked)
         {
-            Console.error(F("Tray at position 1 not locked"));
+            Console.serialError(F("Tray at position 1 not locked"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "TRAY_NOT_LOCKED", sizeof(currentOperation.message));
@@ -1629,20 +1692,20 @@ void processTrayLoading()
             // First tray - goes to position 3
             targetPosition = POSITION_3_MM;
             isShuttleNeeded = true;
-            Console.info(F("First tray - target is position 3"));
+            Console.serialInfo(F("First tray - target is position 3"));
         }
         else if (workflow == 2)
         {
             // Second tray - goes to position 2
             targetPosition = POSITION_2_MM;
             isShuttleNeeded = true;
-            Console.info(F("Second tray - target is position 2"));
+            Console.serialInfo(F("Second tray - target is position 2"));
         }
         else
         {
             // Third tray - stays at position 1
             isShuttleNeeded = false;
-            Console.info(F("Third tray - keeping at position 1"));
+            Console.serialInfo(F("Third tray - keeping at position 1"));
             // Skip to the final step for position 1
             updateOperationStep(12); // Special case - skip to completion
             return;
@@ -1651,7 +1714,7 @@ void processTrayLoading()
         if ((targetPosition == POSITION_2_MM && state.tray2Present) ||
             (targetPosition == POSITION_3_MM && state.tray3Present))
         {
-            Console.error(F("Target position already occupied"));
+            Console.serialError(F("Target position already occupied"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "TARGET_POSITION_OCCUPIED", sizeof(currentOperation.message));
@@ -1661,7 +1724,7 @@ void processTrayLoading()
         // Check if path is clear to target position
         if (!isPathClearForLoading(state.currentPositionMm, targetPosition, state))
         {
-            Console.error(F("Path to target position is blocked"));
+            Console.serialError(F("Path to target position is blocked"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "PATH_BLOCKED", sizeof(currentOperation.message));
@@ -1669,7 +1732,7 @@ void processTrayLoading()
         }
         // All checks pass, advance to next step
         updateOperationStep(1);
-        Console.info(F("Initial checks passed, starting tray advancement sequence"));
+        Console.serialInfo(F("Initial checks passed, starting tray advancement sequence"));
 
         // Start verification delay to ensure stable sensor readings
         sensorVerificationStartTime = currentMillis;
@@ -1690,7 +1753,7 @@ void processTrayLoading()
         // Re-verify tray presence and lock state at position 1
         if (!state.tray1Present)
         {
-            Console.error(F("Tray at position 1 disappeared during verification"));
+            Console.serialError(F("Tray at position 1 disappeared during verification"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "TRAY1_VERIFICATION_FAILED", sizeof(currentOperation.message));
@@ -1699,7 +1762,7 @@ void processTrayLoading()
 
         if (!state.tray1Locked)
         {
-            Console.error(F("Tray 1 lock status changed during verification"));
+            Console.serialError(F("Tray 1 lock status changed during verification"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "TRAY1_LOCK_VERIFICATION_FAILED", sizeof(currentOperation.message));
@@ -1707,7 +1770,7 @@ void processTrayLoading()
         }
         // Advance to next step - shuttle locking if needed
         updateOperationStep(2);
-        Console.info(F("Sensor verification complete"));
+        Console.serialInfo(F("Sensor verification complete"));
     }
     break;
 
@@ -1717,7 +1780,7 @@ void processTrayLoading()
         {
             // Skip shuttle locking if not moving the tray
             updateOperationStep(4);
-            Console.info(F("Skipping shuttle operation (not needed for this move)"));
+            Console.serialInfo(F("Skipping shuttle operation (not needed for this move)"));
             return;
         }
 
@@ -1725,22 +1788,22 @@ void processTrayLoading()
         DoubleSolenoidValve *shuttleValve = getShuttleValve();
         if (shuttleValve)
         {
-            Console.info(F("Attempting to lock shuttle to grip tray"));
+            Console.serialInfo(F("Attempting to lock shuttle to grip tray"));
 
             if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_LOCK, 1000))
             {
-                Console.error(F("Failed to lock shuttle - sensor didn't confirm"));
+                Console.serialError(F("Failed to lock shuttle - sensor didn't confirm"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "SHUTTLE_LOCK_FAILURE", sizeof(currentOperation.message));
                 return;
             }
             valveActuationStartTime = currentMillis;
-            Console.info(F("Initiated shuttle lock valve actuation"));
+            Console.serialInfo(F("Initiated shuttle lock valve actuation"));
         }
         else
         {
-            Console.error(F("Failed to access shuttle valve"));
+            Console.serialError(F("Failed to access shuttle valve"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
@@ -1764,13 +1827,13 @@ void processTrayLoading()
         SystemState state = captureSystemState();
         if (!state.shuttleLocked)
         {
-            Console.error(F("Failed to lock shuttle - verification failed"));
+            Console.serialError(F("Failed to lock shuttle - verification failed"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "SHUTTLE_LOCK_FAILURE", sizeof(currentOperation.message));
             return;
         }
-        Console.info(F("Shuttle lock confirmed successful"));
+        Console.serialInfo(F("Shuttle lock confirmed successful"));
 
         // Shuttle is locked, proceed to unlock tray at position 1
         updateOperationStep(4);
@@ -1783,22 +1846,22 @@ void processTrayLoading()
         DoubleSolenoidValve *valve = getTray1Valve();
         if (valve)
         {
-            Console.info(F("Attempting to unlock tray at position 1"));
+            Console.serialInfo(F("Attempting to unlock tray at position 1"));
 
             if (!safeValveOperation(*valve, *getTray1Sensor(), VALVE_POSITION_UNLOCK, 1000))
             {
-                Console.error(F("Failed to unlock tray 1 - sensor didn't confirm"));
+                Console.serialError(F("Failed to unlock tray 1 - sensor didn't confirm"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "UNLOCK_FAILURE", sizeof(currentOperation.message));
                 return;
             }
             valveActuationStartTime = currentMillis;
-            Console.info(F("Initiated tray 1 unlock valve actuation"));
+            Console.serialInfo(F("Initiated tray 1 unlock valve actuation"));
         }
         else
         {
-            Console.error(F("Failed to access tray 1 valve"));
+            Console.serialError(F("Failed to access tray 1 valve"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
@@ -1822,14 +1885,14 @@ void processTrayLoading()
         SystemState state = captureSystemState();
         if (state.tray1Locked)
         {
-            Console.error(F("Failed to unlock tray at position 1 - verification failed"));
+            Console.serialError(F("Failed to unlock tray at position 1 - verification failed"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "UNLOCK_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.info(F("Tray 1 unlock confirmed successful"));
+        Console.serialInfo(F("Tray 1 unlock confirmed successful"));
         // Add safety delay after unlocking tray before movement
         safetyDelayStartTime = currentMillis;
         updateOperationStep(6);
@@ -1844,7 +1907,7 @@ void processTrayLoading()
             return;
         }
 
-        Console.info(F("Safety delay after unlock completed"));
+        Console.serialInfo(F("Safety delay after unlock completed"));
         // If we're not moving the tray, skip to completion
         if (!isShuttleNeeded)
         {
@@ -1867,20 +1930,20 @@ void processTrayLoading()
             return;
         }
 
-        Console.info(F("Safety delay before movement completed"));
+        Console.serialInfo(F("Safety delay before movement completed"));
 
         // Start movement to target position
         if (!moveToPositionMm(targetPosition))
         {
-            Console.error(F("Failed to start movement to target position"));
+            Console.serialError(F("Failed to start movement to target position"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "MOVE_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.print(F("[INFO] Moving tray to position "));
-        Console.println(targetPosition);
+        Serial.print(F("[INFO] Moving tray to position "));
+        Serial.println(targetPosition);
         // Advance to movement monitoring step
         updateOperationStep(8);
     }
@@ -1895,7 +1958,7 @@ void processTrayLoading()
             return;
         }
 
-        Console.info(F("Motor movement completed"));
+        Console.serialInfo(F("Motor movement completed"));
 
         // Motor has stopped, verify position
         SystemState state = captureSystemState();
@@ -1912,7 +1975,7 @@ void processTrayLoading()
 
         if (!reachedTarget)
         {
-            Console.error(F("Motor did not reach target position"));
+            Console.serialError(F("Motor did not reach target position"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "POSITION_FAILURE", sizeof(currentOperation.message));
@@ -1932,28 +1995,28 @@ void processTrayLoading()
             return;
         }
 
-        Console.info(F("Safety delay after movement completed"));
+        Console.serialInfo(F("Safety delay after movement completed"));
 
         // Unlock shuttle now that we've reached the destination
         DoubleSolenoidValve *shuttleValve = getShuttleValve();
         if (shuttleValve)
         {
-            Console.info(F("Attempting to unlock shuttle to release tray"));
+            Console.serialInfo(F("Attempting to unlock shuttle to release tray"));
 
             if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_UNLOCK, 1000))
             {
-                Console.error(F("Failed to unlock shuttle - sensor didn't confirm"));
+                Console.serialError(F("Failed to unlock shuttle - sensor didn't confirm"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "SHUTTLE_UNLOCK_FAILURE", sizeof(currentOperation.message));
                 return;
             }
             valveActuationStartTime = currentMillis;
-            Console.info(F("Initiated shuttle unlock valve actuation"));
+            Console.serialInfo(F("Initiated shuttle unlock valve actuation"));
         }
         else
         {
-            Console.error(F("Failed to access shuttle valve"));
+            Console.serialError(F("Failed to access shuttle valve"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
@@ -1977,14 +2040,14 @@ void processTrayLoading()
         SystemState state = captureSystemState();
         if (state.shuttleLocked)
         {
-            Console.error(F("Failed to unlock shuttle - verification failed"));
+            Console.serialError(F("Failed to unlock shuttle - verification failed"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "SHUTTLE_UNLOCK_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.info(F("Shuttle unlock confirmed successful"));
+        Console.serialInfo(F("Shuttle unlock confirmed successful"));
         // Add safety delay after shuttle unlock
         safetyDelayStartTime = currentMillis;
         updateOperationStep(11);
@@ -1999,7 +2062,7 @@ void processTrayLoading()
             return;
         }
 
-        Console.info(F("Safety delay after shuttle unlock completed"));
+        Console.serialInfo(F("Safety delay after shuttle unlock completed"));
 
         // Lock tray at target position
         DoubleSolenoidValve *valve = NULL;
@@ -2009,32 +2072,32 @@ void processTrayLoading()
         {
             valve = getTray2Valve();
             sensor = getTray2Sensor();
-            Console.info(F("Attempting to lock tray at position 2"));
+            Console.serialInfo(F("Attempting to lock tray at position 2"));
         }
         else if (targetPosition == POSITION_3_MM)
         {
             valve = getTray3Valve();
             sensor = getTray3Sensor();
-            Console.info(F("Attempting to lock tray at position 3"));
+            Console.serialInfo(F("Attempting to lock tray at position 3"));
         }
 
         if (valve && sensor)
         {
             if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
             {
-                Console.error(F("Failed to lock tray at target position - sensor didn't confirm"));
+                Console.serialError(F("Failed to lock tray at target position - sensor didn't confirm"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "LOCK_FAILURE", sizeof(currentOperation.message));
                 return;
             }
             valveActuationStartTime = currentMillis;
-            Console.print(F("[INFO] Initiated tray lock valve actuation at position "));
-            Console.println(targetPosition);
+            Serial.print(F("[INFO] Initiated tray lock valve actuation at position "));
+            Serial.println(targetPosition);
         }
         else
         {
-            Console.error(F("Failed to access target position valve or sensor"));
+            Console.serialError(F("Failed to access target position valve or sensor"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
@@ -2051,11 +2114,11 @@ void processTrayLoading()
         if (!isShuttleNeeded)
         {
             // Just update tray tracking for position 1
-            Console.info(F("Updating tray tracking for position 1"));
+            Console.serialInfo(F("Updating tray tracking for position 1"));
             loadThirdTray();
 
             // Operation complete
-            Console.println(F("[SUCCESS] Tray loading at position 1 completed successfully"));
+            Serial.println(F("[INFO] Tray loading at position 1 completed successfully"));
             currentOperation.inProgress = false;
             currentOperation.success = true;
             strncpy(currentOperation.message, "SUCCESS", sizeof(currentOperation.message));
@@ -2087,26 +2150,26 @@ void processTrayLoading()
 
         if (!lockSuccessful)
         {
-            Console.error(F("Failed to lock tray at target position - verification failed"));
+            Console.serialError(F("Failed to lock tray at target position - verification failed"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "LOCK_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.info(F("Tray lock at target position confirmed successful"));
+        Console.serialInfo(F("Tray lock at target position confirmed successful"));
 
         // Update tray tracking based on target position
         if (targetPosition == POSITION_2_MM)
         {
             // Move from position 1 to 2
-            Console.info(F("Updating tray tracking: position 1 -> position 2"));
+            Console.serialInfo(F("Updating tray tracking: position 1 -> position 2"));
             loadSecondTray();
         }
         else if (targetPosition == POSITION_3_MM)
         {
             // Move from position 1 to 3
-            Console.info(F("Updating tray tracking: position 1 -> position 3"));
+            Console.serialInfo(F("Updating tray tracking: position 1 -> position 3"));
             loadFirstTray();
         }
         // Add safety delay before returning to position 1
@@ -2123,20 +2186,20 @@ void processTrayLoading()
             return;
         }
 
-        Console.info(F("Safety delay before return movement completed"));
+        Console.serialInfo(F("Safety delay before return movement completed"));
 
         // Now return the conveyor to position 1
         if (!moveToPositionMm(POSITION_1_MM))
         {
-            Console.error(F("Failed to start movement to loading position"));
+            Console.serialError(F("Failed to start movement to loading position"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
-            strncpy(currentOperation.message, "RETURN_MOVE_FAILURE", sizeof(currentOperation.message));
+            strncpy(currentOperation.message, "[ERROR] RETURN_MOVE_FAILURE", sizeof(currentOperation.message));
             return;
         }
         // Advance to next step (watching for conveyor return)
         updateOperationStep(14);
-        Console.info(F("Returning conveyor to loading position"));
+        Console.serialInfo(F("Returning conveyor to loading position"));
     }
     break;
 
@@ -2149,28 +2212,28 @@ void processTrayLoading()
             return;
         }
 
-        Console.info(F("Return movement completed"));
+        Console.serialInfo(F("Return movement completed"));
 
         // Motor has stopped, verify position
         SystemState state = captureSystemState();
         if (!isAtPosition(state.currentPositionMm, POSITION_1_MM))
         {
-            Console.error(F("Motor did not return to position 1"));
+            Console.serialError(F("Motor did not return to position 1"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
-            strncpy(currentOperation.message, "RETURN_FAILURE", sizeof(currentOperation.message));
+            strncpy(currentOperation.message, "[ERROR] RETURN_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
         // Operation complete
-        Console.println(F("[SUCCESS] Tray loading completed successfully"));
+        Console.acknowledge(F("TRAY LOADING COMPLETE"));
         currentOperation.inProgress = false;
         currentOperation.success = true;
-        strncpy(currentOperation.message, "SUCCESS", sizeof(currentOperation.message));
+        strncpy(currentOperation.message, "[INFO] SUCCESS", sizeof(currentOperation.message));
 
         // KEEP THE DEBUG OUTPUT BUT GET THE VALUE FROM THE TRACKING STRUCT:
-        Console.print(F("[INFO] Total loads completed: "));
-        Console.println(trayTracking.totalLoadsCompleted);
+        Serial.print(F("[INFO] Total loads completed: "));
+        Serial.println(trayTracking.totalLoadsCompleted);
 
         // Ensure tray tracking matches sensor readings
         state = captureSystemState();
@@ -2200,12 +2263,12 @@ void processTrayUnloading()
         // Capture system state to get latest sensor readings
         SystemState state = captureSystemState();
 
-        Console.info(F("Starting tray unloading process - initial checks"));
+        Console.serialInfo(F("Starting tray unloading process - initial checks"));
 
         // Check if there are any trays in the system
         if (!state.tray1Present && !state.tray2Present && !state.tray3Present)
         {
-            Console.error(F("No trays in system to unload"));
+            Console.serialError(F("No trays in system to unload"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "NO_TRAYS", sizeof(currentOperation.message));
@@ -2217,7 +2280,7 @@ void processTrayUnloading()
         if (workflow == 0)
         {
             // No trays to unload
-            Console.error(F("No trays in system to unload"));
+            Console.serialError(F("No trays in system to unload"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "NO_TRAYS", sizeof(currentOperation.message));
@@ -2227,7 +2290,7 @@ void processTrayUnloading()
         {
             // Tray already at position 1, just need to unlock it
             needsMovementToPos1 = false;
-            Console.info(F("Tray at position 1 ready for unloading"));
+            Console.serialInfo(F("Tray at position 1 ready for unloading"));
             // Skip to tray unlocking step
             updateOperationStep(11);
             return;
@@ -2237,14 +2300,14 @@ void processTrayUnloading()
             // Need to move tray from position 2 to position 1
             sourcePosition = POSITION_2_MM;
             needsMovementToPos1 = true;
-            Console.info(F("Will move tray from position 2 to position 1 for unloading"));
+            Console.serialInfo(F("Will move tray from position 2 to position 1 for unloading"));
         }
         else if (workflow == 3)
         {
             // Need to move tray from position 3 to position 1
             sourcePosition = POSITION_3_MM;
             needsMovementToPos1 = true;
-            Console.info(F("Will move tray from position 3 to position 1 for unloading"));
+            Console.serialInfo(F("Will move tray from position 3 to position 1 for unloading"));
         }
 
         // If we need to move a tray, check path clearance
@@ -2253,7 +2316,7 @@ void processTrayUnloading()
             if (!isPathClearForUnloading(state.currentPositionMm, sourcePosition, state) ||
                 !isPathClearForUnloading(sourcePosition, POSITION_1_MM, state))
             {
-                Console.error(F("Path to source or target position is blocked"));
+                Console.serialError(F("Path to source or target position is blocked"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "PATH_BLOCKED", sizeof(currentOperation.message));
@@ -2269,7 +2332,7 @@ void processTrayUnloading()
             // No movement needed, verify tray is locked at position 1
             if (!state.tray1Locked)
             {
-                Console.error(F("Tray at position 1 not locked"));
+                Console.serialError(F("Tray at position 1 not locked"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "TRAY_NOT_LOCKED", sizeof(currentOperation.message));
@@ -2296,7 +2359,7 @@ void processTrayUnloading()
         // Verify that source position still has a tray
         if (sourcePosition == POSITION_2_MM && !state.tray2Present)
         {
-            Console.error(F("Tray at position 2 disappeared during verification"));
+            Console.serialError(F("Tray at position 2 disappeared during verification"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "TRAY2_VERIFICATION_FAILED", sizeof(currentOperation.message));
@@ -2304,7 +2367,7 @@ void processTrayUnloading()
         }
         else if (sourcePosition == POSITION_3_MM && !state.tray3Present)
         {
-            Console.error(F("Tray at position 3 disappeared during verification"));
+            Console.serialError(F("Tray at position 3 disappeared during verification"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "TRAY3_VERIFICATION_FAILED", sizeof(currentOperation.message));
@@ -2314,7 +2377,7 @@ void processTrayUnloading()
         // Verify position 1 is still clear
         if (state.tray1Present)
         {
-            Console.error(F("Position 1 unexpectedly occupied during verification"));
+            Console.serialError(F("Position 1 unexpectedly occupied during verification"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "POSITION1_OCCUPIED", sizeof(currentOperation.message));
@@ -2323,7 +2386,7 @@ void processTrayUnloading()
 
         // All verified, move to next step
         updateOperationStep(2);
-        Console.info(F("Sensor verification complete"));
+        Console.serialInfo(F("Sensor verification complete"));
     }
     break;
 
@@ -2332,15 +2395,15 @@ void processTrayUnloading()
         // Start movement to source position
         if (!moveToPositionMm(sourcePosition))
         {
-            Console.error(F("Failed to start movement to source position"));
+            Console.serialError(F("Failed to start movement to source position"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "MOVE_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.print(F("[INFO] Moving to position "));
-        Console.println(sourcePosition);
+        Serial.print(F("[INFO] Moving to position "));
+        Serial.println(sourcePosition);
 
         // Advance to movement monitoring step
         updateOperationStep(3);
@@ -2356,7 +2419,7 @@ void processTrayUnloading()
             return;
         }
 
-        Console.info(F("Reached source position"));
+        Console.serialInfo(F("Reached source position"));
 
         // Motor has stopped, verify position
         SystemState state = captureSystemState();
@@ -2373,7 +2436,7 @@ void processTrayUnloading()
 
         if (!reachedSource)
         {
-            Console.error(F("Motor did not reach source position"));
+            Console.serialError(F("Motor did not reach source position"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "POSITION_FAILURE", sizeof(currentOperation.message));
@@ -2394,28 +2457,28 @@ void processTrayUnloading()
             return;
         }
 
-        Console.info(F("Safety delay after movement completed"));
+        Console.serialInfo(F("Safety delay after movement completed"));
 
         // Start locking shuttle to grip tray
         DoubleSolenoidValve *shuttleValve = getShuttleValve();
         if (shuttleValve)
         {
-            Console.info(F("Attempting to lock shuttle to grip tray"));
+            Console.serialInfo(F("Attempting to lock shuttle to grip tray"));
 
             if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_LOCK, 1000))
             {
-                Console.error(F("Failed to lock shuttle - sensor didn't confirm"));
+                Console.serialError(F("Failed to lock shuttle - sensor didn't confirm"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "SHUTTLE_LOCK_FAILURE", sizeof(currentOperation.message));
                 return;
             }
             valveActuationStartTime = currentMillis;
-            Console.info(F("Initiated shuttle lock valve actuation"));
+            Console.serialInfo(F("Initiated shuttle lock valve actuation"));
         }
         else
         {
-            Console.error(F("Failed to access shuttle valve"));
+            Console.serialError(F("Failed to access shuttle valve"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
@@ -2440,14 +2503,14 @@ void processTrayUnloading()
         SystemState state = captureSystemState();
         if (!state.shuttleLocked)
         {
-            Console.error(F("Failed to lock shuttle - verification failed"));
+            Console.serialError(F("Failed to lock shuttle - verification failed"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "SHUTTLE_LOCK_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.info(F("Shuttle lock confirmed successful"));
+        Console.serialInfo(F("Shuttle lock confirmed successful"));
 
         // Determine which valve to unlock based on source position
         DoubleSolenoidValve *valve = NULL;
@@ -2457,31 +2520,31 @@ void processTrayUnloading()
         {
             valve = getTray2Valve();
             sensor = getTray2Sensor();
-            Console.info(F("Attempting to unlock tray at position 2"));
+            Console.serialInfo(F("Attempting to unlock tray at position 2"));
         }
         else
         {
             valve = getTray3Valve();
             sensor = getTray3Sensor();
-            Console.info(F("Attempting to unlock tray at position 3"));
+            Console.serialInfo(F("Attempting to unlock tray at position 3"));
         }
 
         if (valve && sensor)
         {
             if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
             {
-                Console.error(F("Failed to unlock tray - sensor didn't confirm"));
+                Console.serialError(F("Failed to unlock tray - sensor didn't confirm"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "UNLOCK_FAILURE", sizeof(currentOperation.message));
                 return;
             }
             valveActuationStartTime = currentMillis;
-            Console.info(F("Initiated tray unlock valve actuation"));
+            Console.serialInfo(F("Initiated tray unlock valve actuation"));
         }
         else
         {
-            Console.error(F("Failed to access valve or sensor"));
+            Console.serialError(F("Failed to access valve or sensor"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
@@ -2517,14 +2580,14 @@ void processTrayUnloading()
 
         if (!unlockSuccessful)
         {
-            Console.error(F("Failed to unlock tray - verification failed"));
+            Console.serialError(F("Failed to unlock tray - verification failed"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "UNLOCK_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.info(F("Tray unlock confirmed successful"));
+        Console.serialInfo(F("Tray unlock confirmed successful"));
 
         // Add safety delay after unlocking
         safetyDelayStartTime = currentMillis;
@@ -2540,7 +2603,7 @@ void processTrayUnloading()
             return;
         }
 
-        Console.info(F("Safety delay after unlock completed"));
+        Console.serialInfo(F("Safety delay after unlock completed"));
 
         // Add additional safety delay before movement
         safetyDelayStartTime = currentMillis;
@@ -2556,19 +2619,19 @@ void processTrayUnloading()
             return;
         }
 
-        Console.info(F("Safety delay before movement completed"));
+        Console.serialInfo(F("Safety delay before movement completed"));
 
         // Start movement to position 1
         if (!moveToPositionMm(POSITION_1_MM))
         {
-            Console.error(F("Failed to start movement to position 1"));
+            Console.serialError(F("Failed to start movement to position 1"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "MOVE_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.info(F("Moving tray to position 1 for unloading"));
+        Console.serialInfo(F("Moving tray to position 1 for unloading"));
 
         // Advance to movement monitoring step
         updateOperationStep(9);
@@ -2584,13 +2647,13 @@ void processTrayUnloading()
             return;
         }
 
-        Console.info(F("Reached position 1"));
+        Console.serialInfo(F("Reached position 1"));
 
         // Motor has stopped, verify position
         SystemState state = captureSystemState();
         if (!isAtPosition(state.currentPositionMm, POSITION_1_MM))
         {
-            Console.error(F("Motor did not reach position 1"));
+            Console.serialError(F("Motor did not reach position 1"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "POSITION_FAILURE", sizeof(currentOperation.message));
@@ -2611,28 +2674,28 @@ void processTrayUnloading()
             return;
         }
 
-        Console.info(F("Safety delay after movement completed"));
+        Console.serialInfo(F("Safety delay after movement completed"));
 
         // Unlock shuttle to release tray
         DoubleSolenoidValve *shuttleValve = getShuttleValve();
         if (shuttleValve)
         {
-            Console.info(F("Attempting to unlock shuttle to release tray"));
+            Console.serialInfo(F("Attempting to unlock shuttle to release tray"));
 
             if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_UNLOCK, 1000))
             {
-                Console.error(F("Failed to unlock shuttle - sensor didn't confirm"));
+                Console.serialError(F("Failed to unlock shuttle - sensor didn't confirm"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "SHUTTLE_UNLOCK_FAILURE", sizeof(currentOperation.message));
                 return;
             }
             valveActuationStartTime = currentMillis;
-            Console.info(F("Initiated shuttle unlock valve actuation"));
+            Console.serialInfo(F("Initiated shuttle unlock valve actuation"));
         }
         else
         {
-            Console.error(F("Failed to access shuttle valve"));
+            Console.serialError(F("Failed to access shuttle valve"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
@@ -2659,14 +2722,14 @@ void processTrayUnloading()
             SystemState state = captureSystemState();
             if (state.shuttleLocked)
             {
-                Console.error(F("Failed to unlock shuttle - verification failed"));
+                Console.serialError(F("Failed to unlock shuttle - verification failed"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "SHUTTLE_UNLOCK_FAILURE", sizeof(currentOperation.message));
                 return;
             }
 
-            Console.info(F("Shuttle unlock confirmed successful"));
+            Console.serialInfo(F("Shuttle unlock confirmed successful"));
 
             // Lock tray at position 1
             DoubleSolenoidValve *valve = getTray1Valve();
@@ -2674,22 +2737,22 @@ void processTrayUnloading()
 
             if (valve && sensor)
             {
-                Console.info(F("Attempting to lock tray at position 1"));
+                Console.serialInfo(F("Attempting to lock tray at position 1"));
 
                 if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
                 {
-                    Console.error(F("Failed to lock tray at position 1 - sensor didn't confirm"));
+                    Console.serialError(F("Failed to lock tray at position 1 - sensor didn't confirm"));
                     currentOperation.inProgress = false;
                     currentOperation.success = false;
                     strncpy(currentOperation.message, "LOCK_FAILURE", sizeof(currentOperation.message));
                     return;
                 }
                 valveActuationStartTime = currentMillis;
-                Console.info(F("Initiated tray lock valve actuation at position 1"));
+                Console.serialInfo(F("Initiated tray lock valve actuation at position 1"));
             }
             else
             {
-                Console.error(F("Failed to access tray 1 valve or sensor"));
+                Console.serialError(F("Failed to access tray 1 valve or sensor"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
@@ -2705,7 +2768,7 @@ void processTrayUnloading()
             SystemState state = captureSystemState();
             if (!state.tray1Locked)
             {
-                Console.error(F("Tray at position 1 not locked"));
+                Console.serialError(F("Tray at position 1 not locked"));
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
                 strncpy(currentOperation.message, "TRAY_NOT_LOCKED", sizeof(currentOperation.message));
@@ -2731,14 +2794,14 @@ void processTrayUnloading()
         SystemState state = captureSystemState();
         if (!state.tray1Locked)
         {
-            Console.error(F("Failed to lock tray at position 1 - verification failed"));
+            Console.serialError(F("Failed to lock tray at position 1 - verification failed"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
             strncpy(currentOperation.message, "LOCK_FAILURE", sizeof(currentOperation.message));
             return;
         }
 
-        Console.info(F("Tray lock at position 1 confirmed successful"));
+        Console.serialInfo(F("Tray lock at position 1 confirmed successful"));
 
         // Update tray tracking based on source position
         if (sourcePosition == POSITION_2_MM)
@@ -2755,69 +2818,39 @@ void processTrayUnloading()
     }
     break;
 
-    case 13: // Final unlock of tray at position 1 for removal
+    case 13: // NEW STEP: Notify that tray is ready for gripping (but keep it locked)
     {
-        // Unlock tray at position 1 for removal
-        DoubleSolenoidValve *valve = getTray1Valve();
-        if (valve)
-        {
-            Console.info(F("Unlocking tray at position 1 for removal"));
-
-            if (!safeValveOperation(*valve, *getTray1Sensor(), VALVE_POSITION_UNLOCK, 1000))
-            {
-                Console.error(F("Failed to unlock tray 1 - sensor didn't confirm"));
-                currentOperation.inProgress = false;
-                currentOperation.success = false;
-                strncpy(currentOperation.message, "UNLOCK_FAILURE", sizeof(currentOperation.message));
-                return;
-            }
-            valveActuationStartTime = currentMillis;
-            Console.info(F("Initiated tray 1 unlock valve actuation"));
-        }
-        else
-        {
-            Console.error(F("Failed to access tray 1 valve"));
-            currentOperation.inProgress = false;
-            currentOperation.success = false;
-            strncpy(currentOperation.message, "VALVE_ACCESS_ERROR", sizeof(currentOperation.message));
-            return;
-        }
-
-        // Advance to next step
-        updateOperationStep(14);
-    }
-    break;
-
-    case 14: // Wait for tray unlock and notify ready for removal
-    {
-        // Wait for valve actuation time to elapse
-        if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
-        {
-            // Not enough time has elapsed, check again next cycle
-            return;
-        }
-
-        // Verify tray is unlocked
+        // Verify again that the tray is locked
         SystemState state = captureSystemState();
-        if (state.tray1Locked)
+        if (!state.tray1Locked)
         {
-            Console.error(F("Failed to unlock tray at position 1 - verification failed"));
+            Console.serialError(F("Tray at position 1 not properly locked"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
-            strncpy(currentOperation.message, "UNLOCK_FAILURE", sizeof(currentOperation.message));
+            strncpy(currentOperation.message, "TRAY_NOT_LOCKED", sizeof(currentOperation.message));
             return;
         }
 
-        Console.info(F("Tray unlocked and ready for removal"));
-        Console.println(F("TRAY_READY"));
+        // Verify shuttle is retracted
+        if (state.shuttleLocked)
+        {
+            Console.serialError(F("Shuttle unexpectedly locked - must be retracted for robot access"));
+            currentOperation.inProgress = false;
+            currentOperation.success = false;
+            strncpy(currentOperation.message, "SHUTTLE_NOT_RETRACTED", sizeof(currentOperation.message));
+            return;
+        }
 
-        // Operation complete - mitsubishi will need to send tray,removed command
+        // All good - tray is at position 1, locked, and shuttle is retracted
+        Console.acknowledge(F("TRAY_READY_FOR_GRIP"));
+        Console.serialInfo(F("Tray locked at position 1 and ready for robot to grip"));
+
+        // Operation complete - Mitsubishi will need to send tray,gripped command before removing
         currentOperation.inProgress = false;
         currentOperation.success = true;
-        strncpy(currentOperation.message, "TRAY_READY", sizeof(currentOperation.message));
+        strncpy(currentOperation.message, "TRAY_READY_FOR_GRIP", sizeof(currentOperation.message));
 
         // Ensure tray tracking matches sensor readings
-        state = captureSystemState();
         updateTrayTrackingFromSensors(state);
 
         // End operation
@@ -2849,7 +2882,7 @@ void beginOperation()
     if (encoderControlActive)
     {
         encoderControlActive = false;
-        Console.info(F("MPG handwheel control temporarily disabled during automated operation"));
+        Console.serialInfo(F("MPG handwheel control temporarily disabled during automated operation"));
     }
 
     // Store the encoder state so we can restore it if needed
@@ -2876,7 +2909,7 @@ void endOperation()
     if (operationEncoderState)
     {
         encoderControlActive = true;
-        Console.info(F("MPG handwheel control re-enabled after automated operation"));
+        Console.serialInfo(F("MPG handwheel control re-enabled after automated operation"));
     }
 
     // Clear any pending new command flag
@@ -2921,8 +2954,8 @@ void abortOperation(AbortReason reason)
     motorState = MOTOR_STATE_FAULTED;
 
     // Log the abort with clear reason
-    Console.print(F("[ABORT] Operation aborted: "));
-    Console.println(getAbortReasonString(reason));
+    Serial.print(F("[ABORT] Operation aborted: "));
+    Serial.println(getAbortReasonString(reason));
 
     // Update operation status
     currentOperation.inProgress = false;
@@ -2936,7 +2969,7 @@ void abortOperation(AbortReason reason)
     endOperation();
 
     // Provide information about recovery
-    Console.println(F("[RECOVERY] To reset system and try again, use the 'system,reset' command"));
+    Serial.println(F("[RECOVERY] To reset system and try again, use the 'system,reset' command"));
 }
 
 // Helper function to update operation steps
@@ -2948,8 +2981,8 @@ void updateOperationStep(int newStep)
     expectedOperationStep = newStep;
 
     // For debugging
-    Console.print(F("[DIAGNOSTIC] Operation step updated: "));
-    Console.println(newStep);
+    Serial.print(F("[DIAGNOSTIC] Operation step updated: "));
+    Serial.println(newStep);
 }
 
 // Function to reset the system state after a failure
@@ -2974,35 +3007,35 @@ void resetSystemState()
     trayTracking.totalUnloadsCompleted = 0;
     trayTracking.lastLoadTime = 0;
     trayTracking.lastUnloadTime = 0;
-    Console.println(F("[RESET] Tray tracking state reset"));
+    Serial.println(F("[RESET] Tray tracking state reset"));
 
     // Clear any fault conditions in the motor
     if (motorState == MOTOR_STATE_FAULTED)
     {
         // Initiate fault clearing process
         clearMotorFaults();
-        Console.println(F("[RESET] Clearing motor faults"));
+        Serial.println(F("[RESET] Clearing motor faults"));
     }
 
     // Re-enable the motor if it was disabled but not due to E-stop
     if (!MOTOR_CONNECTOR.EnableRequest() && !isEStopActive())
     {
         MOTOR_CONNECTOR.EnableRequest(true);
-        Console.println(F("[RESET] Re-enabling motor"));
+        Serial.println(F("[RESET] Re-enabling motor"));
     }
 
     // Update motor state if not currently faulted or in fault clearing process
     if (motorState == MOTOR_STATE_FAULTED && !isFaultClearingInProgress())
     {
         motorState = MOTOR_STATE_IDLE;
-        Console.println(F("[RESET] Motor state reset to IDLE"));
+        Serial.println(F("[RESET] Motor state reset to IDLE"));
     }
 
     // Update tray tracking from physical sensors
     SystemState state = captureSystemState();
     updateTrayTrackingFromSensors(state);
-    Console.println(F("[RESET] Tray tracking synchronized with sensors"));
+    Serial.println(F("[RESET] Tray tracking synchronized with sensors"));
 
     // Log the reset action
-    Console.println(F("[RESET] System state has been reset"));
+    Serial.println(F("[SUCCESS] System state has been reset"));
 }

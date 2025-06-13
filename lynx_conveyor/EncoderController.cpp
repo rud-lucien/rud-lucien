@@ -46,7 +46,7 @@ void initEncoderControl(bool swapDirection, bool indexInverted)
     lastEncoderUpdateTime = millis();
     currentMultiplier = MULTIPLIER_X1; // Make sure default is set
 
-    Console.info(F("Manual Pulse Generator (MPG) Handwheel interface initialized"));
+    Console.serialInfo(F("Manual Pulse Generator (MPG) Handwheel interface initialized"));
 }
 
 // Process encoder movement
@@ -82,7 +82,7 @@ void processEncoderInput()
         // Check for quadrature errors after movement detected (less prone to false positives)
         if (EncoderIn.QuadratureError())
         {
-            Console.error(F("Quadrature error detected in encoder! Disabling control."));
+            Console.serialError(F("Quadrature error detected in encoder! Disabling control."));
 
             // The proper way to clear errors is to disable/enable
             EncoderIn.Enable(false);
@@ -92,7 +92,7 @@ void processEncoderInput()
             if (EncoderIn.QuadratureError())
             {
                 encoderControlActive = false;
-                Console.info(F("MPG Handwheel control disabled due to persistent error"));
+                Console.serialInfo(F("MPG Handwheel control disabled due to persistent error"));
                 return;
             }
         }
@@ -153,11 +153,11 @@ void processEncoderInput()
             // Check against limits
             if (targetPositionMm < 0 || targetPositionMm > MAX_TRAVEL_MM)
             {
-                Console.print(F("[WARNING] Encoder movement rejected: target position "));
-                Console.print(targetPositionMm);
-                Console.print(F(" mm is outside allowed range (0 to "));
-                Console.print(MAX_TRAVEL_MM);
-                Console.println(F(" mm)"));
+                Serial.print(F("[WARNING] Encoder movement rejected: target position "));
+                Serial.print(targetPositionMm);
+                Serial.print(F(" mm is outside allowed range (0 to "));
+                Serial.print(MAX_TRAVEL_MM);
+                Serial.println(F(" mm)"));
             }
             else
             {
@@ -179,15 +179,15 @@ void processEncoderInput()
                 }
 
                 // Update the move message to use displaySteps
-                Console.print(F("[MPG] Move: "));
-                Console.print(displaySteps); // Use displaySteps for more intuitive direction display
-                Console.print(F(" steps (x"));
-                Console.print(getMultiplierName(currentMultiplier));
-                Console.print(F(", "));
-                Console.print(scaledVelocity / 1000); // Show in thousands for cleaner display
-                Console.print(F("k pps) → "));
-                Console.print(targetPositionMm, 2); // Show with 2 decimal places
-                Console.println(F(" mm"));
+                Serial.print(F("[MPG] Move: "));
+                Serial.print(displaySteps); // Use displaySteps for more intuitive direction display
+                Serial.print(F(" steps (x"));
+                Serial.print(getMultiplierName(currentMultiplier));
+                Serial.print(F(", "));
+                Serial.print(scaledVelocity / 1000); // Show in thousands for cleaner display
+                Serial.print(F("k pps) → "));
+                Serial.print(targetPositionMm, 2); // Show with 2 decimal places
+                Serial.println(F(" mm"));
 
                 // Set velocity for this move
                 MOTOR_CONNECTOR.VelMax(scaledVelocity);
@@ -218,13 +218,13 @@ void enableEncoderControl(bool enable)
     {
         if (!motorInitialized)
         {
-            Console.error(F("Motor must be initialized before enabling MPG control"));
+            Console.serialError(F("Motor must be initialized before enabling MPG control"));
             return;
         }
         if (!isHomed)
         {
-            Console.error(F("Motor must be homed before enabling MPG control"));
-            Console.info(F("Use the 'home' command to establish a reference position"));
+            Console.serialError(F("Motor must be homed before enabling MPG control"));
+            Console.serialInfo(F("Use the 'home' command to establish a reference position"));
             return;
         }
 
@@ -241,20 +241,20 @@ void enableEncoderControl(bool enable)
         lastEncoderPosition = 0;
         lastEncoderUpdateTime = millis();
 
-        Console.print(F("[INFO] MPG handwheel control enabled - current position: "));
-        Console.print(currentPositionMm);
-        Console.println(F(" mm"));
-        Console.print(F("[INFO] Using multiplier x"));
-        Console.print(getMultiplierName(currentMultiplier));
-        Console.print(F(" ("));
-        Console.print(currentMultiplier);
-        Console.println(F(")"));
-        Console.info(F("Issue 'encoder,disable' when finished with manual control"));
+        Serial.print(F("[INFO] MPG handwheel control enabled - current position: "));
+        Serial.print(currentPositionMm);
+        Serial.println(F(" mm"));
+        Serial.print(F("[INFO] Using multiplier x"));
+        Serial.print(getMultiplierName(currentMultiplier));
+        Serial.print(F(" ("));
+        Serial.print(currentMultiplier);
+        Serial.println(F(")"));
+        Console.serialInfo(F("Issue 'encoder,disable' when finished with manual control"));
     }
     else
     {
         encoderControlActive = false;
-        Console.info(F("MPG Handwheel control disabled"));
+        Console.serialInfo(F("MPG Handwheel control disabled"));
     }
 }
 
@@ -265,27 +265,27 @@ void setEncoderMultiplier(int multiplier)
     {
     case 1:
         currentMultiplier = MULTIPLIER_X1;
-        Console.print(F("[INFO] MPG multiplier set to x1 (fine control): "));
-        Console.println(currentMultiplier);
+        Serial.print(F("[INFO] MPG multiplier set to x1 (fine control): "));
+        Serial.println(currentMultiplier);
         break;
     case 10:
         currentMultiplier = MULTIPLIER_X10;
-        Console.print(F("[INFO] MPG multiplier set to x10 (medium control): "));
-        Console.println(currentMultiplier);
+        Serial.print(F("[INFO] MPG multiplier set to x10 (medium control): "));
+        Serial.println(currentMultiplier);
         break;
     case 100:
         currentMultiplier = MULTIPLIER_X100;
-        Console.print(F("[INFO] MPG multiplier set to x100 (coarse control): "));
-        Console.println(currentMultiplier);
+        Serial.print(F("[INFO] MPG multiplier set to x100 (coarse control): "));
+        Serial.println(currentMultiplier);
         break;
     default:
-        Console.error(F("Invalid multiplier. Use 1, 10, or 100"));
+        Console.serialError(F("Invalid multiplier. Use 1, 10, or 100"));
         return;
     }
 
     // Useful diagnostic information
     float mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-    Console.print(F("[INFO] One full rotation moves ~"));
-    Console.print(mmPerRotation, 2);
-    Console.println(F(" mm"));
+    Serial.print(F("[INFO] One full rotation moves ~"));
+    Serial.print(mmPerRotation, 2);
+    Serial.println(F(" mm"));
 }

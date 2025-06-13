@@ -29,46 +29,46 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
-    Console.info(F("Initializing Ethernet interface..."));
-    initEthernetController(true); // true = use DHCP
+    Console.serialInfo(F("Lynx Conveyor Controller starting up..."));
+
+    Console.serialInfo(F("Initializing Ethernet interface..."));
+    initEthernetController(false); // true = use DHCP
 
     // Initialize the output manager (must be before any Console calls)
     initOutputManager();
 
-    Console.info(F("Lynx Conveyor Controller starting up..."));
-
     // First set up the CCIO board
-    Console.info(F("Initializing CCIO-8 expansion boards..."));
+    Console.serialInfo(F("Initializing CCIO-8 expansion boards..."));
     CcioPort.Mode(Connector::CCIO);
     CcioPort.PortOpen();
 
     // Get count of CCIO-8 boards
     ccioBoardCount = CcioMgr.CcioCount();
-    Console.print(F("[INFO] Discovered CCIO boards: "));
-    Console.println(ccioBoardCount);
+    Serial.print(F("[INFO] Discovered CCIO boards: "));
+    Serial.println(ccioBoardCount);
 
     // Now initialize sensor systems
-    Console.info(F("Initializing sensor systems..."));
+    Console.serialInfo(F("Initializing sensor systems..."));
     initSensorSystem();
 
     // Initialize valve system with CCIO board status
-    Console.info(F("Initializing valve controller..."));
+    Console.serialInfo(F("Initializing valve controller..."));
     initValveSystem(ccioBoardCount > 0);
 
     // Initialize encoder with default direction (modify if needed)
-    Console.info(F("Initializing MPG handwheel interface..."));
+    Console.serialInfo(F("Initializing MPG handwheel interface..."));
     initEncoderControl(true, false);
 
     // Rest of your setup code...
-    Console.info(F("Motor controller ready for initialization."));
-    Console.info(F("Use 'motor init' command to initialize the motor."));
+    Console.serialInfo(F("Motor controller ready for initialization."));
+    Console.serialInfo(F("Use 'motor init' command to initialize the motor."));
 
     commander.attachTree(API_tree);
     commander.init();
     initTestFlags();
 
-    Console.info(F("System ready."));
-    Console.info(F("Type 'help' for available commands"));
+    Console.serialInfo(F("System ready."));
+    Console.serialInfo(F("Type 'help' for available commands"));
 }
 
 // The main loop
@@ -83,9 +83,9 @@ void loop()
     // Check for test abort requested
     if (testAbortRequested && testInProgress)
     {
-        Console.info(F("Test abort detected in main loop"));
+        Console.serialInfo(F("Test abort detected in main loop"));
         handleTestAbort();
-        Console.info(F("Test aborted successfully"));
+        Console.acknowledge(F("Test aborted successfully"));
     }
 
     // Always capture current system state - it's the foundation of safety
@@ -132,7 +132,7 @@ void loop()
     if (operationInProgress &&
         (!safety.operationWithinTimeout || !safety.operationSequenceValid))
     {
-        Console.print(F("[SAFETY] VIOLATION: "));
+        Console.print(F("[ERROR] SAFETY VIOLATION: "));
         Console.println(safety.operationSequenceMessage);
 
         // Emergency stop or other recovery action
@@ -157,7 +157,7 @@ void loop()
     { // Check every 10 seconds
         if (!isPressureSufficient())
         {
-            Console.warning(F("System pressure below minimum threshold (21.75 PSI)"));
+            Console.serialWarning(F("System pressure below minimum threshold (21.75 PSI)"));
         }
         lastPressureCheckTime = currentTime;
     }

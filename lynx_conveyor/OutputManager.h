@@ -78,6 +78,22 @@ public:
     void ethernetCommand(const char *msg);
     void ethernetCommand(const __FlashStringHelper *msg);
 
+    // Command acknowledgment method
+    void acknowledge(const char *msg);
+    void acknowledge(const __FlashStringHelper *msg);
+    
+    // Serial-only variants
+    void serialInfo(const char *msg);
+    void serialInfo(const __FlashStringHelper *msg);
+    void serialError(const char *msg);
+    void serialError(const __FlashStringHelper *msg);
+    void serialDiagnostic(const char *msg);
+    void serialDiagnostic(const __FlashStringHelper *msg);
+    void serialWarning(const char *msg);
+    void serialWarning(const __FlashStringHelper *msg);
+    void serialSafety(const char *msg);
+    void serialSafety(const __FlashStringHelper *msg);
+
     // Legacy method (now maps to info)
     void message(const char *msg) { info(msg); }
     void message(const __FlashStringHelper *msg) { info(msg); }
