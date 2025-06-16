@@ -248,7 +248,9 @@ CommandType getCommandType(const char *command)
         strstr(command, "h ") ||
         strstr(command, "encoder status") ||
         strstr(command, "jog status") ||
-        strstr(command, "tray status"))
+        strstr(command, "tray status") ||
+        strstr(command, "tray load ready") || 
+        strstr(command, "tray unload ready")) 
     {
         return CMD_READ_ONLY;
     }
@@ -318,8 +320,8 @@ bool canExecuteCommand(const char *command)
 void sendCommandRejection(const char *command, const char *reason)
 {
     char errorMsg[128];
-    snprintf(errorMsg, sizeof(errorMsg), "Cannot execute '%s' - %s", command, reason);
-    Console.error(errorMsg);
+    snprintf(errorMsg, sizeof(errorMsg), "[BUSY], Cannot execute '%s' - %s", command, reason);
+    Console.println(errorMsg);
 
     if (operationInProgress)
     {

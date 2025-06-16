@@ -2275,15 +2275,15 @@ bool cmd_tray(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        Console.error(F("Missing parameter. Usage: tray,<load|unload|placed|gripped|released|status|help>"));
+        Console.error(F("Missing parameter. Usage: tray,<load|unload|load,ready|unload,ready|placed|gripped|released|status|help>"));
         return false;
     }
 
-    // Parse the subcommand
+    // Parse the subcommand - SPLIT BY BOTH SPACES AND COMMAS
     char *subcommand = strtok(trimmed, " ");
     if (subcommand == NULL)
     {
-        Console.error(F("Invalid format. Usage: tray,<load|unload|placed|gripped|released|status|help>"));
+        Console.error(F("Missing parameter. Usage: tray,<load|unload|load,ready|unload,ready|placed|gripped|released|status|help>"));
         return false;
     }
 
@@ -2297,7 +2297,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         subcommand = strtok(NULL, " ");
         if (subcommand == NULL)
         {
-            Console.error(F("Missing subcommand. Usage: tray,<load|unload|placed|gripped|released|status|help>"));
+            Console.error(F("Missing parameter. Usage: tray,<load|unload|load,ready|unload,ready|placed|gripped|released|status|help>"));
             return false;
         }
         subcommand = trimLeadingSpaces(subcommand);
@@ -2306,13 +2306,31 @@ bool cmd_tray(char *args, CommandCaller *caller)
     // Map subcommand to integer for switch statement
     int cmdCode = 0;
     if (strcmp(subcommand, "load") == 0)
-        cmdCode = 1;
+    {
+        // Check if next token is "ready"
+        char *action = strtok(NULL, " ");
+        if (action != NULL && strcmp(action, "ready") == 0)
+            cmdCode = 9; // tray,load,ready
+        else if (action != NULL && strcmp(action, "request") == 0)
+            cmdCode = 1; // tray,load,request
+        else
+            cmdCode = 1; // Default to load case which will show proper error
+    }
     else if (strcmp(subcommand, "placed") == 0)
         cmdCode = 2;
     else if (strcmp(subcommand, "released") == 0)
         cmdCode = 3;
     else if (strcmp(subcommand, "unload") == 0)
-        cmdCode = 4;
+    {
+        // Check if next token is "ready" or "request"
+        char *action = strtok(NULL, " ");
+        if (action != NULL && strcmp(action, "ready") == 0)
+            cmdCode = 10; // tray,unload,ready
+        else if (action != NULL && strcmp(action, "request") == 0)
+            cmdCode = 4; // tray,unload,request
+        else
+            cmdCode = 4; // Default to unload case which will show proper error
+    }
     else if (strcmp(subcommand, "gripped") == 0)
         cmdCode = 5;
     else if (strcmp(subcommand, "removed") == 0)
@@ -2321,19 +2339,19 @@ bool cmd_tray(char *args, CommandCaller *caller)
         cmdCode = 7;
     else if (strcmp(subcommand, "help") == 0)
         cmdCode = 8;
+    else
+    {
+        Console.print(F("[ERROR] Unknown tray command: "));
+        Console.println(subcommand);
+        Console.error(F("Valid options: load,request | unload,request | load,ready | unload,ready | placed | gripped | removed | released | status | help"));
+        return false;
+    }
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
     {
-    case 1: // "load"
+    case 1: // "load,request"
     {
-        // Check for second parameter "request"
-        char *action = strtok(NULL, " ");
-        if (action == NULL || strcmp(action, "request") != 0)
-        {
-            Console.error(F("Invalid format. Usage: tray,load,request"));
-            return false;
-        }
         // Mitsubishi robot is requesting to load a tray
 
         // 1. Check if the system can accept a tray
@@ -2346,7 +2364,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         // First check for motor readiness
         if (!safety.safeToMove)
         {
-            Console.error(F("MOTOR NOT READY"));
+            Console.error(F("MOTOR_NOT_READY"));
             Serial.println(safety.moveUnsafeReason);
             Console.serialInfo(F("Motor must be initialized and homed before loading/unloading operations"));
             return false;
@@ -2407,7 +2425,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         }
 
         return true;
-    }
+    } // End of case 1
 
     case 2: // "placed"
     {
@@ -2461,7 +2479,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
             Console.error(F("LOCK_FAILURE"));
             return false;
         }
-    }
+    } // End of case 2
 
     case 3: // "released"
     {
@@ -2477,97 +2495,84 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         Console.acknowledge(F("STARTING_PROCESSING"));
         return true;
-    }
+    } // End of case 3
 
-    case 4: // "unload"
+    case 4: // "unload,request"
     {
-        // Use direct string search approach instead of strtok()
-        char *originalArgs = args; // Original command string
+        // Mitsubishi robot is requesting to unload a tray
 
-        // Look for "unload" then "request" in sequence
-        char *unloadPos = strstr(originalArgs, "unload");
-        if (unloadPos && strstr(unloadPos + 6, "request"))
+        // 1. Check if there are any trays in the system to unload
+        SystemState state = captureSystemState();
+        updateTrayTrackingFromSensors(state);
+
+        // Validate ONLY motor initialization/homing status, not full movement safety
+        if (!state.isHomed || state.motorState == MOTOR_STATE_FAULTED ||
+            state.motorState == MOTOR_STATE_NOT_READY)
         {
-            // Mitsubishi robot is requesting to unload a tray
+            Console.error(F("MOTOR_NOT_READY"));
+            Console.serialInfo(F("Motor not initialized or homed"));
+            Console.serialInfo(F("Use 'motor,init' and 'motor,home' commands"));
+            return false;
+        }
 
-            // 1. Check if there are any trays in the system to unload
-            SystemState state = captureSystemState();
-            updateTrayTrackingFromSensors(state);
+        if (trayTracking.totalTraysInSystem == 0)
+        {
+            Console.error(F("NO_TRAYS_TO_UNLOAD"));
+            return false;
+        }
 
-            // Validate ONLY motor initialization/homing status, not full movement safety
-            if (!state.isHomed || state.motorState == MOTOR_STATE_FAULTED ||
-                state.motorState == MOTOR_STATE_NOT_READY)
+        // 2. Check if an operation is already in progress
+        if (operationInProgress)
+        {
+            Console.error(F("SYSTEM_BUSY"));
+            return false;
+        }
+
+        // 3. Check if there's a tray at position 1
+        if (state.tray1Present)
+        {
+            // Tray already at position 1
+            // Don't unlock the tray here - wait for tray,gripped command
+            // Just inform that the tray is ready to be gripped
+            Console.serialInfo(F("Tray at position 1 (loading position) ready to be gripped"));
+            Console.serialInfo(F("Tray at position 1 is locked and ready for gripping"));
+            Console.acknowledge(F("TRAY_READY_FOR_GRIP"));
+
+            // Ensure tray is locked (in case it was somehow unlocked)
+            DoubleSolenoidValve *valve = getTray1Valve();
+            CylinderSensor *sensor = getTray1Sensor();
+
+            if (valve && sensor && valve->position != VALVE_POSITION_LOCK)
             {
-                Console.error(F("MOTOR_NOT_READY"));
-                Console.serialInfo(F("Motor not initialized or homed"));
-                Console.serialInfo(F("Use 'motor,init' and 'motor,home' commands"));
-                return false;
+                // Lock the tray if it's not already locked
+                safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000);
             }
 
-            if (trayTracking.totalTraysInSystem == 0)
-            {
-                Console.error(F("NO_TRAYS_TO_UNLOAD"));
-                return false;
-            }
-
-            // 2. Check if an operation is already in progress
-            if (operationInProgress)
-            {
-                Console.error(F("SYSTEM_BUSY"));
-                return false;
-            }
-
-            // 3. Check if there's a tray at position 1
-            if (state.tray1Present)
-            {
-                // Tray already at position 1
-                // Don't unlock the tray here - wait for tray,gripped command
-                // Just inform that the tray is ready to be gripped
-                Console.serialInfo(F("Tray at position 1 (loading position) ready to be gripped"));
-                Console.serialInfo(F("Tray at position 1 is locked and ready for gripping"));
-                Console.acknowledge(F("TRAY_READY_FOR_GRIP"));
-
-                // Ensure tray is locked (in case it was somehow unlocked)
-                DoubleSolenoidValve *valve = getTray1Valve();
-                CylinderSensor *sensor = getTray1Sensor();
-
-                if (valve && sensor && valve->position != VALVE_POSITION_LOCK)
-                {
-                    // Lock the tray if it's not already locked
-                    safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000);
-                }
-
-                return true;
-            }
-            else
-            {
-                // Need to start unloading operation to move a tray to position 1
-                if (state.tray2Present)
-                {
-                    Console.serialInfo(F("Moving tray from position 2 to position 1 for unloading"));
-                }
-                else if (state.tray3Present)
-                {
-                    Console.serialInfo(F("Moving tray from position 3 to position 1 for unloading"));
-                }
-
-                beginOperation();
-
-                // Set the operation details
-                currentOperation.inProgress = true;
-                currentOperation.type = OPERATION_UNLOADING;
-                currentOperation.startTime = millis();
-
-                Console.acknowledge(F("PREPARING_TRAY"));
-                return true;
-            }
+            return true;
         }
         else
         {
-            Console.error(F("Invalid format. Usage: tray,unload,request"));
-            return false;
+            // Need to start unloading operation to move a tray to position 1
+            if (state.tray2Present)
+            {
+                Console.serialInfo(F("Moving tray from position 2 to position 1 for unloading"));
+            }
+            else if (state.tray3Present)
+            {
+                Console.serialInfo(F("Moving tray from position 3 to position 1 for unloading"));
+            }
+
+            beginOperation();
+
+            // Set the operation details
+            currentOperation.inProgress = true;
+            currentOperation.type = OPERATION_UNLOADING;
+            currentOperation.startTime = millis();
+
+            Console.acknowledge(F("PREPARING_TRAY"));
+            return true;
         }
-    }
+    } // End of case 4
 
     case 5: // "gripped"
     {
@@ -2580,7 +2585,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         // Check if it's safe to unlock the gripped tray
         if (!safety.safeToUnlockGrippedTray)
         {
-            Console.error(F("UNSAFE TO UNLOCK GRIPPED TRAY: "));
+            Console.error(F("UNSAFE_TO_UNLOCK"));
             Serial.println(safety.grippedTrayUnlockUnsafeReason);
             return false;
         }
@@ -2620,7 +2625,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         // (don't remove from tracking yet - that happens at tray,removed)
 
         return true;
-    }
+    } // End of case 5
 
     case 6: // "removed"
     {
@@ -2648,7 +2653,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Serial.println(trayTracking.totalUnloadsCompleted);
 
         return true;
-    }
+    } // End of case 6
 
     case 7: // "status"
     {
@@ -2687,7 +2692,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Console.println(trayTracking.totalUnloadsCompleted);
 
         return true;
-    }
+    } // End of case 7
 
     case 8: // "help"
     {
@@ -2697,10 +2702,14 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Console.println(F("  1. tray,load,request - Request permission to load a tray"));
         Console.println(F("     > System will validate position 1 is empty and move shuttle there"));
         Console.println(F("     > System responds with 'READY_TO_RECEIVE' when ready"));
-        Console.println(F("  2. tray,placed - Notify system that tray has been physically placed"));
+        Console.println(F("  2. tray,load,ready - Check if system is ready to receive a tray"));
+        Console.println(F("     > Returns [ACK] READY_TO_LOAD if system can accept a tray"));
+        Console.println(F("     > Returns [BUSY] if system is processing another tray"));
+        Console.println(F("     > Returns [ERROR] with reason if system cannot accept a tray"));
+        Console.println(F("  3. tray,placed - Notify system that tray has been physically placed"));
         Console.println(F("     > System will lock the tray at position 1"));
         Console.println(F("     > System responds with 'TRAY_SECURED' when complete"));
-        Console.println(F("  3. tray,released - Notify system to start processing the tray"));
+        Console.println(F("  4. tray,released - Notify system to start processing the tray"));
         Console.println(F("     > System will move tray to appropriate position based on system state"));
         Console.println(F("     > First tray goes to position 3, second to position 2, third stays at position 1"));
 
@@ -2709,10 +2718,15 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Console.println(F("     > If tray at position 1, system prepares it (shuttle retracted, tray locked)"));
         Console.println(F("     > If tray at positions 2 or 3, system moves it to position 1 first"));
         Console.println(F("     > System responds with 'TRAY_READY_FOR_GRIP' when at position 1"));
-        Console.println(F("  2. tray,gripped - Notify system that robot has gripped the tray"));
+        Console.println(F("  2. tray,unload,ready - Check if a tray is ready for pickup"));
+        Console.println(F("     > Returns [ACK] TRAY_READY_FOR_PICKUP if a tray is available"));
+        Console.println(F("     > Returns [BUSY] if system is preparing a tray for unloading"));
+        Console.println(F("     > Returns [ERROR] with reason if no tray is available"));
+        Console.println(F("     > This command can be used during operations"));
+        Console.println(F("  3. tray,gripped - Notify system that robot has gripped the tray"));
         Console.println(F("     > Robot must have secure grip on tray before sending this command"));
         Console.println(F("     > System unlocks the tray and responds with 'TRAY_UNLOCKED'"));
-        Console.println(F("  3. tray,removed - Notify system that tray has been physically removed"));
+        Console.println(F("  4. tray,removed - Notify system that tray has been physically removed"));
         Console.println(F("     > System updates internal tracking"));
         Console.println(F("     > System responds with 'TRAY_REMOVAL_CONFIRMED'"));
 
@@ -2737,19 +2751,115 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
-    }
+    } // End of case 8
+
+    case 9: // "load,ready"
+    {
+        // Check if the system is ready to receive a tray for loading
+        SystemState state = captureSystemState();
+
+        // Check if an operation is in progress
+        if (operationInProgress && currentOperation.type == OPERATION_LOADING)
+        {
+            // System is busy loading a tray
+            Console.println(F("[BUSY] TRAY_LOADING_IN_PROGRESS"));
+            Console.serialInfo(F("System is currently processing a loading operation"));
+            return true;
+        }
+
+        // Check for motor readiness
+        if (motorState == MOTOR_STATE_NOT_READY || motorState == MOTOR_STATE_FAULTED || !isHomed)
+        {
+            Console.error(F("MOTOR_NOT_READY"));
+            Console.serialInfo(F("Motor must be initialized and homed"));
+            return false;
+        }
+
+        // Check if system is full
+        if (trayTracking.position1Occupied && trayTracking.position2Occupied && trayTracking.position3Occupied)
+        {
+            Console.error(F("SYSTEM_FULL"));
+            Console.serialInfo(F("All positions are occupied"));
+            return false;
+        }
+
+        // Check if position 1 is occupied
+        if (trayTracking.position1Occupied)
+        {
+            Console.error(F("POSITION1_OCCUPIED"));
+            Console.serialInfo(F("Position 1 already has a tray"));
+            return false;
+        }
+
+        // System is ready to load a tray
+        Console.acknowledge(F("READY_TO_LOAD"));
+        Console.serialInfo(F("System is ready to receive a tray at position 1"));
+        return true;
+    } // End of case 9
+
+    case 10: // "unload,ready"
+    {
+        // Check if the system has a tray ready for unloading
+        SystemState state = captureSystemState();
+
+        // Check if an unloading operation is in progress
+        if (operationInProgress && currentOperation.type == OPERATION_UNLOADING)
+        {
+            // System is busy preparing a tray for unloading
+            Console.println(F("[BUSY] TRAY_UNLOADING_IN_PROGRESS"));
+            Console.serialInfo(F("System is currently moving a tray to position 1 for unloading"));
+            return true;
+        }
+
+        // Check if there are any trays in the system
+        if (trayTracking.totalTraysInSystem == 0)
+        {
+            Console.error(F("NO_TRAYS_TO_UNLOAD"));
+            Console.serialInfo(F("System has no trays to unload"));
+            return false;
+        }
+
+        // Check if there's a tray at position 1 and it's locked
+        if (state.tray1Present && state.tray1Locked)
+        {
+            // Tray is ready to be picked up
+            Console.acknowledge(F("TRAY_READY_FOR_PICKUP"));
+            Console.serialInfo(F("Tray at position 1 is locked and ready to be gripped"));
+            return true;
+        }
+        else if (state.tray1Present && !state.tray1Locked)
+        {
+            Console.error(F("TRAY_NOT_LOCKED"));
+            Console.serialInfo(F("Tray at position 1 is not locked"));
+            return false;
+        }
+        else if (!state.tray1Present && (state.tray2Present || state.tray3Present))
+        {
+            // There are trays in the system but not at position 1
+            Console.error(F("NO_TRAY_AT_POSITION1"));
+            Console.serialInfo(F("No tray at position 1, but trays exist at other positions"));
+            Console.serialInfo(F("Use tray,unload,request to move a tray to position 1"));
+            return true;
+        }
+        else
+        {
+            Console.error(F("SYSTEM_STATE_INCONSISTENT"));
+            Console.serialInfo(F("Tray tracking inconsistency detected"));
+            return false;
+        }
+    } // End of case 10
 
     default: // Unknown command
     {
-        Console.print(F("[ERROR], Unknown tray command: "));
+        Console.print(F("[ERROR] Unknown tray command: "));
         Console.println(subcommand);
-        Console.error(F("Valid options are 'load,request', 'unload,request', 'placed', 'gripped', 'removed', 'released', 'status', or 'help'"));
+        Console.error(F("Valid options: load,request | unload,request | load,ready | unload,ready | placed | gripped | removed | released | status | help"));
         return false;
-    }
-    }
+    } // End of default case
+    } // End of switch
 
     return false; // Should never reach here
-}
+} // End of function
 
 bool cmd_test(char *args, CommandCaller *caller)
 {
