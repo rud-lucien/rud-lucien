@@ -1931,7 +1931,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
         Console.acknowledge(F("JOG_STATUS"));
 
         // Display current jog settings
-        Console.info(F("Current jog settings:"));
+        Console.println(F("[INFO] Current jog settings:"));
 
         // Jog increment
         Console.print(F("  Increment: "));
@@ -2237,12 +2237,12 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         // Provide feedback on what was reset
         if (wasFaulted)
         {
-            Console.info(F("FAULT_CLEARED"));
+            Console.serialInfo(F("FAULT_CLEARED"));
         }
 
         if (wasOperationInProgress)
         {
-            Console.info(F("OPERATION_CLEARED"));
+            Console.serialInfo(F("OPERATION_CLEARED"));
         }
 
         return true;
@@ -2758,15 +2758,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
         // Check if the system is ready to receive a tray for loading
         SystemState state = captureSystemState();
 
-        // Check if an operation is in progress
-        if (operationInProgress && currentOperation.type == OPERATION_LOADING)
-        {
-            // System is busy loading a tray
-            Console.println(F("[BUSY] TRAY_LOADING_IN_PROGRESS"));
-            Console.serialInfo(F("System is currently processing a loading operation"));
-            return true;
-        }
-
         // Check for motor readiness
         if (motorState == MOTOR_STATE_NOT_READY || motorState == MOTOR_STATE_FAULTED || !isHomed)
         {
@@ -2801,15 +2792,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
     {
         // Check if the system has a tray ready for unloading
         SystemState state = captureSystemState();
-
-        // Check if an unloading operation is in progress
-        if (operationInProgress && currentOperation.type == OPERATION_UNLOADING)
-        {
-            // System is busy preparing a tray for unloading
-            Console.println(F("[BUSY] TRAY_UNLOADING_IN_PROGRESS"));
-            Console.serialInfo(F("System is currently moving a tray to position 1 for unloading"));
-            return true;
-        }
 
         // Check if there are any trays in the system
         if (trayTracking.totalTraysInSystem == 0)
@@ -2875,7 +2857,7 @@ bool cmd_test(char *args, CommandCaller *caller)
     if (strlen(trimmed) == 0)
     {
         Console.println(F("[ACK], TEST_COMMANDS"));
-        Console.info(F("Available: home | position | tray | help"));
+        Console.serialInfo(F("Available: home | position | tray | help"));
 
         // More detailed options to Serial only
         Console.serialInfo(F("  home     - Test homing repeatability"));
@@ -2946,7 +2928,7 @@ bool cmd_test(char *args, CommandCaller *caller)
     {
         Console.acknowledge(F("TEST_POSITION_STARTED"));
 
-        Console.info(F("Starting position cycling test..."));
+        Console.serialInfo(F("Starting position cycling test..."));
 
         if (testPositionCycling())
         {
@@ -2965,7 +2947,7 @@ bool cmd_test(char *args, CommandCaller *caller)
     {
         Console.acknowledge(F("TEST_TRAY_STARTED"));
 
-        Console.info(F("Starting tray handling test..."));
+        Console.serialInfo(F("Starting tray handling test..."));
 
         // Add pneumatic pressure validation before starting the test
         if (!isPressureSufficient())

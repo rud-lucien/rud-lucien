@@ -13,7 +13,7 @@ byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 
 void initEthernetController(bool useDhcp)
 {
-    Console.info(F("Starting Ethernet initialization..."));
+    Console.serialInfo(F("Starting Ethernet initialization..."));
 
     // Print link status for debugging
     Serial.print(F("Ethernet physical link status: "));

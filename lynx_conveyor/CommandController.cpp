@@ -249,8 +249,8 @@ CommandType getCommandType(const char *command)
         strstr(command, "encoder status") ||
         strstr(command, "jog status") ||
         strstr(command, "tray status") ||
-        strstr(command, "tray load ready") || 
-        strstr(command, "tray unload ready")) 
+        strstr(command, "tray load ready") ||
+        strstr(command, "tray unload ready"))
     {
         return CMD_READ_ONLY;
     }
@@ -317,19 +317,34 @@ bool canExecuteCommand(const char *command)
 //-------------------------------------------------------------------------
 // Utility Functions
 //-------------------------------------------------------------------------
+
 void sendCommandRejection(const char *command, const char *reason)
 {
-    char errorMsg[128];
-    snprintf(errorMsg, sizeof(errorMsg), "[BUSY], Cannot execute '%s' - %s", command, reason);
-    Console.println(errorMsg);
+    char msg[128];
 
     if (operationInProgress)
     {
-        char infoMsg[128];
-        snprintf(infoMsg, sizeof(infoMsg), "%s operation in progress. Use 'abort' to cancel.",
-                 getOperationTypeName(currentOperation.type));
-        Console.info(infoMsg);
+        // This is truly a BUSY condition
+        snprintf(msg, sizeof(msg),
+                 "[BUSY], Cannot execute '%s' - %s operation in progress. Use 'abort' to cancel.",
+                 command, getOperationTypeName(currentOperation.type));
     }
+    else if (testInProgress)
+    {
+        // This is also a BUSY condition
+        snprintf(msg, sizeof(msg),
+                 "[BUSY], Cannot execute '%s' - Test in progress. Use 'abort' to cancel.",
+                 command);
+    }
+    else
+    {
+        // This is an ERROR condition, not BUSY
+        snprintf(msg, sizeof(msg),
+                 "[ERROR], Cannot execute '%s' - %s",
+                 command, reason);
+    }
+
+    Console.println(msg);
 }
 
 const char *getOperationTypeName(int type)

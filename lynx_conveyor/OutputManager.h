@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 // Forward declaration of persistentClient
-extern Stream* persistentClient;
+extern Stream *persistentClient;
 
 // Class to handle output to multiple destinations (Serial, Ethernet, etc.)
 class MultiPrint : public Stream
@@ -13,7 +13,7 @@ private:
     static const int MAX_OUTPUTS = 4; // Support up to 4 outputs
     Print *outputs[MAX_OUTPUTS];
     int outputCount;
-    Stream *primaryInput; // Designated input source (usually Serial)
+    Stream *primaryInput;  // Designated input source (usually Serial)
     Stream *currentClient; // Current client connection for command output
 
 public:
@@ -29,15 +29,16 @@ public:
     void setCurrentClient(Stream *client)
     {
         currentClient = client;
-        
+
         // When setting a new client, also update persistent client
-        if (client != nullptr) {
+        if (client != nullptr)
+        {
             persistentClient = client;
         }
     }
 
     // Get the current client
-    Stream* getCurrentClient()
+    Stream *getCurrentClient()
     {
         return currentClient;
     }
@@ -81,7 +82,7 @@ public:
     // Command acknowledgment method
     void acknowledge(const char *msg);
     void acknowledge(const __FlashStringHelper *msg);
-    
+
     // Serial-only variants
     void serialInfo(const char *msg);
     void serialInfo(const __FlashStringHelper *msg);
@@ -99,8 +100,10 @@ public:
     void message(const __FlashStringHelper *msg) { info(msg); }
 
     // Set the client if none is currently set
-    void setClientIfNone(Stream* client) {
-        if (currentClient == nullptr) {
+    void setClientIfNone(Stream *client)
+    {
+        if (currentClient == nullptr)
+        {
             currentClient = client;
         }
     }
@@ -108,16 +111,6 @@ public:
 
 // Global instance
 extern MultiPrint Console;
-
-// Helper macros for common message types
-#define LOG_INFO(msg) Console.info(F(msg))
-#define LOG_ERR(msg) Console.error(F(msg))
-#define LOG_DIAG(msg) Console.diagnostic(F(msg))
-#define LOG_SAFETY(msg) Console.safety(F(msg))
-#define LOG_WARN(msg) Console.warning(F(msg))
-#define LOG_MSG(msg) Console.info(F(msg)) // Fixed from log to info
-#define LOG_SERIAL_CMD(msg) Console.serialCommand(F(msg))
-#define LOG_ETH_CMD(msg) Console.ethernetCommand(F(msg))
 
 // Initialize the output manager
 void initOutputManager();

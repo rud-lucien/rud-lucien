@@ -802,7 +802,7 @@ MotorState updateMotorState()
 
 void printMotorStatus()
 {
-    Console.info(F("Motor Status:"));
+    Console.println(F("[INFO] Motor Status:"));
 
     Console.print(F("  Enabled: "));
     Console.println(MOTOR_CONNECTOR.EnableRequest() ? F("Yes") : F("No"));

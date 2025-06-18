@@ -513,11 +513,28 @@ SafetyValidationResult validateSafety(const SystemState &state)
 
     // Mechanical Safety Constraints
     // Prevents movement if any tray is locked, which could damage hardware
-    if (state.tray1Locked || state.tray2Locked || state.tray3Locked)
+    // if (state.tray1Locked || state.tray2Locked || state.tray3Locked)
+    // {
+    //     result.safeToMove = false;
+    //     result.moveUnsafeReason = F("Tray locks engaged");
+    //     // This is a prerequisite safety check, not an abort condition
+    // }
+
+    // Check which specific position has a locked tray that's blocking movement
+    if (isAtPosition(state.currentPositionMm, POSITION_1_MM) && state.tray1Locked)
     {
         result.safeToMove = false;
-        result.moveUnsafeReason = F("Tray locks engaged");
-        // This is a prerequisite safety check, not an abort condition
+        result.moveUnsafeReason = F("Cannot move - Tray at position 1 is locked");
+    }
+    else if (isAtPosition(state.currentPositionMm, POSITION_2_MM) && state.tray2Locked)
+    {
+        result.safeToMove = false;
+        result.moveUnsafeReason = F("Cannot move - Tray at position 2 is locked");
+    }
+    else if (isAtPosition(state.currentPositionMm, POSITION_3_MM) && state.tray3Locked)
+    {
+        result.safeToMove = false;
+        result.moveUnsafeReason = F("Cannot move - Tray at position 3 is locked");
     }
 
     // System State Requirements
