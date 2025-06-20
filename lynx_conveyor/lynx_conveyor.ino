@@ -63,6 +63,10 @@ void setup()
     Console.serialInfo(F("Motor controller ready for initialization."));
     Console.serialInfo(F("Use 'motor init' command to initialize the motor."));
 
+    // Initialize system state variables including target position tracking
+    Console.serialInfo(F("Initializing system state variables..."));
+    initSystemStateVariables();
+
     commander.attachTree(API_tree);
     commander.init();
     initTestFlags();

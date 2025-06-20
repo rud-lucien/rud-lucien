@@ -38,6 +38,14 @@ extern const unsigned long SAFETY_DELAY_BEFORE_MOVEMENT_MS;
 extern const unsigned long SAFETY_DELAY_AFTER_MOVEMENT_MS;
 extern const unsigned long SENSOR_VERIFICATION_DELAY_MS;
 
+// Lock/unlock operation status tracking (used by safety validation)
+extern bool lastLockOperationFailed;
+extern bool lastUnlockOperationFailed;
+extern String lastLockFailureDetails;
+extern String lastUnlockFailureDetails;
+extern unsigned long lockFailureTimestamp;
+extern unsigned long unlockFailureTimestamp;
+
 // Operation type enum
 enum OperationType
 {
@@ -203,6 +211,12 @@ struct SafetyValidationResult
 
     // Abort reason - directly indicates what type of abort should be triggered
     AbortReason failureReason;
+
+    // Lock/unlock operation status
+    bool lockOperationSuccessful;     // Set to false if a lock operation recently failed
+    bool unlockOperationSuccessful;   // Set to false if an unlock operation recently failed
+    String lockFailureDetails;        // Details about which lock operation failed
+    String unlockFailureDetails;      // Details about which unlock operation failed
 };
 
 //=============================================================================
@@ -258,5 +272,9 @@ void resetSystemState(); // Function to reset the system state after a failure
 
 // Global variable declaration
 extern SystemState previousState;
+
+void resetLockUnlockFailures();
+void resetTrayTracking();
+void initSystemStateVariables();
 
 #endif // UTILS_H

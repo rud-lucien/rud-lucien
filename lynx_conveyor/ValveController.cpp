@@ -1,5 +1,6 @@
 #include "ValveController.h"
 #include "OutputManager.h"
+#include "Utils.h"
 
 // ----------------- Global variables -----------------
 
@@ -367,7 +368,59 @@ bool safeValveOperation(DoubleSolenoidValve &valve, CylinderSensor &sensor,
     valveSetPosition(valve, targetPosition);
 
     // Wait for sensor to confirm the operation
-    return waitForSensor(sensor, expectedSensorState, timeoutMs);
+    bool success = waitForSensor(sensor, expectedSensorState, timeoutMs);
+
+    // If operation failed, record it with valve type and position info
+    if (!success) {
+        // Determine valve type and position
+        const char* valveType = "unknown";
+        int valvePosition = 0;
+        
+        // Compare valve address to determine which valve it is
+        if (&valve == getTray1Valve()) {
+            valveType = "tray";
+            valvePosition = 1;
+        } 
+        else if (&valve == getTray2Valve()) {
+            valveType = "tray";
+            valvePosition = 2;
+        }
+        else if (&valve == getTray3Valve()) {
+            valveType = "tray";
+            valvePosition = 3;
+        }
+        else if (&valve == getShuttleValve()) {
+            valveType = "shuttle";
+            valvePosition = 0;
+        }
+        
+        // Record the failure based on operation type
+        if (targetPosition == VALVE_POSITION_LOCK) {
+            // Call the function to record a lock failure
+            lastLockOperationFailed = true;
+            lastLockFailureDetails = F("Failed to lock ");
+            lastLockFailureDetails += valveType;
+            lastLockFailureDetails += F(" at position ");
+            lastLockFailureDetails += String(valvePosition);
+            lastLockFailureDetails += F(" - sensor didn't confirm");
+            lockFailureTimestamp = millis();  // Record the timestamp
+        } else {
+            // Call the function to record an unlock failure
+            lastUnlockOperationFailed = true;
+            lastUnlockFailureDetails = F("Failed to unlock ");
+            lastUnlockFailureDetails += valveType;
+            lastUnlockFailureDetails += F(" at position ");
+            lastUnlockFailureDetails += String(valvePosition);
+            lastUnlockFailureDetails += F(" - sensor didn't confirm");
+            unlockFailureTimestamp = millis();  // Record the timestamp
+        }
+        
+        Console.print(F("[ERROR] Valve operation failed: "));
+        Console.println(targetPosition == VALVE_POSITION_LOCK ? 
+                     lastLockFailureDetails : lastUnlockFailureDetails);
+    }
+    
+    return success;
 }
 
 // ----------------- Convenience functions -----------------
@@ -404,6 +457,8 @@ bool safeUnlockAllValves(unsigned long timeoutMs)
 
     return allSucceeded;
 }
+
+
 
 // Create an array for tray detection sensors for easier batch operations
 CylinderSensor *allTrayDetectSensors[3] = {

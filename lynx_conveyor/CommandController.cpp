@@ -285,10 +285,6 @@ CommandType getCommandType(const char *originalCommand)
         strstr(command, "system safety") ||
         strstr(command, "system trays") ||
 
-        // Special tray check commands
-        strstr(command, "tray load ready") ||
-        strstr(command, "tray unload ready") ||
-
         // Other read-only commands that need exact matching
         strstr(command, "log now") ||
         // Much simpler checks for the exact commands without parameters

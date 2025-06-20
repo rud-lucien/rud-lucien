@@ -29,6 +29,7 @@
 #define MOTOR_VELOCITY_RPM 300       // Maximum velocity for motor operation (RPM)
 #define MAX_ACCEL_RPM_PER_SEC 5000   // Maximum acceleration in RPM/s
 #define ACCEL_LIMIT_RPM_PER_SEC 2500 // Acceleration limit for normal operation
+#define EMPTY_SHUTTLE_VELOCITY_RPM 1000       // Higher speed for empty shuttle movements
 
 // Motion direction control (1 for normal direction, -1 for reversed)
 #define MOTION_DIRECTION -1 // Set to -1 to reverse all motion

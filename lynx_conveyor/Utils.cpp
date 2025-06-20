@@ -30,11 +30,11 @@ unsigned long safetyDelayStartTime = 0;
 unsigned long sensorVerificationStartTime = 0;
 
 // Valve actuation and safety delay constants
-const unsigned long VALVE_ACTUATION_TIME_MS = 500;          // Increased from 500ms for more reliable actuation (previosly 750ms)
+const unsigned long VALVE_ACTUATION_TIME_MS = 500;         // Increased from 500ms for more reliable actuation (previosly 750ms)
 const unsigned long SAFETY_DELAY_AFTER_UNLOCK_MS = 500;    // Safety delay after unlocking a tray (previously 1000ms)
 const unsigned long SAFETY_DELAY_BEFORE_MOVEMENT_MS = 500; // Safety delay before starting motor movement (previously 1000ms)
 const unsigned long SAFETY_DELAY_AFTER_MOVEMENT_MS = 500;  // Safety delay after motor has completed movement (previously 1000ms)
-const unsigned long SENSOR_VERIFICATION_DELAY_MS = 200;     // Delay for stable sensor readings
+const unsigned long SENSOR_VERIFICATION_DELAY_MS = 200;    // Delay for stable sensor readings
 
 // Tray status structure
 TrayStatus trayStatus = {false, false, false, 0, OPERATION_NONE};
@@ -44,6 +44,14 @@ OperationStatus currentOperation = {false, OPERATION_NONE, 0, 0, false, ""};
 
 // Add this variable definition near your other global variables:
 SystemState previousState;
+
+// Add these near your other global variables
+bool lastLockOperationFailed = false;
+bool lastUnlockOperationFailed = false;
+String lastLockFailureDetails = "";
+String lastUnlockFailureDetails = "";
+unsigned long lockFailureTimestamp = 0;
+unsigned long unlockFailureTimestamp = 0;
 
 // Generic tray movement function - core implementation
 bool moveTray(int fromPosition, int toPosition)
@@ -476,6 +484,8 @@ SafetyValidationResult validateSafety(const SystemState &state)
     result.safeToUnloadTrayFromPos2 = true;
     result.safeToUnloadTrayFromPos3 = true;
     result.safeToUnlockGrippedTray = true;
+    result.lockOperationSuccessful = true;
+    result.unlockOperationSuccessful = true;
     result.commandStateValid = true;
     result.trayPositionValid = true;
     result.targetPositionValid = true;
@@ -906,6 +916,68 @@ SafetyValidationResult validateSafety(const SystemState &state)
     }
 
     //=============================================================================
+    // LOCK/UNLOCK OPERATION VALIDATION
+    //=============================================================================
+    // Validates that recent lock/unlock operations succeeded
+    // Triggers safety violations when lock/unlock operations fail during automated operations
+
+    // Check for recent lock operation failures
+    if (lastLockOperationFailed)
+    {
+        result.lockOperationSuccessful = false;
+        result.lockFailureDetails = lastLockFailureDetails;
+
+        // If we're in an operation, mark the sequence as invalid
+        if (operationInProgress)
+        {
+            result.operationSequenceValid = false;
+            result.operationSequenceMessage = F("Lock operation failed: ");
+            result.operationSequenceMessage += lastLockFailureDetails;
+            result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
+
+            // Add operation context for better diagnostics
+            if (currentOperation.type == OPERATION_LOADING)
+            {
+                result.operationSequenceMessage += F(" during loading operation step ");
+                result.operationSequenceMessage += String(currentOperationStep);
+            }
+            else if (currentOperation.type == OPERATION_UNLOADING)
+            {
+                result.operationSequenceMessage += F(" during unloading operation step ");
+                result.operationSequenceMessage += String(currentOperationStep);
+            }
+        }
+    }
+
+    // Check for recent unlock operation failures
+    if (lastUnlockOperationFailed)
+    {
+        result.unlockOperationSuccessful = false;
+        result.unlockFailureDetails = lastUnlockFailureDetails;
+
+        // If we're in an operation, mark the sequence as invalid
+        if (operationInProgress)
+        {
+            result.operationSequenceValid = false;
+            result.operationSequenceMessage = F("Unlock operation failed: ");
+            result.operationSequenceMessage += lastUnlockFailureDetails;
+            result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
+
+            // Add operation context for better diagnostics
+            if (currentOperation.type == OPERATION_LOADING)
+            {
+                result.operationSequenceMessage += F(" during loading operation step ");
+                result.operationSequenceMessage += String(currentOperationStep);
+            }
+            else if (currentOperation.type == OPERATION_UNLOADING)
+            {
+                result.operationSequenceMessage += F(" during unloading operation step ");
+                result.operationSequenceMessage += String(currentOperationStep);
+            }
+        }
+    }
+
+    //=============================================================================
     // POSITION AND STATE VALIDATION
     //=============================================================================
     // Validates that motor position and system state match expectations
@@ -1013,11 +1085,19 @@ SafetyValidationResult validateSafety(const SystemState &state)
         }
     }
 
+    // If not in an operation, tray position validation should pass
+    // This ensures the system doesn't block commands when idle
+    if (!operationInProgress)
+    {
+        result.trayPositionValid = true;
+        result.stateValidationMessage = F("System idle - position validation not required");
+    }
+
     // Target Position Validation
     // Verifies that commanded target position is within allowed range
     bool skipTargetValidation = (operationInProgress &&
                                  currentOperation.type == OPERATION_UNLOADING &&
-                                 (currentOperationStep >= 4 && currentOperationStep <= 7));
+                                 (currentOperationStep >= 4 && currentOperationStep <= 10));
 
     if (hasCurrentTarget)
     {
@@ -1028,12 +1108,18 @@ SafetyValidationResult validateSafety(const SystemState &state)
             result.operationSequenceMessage = result.stateValidationMessage;
         }
     }
-    else if (!skipTargetValidation) // Only fail if validation isn't temporarily disabled
+    else if (operationInProgress && !skipTargetValidation)
     {
-        // Only a problem if we expect a target position
+        // Missing target is only a problem during active operations
         result.targetPositionValid = false;
-        result.stateValidationMessage = F("No target position set");
+        result.stateValidationMessage = F("No target position set during active operation");
         result.operationSequenceMessage = result.stateValidationMessage;
+    }
+    else if (!hasCurrentTarget)
+    {
+        // No target position when system is idle is perfectly fine
+        result.targetPositionValid = true;
+        result.stateValidationMessage = F("System idle - no target needed");
     }
 
     //=============================================================================
@@ -1246,8 +1332,59 @@ void printSafetyStatus(const SafetyValidationResult &result)
         Console.println(result.shuttleUnlockUnsafeReason);
     }
 
-    // System state validation status with enhanced messages
+    // Add this new section for lock/unlock operation status
+    Console.println(F("\n  Lock/Unlock Operations:"));
+    Console.print(F("    Lock Operations: "));
+    if (result.lockOperationSuccessful)
+    {
+        Console.println(F("SUCCESSFUL - No recent lock failures"));
+    }
+    else
+    {
+        Console.print(F("FAILED - "));
+        Console.println(result.lockFailureDetails);
+
+        // Add timestamp if available
+        if (lockFailureTimestamp > 0)
+        {
+            unsigned long elapsedTime = (millis() - lockFailureTimestamp) / 1000;
+            Console.print(F("              Failure occurred "));
+            Console.print(elapsedTime);
+            Console.println(F(" seconds ago"));
+        }
+    }
+
+    Console.print(F("    Unlock Operations: "));
+    if (result.unlockOperationSuccessful)
+    {
+        Console.println(F("SUCCESSFUL - No recent unlock failures"));
+    }
+    else
+    {
+        Console.print(F("FAILED - "));
+        Console.println(result.unlockFailureDetails);
+
+        // Add timestamp if available
+        if (unlockFailureTimestamp > 0)
+        {
+            unsigned long elapsedTime = (millis() - unlockFailureTimestamp) / 1000;
+            Console.print(F("              Failure occurred "));
+            Console.print(elapsedTime);
+            Console.println(F(" seconds ago"));
+        }
+    }
+
+    // Also update the system summary section to include lock/unlock status
+    if (!result.lockOperationSuccessful || !result.unlockOperationSuccessful)
+    {
+        Console.print(F("    Recovery: Use 'tray,released' or 'tray,gripped' to retry "));
+        Console.println(F("the operation, or 'system,reset' to clear the alert"));
+    }
+
+    // Continue with existing code for System State Validation
     Console.println(F("\n  System State Validation:"));
+
+    // Command/Actual State
     Console.print(F("    Command/Actual State: "));
     if (result.commandStateValid)
     {
@@ -1259,6 +1396,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         Console.println(result.stateValidationMessage);
     }
 
+    // Tray Positions
     Console.print(F("    Tray Positions: "));
     if (result.trayPositionValid)
     {
@@ -1270,6 +1408,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         Console.println(result.stateValidationMessage);
     }
 
+    // Target Position
     Console.print(F("    Target Position: "));
     if (result.targetPositionValid)
     {
@@ -1476,7 +1615,8 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
     // Add overall system status at the end
     Console.println(F("\n  System Summary:"));
-    if (result.operationSequenceValid && result.trayPositionValid && result.commandStateValid)
+    if (result.operationSequenceValid && result.trayPositionValid && result.commandStateValid &&
+        (result.targetPositionValid || !operationInProgress))
     {
         Console.println(F("    Status: NORMAL - System operating correctly"));
 
@@ -1514,6 +1654,12 @@ void printSafetyStatus(const SafetyValidationResult &result)
         else if (!result.trayPositionValid)
         {
             Console.println(F("    Reason: Tray position error detected"));
+            Console.print(F("            "));
+            Console.println(result.stateValidationMessage);
+        }
+        else if (!result.targetPositionValid && operationInProgress)
+        {
+            Console.println(F("    Reason: Target position error detected"));
             Console.print(F("            "));
             Console.println(result.stateValidationMessage);
         }
@@ -2848,7 +2994,7 @@ void processTrayUnloading()
             return;
         }
 
-        // Verify shuttle is retracted
+        // Verify shuttle retraction
         if (state.shuttleLocked)
         {
             Console.serialError(F("Shuttle unexpectedly locked - must be retracted for robot access"));
@@ -2919,7 +3065,7 @@ void endOperation()
     // Update target tracking in MotorController
     lastTargetPositionMm = currentTargetPositionMm;
     lastTargetPulses = currentTargetPulses;
-    hasLastTarget = hasCurrentTarget;
+    hasLastTarget = true;
     hasCurrentTarget = false; // Clear current target
 
     // Restore encoder control if it was active before
@@ -3002,32 +3148,127 @@ void updateOperationStep(int newStep)
     Serial.println(newStep);
 }
 
+void resetTrayTracking()
+{
+    trayTracking.totalTraysInSystem = 0;
+    trayTracking.position1Occupied = false;
+    trayTracking.position2Occupied = false;
+    trayTracking.position3Occupied = false;
+    trayTracking.lastLoadTime = 0;
+    trayTracking.lastUnloadTime = 0;
+    trayTracking.totalLoadsCompleted = 0;
+    trayTracking.totalUnloadsCompleted = 0;
+}
+
+void initSystemStateVariables()
+{
+    // Initialize operation state variables
+    operationInProgress = false;
+    newCommandReceived = false;
+    currentOperationStep = 0;
+    operationStartTime = 0;
+    operationTimeoutMs = 60000; // 60 seconds default
+
+    // Initialize target position tracking variables
+    hasCurrentTarget = true; // This is key - it prevents the initial target position error
+    hasLastTarget = false;
+    currentTargetType = POSITION_1; // Set default position
+    lastTargetType = POSITION_UNDEFINED;
+    currentTargetPositionMm = 0.0; // Will be updated after homing
+    lastTargetPositionMm = 0.0;
+    currentTargetPulses = 0; // Will be updated after homing
+    lastTargetPulses = 0;
+
+    // Initialize lock/unlock failure tracking
+    lastLockOperationFailed = false;
+    lastUnlockOperationFailed = false;
+    lastLockFailureDetails = "";
+    lastUnlockFailureDetails = "";
+    lockFailureTimestamp = 0;
+    unlockFailureTimestamp = 0;
+
+    // Initialize tray tracking state variables
+    // (assuming you have a function that does this already)
+    resetTrayTracking();
+
+    Console.serialInfo(F("System state variables initialized"));
+}
+
+// Function to reset the system state after a failure
+// void resetSystemState()
+// {
+//     // Reset operation state variables
+//     operationInProgress = false;
+//     newCommandReceived = false;
+
+//     // Reset step tracking
+//     updateOperationStep(0);
+
+//     // Clear current operation status
+//     currentOperation.inProgress = false;
+//     currentOperation.success = false;
+//     strncpy(currentOperation.message, "RESET", sizeof(currentOperation.message));
+//     // End operation to update target tracking
+//     endOperation();
+
+//     // Reset ALL target position tracking variables
+//     hasCurrentTarget = false;
+//     hasLastTarget = false;
+//     currentTargetType = POSITION_UNDEFINED;
+//     lastTargetType = POSITION_UNDEFINED;
+//     currentTargetPositionMm = 0.0;
+//     lastTargetPositionMm = 0.0;
+//     currentTargetPulses = 0;
+//     lastTargetPulses = 0;
+
+//     // Reset operation counters
+//     trayTracking.totalLoadsCompleted = 0;
+//     trayTracking.totalUnloadsCompleted = 0;
+//     trayTracking.lastLoadTime = 0;
+//     trayTracking.lastUnloadTime = 0;
+//     Serial.println(F("[RESET] Tray tracking state reset"));
+
+//     resetLockUnlockFailures();
+
+//     // Clear any fault conditions in the motor
+//     if (motorState == MOTOR_STATE_FAULTED)
+//     {
+//         // Initiate fault clearing process
+//         clearMotorFaults();
+//         Serial.println(F("[RESET] Clearing motor faults"));
+//     }
+
+//     // Re-enable the motor if it was disabled but not due to E-stop
+//     if (!MOTOR_CONNECTOR.EnableRequest() && !isEStopActive())
+//     {
+//         MOTOR_CONNECTOR.EnableRequest(true);
+//         Serial.println(F("[RESET] Re-enabling motor"));
+//     }
+
+//     // Update motor state if not currently faulted or in fault clearing process
+//     if (motorState == MOTOR_STATE_FAULTED && !isFaultClearingInProgress())
+//     {
+//         motorState = MOTOR_STATE_IDLE;
+//         Serial.println(F("[RESET] Motor state reset to IDLE"));
+//     }
+
+//     // Update tray tracking from physical sensors
+//     SystemState state = captureSystemState();
+//     updateTrayTrackingFromSensors(state);
+//     Serial.println(F("[RESET] Tray tracking synchronized with sensors"));
+
+//     // Log the reset action
+//     Serial.println(F("[SUCCESS] System state has been reset"));
+// }
+
 // Function to reset the system state after a failure
 void resetSystemState()
 {
-    // Reset operation state variables
-    operationInProgress = false;
-    newCommandReceived = false;
+    // Call the initialization function to set all variables to default values
+    initSystemStateVariables();
 
-    // Reset step tracking
-    updateOperationStep(0);
-
-    // Clear current operation status
-    currentOperation.inProgress = false;
-    currentOperation.success = false;
-    strncpy(currentOperation.message, "RESET", sizeof(currentOperation.message));
-    // End operation to update target tracking
+    // End operation to update target tracking (if needed beyond what init does)
     endOperation();
-
-    // Reset ALL target position tracking variables
-    hasCurrentTarget = false;
-    hasLastTarget = false;
-    currentTargetType = POSITION_UNDEFINED;
-    lastTargetType = POSITION_UNDEFINED;
-    currentTargetPositionMm = 0.0;
-    lastTargetPositionMm = 0.0;
-    currentTargetPulses = 0;
-    lastTargetPulses = 0;
 
     // Reset operation counters
     trayTracking.totalLoadsCompleted = 0;
@@ -3065,4 +3306,12 @@ void resetSystemState()
 
     // Log the reset action
     Serial.println(F("[SUCCESS] System state has been reset"));
+}
+
+void resetLockUnlockFailures()
+{
+    lastLockOperationFailed = false;
+    lastUnlockOperationFailed = false;
+    lastLockFailureDetails = "";
+    lastUnlockFailureDetails = "";
 }

@@ -273,42 +273,60 @@ bool moveToPosition(PositionTarget position)
     Serial.println(F("mm"));
 
     // Apply velocity scaling based on move distance
-    if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+    // Check if shuttle is retracted (empty) - use higher speed
+    SystemState currentState = captureSystemState();
+    // Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
+    // Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+    if (!currentState.shuttleLocked)
     {
-        currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Very short move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+        // Shuttle is retracted/locked, which means it's empty - use higher speed
+        currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+
+        Serial.print(F("[INFO] Empty shuttle detected - Using increased speed: "));
+        Serial.print(EMPTY_SHUTTLE_VELOCITY_RPM);
         Serial.println(F(" RPM"));
     }
-    else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
-    {
-        currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Short move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(SHORT_MOVE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
-    }
-    else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
-    {
-        currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Medium move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
-    }
+    // If shuttle is not empty, use the normal distance-based velocity selection
     else
     {
-        // For long moves, explicitly set to maximum velocity
-        currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-        Serial.print(F("[INFO] Long move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using full speed: "));
-        Serial.print(MOTOR_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
+        // Apply velocity scaling based on move distance
+        if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Very short move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Short move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(SHORT_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Medium move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else
+        {
+            // For long moves, explicitly set to maximum velocity
+            currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+            Serial.print(F("[INFO] Long move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using full speed: "));
+            Serial.print(MOTOR_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
     }
 
     // Rest of function remains the same
@@ -376,42 +394,60 @@ bool moveToPositionMm(double positionMm)
     int32_t originalVelMax = currentVelMax;
 
     // Apply velocity scaling based on move distance
-    if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+    // Check if shuttle is retracted (empty) - use higher speed
+    SystemState currentState = captureSystemState();
+    // Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
+    // Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+    if (!currentState.shuttleLocked)
     {
-        currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Very short move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+        // Shuttle is retracted/locked, which means it's empty - use higher speed
+        currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+
+        Serial.print(F("[INFO] Empty shuttle detected - Using increased speed: "));
+        Serial.print(EMPTY_SHUTTLE_VELOCITY_RPM);
         Serial.println(F(" RPM"));
     }
-    else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
-    {
-        currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Short move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(SHORT_MOVE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
-    }
-    else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
-    {
-        currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Medium move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
-    }
+    // If shuttle is not empty, use the normal distance-based velocity selection
     else
     {
-        // For long moves, explicitly set to maximum velocity
-        currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-        Serial.print(F("[INFO] Long move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using full speed: "));
-        Serial.print(MOTOR_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
+        // Apply velocity scaling based on move distance
+        if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Very short move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Short move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(SHORT_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Medium move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else
+        {
+            // For long moves, explicitly set to maximum velocity
+            currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+            Serial.print(F("[INFO] Long move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using full speed: "));
+            Serial.print(MOTOR_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
     }
 
     // Apply the new velocity limit to the motor
@@ -488,42 +524,60 @@ bool moveRelative(double relativeMm)
     int32_t originalVelMax = currentVelMax;
 
     // Apply velocity scaling based on move distance
-    if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+    // Check if shuttle is retracted (empty) - use higher speed
+    SystemState currentState = captureSystemState();
+    // Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
+    // Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+    if (!currentState.shuttleLocked)
     {
-        currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Very short move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+        // Shuttle is retracted/locked, which means it's empty - use higher speed
+        currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+
+        Serial.print(F("[INFO] Empty shuttle detected - Using increased speed: "));
+        Serial.print(EMPTY_SHUTTLE_VELOCITY_RPM);
         Serial.println(F(" RPM"));
     }
-    else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
-    {
-        currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Short move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(SHORT_MOVE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
-    }
-    else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
-    {
-        currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-        Serial.print(F("[INFO] Medium move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using reduced speed: "));
-        Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
-    }
+    // If shuttle is not empty, use the normal distance-based velocity selection
     else
     {
-        // For long moves, explicitly set to maximum velocity
-        currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-        Serial.print(F("[INFO] Long move detected ("));
-        Serial.print(distanceToMoveMm);
-        Serial.print(F("mm) - Using full speed: "));
-        Serial.print(MOTOR_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
+        // Apply velocity scaling based on move distance
+        if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Very short move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(VERY_SHORT_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Short move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(SHORT_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
+        {
+            currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
+            Serial.print(F("[INFO] Medium move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using reduced speed: "));
+            Serial.print(MEDIUM_MOVE_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
+        else
+        {
+            // For long moves, explicitly set to maximum velocity
+            currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+            Serial.print(F("[INFO] Long move detected ("));
+            Serial.print(distanceToMoveMm);
+            Serial.print(F("mm) - Using full speed: "));
+            Serial.print(MOTOR_VELOCITY_RPM);
+            Serial.println(F(" RPM"));
+        }
     }
 
     // Apply the new velocity limit to the motor

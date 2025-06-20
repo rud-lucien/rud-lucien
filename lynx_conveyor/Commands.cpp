@@ -2320,53 +2320,78 @@ bool cmd_tray(char *args, CommandCaller *caller)
     }
 
     // Check system safety state before processing any tray command
-// (except help and status which should always work)
-if (cmdCode != 7 && cmdCode != 8) {  // Skip check for status and help commands
-    // Capture current system state and validate safety
-    SystemState state = captureSystemState();
-    SafetyValidationResult safety = validateSafety(state);
-    
-    // Comprehensive safety validation with prioritized messages
-    bool safeToExecute = true;
-    String errorReason = "";
-    
-    // Check emergency conditions first (highest priority)
-    if (state.eStopActive) {
-        safeToExecute = false;
-        errorReason = F("E-STOP_ACTIVE");
+    // (except help and status which should always work)
+    if (cmdCode != 7 && cmdCode != 8)
+    { // Skip check for status and help commands
+        // Capture current system state and validate safety
+        SystemState state = captureSystemState();
+        SafetyValidationResult safety = validateSafety(state);
+
+        // Comprehensive safety validation with prioritized messages
+        bool safeToExecute = true;
+        String errorReason = "";
+
+        // Check emergency conditions first (highest priority)
+        if (state.eStopActive)
+        {
+            safeToExecute = false;
+            errorReason = F("E-STOP_ACTIVE");
+        }
+        // Check motor fault conditions
+        else if (state.motorState == MOTOR_STATE_FAULTED &&
+                 (cmdCode == 1 || cmdCode == 4 || cmdCode == 9 || cmdCode == 10))
+        {
+            safeToExecute = false;
+            errorReason = F("MOTOR_FAULTED");
+        }
+        // Check pneumatic pressure for valve operations
+        else if (!safety.pneumaticPressureSufficient &&
+                 (cmdCode == 2 || cmdCode == 3 || cmdCode == 5 || cmdCode == 6))
+        {
+            safeToExecute = false;
+            errorReason = F("INSUFFICIENT_PRESSURE");
+        }
+        // Check for lock/unlock operation failures
+        else if ((!safety.lockOperationSuccessful || !safety.unlockOperationSuccessful) &&
+                 (cmdCode == 1 || cmdCode == 2 || cmdCode == 3 || cmdCode == 4 ||
+                  cmdCode == 5 || cmdCode == 6 || cmdCode == 9 || cmdCode == 10))
+        {
+            safeToExecute = false;
+            errorReason = F("VALVE_OPERATION_FAILURE");
+
+            // Provide specific details about which operation failed
+            if (!safety.lockOperationSuccessful)
+            {
+                Serial.println(safety.lockFailureDetails);
+            }
+            if (!safety.unlockOperationSuccessful)
+            {
+                Serial.println(safety.unlockFailureDetails);
+            }
+        }
+        // Check operation sequence validity
+        else if (!safety.operationSequenceValid)
+        {
+            safeToExecute = false;
+            errorReason = F("SEQUENCE_ERROR");
+        }
+        // Check position tracking (your original checks)
+        else if (!safety.targetPositionValid || !safety.trayPositionValid)
+        {
+            safeToExecute = false;
+            errorReason = F("POSITION_TRACKING_ERROR");
+        }
+
+        if (!safeToExecute)
+        {
+            Console.print("[ERROR], ");
+            Console.println(errorReason);
+            Console.serialInfo(F("Cannot execute tray commands while system is in an unsafe state"));
+            Console.serialInfo(F("Use 'system,reset' to clear the alert and try again"));
+            Console.serialInfo(F("For diagnosis, use 'system,safety' to see detailed system status"));
+            return false;
+        }
     }
-    // Check motor fault conditions
-    else if (state.motorState == MOTOR_STATE_FAULTED && 
-            (cmdCode == 1 || cmdCode == 4 || cmdCode == 9 || cmdCode == 10)) {
-        safeToExecute = false;
-        errorReason = F("MOTOR_FAULTED");
-    }
-    // Check pneumatic pressure for valve operations
-    else if (!safety.pneumaticPressureSufficient && 
-            (cmdCode == 2 || cmdCode == 3 || cmdCode == 5 || cmdCode == 6)) {
-        safeToExecute = false;
-        errorReason = F("INSUFFICIENT_PRESSURE");
-    }
-    // Check operation sequence validity
-    else if (!safety.operationSequenceValid) {
-        safeToExecute = false;
-        errorReason = F("SEQUENCE_ERROR");
-    }
-    // Check position tracking (your original checks)
-    else if (!safety.targetPositionValid || !safety.trayPositionValid) {
-        safeToExecute = false;
-        errorReason = F("POSITION_TRACKING_ERROR");
-    }
-    
-    if (!safeToExecute) {
-        Console.println("[ERROR], ");
-        Console.print(errorReason);
-        Console.serialInfo(F("Cannot execute tray commands while system is in an unsafe state"));
-        Console.serialInfo(F("Use 'system,reset' to clear the alert and try again"));
-        Console.serialInfo(F("For diagnosis, use 'system,safety' to see detailed system status"));
-        return false;
-    }
-}
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
