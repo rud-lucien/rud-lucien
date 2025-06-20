@@ -696,6 +696,11 @@ bool cmd_log(char *args, CommandCaller *caller)
         Console.println(F("  • Jog - Current jog increment and speed settings"));
         Console.println(F("  • MPG - Handwheel control status, multiplier, and mm/rotation"));
 
+        Console.println(F("\nOUTPUT DESTINATION:"));
+        Console.println(F("  • Logs are only sent to the serial port"));
+        Console.println(F("  • Ethernet clients do not receive log output"));
+        Console.println(F("  • Connect via USB serial to view logs"));
+
         Console.println(F("\nPERFORMANCE CONSIDERATIONS:"));
         Console.println(F("  • Default 250ms interval is optimal for most debugging"));
         Console.println(F("  • Very frequent logging (< 100ms) may impact system responsiveness"));
@@ -2061,7 +2066,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
     // If no subcommand provided, display usage
     if (subcommand == NULL || strlen(subcommand) == 0)
     {
-        Console.error(F("Missing subcommand. Valid options: state, safety, trays, network, reset"));
+        Console.error(F("Missing subcommand. Valid options: state, safety, trays, reset"));
         return false;
     }
 
@@ -2073,10 +2078,8 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         cmdCode = 2;
     else if (strcmp(subcommand, "trays") == 0)
         cmdCode = 3;
-    else if (strcmp(subcommand, "network") == 0)
-        cmdCode = 4;
     else if (strcmp(subcommand, "reset") == 0)
-        cmdCode = 5;
+        cmdCode = 4;
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
@@ -2143,82 +2146,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         return true;
     }
 
-    case 4: // "network"
-    {
-        Console.acknowledge(F("NETWORK_STATUS"));
-
-        // Show initialization status
-        Console.print(F("Ethernet Status: "));
-        Console.println(ethernetInitialized ? F("INITIALIZED") : F("NOT INITIALIZED"));
-
-        if (ethernetInitialized)
-        {
-            // Display IP address
-            IPAddress ip = Ethernet.localIP();
-            Console.print(F("IP Address: "));
-            Console.print(ip[0]);
-            Console.print(F("."));
-            Console.print(ip[1]);
-            Console.print(F("."));
-            Console.print(ip[2]);
-            Console.print(F("."));
-            Console.println(ip[3]);
-
-            // Display MAC address
-            byte mac[6];
-            Ethernet.MACAddress(mac);
-            Console.print(F("MAC Address: "));
-            for (int i = 0; i < 6; i++)
-            {
-                if (mac[i] < 16)
-                    Console.print(F("0"));
-                Console.print(mac[i], HEX);
-                if (i < 5)
-                    Console.print(F(":"));
-            }
-            Console.println();
-
-            // Display port
-            Console.print(F("Server Port: "));
-            Console.println(ETHERNET_PORT);
-
-            // Get client count using the shared function
-            int connectedCount = getConnectedClientCount();
-
-            // Display connected clients
-            Console.println(F("\nConnected Clients:"));
-
-            if (connectedCount == 0)
-            {
-                Console.println(F("  No clients connected"));
-            }
-            else
-            {
-                // Only iterate through to display client details
-                for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
-                {
-                    if (clients[i] && clients[i].connected())
-                    {
-                        Console.print(F("  Client "));
-                        Console.print(i + 1);
-                        Console.print(F(": "));
-                        Console.print(clients[i].remoteIP());
-                        Console.print(F(":"));
-                        Console.println(clients[i].remotePort());
-                    }
-                }
-            }
-
-            Console.print(F("Total Connections: "));
-            Console.print(connectedCount);
-            Console.print(F(" of "));
-            Console.println(MAX_ETHERNET_CLIENTS);
-        }
-
-        return true;
-    }
-
-    case 5: // "reset"
+    case 4: // "reset"
     {
 
         // Capture the current state before resetting
@@ -2248,12 +2176,56 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         return true;
     }
 
+    case 5: // "help"
+    {
+        Console.acknowledge(F("SYSTEM_HELP"));
+        Console.println(F("\n===== SYSTEM COMMAND HELP ====="));
+
+        Console.println(F("\nOVERVIEW:"));
+        Console.println(F("  The system command provides access to core system functions,"));
+        Console.println(F("  status information, and diagnostic capabilities. Use these"));
+        Console.println(F("  commands to monitor and manage the overall system state."));
+
+        Console.println(F("\nCOMMAND REFERENCE:"));
+        Console.println(F("  system,state - Display comprehensive system state"));
+        Console.println(F("    > Shows all sensor readings, valve positions, and motor status"));
+        Console.println(F("    > Provides complete snapshot of current hardware state"));
+        Console.println(F("    > Use for diagnostics and troubleshooting"));
+
+        Console.println(F("  system,safety - Display safety validation status"));
+        Console.println(F("    > Shows detailed safety checks and their current status"));
+        Console.println(F("    > Reports any safety constraints preventing operations"));
+        Console.println(F("    > Provides reasons why operations might be blocked"));
+
+        Console.println(F("  system,trays - Display tray tracking information"));
+        Console.println(F("    > Shows which positions are occupied"));
+        Console.println(F("    > Reports total number of trays in the system"));
+        Console.println(F("    > Provides statistics on load/unload operations"));
+        Console.println(F("    > Shows timestamps of recent operations"));
+
+        Console.println(F("  system,reset - Reset system state after failure"));
+        Console.println(F("    > Clears fault conditions"));
+        Console.println(F("    > Aborts any in-progress operations"));
+        Console.println(F("    > Use when system is in an inconsistent state"));
+        Console.println(F("    > Emergency recovery function for error conditions"));
+
+        Console.println(F("\nTROUBLESHOOTING:"));
+        Console.println(F("  • For hardware issues: Check 'system,state' for sensor/valve status"));
+        Console.println(F("  • For operation failures: Check 'system,safety' for constraints"));
+        Console.println(F("  • For tray inconsistencies: Use 'system,trays' to verify positions"));
+        Console.println(F("  • When stuck in error state: Try 'system,reset' to recover"));
+        Console.println(F("  • After E-Stop activation: Use 'motor,clear' followed by 'system,reset'"));
+        Console.println(F("-------------------------------------------"));
+
+        return true;
+    }
+
     default: // Unknown subcommand
     {
         // Unknown subcommand
         Console.error(F("Unknown system command: "));
         Console.println(subcommand);
-        Console.error(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,network', or 'system,reset'"));
+        Console.error(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,reset', or 'system,help'"));
         return false;
     }
     }
@@ -2758,6 +2730,14 @@ bool cmd_tray(char *args, CommandCaller *caller)
         // Check if the system is ready to receive a tray for loading
         SystemState state = captureSystemState();
 
+        // First, check if a loading operation is already in progress
+        if (operationInProgress && currentOperation.type == OPERATION_LOADING)
+        {
+            Console.println(F("[BUSY], LOADING_OPERATION_IN_PROGRESS"));
+            Console.serialInfo(F("System is currently processing a tray, please wait..."));
+            return true;
+        }
+
         // Check for motor readiness
         if (motorState == MOTOR_STATE_NOT_READY || motorState == MOTOR_STATE_FAULTED || !isHomed)
         {
@@ -2792,6 +2772,14 @@ bool cmd_tray(char *args, CommandCaller *caller)
     {
         // Check if the system has a tray ready for unloading
         SystemState state = captureSystemState();
+
+        // First, check if an unloading operation is already in progress
+        if (operationInProgress && currentOperation.type == OPERATION_UNLOADING)
+        {
+            Console.println(F("[BUSY], UNLOADING_OPERATION_IN_PROGRESS"));
+            Console.serialInfo(F("Tray is being prepared at position 1, please wait..."));
+            return true;
+        }
 
         // Check if there are any trays in the system
         if (trayTracking.totalTraysInSystem == 0)
@@ -3377,6 +3365,196 @@ bool cmd_abort(char *args, CommandCaller *caller)
     return true;
 }
 
+// Network management command
+bool cmd_network(char *args, CommandCaller *caller)
+{
+    char *subcommand = strtok(args, " ");
+
+    if (subcommand == nullptr)
+    {
+        // No subcommand provided, show usage
+        Console.error(F("Missing subcommand. Usage: network,<status|close|closeall|help>"));
+        return false;
+    }
+
+    if (strcmp(subcommand, "status") == 0)
+    {
+        Console.acknowledge(F("NETWORK_STATUS"));
+
+        // Show initialization status
+        Console.print(F("Ethernet Status: "));
+        Console.println(ethernetInitialized ? F("INITIALIZED") : F("NOT INITIALIZED"));
+
+        if (ethernetInitialized)
+        {
+            // Display IP address
+            IPAddress ip = Ethernet.localIP();
+            Console.print(F("IP Address: "));
+            Console.print(ip[0]);
+            Console.print(F("."));
+            Console.print(ip[1]);
+            Console.print(F("."));
+            Console.print(ip[2]);
+            Console.print(F("."));
+            Console.println(ip[3]);
+
+            // Display MAC address
+            byte mac[6];
+            Ethernet.MACAddress(mac);
+            Console.print(F("MAC Address: "));
+            for (int i = 0; i < 6; i++)
+            {
+                if (mac[i] < 16)
+                    Console.print(F("0"));
+                Console.print(mac[i], HEX);
+                if (i < 5)
+                    Console.print(F(":"));
+            }
+            Console.println();
+
+            // Display port
+            Console.print(F("Server Port: "));
+            Console.println(ETHERNET_PORT);
+
+            // Get client count using the shared function
+            int connectedCount = getConnectedClientCount();
+
+            // Display connected clients
+            Console.println(F("\nConnected Clients:"));
+
+            if (connectedCount == 0)
+            {
+                Console.println(F("  No clients connected"));
+            }
+            else
+            {
+                // Only iterate through to display client details
+                for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+                {
+                    if (clients[i] && clients[i].connected())
+                    {
+                        Console.print(F("  Client "));
+                        Console.print(i + 1);
+                        Console.print(F(": "));
+                        Console.print(clients[i].remoteIP());
+                        Console.print(F(":"));
+                        Console.println(clients[i].remotePort());
+                    }
+                }
+            }
+
+            Console.print(F("Total Connections: "));
+            Console.print(connectedCount);
+            Console.print(F(" of "));
+            Console.println(MAX_ETHERNET_CLIENTS);
+        }
+
+        return true;
+    }
+    else if (strcmp(subcommand, "close") == 0)
+    {
+        // Parse the client index
+        char *indexStr = strtok(NULL, " ");
+        if (indexStr == nullptr)
+        {
+            Console.error(F("Missing client index"));
+            Console.serialInfo(F("Usage: network,close,<client_number>"));
+            Console.serialInfo(F("Use network,status to see client numbers"));
+            return false;
+        }
+
+        int index = atoi(indexStr) - 1; // Convert to 0-based index
+
+        if (index >= 0 && index < MAX_ETHERNET_CLIENTS && clients[index] && clients[index].connected())
+        {
+            IPAddress ip = clients[index].remoteIP();
+            int port = clients[index].remotePort();
+            clients[index].stop();
+
+            Console.acknowledge(F("CLIENT_DISCONNECTED"));
+            Console.print(F("Closed connection from "));
+            Console.print(ip);
+            Console.print(F(":"));
+            Console.println(port);
+            return true;
+        }
+        else
+        {
+            Console.error(F("INVALID_CLIENT_INDEX"));
+            Console.serialInfo(F("Client index must be between 1 and "));
+            Console.serialInfo(String(MAX_ETHERNET_CLIENTS).c_str());
+            Console.serialInfo(F(" and the client must be connected"));
+            return false;
+        }
+    }
+    else if (strcmp(subcommand, "closeall") == 0)
+    {
+        int count = 0;
+        for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+        {
+            if (clients[i] && clients[i].connected())
+            {
+                clients[i].stop();
+                count++;
+            }
+        }
+
+        Console.acknowledge(F("ALL_CLIENTS_DISCONNECTED"));
+        Console.print(F("Closed "));
+        Console.print(count);
+        Console.println(F(" connections"));
+        return true;
+    }
+    else if (strcmp(subcommand, "help") == 0)
+    {
+        Console.acknowledge(F("NETWORK_HELP"));
+        Console.println(F("\n===== NETWORK MANAGEMENT HELP ====="));
+
+        Console.println(F("\nOVERVIEW:"));
+        Console.println(F("  The network system provides commands to monitor and manage"));
+        Console.println(F("  Ethernet connections to the conveyor controller."));
+
+        Console.println(F("\nCOMMAND REFERENCE:"));
+        Console.println(F("  network,status - Display network status and connections"));
+        Console.println(F("    > Shows IP address, MAC address, and port"));
+        Console.println(F("    > Lists all currently connected clients"));
+        Console.println(F("    > Displays connection count and maximum capacity"));
+
+        Console.println(F("  network,close,X - Close a specific client connection"));
+        Console.println(F("    > X = Client number from the status display (1-based)"));
+        Console.println(F("    > Example: network,close,1 - closes the first client"));
+        Console.println(F("    > Useful for disconnecting individual stale connections"));
+
+        Console.println(F("  network,closeall - Close all client connections"));
+        Console.println(F("    > Forcibly disconnects all connected clients"));
+        Console.println(F("    > Use to recover from connection management issues"));
+        Console.println(F("    > Clients can reconnect after being closed"));
+
+        Console.println(F("\nCONNECTION MANAGEMENT:"));
+        Console.println(F("  • System supports up to "));
+        Console.print(MAX_ETHERNET_CLIENTS);
+        Console.println(F(" simultaneous client connections"));
+        Console.println(F("  • Inactive connections time out after 2 minutes"));
+        Console.println(F("  • System automatically checks for stale connections every 30s"));
+        Console.println(F("  • Commands can be issued through any connected client"));
+
+        Console.println(F("\nTROUBLESHOOTING:"));
+        Console.println(F("  • If unable to connect: Check IP address and network settings"));
+        Console.println(F("  • If 'no free slots' error: Use network,status to check connections"));
+        Console.println(F("  • For stale connections: Use network,close or network,closeall"));
+        Console.println(F("  • When cable is disconnected, all clients will be closed automatically"));
+        Console.println(F("-------------------------------------------"));
+
+        return true;
+    }
+    else
+    {
+        Console.error(F("UNKNOWN_SUBCOMMAND"));
+        Console.println(F("Valid subcommands: status, close, closeall, help"));
+        return false;
+    }
+}
+
 Commander commander;
 
 Commander::systemCommand_t API_tree[] = {
@@ -3411,8 +3589,8 @@ Commander::systemCommand_t API_tree[] = {
                             "  system,state    - Display current system state (sensors, actuators, positions)\r\n"
                             "  system,safety   - Display comprehensive safety validation status\r\n"
                             "  system,trays    - Display tray tracking and statistics\r\n"
-                            "  system,network  - Display Ethernet connection status and IP address\r\n"
-                            "  system,reset    - Reset system state after failure to retry operation",
+                            "  system,reset    - Reset system state after failure to retry operation\r\n"
+                            "  system,help     - Display detailed instructions for system commands",
                   cmd_system_state),
 
     // Motor control commands
@@ -3476,6 +3654,14 @@ Commander::systemCommand_t API_tree[] = {
 
     // Abort command
     systemCommand("abort", "Abort any running test", cmd_abort),
+
+    // Network management command
+    systemCommand("network", "Network management:\r\n"
+                             "  network,status   - Display current network status and connected clients\r\n"
+                             "  network,close,X  - Close a specific client connection (X = client number)\r\n"
+                             "  network,closeall - Close all client connections\r\n"
+                             "  network,help     - Display detailed network management instructions",
+                  cmd_network),
 };
 
 const size_t API_tree_size = sizeof(API_tree) / sizeof(Commander::systemCommand_t);

@@ -1,12 +1,12 @@
 #include "EthernetController.h"
 
-
-
 // Global variables
 EthernetServer server(ETHERNET_PORT);
 EthernetClient clients[MAX_ETHERNET_CLIENTS];
 bool ethernetInitialized = false;
 char ethernetCommandBuffer[MAX_PACKET_LENGTH];
+unsigned long clientLastActivityTime[MAX_ETHERNET_CLIENTS] = {0};
+const unsigned long CLIENT_TIMEOUT_MS = 120000; // 2 minute timeout
 
 // MAC address for the ClearCore
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
@@ -81,16 +81,65 @@ void processEthernetConnections()
 
     // Check for Ethernet cable disconnection with warning throttling
     static bool warningPrinted = false;
-    if (Ethernet.linkStatus() == LinkOFF) {
-        if (ethernetInitialized && !warningPrinted) {
+    if (Ethernet.linkStatus() == LinkOFF)
+    {
+        if (ethernetInitialized && !warningPrinted)
+        {
             Console.serialWarning(F("Ethernet cable disconnected."));
             warningPrinted = true;
         }
-    } else {
+    }
+    else
+    {
         // Reset warning flag when cable is reconnected
-        if (warningPrinted) {
+        if (warningPrinted)
+        {
             Console.serialInfo(F("Ethernet cable reconnected."));
             warningPrinted = false;
+        }
+    }
+
+    // Current time for timeout calculations
+    unsigned long currentTime = millis();
+
+    // Check for inactive clients and disconnect them
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+    {
+        if (clients[i] && clients[i].connected())
+        {
+            // Check if client has been inactive too long
+            if (currentTime - clientLastActivityTime[i] > CLIENT_TIMEOUT_MS)
+            {
+                Serial.print(F("[NETWORK] Closing inactive client: "));
+                Serial.print(clients[i].remoteIP());
+                Serial.print(F(":"));
+                Serial.println(clients[i].remotePort());
+                clients[i].stop();
+            }
+        }
+    }
+
+    // Periodic connection testing (every 30 seconds)
+    static unsigned long lastConnectionTestTime = 0;
+    if (currentTime - lastConnectionTestTime > 30000)
+    {
+        lastConnectionTestTime = currentTime;
+
+        // Test each connection by sending a small ping
+        for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+        {
+            if (clients[i] && clients[i].connected())
+            {
+                // Try to write a single byte to test connection
+                if (!clients[i].print(""))
+                {
+                    Serial.print(F("[NETWORK] Detected stale connection: "));
+                    Serial.print(clients[i].remoteIP());
+                    Serial.print(F(":"));
+                    Serial.println(clients[i].remotePort());
+                    clients[i].stop();
+                }
+            }
         }
     }
 
@@ -113,6 +162,7 @@ void processEthernetConnections()
 
                 // Replace client in this slot
                 clients[i] = newClient;
+                clientLastActivityTime[i] = millis(); // Initialize activity timestamp
                 clientAdded = true;
 
                 // Send welcome message
@@ -143,6 +193,41 @@ void processEthernetConnections()
     }
 }
 
+void testConnections()
+{
+    static unsigned long lastConnectionTestTime = 0;
+    unsigned long currentTime = millis();
+
+    // Test every 30 seconds
+    if (currentTime - lastConnectionTestTime < 30000)
+    {
+        return;
+    }
+
+    lastConnectionTestTime = currentTime;
+
+    // Actively test each connection
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+    {
+        if (clients[i])
+        {
+            // The connected() check might not catch all stale connections
+            // We can do an additional check by trying to write a single byte
+            if (clients[i].connected())
+            {
+                // Try to send a small non-disruptive ping
+                // If this fails, the connection is stale
+                if (!clients[i].print(" "))
+                {
+                    Serial.print(F("[NETWORK] Detected stale connection: "));
+                    Serial.println(clients[i].remoteIP());
+                    clients[i].stop();
+                }
+            }
+        }
+    }
+}
+
 // Send a message to all connected clients
 bool sendToAllClients(const char *message)
 {
@@ -167,12 +252,54 @@ bool sendToAllClients(const char *message)
     return success;
 }
 
-int getConnectedClientCount() {
+int getConnectedClientCount()
+{
     int count = 0;
-    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++) {
-        if (clients[i] && clients[i].connected()) {
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+    {
+        if (clients[i] && clients[i].connected())
+        {
             count++;
         }
     }
     return count;
+}
+
+// Call this whenever data is received from a client
+void updateClientActivity(int clientIndex) {
+    if (clientIndex >= 0 && clientIndex < MAX_ETHERNET_CLIENTS) {
+        clientLastActivityTime[clientIndex] = millis();
+    }
+}
+
+// Network management functions
+bool closeClientConnection(int index) {
+    if (index >= 0 && index < MAX_ETHERNET_CLIENTS && 
+        clients[index] && clients[index].connected()) {
+        
+        IPAddress ip = clients[index].remoteIP();
+        int port = clients[index].remotePort();
+        clients[index].stop();
+        
+        Serial.print(F("[NETWORK] Manually closed connection from "));
+        Serial.print(ip);
+        Serial.print(F(":"));
+        Serial.println(port);
+        return true;
+    }
+    return false;
+}
+
+bool closeAllConnections() {
+    int count = 0;
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++) {
+        if (clients[i] && clients[i].connected()) {
+            clients[i].stop();
+            count++;
+        }
+    }
+    Serial.print(F("[NETWORK] Closed "));
+    Serial.print(count);
+    Serial.println(F(" connections"));
+    return count > 0;
 }

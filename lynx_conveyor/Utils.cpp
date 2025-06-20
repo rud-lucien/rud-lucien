@@ -30,10 +30,10 @@ unsigned long safetyDelayStartTime = 0;
 unsigned long sensorVerificationStartTime = 0;
 
 // Valve actuation and safety delay constants
-const unsigned long VALVE_ACTUATION_TIME_MS = 750;          // Increased from 500ms for more reliable actuation
-const unsigned long SAFETY_DELAY_AFTER_UNLOCK_MS = 1000;    // Safety delay after unlocking a tray
-const unsigned long SAFETY_DELAY_BEFORE_MOVEMENT_MS = 1000; // Safety delay before starting motor movement
-const unsigned long SAFETY_DELAY_AFTER_MOVEMENT_MS = 1000;  // Safety delay after motor has completed movement
+const unsigned long VALVE_ACTUATION_TIME_MS = 500;          // Increased from 500ms for more reliable actuation (previosly 750ms)
+const unsigned long SAFETY_DELAY_AFTER_UNLOCK_MS = 500;    // Safety delay after unlocking a tray (previously 1000ms)
+const unsigned long SAFETY_DELAY_BEFORE_MOVEMENT_MS = 500; // Safety delay before starting motor movement (previously 1000ms)
+const unsigned long SAFETY_DELAY_AFTER_MOVEMENT_MS = 500;  // Safety delay after motor has completed movement (previously 1000ms)
 const unsigned long SENSOR_VERIFICATION_DELAY_MS = 200;     // Delay for stable sensor readings
 
 // Tray status structure

@@ -20,7 +20,7 @@
 //=============================================================================
 
 // Command tree size
-#define COMMAND_SIZE 14 
+#define COMMAND_SIZE 15 
 
 //=============================================================================
 // EXTERNAL REFERENCES
@@ -66,6 +66,7 @@ bool cmd_unlock(char *args, CommandCaller *caller);
 bool cmd_log(char *args, CommandCaller *caller);
 bool cmd_system_state(char *args, CommandCaller *caller); // New state command
 bool cmd_test(char *args, CommandCaller *caller);         // Test command for diagnostics
+bool cmd_network(char *args, CommandCaller *caller); // Network configuration command
 
 //-----------------------------------------------------------------------------
 // Encoder Control Commands

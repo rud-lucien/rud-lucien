@@ -84,6 +84,10 @@ void handleEthernetCommands()
     {
         if (clients[i] && clients[i].connected() && clients[i].available())
         {
+            // Update activity timestamp when client sends data
+            extern unsigned long clientLastActivityTime[];
+            clientLastActivityTime[i] = millis();
+
             // Read the command
             int j = 0;
             while (clients[i].available() && j < 63)
@@ -225,8 +229,22 @@ void clearPersistentClient()
 }
 
 // Command Validation Functions
-CommandType getCommandType(const char *command)
+CommandType getCommandType(const char *originalCommand)
 {
+    // Make a local copy that we can modify
+    char command[64];
+    strncpy(command, originalCommand, 63);
+    command[63] = '\0';
+
+    // Convert commas to spaces for consistent pattern matching
+    for (int i = 0; command[i]; i++)
+    {
+        if (command[i] == ',')
+        {
+            command[i] = ' ';
+        }
+    }
+
     // Emergency commands - always allowed
     if (strstr(command, "motor stop") ||
         strstr(command, "motor abort") ||
@@ -238,19 +256,45 @@ CommandType getCommandType(const char *command)
     }
 
     // Read-only commands - always allowed
-    if (strstr(command, "status") ||
+    if (strstr(command, "help") ||
+        strstr(command, "h ") ||
+        strstr(command, "H ") ||
+
+        // All status commands
         strstr(command, "motor status") ||
-        strstr(command, "position") ||
+        strstr(command, "jog status") ||
+        strstr(command, "tray status") ||
+        strstr(command, "encoder status") ||
+        strstr(command, "network status") ||
+
+        // All help subcommands
+        strstr(command, "lock help") ||
+        strstr(command, "unlock help") ||
+        strstr(command, "log help") ||
+        strstr(command, "system help") ||
+        strstr(command, "motor help") ||
+        strstr(command, "move help") ||
+        strstr(command, "jog help") ||
+        strstr(command, "tray help") ||
+        strstr(command, "test help") ||
+        strstr(command, "encoder help") ||
+        strstr(command, "network help") ||
+
+        // System information commands
         strstr(command, "system state") ||
         strstr(command, "system safety") ||
         strstr(command, "system trays") ||
-        strstr(command, "help") ||
-        strstr(command, "h ") ||
-        strstr(command, "encoder status") ||
-        strstr(command, "jog status") ||
-        strstr(command, "tray status") ||
+
+        // Special tray check commands
         strstr(command, "tray load ready") ||
-        strstr(command, "tray unload ready"))
+        strstr(command, "tray unload ready") ||
+
+        // Other read-only commands that need exact matching
+        strstr(command, "log now") ||
+        // Much simpler checks for the exact commands without parameters
+        strcmp(command, "jog inc") == 0 ||
+        strcmp(command, "jog speed") == 0 ||
+        strcmp(command, "encoder multiplier") == 0)
     {
         return CMD_READ_ONLY;
     }

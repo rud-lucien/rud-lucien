@@ -26,9 +26,17 @@ extern float currentMultiplier;             // Current multiplier setting - CHAN
 
 // Function declarations
 void initEncoderControl(bool swapDirection = false, bool indexInverted = false);
+void testConnections();
 void processEncoderInput();
 void enableEncoderControl(bool enable);
 void setEncoderMultiplier(int multiplier);
 const char *getMultiplierName(float multiplier); // New helper function
+
+// Update client activity timestamp
+void updateClientActivity(int clientIndex);
+
+// Network management functions
+bool closeClientConnection(int index);
+bool closeAllConnections();
 
 #endif // ENCODER_CONTROLLER_H
