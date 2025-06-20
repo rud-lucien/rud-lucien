@@ -3019,6 +3019,16 @@ void resetSystemState()
     // End operation to update target tracking
     endOperation();
 
+    // Reset ALL target position tracking variables
+    hasCurrentTarget = false;
+    hasLastTarget = false;
+    currentTargetType = POSITION_UNDEFINED;
+    lastTargetType = POSITION_UNDEFINED;
+    currentTargetPositionMm = 0.0;
+    lastTargetPositionMm = 0.0;
+    currentTargetPulses = 0;
+    lastTargetPulses = 0;
+
     // Reset operation counters
     trayTracking.totalLoadsCompleted = 0;
     trayTracking.totalUnloadsCompleted = 0;

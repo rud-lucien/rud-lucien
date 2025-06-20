@@ -121,7 +121,7 @@ void processEthernetConnections()
 
     // Periodic connection testing (every 30 seconds)
     static unsigned long lastConnectionTestTime = 0;
-    if (currentTime - lastConnectionTestTime > 30000)
+    if (currentTime - lastConnectionTestTime > 60000)
     {
         lastConnectionTestTime = currentTime;
 
@@ -130,6 +130,13 @@ void processEthernetConnections()
         {
             if (clients[i] && clients[i].connected())
             {
+                // Add grace period check here
+                if (currentTime - clientLastActivityTime[i] < 5000)
+                {
+                    // Skip new connections (less than 5 seconds old)
+                    continue;
+                }
+
                 // Try to write a single byte to test connection
                 if (!clients[i].print(""))
                 {
@@ -266,21 +273,25 @@ int getConnectedClientCount()
 }
 
 // Call this whenever data is received from a client
-void updateClientActivity(int clientIndex) {
-    if (clientIndex >= 0 && clientIndex < MAX_ETHERNET_CLIENTS) {
+void updateClientActivity(int clientIndex)
+{
+    if (clientIndex >= 0 && clientIndex < MAX_ETHERNET_CLIENTS)
+    {
         clientLastActivityTime[clientIndex] = millis();
     }
 }
 
 // Network management functions
-bool closeClientConnection(int index) {
-    if (index >= 0 && index < MAX_ETHERNET_CLIENTS && 
-        clients[index] && clients[index].connected()) {
-        
+bool closeClientConnection(int index)
+{
+    if (index >= 0 && index < MAX_ETHERNET_CLIENTS &&
+        clients[index] && clients[index].connected())
+    {
+
         IPAddress ip = clients[index].remoteIP();
         int port = clients[index].remotePort();
         clients[index].stop();
-        
+
         Serial.print(F("[NETWORK] Manually closed connection from "));
         Serial.print(ip);
         Serial.print(F(":"));
@@ -290,10 +301,13 @@ bool closeClientConnection(int index) {
     return false;
 }
 
-bool closeAllConnections() {
+bool closeAllConnections()
+{
     int count = 0;
-    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++) {
-        if (clients[i] && clients[i].connected()) {
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+    {
+        if (clients[i] && clients[i].connected())
+        {
             clients[i].stop();
             count++;
         }
