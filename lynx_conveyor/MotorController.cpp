@@ -218,8 +218,9 @@ bool moveToPosition(PositionTarget position)
     hasCurrentTarget = true;
     currentTargetType = position;
 
-    // Save original velocity for potential restoration
+    // Save original velocity and deceleration state
     int32_t originalVelMax = currentVelMax;
+    bool originalDecelEnabled = motorDecelConfig.enableDeceleration;
     double targetPositionMm = 0.0;
     int32_t targetPulses = 0;
 
@@ -275,20 +276,24 @@ bool moveToPosition(PositionTarget position)
     // Apply velocity scaling based on move distance
     // Check if shuttle is retracted (empty) - use higher speed
     SystemState currentState = captureSystemState();
-    // Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
-    // Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+    Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
+    Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+
     if (!currentState.shuttleLocked)
     {
-        // Shuttle is retracted/locked, which means it's empty - use higher speed
+        // Shuttle is empty - use higher speed AND disable deceleration
         currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+        motorDecelConfig.enableDeceleration = false;
 
         Serial.print(F("[INFO] Empty shuttle detected - Using increased speed: "));
         Serial.print(EMPTY_SHUTTLE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
+        Serial.println(F(" RPM with deceleration disabled"));
     }
-    // If shuttle is not empty, use the normal distance-based velocity selection
     else
     {
+        // Make sure deceleration is enabled for loaded shuttle
+        motorDecelConfig.enableDeceleration = true;
+
         // Apply velocity scaling based on move distance
         if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
         {
@@ -329,15 +334,21 @@ bool moveToPosition(PositionTarget position)
         }
     }
 
-    // Rest of function remains the same
+    // Apply the velocity limit to the motor
     MOTOR_CONNECTOR.VelMax(currentVelMax);
+
+    // Perform the move
     bool moveResult = moveToAbsolutePosition(normalizeEncoderValue(targetPulses));
+
     if (!moveResult)
     {
+        // Restore original settings if move command failed
         currentVelMax = originalVelMax;
         MOTOR_CONNECTOR.VelMax(currentVelMax);
+        motorDecelConfig.enableDeceleration = originalDecelEnabled;
         hasCurrentTarget = false;
     }
+
     return moveResult;
 }
 
@@ -390,26 +401,31 @@ bool moveToPositionMm(double positionMm)
     Serial.print(distanceToMoveMm);
     Serial.println(F("mm"));
 
-    // Save original velocity
+    // Save original velocity and deceleration state
     int32_t originalVelMax = currentVelMax;
+    bool originalDecelEnabled = motorDecelConfig.enableDeceleration;
 
     // Apply velocity scaling based on move distance
     // Check if shuttle is retracted (empty) - use higher speed
     SystemState currentState = captureSystemState();
-    // Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
-    // Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+    Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
+    Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+
     if (!currentState.shuttleLocked)
     {
-        // Shuttle is retracted/locked, which means it's empty - use higher speed
+        // Shuttle is empty - use higher speed AND disable deceleration
         currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+        motorDecelConfig.enableDeceleration = false;
 
         Serial.print(F("[INFO] Empty shuttle detected - Using increased speed: "));
         Serial.print(EMPTY_SHUTTLE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
+        Serial.println(F(" RPM with deceleration disabled"));
     }
-    // If shuttle is not empty, use the normal distance-based velocity selection
     else
     {
+        // Make sure deceleration is enabled for loaded shuttle
+        motorDecelConfig.enableDeceleration = true;
+
         // Apply velocity scaling based on move distance
         if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
         {
@@ -475,6 +491,9 @@ bool moveToPositionMm(double positionMm)
         currentVelMax = originalVelMax;
         MOTOR_CONNECTOR.VelMax(currentVelMax);
 
+        // Also restore original deceleration setting if move failed
+        motorDecelConfig.enableDeceleration = originalDecelEnabled;
+
         // Clear current target
         hasCurrentTarget = false;
     }
@@ -520,26 +539,31 @@ bool moveRelative(double relativeMm)
     Serial.print(distanceToMoveMm);
     Serial.println(F("mm"));
 
-    // Save original velocity for restoration later
+    // Save original velocity and deceleration state
     int32_t originalVelMax = currentVelMax;
+    bool originalDecelEnabled = motorDecelConfig.enableDeceleration;
 
     // Apply velocity scaling based on move distance
     // Check if shuttle is retracted (empty) - use higher speed
     SystemState currentState = captureSystemState();
-    // Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
-    // Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+    Serial.print(F("[DIAGNOSTIC] Shuttle locked state: "));
+    Serial.println(currentState.shuttleLocked ? F("TRUE (not empty)") : F("FALSE (empty)"));
+
     if (!currentState.shuttleLocked)
     {
-        // Shuttle is retracted/locked, which means it's empty - use higher speed
+        // Shuttle is empty - use higher speed AND disable deceleration
         currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+        motorDecelConfig.enableDeceleration = false;
 
         Serial.print(F("[INFO] Empty shuttle detected - Using increased speed: "));
         Serial.print(EMPTY_SHUTTLE_VELOCITY_RPM);
-        Serial.println(F(" RPM"));
+        Serial.println(F(" RPM with deceleration disabled"));
     }
-    // If shuttle is not empty, use the normal distance-based velocity selection
     else
     {
+        // Make sure deceleration is enabled for loaded shuttle
+        motorDecelConfig.enableDeceleration = true;
+
         // Apply velocity scaling based on move distance
         if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
         {
@@ -605,8 +629,8 @@ bool moveRelative(double relativeMm)
     Serial.print(normalizeEncoderValue(relativePulses));
     Serial.println(F(" pulses)"));
 
-    // Note: We DON'T restore velocity here - let deceleration system handle it
-    // checkMoveProgress() will restore velocity when move completes
+    // Note: We don't need to restore deceleration setting here
+    // checkMoveProgress() will handle this when the move completes
 
     return true;
 }
@@ -1125,8 +1149,8 @@ void checkHomingProgress()
         return; // Don't process hardstop detection until initial delay is complete
     }
 
-    static const int32_t minimumMovementPulses = 3000;  // Minimum movement before detecting hardstop
-    static const int32_t minimumAdditionalPulses = 500; // Must travel at least this much AFTER min distance
+    static const int32_t minimumMovementPulses = 5000;   // Minimum movement before detecting hardstop
+    static const int32_t minimumAdditionalPulses = 1000; // Must travel at least this much AFTER min distance
 
     MotorDriver::HlfbStates currentHlfbState = MOTOR_CONNECTOR.HlfbState();
     int32_t currentPosition = MOTOR_CONNECTOR.PositionRefCommanded();
@@ -1228,9 +1252,9 @@ void checkHomingProgress()
     // 6. We've traveled at least 500 additional pulses after minimum distance
     if (homing_hlfbWentNonAsserted &&
         currentHlfbState == MotorDriver::HLFB_ASSERTED &&
-        (currentTime - homing_hlfbNonAssertedTime > 100) &&
+        (currentTime - homing_hlfbNonAssertedTime > 250) &&
         homing_minDistanceTraveled &&
-        (currentTime - minTimeAfterDistanceReached > 300) && // Increased to 300ms
+        (currentTime - minTimeAfterDistanceReached > 500) && // Increased to 300ms
         pulsesTraveledAfterMinDistance >= minimumAdditionalPulses)
     { // NEW condition
 
@@ -1412,43 +1436,50 @@ void checkMoveProgress()
     // Update the current position when moving
     if (motorState == MOTOR_STATE_MOVING)
     {
-
         // Apply deceleration when approaching target
         if (hasCurrentTarget && motorDecelConfig.enableDeceleration)
         {
-            // Calculate absolute distance to target
-            float distanceToTargetMm = fabs(currentTargetPositionMm - currentPositionMm);
+            // Get current shuttle state
+            SystemState currentState = captureSystemState();
+            bool shuttleEmpty = !currentState.shuttleLocked;
 
-            // Calculate appropriate velocity based on distance
-            int32_t newVelocity = calculateDeceleratedVelocity(distanceToTargetMm, currentVelMax);
-
-            // Apply new velocity if different from last set velocity
-            if (newVelocity != lastSetVelocity &&
-                abs(ppsToRpm(newVelocity - lastSetVelocity)) > VELOCITY_CHANGE_THRESHOLD)
+            // Only apply deceleration if shuttle is NOT empty
+            if (!shuttleEmpty)
             {
-                MOTOR_CONNECTOR.VelMax(newVelocity);
-                lastSetVelocity = newVelocity;
+                // Calculate absolute distance to target
+                float distanceToTargetMm = fabs(currentTargetPositionMm - currentPositionMm);
 
-                // Optional: Log velocity changes (for debugging)
-                // Serial.print(F("[DECEL] Distance: "));
-                // Serial.print(distanceToTargetMm);
-                // Serial.print(F("mm, Velocity: "));
-                // Serial.print(ppsToRpm(newVelocity));
-                // Serial.print(F(" RPM, Position: "));
-                // Serial.print(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()));
-                // Serial.print(F("mm ("));
-                // Serial.print(MOTOR_CONNECTOR.PositionRefCommanded());
-                // Serial.print(F(" pulses), Target: "));
-                // Serial.print(currentTargetPositionMm);
-                // Serial.print(F("mm, HLFB: "));
-                // Serial.print(MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT_ASSERTED"));
-                // Serial.print(F(", Moving: "));
-                // Serial.print(MOTOR_CONNECTOR.StepsComplete() ? F("NO") : F("YES"));
-                // Serial.print(F(", Direction: ")); // Fixed: removed "mm"
-                // Serial.print(currentTargetPulses > MOTOR_CONNECTOR.PositionRefCommanded() ? F("POS") : F("NEG"));
-                // Serial.print(F(", Delta: "));
-                // Serial.print(ppsToRpm(abs(newVelocity - lastSetVelocity)));
-                // Serial.println();
+                // Calculate appropriate velocity based on distance
+                int32_t newVelocity = calculateDeceleratedVelocity(distanceToTargetMm, currentVelMax);
+
+                // Apply new velocity if different from last set velocity
+                if (newVelocity != lastSetVelocity &&
+                    abs(ppsToRpm(newVelocity - lastSetVelocity)) > VELOCITY_CHANGE_THRESHOLD)
+                {
+                    MOTOR_CONNECTOR.VelMax(newVelocity);
+                    lastSetVelocity = newVelocity;
+
+                    // Optional: Log velocity changes (for debugging)
+                    // Serial.print(F("[DECEL] Distance: "));
+                    // Serial.print(distanceToTargetMm);
+                    // Serial.print(F("mm, Velocity: "));
+                    // Serial.print(ppsToRpm(newVelocity));
+                    // Serial.print(F(" RPM, Position: "));
+                    // Serial.print(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()));
+                    // Serial.print(F("mm ("));
+                    // Serial.print(MOTOR_CONNECTOR.PositionRefCommanded());
+                    // Serial.print(F(" pulses), Target: "));
+                    // Serial.print(currentTargetPositionMm);
+                    // Serial.print(F("mm, HLFB: "));
+                    // Serial.print(MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED ? F("ASSERTED") : F("NOT_ASSERTED"));
+                    // Serial.print(F(", Moving: "));
+                    // Serial.print(MOTOR_CONNECTOR.StepsComplete() ? F("NO") : F("YES"));
+                    // Serial.print(F(", Direction: ")); // Fixed: removed "mm"
+                    // Serial.print(currentTargetPulses > MOTOR_CONNECTOR.PositionRefCommanded() ? F("POS") : F("NEG"));
+                    // Serial.print(F(", Delta: "));
+                    // Serial.print(ppsToRpm(abs(newVelocity - lastSetVelocity)));
+                    // Serial.println();
+                }
             }
         }
     }

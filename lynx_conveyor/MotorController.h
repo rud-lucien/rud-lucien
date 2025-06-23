@@ -26,10 +26,10 @@
 #define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV) // ~61.27 pulses per mm
 
 // Motion profile parameters (in RPM units)
-#define MOTOR_VELOCITY_RPM 300       // Maximum velocity for motor operation (RPM)
-#define MAX_ACCEL_RPM_PER_SEC 5000   // Maximum acceleration in RPM/s
-#define ACCEL_LIMIT_RPM_PER_SEC 2500 // Acceleration limit for normal operation
-#define EMPTY_SHUTTLE_VELOCITY_RPM 1000       // Higher speed for empty shuttle movements
+#define MOTOR_VELOCITY_RPM 300         // Maximum velocity for motor operation (RPM)
+#define MAX_ACCEL_RPM_PER_SEC 5000     // Maximum acceleration in RPM/s
+#define ACCEL_LIMIT_RPM_PER_SEC 2500   // Acceleration limit for normal operation
+#define EMPTY_SHUTTLE_VELOCITY_RPM 800 // Higher speed for empty shuttle movements
 
 // Motion direction control (1 for normal direction, -1 for reversed)
 #define MOTION_DIRECTION -1 // Set to -1 to reverse all motion
@@ -55,9 +55,9 @@
 
 // Position definitions (in mm from home)
 #define POSITION_HOME_MM 0.0        // Home position
-#define POSITION_1_MM 28.70         // Position 1 (29.48 mm)
-#define POSITION_2_MM 456.00        // Position 2 (456.50 mm)
-#define POSITION_3_MM 883.58        // Position 3 (884.81 mm)
+#define POSITION_1_MM 28.78         // Position 1 (28.78 mm)
+#define POSITION_2_MM 455.80        // Position 2 (455.80 mm)
+#define POSITION_3_MM 884.20        // Position 3 (884.20 mm)
 #define POSITION_4_MM MAX_TRAVEL_MM // Position 4 (max = 1050 mm)
 
 // Position definitions in pulses (calculated from mm)

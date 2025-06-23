@@ -2160,8 +2160,6 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         // Capture state after reset for comparison
         SystemState postResetState = captureSystemState();
 
-        Console.acknowledge(F("SYSTEM_RESET"));
-
         // Provide feedback on what was reset
         if (wasFaulted)
         {

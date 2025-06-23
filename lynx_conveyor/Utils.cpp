@@ -522,14 +522,6 @@ SafetyValidationResult validateSafety(const SystemState &state)
     // Movement is blocked if any of these conditions are not satisfied
 
     // Mechanical Safety Constraints
-    // Prevents movement if any tray is locked, which could damage hardware
-    // if (state.tray1Locked || state.tray2Locked || state.tray3Locked)
-    // {
-    //     result.safeToMove = false;
-    //     result.moveUnsafeReason = F("Tray locks engaged");
-    //     // This is a prerequisite safety check, not an abort condition
-    // }
-
     // Check which specific position has a locked tray that's blocking movement
     if (isAtPosition(state.currentPositionMm, POSITION_1_MM) && state.tray1Locked)
     {
@@ -2123,27 +2115,61 @@ void processTrayLoading()
 
         Console.serialInfo(F("Motor movement completed"));
 
-        // Motor has stopped, verify position
+        // Motor has stopped, verify position with tolerance
         SystemState state = captureSystemState();
+        const float POSITION_WARNING_TOLERANCE = 2.0; // 2mm tolerance for warnings vs errors
         bool reachedTarget = false;
+        float targetPos = 0.0;
 
         if (targetPosition == POSITION_2_MM)
         {
             reachedTarget = isAtPosition(state.currentPositionMm, POSITION_2_MM);
+            targetPos = POSITION_2_MM;
         }
         else if (targetPosition == POSITION_3_MM)
         {
             reachedTarget = isAtPosition(state.currentPositionMm, POSITION_3_MM);
+            targetPos = POSITION_3_MM;
         }
 
         if (!reachedTarget)
         {
+            // Report the error
             Console.serialError(F("Motor did not reach target position"));
-            currentOperation.inProgress = false;
-            currentOperation.success = false;
-            strncpy(currentOperation.message, "POSITION_FAILURE", sizeof(currentOperation.message));
+
+            // Calculate how far off we are from the target
+            float positionError = abs(state.currentPositionMm - targetPos);
+
+            if (positionError <= POSITION_WARNING_TOLERANCE)
+            {
+                // Close enough to continue - log warning but continue operation
+                Serial.print(F("[WARNING] Position error of "));
+                Serial.print(positionError);
+                Serial.println(F("mm is within tolerance - continuing"));
+
+                // Continue with the loading sequence despite small position error
+                safetyDelayStartTime = currentMillis;
+                updateOperationStep(9);
+            }
+            else
+            {
+                // Major position error - mark as failure but still end the operation
+                Console.error(F("TARGET_POSITION_ERROR"));
+                Serial.print(F("[ERROR] Position error of "));
+                Serial.print(positionError);
+                Serial.println(F("mm exceeds tolerance"));
+
+                currentOperation.inProgress = false;
+                currentOperation.success = false;
+                strncpy(currentOperation.message, "[ERROR] TARGET_POSITION_FAILURE", sizeof(currentOperation.message));
+
+                // CRITICAL: Always call endOperation() to clean up state
+                // This ensures the system doesn't remain in "busy" state
+                endOperation();
+            }
             return;
         }
+
         // Add safety delay after movement completion
         safetyDelayStartTime = currentMillis;
         updateOperationStep(9);
@@ -2377,24 +2403,61 @@ void processTrayLoading()
 
         Console.serialInfo(F("Return movement completed"));
 
-        // Motor has stopped, verify position
+        // Motor has stopped, verify position with tolerance
         SystemState state = captureSystemState();
+        const float POSITION_WARNING_TOLERANCE = 2.0; // 2mm tolerance for warnings vs errors
+
         if (!isAtPosition(state.currentPositionMm, POSITION_1_MM))
         {
+            // Report the error
             Console.serialError(F("Motor did not return to position 1"));
-            currentOperation.inProgress = false;
-            currentOperation.success = false;
-            strncpy(currentOperation.message, "[ERROR] RETURN_FAILURE", sizeof(currentOperation.message));
+
+            // Calculate how far off we are from the target
+            float positionError = abs(state.currentPositionMm - POSITION_1_MM);
+
+            if (positionError <= POSITION_WARNING_TOLERANCE)
+            {
+                // Close enough to continue - log warning but mark operation as successful
+                Serial.print(F("[WARNING] Position error of "));
+                Serial.print(positionError);
+                Serial.println(F("mm is within tolerance - continuing"));
+
+                // Operation complete with warning
+                Console.acknowledge(F("TRAY LOADING COMPLETE"));
+                currentOperation.inProgress = false;
+                currentOperation.success = true;
+                strncpy(currentOperation.message, "[INFO] SUCCESS_WITH_POSITION_WARNING", sizeof(currentOperation.message));
+            }
+            else
+            {
+                // Major position error - mark as failure but still end the operation
+                Console.error(F("POSITION_ERROR"));
+                Serial.print(F("[ERROR] Position error of "));
+                Serial.print(positionError);
+                Serial.println(F("mm exceeds tolerance"));
+
+                currentOperation.inProgress = false;
+                currentOperation.success = false;
+                strncpy(currentOperation.message, "[ERROR] RETURN_FAILURE", sizeof(currentOperation.message));
+            }
+
+            // Always output load completed counter regardless of success/failure
+            Serial.print(F("[INFO] Total loads completed: "));
+            Serial.println(trayTracking.totalLoadsCompleted);
+
+            // CRITICAL: Always call endOperation() to clean up state
+            // This ensures the system doesn't remain in "busy" state
+            endOperation();
+
             return;
         }
 
-        // Operation complete
+        // Normal successful completion - no position error
         Console.acknowledge(F("TRAY LOADING COMPLETE"));
         currentOperation.inProgress = false;
         currentOperation.success = true;
         strncpy(currentOperation.message, "[INFO] SUCCESS", sizeof(currentOperation.message));
 
-        // KEEP THE DEBUG OUTPUT BUT GET THE VALUE FROM THE TRACKING STRUCT:
         Serial.print(F("[INFO] Total loads completed: "));
         Serial.println(trayTracking.totalLoadsCompleted);
 
@@ -2584,25 +2647,57 @@ void processTrayUnloading()
 
         Console.serialInfo(F("Reached source position"));
 
-        // Motor has stopped, verify position
+        // Motor has stopped, verify position with tolerance
         SystemState state = captureSystemState();
+        const float POSITION_WARNING_TOLERANCE = 2.0; // 2mm tolerance for warnings vs errors
         bool reachedSource = false;
+        float targetPosition = 0.0;
 
         if (sourcePosition == POSITION_2_MM)
         {
             reachedSource = isAtPosition(state.currentPositionMm, POSITION_2_MM);
+            targetPosition = POSITION_2_MM;
         }
         else if (sourcePosition == POSITION_3_MM)
         {
             reachedSource = isAtPosition(state.currentPositionMm, POSITION_3_MM);
+            targetPosition = POSITION_3_MM;
         }
 
         if (!reachedSource)
         {
+            // Report the error
             Console.serialError(F("Motor did not reach source position"));
-            currentOperation.inProgress = false;
-            currentOperation.success = false;
-            strncpy(currentOperation.message, "POSITION_FAILURE", sizeof(currentOperation.message));
+
+            // Calculate how far off we are from the target
+            float positionError = abs(state.currentPositionMm - targetPosition);
+
+            if (positionError <= POSITION_WARNING_TOLERANCE)
+            {
+                // Close enough to continue - log warning but continue operation
+                Serial.print(F("[WARNING] Position error of "));
+                Serial.print(positionError);
+                Serial.println(F("mm is within tolerance - continuing"));
+
+                // Continue with the unloading sequence despite small position error
+                safetyDelayStartTime = currentMillis;
+                updateOperationStep(4);
+            }
+            else
+            {
+                // Major position error - mark as failure but still end the operation
+                Console.error(F("SOURCE_POSITION_ERROR"));
+                Serial.print(F("[ERROR] Position error of "));
+                Serial.print(positionError);
+                Serial.println(F("mm exceeds tolerance"));
+
+                currentOperation.inProgress = false;
+                currentOperation.success = false;
+                strncpy(currentOperation.message, "[ERROR] SOURCE_POSITION_FAILURE", sizeof(currentOperation.message));
+
+                // CRITICAL: Always call endOperation() to clean up state
+                endOperation();
+            }
             return;
         }
 
@@ -2812,14 +2907,45 @@ void processTrayUnloading()
 
         Console.serialInfo(F("Reached position 1"));
 
-        // Motor has stopped, verify position
+        // Motor has stopped, verify position with tolerance
         SystemState state = captureSystemState();
+        const float POSITION_WARNING_TOLERANCE = 2.0; // 2mm tolerance for warnings vs errors
+
         if (!isAtPosition(state.currentPositionMm, POSITION_1_MM))
         {
+            // Report the error
             Console.serialError(F("Motor did not reach position 1"));
-            currentOperation.inProgress = false;
-            currentOperation.success = false;
-            strncpy(currentOperation.message, "POSITION_FAILURE", sizeof(currentOperation.message));
+
+            // Calculate how far off we are from the target
+            float positionError = abs(state.currentPositionMm - POSITION_1_MM);
+
+            if (positionError <= POSITION_WARNING_TOLERANCE)
+            {
+                // Close enough to continue - log warning but mark operation as successful
+                Serial.print(F("[WARNING] Position error of "));
+                Serial.print(positionError);
+                Serial.println(F("mm is within tolerance - continuing"));
+
+                // Continue with the unloading sequence despite small position error
+                safetyDelayStartTime = currentMillis;
+                updateOperationStep(10);
+            }
+            else
+            {
+                // Major position error - mark as failure but still end the operation
+                Console.error(F("POSITION_ERROR"));
+                Serial.print(F("[ERROR] Position error of "));
+                Serial.print(positionError);
+                Serial.println(F("mm exceeds tolerance"));
+
+                currentOperation.inProgress = false;
+                currentOperation.success = false;
+                strncpy(currentOperation.message, "[ERROR] POSITION_FAILURE", sizeof(currentOperation.message));
+
+                // CRITICAL: Always call endOperation() to clean up state
+                // This ensures the system doesn't remain in "busy" state
+                endOperation();
+            }
             return;
         }
 
@@ -3195,75 +3321,11 @@ void initSystemStateVariables()
 }
 
 // Function to reset the system state after a failure
-// void resetSystemState()
-// {
-//     // Reset operation state variables
-//     operationInProgress = false;
-//     newCommandReceived = false;
-
-//     // Reset step tracking
-//     updateOperationStep(0);
-
-//     // Clear current operation status
-//     currentOperation.inProgress = false;
-//     currentOperation.success = false;
-//     strncpy(currentOperation.message, "RESET", sizeof(currentOperation.message));
-//     // End operation to update target tracking
-//     endOperation();
-
-//     // Reset ALL target position tracking variables
-//     hasCurrentTarget = false;
-//     hasLastTarget = false;
-//     currentTargetType = POSITION_UNDEFINED;
-//     lastTargetType = POSITION_UNDEFINED;
-//     currentTargetPositionMm = 0.0;
-//     lastTargetPositionMm = 0.0;
-//     currentTargetPulses = 0;
-//     lastTargetPulses = 0;
-
-//     // Reset operation counters
-//     trayTracking.totalLoadsCompleted = 0;
-//     trayTracking.totalUnloadsCompleted = 0;
-//     trayTracking.lastLoadTime = 0;
-//     trayTracking.lastUnloadTime = 0;
-//     Serial.println(F("[RESET] Tray tracking state reset"));
-
-//     resetLockUnlockFailures();
-
-//     // Clear any fault conditions in the motor
-//     if (motorState == MOTOR_STATE_FAULTED)
-//     {
-//         // Initiate fault clearing process
-//         clearMotorFaults();
-//         Serial.println(F("[RESET] Clearing motor faults"));
-//     }
-
-//     // Re-enable the motor if it was disabled but not due to E-stop
-//     if (!MOTOR_CONNECTOR.EnableRequest() && !isEStopActive())
-//     {
-//         MOTOR_CONNECTOR.EnableRequest(true);
-//         Serial.println(F("[RESET] Re-enabling motor"));
-//     }
-
-//     // Update motor state if not currently faulted or in fault clearing process
-//     if (motorState == MOTOR_STATE_FAULTED && !isFaultClearingInProgress())
-//     {
-//         motorState = MOTOR_STATE_IDLE;
-//         Serial.println(F("[RESET] Motor state reset to IDLE"));
-//     }
-
-//     // Update tray tracking from physical sensors
-//     SystemState state = captureSystemState();
-//     updateTrayTrackingFromSensors(state);
-//     Serial.println(F("[RESET] Tray tracking synchronized with sensors"));
-
-//     // Log the reset action
-//     Serial.println(F("[SUCCESS] System state has been reset"));
-// }
-
-// Function to reset the system state after a failure
 void resetSystemState()
 {
+    // Track overall reset success
+    bool resetSuccessful = true;
+
     // Call the initialization function to set all variables to default values
     initSystemStateVariables();
 
@@ -3275,37 +3337,105 @@ void resetSystemState()
     trayTracking.totalUnloadsCompleted = 0;
     trayTracking.lastLoadTime = 0;
     trayTracking.lastUnloadTime = 0;
-    Serial.println(F("[RESET] Tray tracking state reset"));
+    Serial.println(F("[INFO] Tray tracking state reset"));
 
-    // Clear any fault conditions in the motor
+    // Enhanced fault clearing with retry logic
     if (motorState == MOTOR_STATE_FAULTED)
     {
-        // Initiate fault clearing process
-        clearMotorFaults();
-        Serial.println(F("[RESET] Clearing motor faults"));
+        // Track whether fault clearing was successful
+        bool faultCleared = false;
+        int clearAttempts = 0;
+        const int maxClearAttempts = 3;
+
+        // Print initial message about fault clearing attempts
+        Serial.print(F("[INFO] Motor faults detected - will attempt clearing up to "));
+        Serial.print(maxClearAttempts);
+        Serial.println(F(" times"));
+
+        while (!faultCleared && clearAttempts < maxClearAttempts)
+        {
+            clearAttempts++;
+
+            // Initiate fault clearing process
+            clearMotorFaults();
+            Serial.print(F("[INFO] Attempt "));
+            Serial.print(clearAttempts);
+            Serial.print(F("/"));
+            Serial.println(maxClearAttempts);
+
+            // Wait for fault clearing to complete
+            unsigned long startTime = millis();
+            unsigned long timeoutMs = 2000; // 2 second timeout
+
+            while (isFaultClearingInProgress() && (millis() - startTime < timeoutMs))
+            {
+                // Call processFaultClearing repeatedly to advance the state machine
+                processFaultClearing();
+                delay(10); // Small delay to avoid blocking
+            }
+
+            // Check if fault clearing timed out
+            if (isFaultClearingInProgress())
+            {
+                Serial.println(F("[WARNING] Fault clearing timed out"));
+                // Force fault clearing process to end
+                faultClearState = FAULT_CLEAR_FINISHED;
+                processFaultClearing(); // Process one more time to finish
+            }
+
+            // Check if alerts were successfully cleared
+            if (!MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
+            {
+                faultCleared = true;
+                Serial.println(F("[SUCCESS] Motor faults cleared successfully"));
+                break; // Exit the retry loop
+            }
+            else
+            {
+                Serial.println(F("[WARNING] Faults still present after clearing attempt"));
+                printMotorAlerts();
+                // Add a brief delay between attempts
+                delay(500);
+            }
+        }
+
+        if (!faultCleared)
+        {
+            Serial.println(F("[ERROR] Failed to clear motor faults - Try 'motor,clear' command or cycle system power"));
+            resetSuccessful = false; // Mark reset as unsuccessful
+        }
     }
 
-    // Re-enable the motor if it was disabled but not due to E-stop
-    if (!MOTOR_CONNECTOR.EnableRequest() && !isEStopActive())
+    // Only try to re-enable motor if fault clearing was successful or no faults existed
+    if (resetSuccessful && !MOTOR_CONNECTOR.EnableRequest() && !isEStopActive())
     {
         MOTOR_CONNECTOR.EnableRequest(true);
-        Serial.println(F("[RESET] Re-enabling motor"));
+        Serial.println(F("[INFO] Re-enabling motor"));
     }
 
-    // Update motor state if not currently faulted or in fault clearing process
-    if (motorState == MOTOR_STATE_FAULTED && !isFaultClearingInProgress())
+    // Update motor state if not currently faulted (alerts check is already in the condition)
+    if (resetSuccessful && motorState == MOTOR_STATE_FAULTED && !MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
     {
         motorState = MOTOR_STATE_IDLE;
-        Serial.println(F("[RESET] Motor state reset to IDLE"));
+        Serial.println(F("[INFO] Motor state reset to IDLE"));
     }
 
-    // Update tray tracking from physical sensors
+    // Always update tray tracking regardless of motor state
     SystemState state = captureSystemState();
     updateTrayTrackingFromSensors(state);
-    Serial.println(F("[RESET] Tray tracking synchronized with sensors"));
+    Serial.println(F("[INFO] Tray tracking synchronized with sensors"));
 
-    // Log the reset action
-    Serial.println(F("[SUCCESS] System state has been reset"));
+    // Log the reset action with appropriate status
+    if (resetSuccessful)
+    {
+        Serial.println(F("[SUCCESS] System state has been fully reset"));
+        Console.acknowledge(F("SYSTEM_RESET_COMPLETE"));
+    }
+    else
+    {
+        Serial.println(F("[WARNING] System reset partially completed - motor faults persist"));
+        Console.error(F("MOTOR_FAULT_PERSIST"));
+    }
 }
 
 void resetLockUnlockFailures()
