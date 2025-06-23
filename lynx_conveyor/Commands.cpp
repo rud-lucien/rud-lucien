@@ -263,7 +263,7 @@ bool cmd_lock(char *args, CommandCaller *caller)
         // Try locking with sensor feedback
         if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_LOCK, 1000))
         {
-            Console.acknowledge(F("TRAY_"));
+            Console.print(F("[ACK], TRAY_"));
             Console.print(trayNum);
             Console.println(F("_LOCKED"));
             return true;
@@ -461,7 +461,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         // Try to parse as tray number
         trayNum = atoi(subcommand);
 
-        Console.serialInfo(F("[INFO] Disengaging tray "));
+        Console.serialInfo(F("Disengaging tray "));
         Serial.print(trayNum);
         Serial.println(F(" with sensor verification..."));
 
