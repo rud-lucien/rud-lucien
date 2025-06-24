@@ -28,7 +28,6 @@
 // Motion profile parameters (in RPM units)
 #define MOTOR_VELOCITY_RPM 300         // Maximum velocity for motor operation (RPM)
 #define MAX_ACCEL_RPM_PER_SEC 2500     // Maximum acceleration in RPM/s
-#define ACCEL_LIMIT_RPM_PER_SEC 1250   // Acceleration limit for normal operation
 #define EMPTY_SHUTTLE_VELOCITY_RPM 800 // Higher speed for empty shuttle movements
 
 // Motion direction control (1 for normal direction, -1 for reversed)
