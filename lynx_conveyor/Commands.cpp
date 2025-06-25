@@ -141,7 +141,7 @@ bool cmd_lock(char *args, CommandCaller *caller)
 
         // Try locking with sensor feedback
         Console.serialInfo(F("Locking shuttle..."));
-        if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
+        if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
             // Success acknowledgment to both outputs
             Console.acknowledge(F("SHUTTLE_LOCKED"));
@@ -261,7 +261,7 @@ bool cmd_lock(char *args, CommandCaller *caller)
         }
 
         // Try locking with sensor feedback
-        if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_LOCK, 1000))
+        if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
             Console.print(F("[ACK], TRAY_"));
             Console.print(trayNum);
@@ -393,7 +393,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
 
         // Try unlocking with sensor feedback
         Console.serialInfo(F("Unlocking shuttle..."));
-        if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
+        if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
             Console.print(F("[ACK], SHUTTLE_UNLOCKED"));
             return true;
@@ -519,7 +519,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         }
 
         // Try unlocking with sensor feedback
-        if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_UNLOCK, 1000))
+        if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
             Console.print(F("[ACK], TRAY_"));
             Console.print(trayNum);
@@ -2133,14 +2133,14 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         if (trayTracking.lastLoadTime > 0)
         {
             Console.print(F("  Last load: "));
-            Console.print((millis() - trayTracking.lastLoadTime) / 1000);
+            Console.print(timeDiff(millis(), trayTracking.lastLoadTime) / 1000);
             Console.println(F(" seconds ago"));
         }
 
         if (trayTracking.lastUnloadTime > 0)
         {
             Console.print(F("  Last unload: "));
-            Console.print((millis() - trayTracking.lastUnloadTime) / 1000);
+            Console.print(timeDiff(millis(), trayTracking.lastUnloadTime) / 1000);
             Console.println(F(" seconds ago"));
         }
         return true;
@@ -2496,7 +2496,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
             // Check current state first
             if (valve->position != VALVE_POSITION_LOCK)
             {
-                if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
+                if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
                 {
                     Console.error(F("LOCK_FAILURE"));
                     Console.serialInfo(F("Failed to lock tray - sensor didn't confirm"));
@@ -2589,7 +2589,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
             if (valve && sensor && valve->position != VALVE_POSITION_LOCK)
             {
                 // Lock the tray if it's not already locked
-                safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000);
+                safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS);
             }
 
             return true;
@@ -2654,7 +2654,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         // Unlock the tray now that the robot has gripped it
         Console.serialInfo(F("Mitsubishi has gripped the tray. Unlocking tray at position 1..."));
-        if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
+        if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
             Console.error(F("UNLOCK_FAILURE"));
             Console.serialInfo(F("Failed to unlock tray - sensor didn't confirm"));

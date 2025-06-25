@@ -1,4 +1,5 @@
 #include "MotorController.h"
+#include "Utils.h"
 
 // ----------------- Global Variables -----------------
 bool motorInitialized = false;
@@ -146,7 +147,7 @@ void initMotorSystem()
     unsigned long startTime = millis();
     bool ready = false;
 
-    while (!ready && millis() - startTime < 2000)
+    while (!ready && !timeoutElapsed(millis(), startTime, 2000)) 
     {
         if (MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED)
         {
@@ -1006,7 +1007,7 @@ void processFaultClearing()
 
     case FAULT_CLEAR_WAITING_DISABLE:
         // Wait 100ms after disabling
-        if (currentTime - faultClearTimer >= 100)
+        if (timeoutElapsed(currentTime, faultClearTimer, 100)) // CHANGED: using timeoutElapsed
         {
             faultClearState = FAULT_CLEAR_ENABLE;
         }
@@ -1021,7 +1022,7 @@ void processFaultClearing()
 
     case FAULT_CLEAR_WAITING_ENABLE:
         // Wait 100ms after enabling
-        if (currentTime - faultClearTimer >= 100)
+        if (timeoutElapsed(currentTime, faultClearTimer, 100)) // CHANGED: using timeoutElapsed
         {
             faultClearState = FAULT_CLEAR_ALERTS;
         }
@@ -1144,7 +1145,7 @@ void checkHomingProgress()
 
     // Add a delay before starting actual hardstop detection
     static const unsigned long homingStartDelay = 500; // 500ms delay
-    if (currentTime - homingStartTime < homingStartDelay)
+    if (!timeoutElapsed(currentTime, homingStartTime, homingStartDelay))
     {
         return; // Don't process hardstop detection until initial delay is complete
     }
@@ -1156,7 +1157,7 @@ void checkHomingProgress()
     int32_t currentPosition = MOTOR_CONNECTOR.PositionRefCommanded();
 
     // Check if motor is actually moving during homing (every 100ms)
-    if (currentTime - lastPositionCheckTime > 100)
+    if (timeoutElapsed(currentTime, lastPositionCheckTime, 100))
     {
         // Calculate movement since last check
         int32_t movementSinceLastCheck = abs(currentPosition - lastCheckedPosition);
@@ -1183,7 +1184,7 @@ void checkHomingProgress()
     }
 
     // Check for timeout first
-    if (currentTime - homingStartTime > 30000)
+    if (timeoutElapsed(currentTime, homingStartTime, 30000))
     { // 30 seconds timeout
         Console.serialError(F("Homing operation timed out"));
         Serial.print(F("[DIAGNOSTIC] Final HLFB state: "));
@@ -1252,14 +1253,14 @@ void checkHomingProgress()
     // 6. We've traveled at least 500 additional pulses after minimum distance
     if (homing_hlfbWentNonAsserted &&
         currentHlfbState == MotorDriver::HLFB_ASSERTED &&
-        (currentTime - homing_hlfbNonAssertedTime > 250) &&
+        timeoutElapsed(currentTime, homing_hlfbNonAssertedTime, 250) && // Debounce time check
         homing_minDistanceTraveled &&
-        (currentTime - minTimeAfterDistanceReached > 500) && // Increased to 300ms
+        timeoutElapsed(currentTime, minTimeAfterDistanceReached, 500) && // Min time after distance
         pulsesTraveledAfterMinDistance >= minimumAdditionalPulses)
-    { // NEW condition
+    {
 
         Serial.print(F("[INFO] Hardstop reached - HLFB reasserted after "));
-        Serial.print(currentTime - minTimeAfterDistanceReached);
+        Serial.print(timeDiff(currentTime, minTimeAfterDistanceReached));
         Serial.print(F("ms from minimum distance, additional travel: "));
         Serial.print(pulsesTraveledAfterMinDistance);
         Serial.println(F(" pulses"));
@@ -1290,7 +1291,7 @@ void checkHomingProgress()
             Console.serialInfo(F("Waiting for offset move to complete..."));
             unsigned long offsetMoveStartTime = millis(); // Use a fresh start time for this wait
             while (!MOTOR_CONNECTOR.StepsComplete() &&
-                   (millis() - offsetMoveStartTime < 5000))
+                   !timeoutElapsed(millis(), offsetMoveStartTime, 5000))
             { // Timeout for offset move
                 delay(10);
 
@@ -1538,7 +1539,7 @@ void handleEStop()
 
     // Only check periodically to avoid consuming too much processing time
     unsigned long currentTime = millis();
-    if (currentTime - lastEStopCheckTime < E_STOP_CHECK_INTERVAL_MS)
+    if (!timeoutElapsed(currentTime, lastEStopCheckTime, E_STOP_CHECK_INTERVAL_MS))
     {
         return;
     }

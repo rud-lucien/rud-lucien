@@ -53,6 +53,24 @@ String lastUnlockFailureDetails = "";
 unsigned long lockFailureTimestamp = 0;
 unsigned long unlockFailureTimestamp = 0;
 
+// Safe time difference calculation that handles rollover
+unsigned long timeDiff(unsigned long current, unsigned long previous)
+{
+    return current - previous; // Correctly handles rollover with unsigned arithmetic
+}
+
+// Safe timeout check that handles rollover
+bool timeoutElapsed(unsigned long current, unsigned long previous, unsigned long timeout)
+{
+    return timeDiff(current, previous) >= timeout;
+}
+
+// Safe waiting check
+bool waitTimeReached(unsigned long current, unsigned long previous, unsigned long waitTime)
+{
+    return timeDiff(current, previous) >= waitTime;
+}
+
 // Generic tray movement function - core implementation
 bool moveTray(int fromPosition, int toPosition)
 {
@@ -1134,7 +1152,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
 
     // Operation Timeout Detection
     // Detects and reports operations that exceed their timeout
-    if (operationInProgress && millis() - operationStartTime > operationTimeoutMs)
+    if (operationInProgress && timeoutElapsed(millis(), operationStartTime, operationTimeoutMs))
     {
         result.operationWithinTimeout = false;
         result.operationSequenceMessage = F("Operation exceeded timeout");
@@ -1339,7 +1357,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         // Add timestamp if available
         if (lockFailureTimestamp > 0)
         {
-            unsigned long elapsedTime = (millis() - lockFailureTimestamp) / 1000;
+            unsigned long elapsedTime = timeDiff(millis(), lockFailureTimestamp) / 1000;
             Console.print(F("              Failure occurred "));
             Console.print(elapsedTime);
             Console.println(F(" seconds ago"));
@@ -1359,7 +1377,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         // Add timestamp if available
         if (unlockFailureTimestamp > 0)
         {
-            unsigned long elapsedTime = (millis() - unlockFailureTimestamp) / 1000;
+            unsigned long elapsedTime = timeDiff(millis(), unlockFailureTimestamp) / 1000;
             Console.print(F("              Failure occurred "));
             Console.print(elapsedTime);
             Console.println(F(" seconds ago"));
@@ -1464,7 +1482,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         if (operationInProgress)
         {
             // Show elapsed time information for active operations
-            unsigned long elapsedTime = millis() - operationStartTime;
+            unsigned long elapsedTime = timeDiff(millis(), operationStartTime);
             Console.print(F("WITHIN TIMEOUT - Elapsed: "));
             Console.print(elapsedTime / 1000);
             Console.print(F("."));
@@ -1770,7 +1788,7 @@ void processTrayOperations()
     unsigned long currentTime = millis();
 
     // Check for timeout
-    if (currentTime - currentOperation.startTime > operationTimeoutMs)
+    if (timeoutElapsed(currentTime, currentOperation.startTime, operationTimeoutMs))
     {
         // Handle timeout
         Console.serialError(F("Tray operation timeout"));
@@ -1897,7 +1915,7 @@ void processTrayLoading()
     case 1: // Verify sensor readings after brief delay to ensure stability
     {
         // Wait for sensor verification delay
-        if (currentMillis - sensorVerificationStartTime < SENSOR_VERIFICATION_DELAY_MS)
+        if (!timeoutElapsed(currentMillis, sensorVerificationStartTime, SENSOR_VERIFICATION_DELAY_MS))
         {
             return;
         }
@@ -1945,7 +1963,7 @@ void processTrayLoading()
         {
             Console.serialInfo(F("Attempting to lock shuttle to grip tray"));
 
-            if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_LOCK, 1000))
+            if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
             {
                 Console.serialError(F("Failed to lock shuttle - sensor didn't confirm"));
                 currentOperation.inProgress = false;
@@ -1972,9 +1990,9 @@ void processTrayLoading()
     case 3: // Wait for shuttle lock valve actuation
     {
         // Wait for valve actuation time to elapse
-        if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
+        if (!timeoutElapsed(currentMillis, valveActuationStartTime, VALVE_ACTUATION_TIME_MS))
         {
-            // Not enough time has elapsed, return and check again next cycle
+            // Not enough time has elapsed, check again next cycle
             return;
         }
 
@@ -2003,7 +2021,7 @@ void processTrayLoading()
         {
             Console.serialInfo(F("Attempting to unlock tray at position 1"));
 
-            if (!safeValveOperation(*valve, *getTray1Sensor(), VALVE_POSITION_UNLOCK, 1000))
+            if (!safeValveOperation(*valve, *getTray1Sensor(), VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
             {
                 Console.serialError(F("Failed to unlock tray 1 - sensor didn't confirm"));
                 currentOperation.inProgress = false;
@@ -2030,9 +2048,9 @@ void processTrayLoading()
     case 5: // Wait for tray unlock valve actuation
     {
         // Wait for valve actuation time to elapse
-        if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
+        if (!timeoutElapsed(currentMillis, valveActuationStartTime, VALVE_ACTUATION_TIME_MS))
         {
-            // Not enough time has elapsed, return and check again next cycle
+            // Not enough time has elapsed, check again next cycle
             return;
         }
 
@@ -2057,7 +2075,7 @@ void processTrayLoading()
     case 6: // Safety delay after unlocking tray before movement
     {
         // Wait for safety delay to elapse
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_AFTER_UNLOCK_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_AFTER_UNLOCK_MS))
         {
             return;
         }
@@ -2080,7 +2098,7 @@ void processTrayLoading()
     case 7: // Safety delay before starting motor movement
     {
         // Wait for safety delay before movement
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_BEFORE_MOVEMENT_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_BEFORE_MOVEMENT_MS))
         {
             return;
         }
@@ -2179,7 +2197,7 @@ void processTrayLoading()
     case 9: // Safety delay after motor movement
     {
         // Wait for safety delay after movement
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_AFTER_MOVEMENT_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_AFTER_MOVEMENT_MS))
         {
             return;
         }
@@ -2192,7 +2210,7 @@ void processTrayLoading()
         {
             Console.serialInfo(F("Attempting to unlock shuttle to release tray"));
 
-            if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_UNLOCK, 1000))
+            if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
             {
                 Console.serialError(F("Failed to unlock shuttle - sensor didn't confirm"));
                 currentOperation.inProgress = false;
@@ -2219,9 +2237,9 @@ void processTrayLoading()
     case 10: // Wait for shuttle unlock valve actuation
     {
         // Wait for valve actuation time to elapse
-        if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
+        if (!timeoutElapsed(currentMillis, valveActuationStartTime, VALVE_ACTUATION_TIME_MS))
         {
-            // Not enough time has elapsed, return and check again next cycle
+            // Not enough time has elapsed, check again next cycle
             return;
         }
 
@@ -2246,7 +2264,7 @@ void processTrayLoading()
     case 11: // Safety delay after shuttle unlock, then lock tray at target
     {
         // Wait for safety delay to elapse
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_AFTER_UNLOCK_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_AFTER_UNLOCK_MS))
         {
             return;
         }
@@ -2272,7 +2290,7 @@ void processTrayLoading()
 
         if (valve && sensor)
         {
-            if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
+            if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
             {
                 Console.serialError(F("Failed to lock tray at target position - sensor didn't confirm"));
                 currentOperation.inProgress = false;
@@ -2318,9 +2336,9 @@ void processTrayLoading()
         }
 
         // For moved trays, wait for valve actuation time to elapse
-        if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
+        if (!timeoutElapsed(currentMillis, valveActuationStartTime, VALVE_ACTUATION_TIME_MS))
         {
-            // Not enough time has elapsed, return and check again next cycle
+            // Not enough time has elapsed, check again next cycle
             return;
         }
 
@@ -2370,7 +2388,7 @@ void processTrayLoading()
     case 13: // Safety delay before returning to position 1
     {
         // Wait for safety delay to elapse
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_BEFORE_MOVEMENT_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_BEFORE_MOVEMENT_MS))
         {
             return;
         }
@@ -2574,7 +2592,7 @@ void processTrayUnloading()
     case 1: // Verify sensor readings for stability
     {
         // Wait for sensor verification delay
-        if (currentMillis - sensorVerificationStartTime < SENSOR_VERIFICATION_DELAY_MS)
+        if (!timeoutElapsed(currentMillis, sensorVerificationStartTime, SENSOR_VERIFICATION_DELAY_MS))
         {
             return;
         }
@@ -2710,7 +2728,7 @@ void processTrayUnloading()
     case 4: // Safety delay after reaching source position
     {
         // Wait for safety delay to elapse
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_AFTER_MOVEMENT_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_AFTER_MOVEMENT_MS))
         {
             return;
         }
@@ -2723,7 +2741,7 @@ void processTrayUnloading()
         {
             Console.serialInfo(F("Attempting to lock shuttle to grip tray"));
 
-            if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_LOCK, 1000))
+            if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
             {
                 Console.serialError(F("Failed to lock shuttle - sensor didn't confirm"));
                 currentOperation.inProgress = false;
@@ -2751,7 +2769,7 @@ void processTrayUnloading()
     case 5: // Wait for shuttle lock valve actuation
     {
         // Wait for valve actuation time to elapse
-        if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
+        if (!timeoutElapsed(currentMillis, valveActuationStartTime, VALVE_ACTUATION_TIME_MS))
         {
             // Not enough time has elapsed, check again next cycle
             return;
@@ -2789,7 +2807,7 @@ void processTrayUnloading()
 
         if (valve && sensor)
         {
-            if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, 1000))
+            if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
             {
                 Console.serialError(F("Failed to unlock tray - sensor didn't confirm"));
                 currentOperation.inProgress = false;
@@ -2817,7 +2835,7 @@ void processTrayUnloading()
     case 6: // Wait for tray unlock valve actuation
     {
         // Wait for valve actuation time to elapse
-        if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
+        if (!timeoutElapsed(currentMillis, valveActuationStartTime, VALVE_ACTUATION_TIME_MS))
         {
             // Not enough time has elapsed, check again next cycle
             return;
@@ -2856,7 +2874,7 @@ void processTrayUnloading()
     case 7: // Safety delay after tray unlock
     {
         // Wait for safety delay to elapse
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_AFTER_UNLOCK_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_AFTER_UNLOCK_MS))
         {
             return;
         }
@@ -2872,7 +2890,7 @@ void processTrayUnloading()
     case 8: // Move to position 1 with the tray
     {
         // Wait for safety delay before movement
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_BEFORE_MOVEMENT_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_BEFORE_MOVEMENT_MS))
         {
             return;
         }
@@ -2958,7 +2976,7 @@ void processTrayUnloading()
     case 10: // Safety delay after movement to position 1, unlock shuttle, lock tray
     {
         // Wait for safety delay after movement
-        if (currentMillis - safetyDelayStartTime < SAFETY_DELAY_AFTER_MOVEMENT_MS)
+        if (!timeoutElapsed(currentMillis, safetyDelayStartTime, SAFETY_DELAY_AFTER_MOVEMENT_MS))
         {
             return;
         }
@@ -2971,7 +2989,7 @@ void processTrayUnloading()
         {
             Console.serialInfo(F("Attempting to unlock shuttle to release tray"));
 
-            if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_UNLOCK, 1000))
+            if (!safeValveOperation(*shuttleValve, *getShuttleSensor(), VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
             {
                 Console.serialError(F("Failed to unlock shuttle - sensor didn't confirm"));
                 currentOperation.inProgress = false;
@@ -3001,7 +3019,7 @@ void processTrayUnloading()
         if (needsMovementToPos1)
         {
             // For trays that were moved, wait for shuttle unlock to complete
-            if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
+            if (!timeoutElapsed(currentMillis, valveActuationStartTime, VALVE_ACTUATION_TIME_MS))
             {
                 // Not enough time has elapsed, check again next cycle
                 return;
@@ -3028,7 +3046,7 @@ void processTrayUnloading()
             {
                 Console.serialInfo(F("Attempting to lock tray at position 1"));
 
-                if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, 1000))
+                if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
                 {
                     Console.serialError(F("Failed to lock tray at position 1 - sensor didn't confirm"));
                     currentOperation.inProgress = false;
@@ -3073,7 +3091,7 @@ void processTrayUnloading()
     case 12: // Wait for tray lock at position 1, update tracking
     {
         // Wait for valve actuation time to elapse
-        if (currentMillis - valveActuationStartTime < VALVE_ACTUATION_TIME_MS)
+        if (!timeoutElapsed(currentMillis, valveActuationStartTime, VALVE_ACTUATION_TIME_MS))
         {
             // Not enough time has elapsed, check again next cycle
             return;
@@ -3367,7 +3385,7 @@ void resetSystemState()
             unsigned long startTime = millis();
             unsigned long timeoutMs = 2000; // 2 second timeout
 
-            while (isFaultClearingInProgress() && (millis() - startTime < timeoutMs))
+            while (isFaultClearingInProgress() && !timeoutElapsed(millis(), startTime, timeoutMs))
             {
                 // Call processFaultClearing repeatedly to advance the state machine
                 processFaultClearing();

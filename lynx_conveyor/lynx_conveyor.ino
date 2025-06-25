@@ -78,7 +78,6 @@ void setup()
 // The main loop
 void loop()
 {
-
     unsigned long currentTime = millis();
 
     // Check for E-stop condition (highest priority)
@@ -123,7 +122,7 @@ void loop()
     }
 
     // Log system state periodically if logging is enabled
-    if (logging.logInterval > 0 && currentTime - logging.previousLogTime >= logging.logInterval)
+    if (logging.logInterval > 0 && waitTimeReached(currentTime, logging.previousLogTime, logging.logInterval))
     {
         logging.previousLogTime = currentTime;
         logSystemState();
@@ -156,9 +155,12 @@ void loop()
         processEncoderInput();
     }
 
+    // Pressure check using waitTimeReached helper for safe rollover handling
+    static const unsigned long PRESSURE_CHECK_INTERVAL = 10000; // 10 seconds
     static unsigned long lastPressureCheckTime = 0;
-    if (currentTime - lastPressureCheckTime > 10000)
-    { // Check every 10 seconds
+    
+    if (waitTimeReached(currentTime, lastPressureCheckTime, PRESSURE_CHECK_INTERVAL))
+    {
         if (!isPressureSufficient())
         {
             Console.serialWarning(F("System pressure below minimum threshold (21.75 PSI)"));
@@ -166,6 +168,3 @@ void loop()
         lastPressureCheckTime = currentTime;
     }
 }
-
-
-

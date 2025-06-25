@@ -100,8 +100,8 @@ void processEncoderInput()
         // Update accumulated delta
         accumulatedDelta += encoderDelta;
 
-        // Calculate time since last update
-        unsigned long timeDelta = currentTime - lastEncoderUpdateTime;
+        // Calculate time since last update - CHANGED: using timeDiff() for rollover safety
+        unsigned long timeDelta = timeDiff(currentTime, lastEncoderUpdateTime);
         if (timeDelta < ENCODER_DEBOUNCE_MS)
         {
             // Update position but wait to process movement (debounce)
@@ -114,7 +114,8 @@ void processEncoderInput()
 
         // Either we have accumulated enough movement or waited long enough since last move
         // Increase this value for smoother, less frequent moves
-        if (abs(accumulatedDelta) >= 10 || (currentTime - lastMoveTime > 150 && accumulatedDelta != 0))
+        // CHANGED: using timeoutElapsed() for rollover safety
+        if (abs(accumulatedDelta) >= 10 || (timeoutElapsed(currentTime, lastMoveTime, 150) && accumulatedDelta != 0))
         {
             shouldMove = true;
         }

@@ -1,6 +1,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+//=============================================================================
+// INCLUDES
+//=============================================================================
 #include "Arduino.h"
 #include "ClearCore.h"
 #include "ValveController.h"
@@ -12,40 +15,15 @@
 #include "OutputManager.h"
 #include "EthernetController.h"
 
-// Forward declarations of types from other headers
-// to avoid circular dependencies
+//=============================================================================
+// FORWARD DECLARATIONS
+//=============================================================================
 struct LoggingManagement;
 class CommandCaller;
 
-// Position tracking
-extern double commandedPositionMm; // Last commanded position, -1 means no command yet
-
-// Operation state tracking
-extern bool operationInProgress;         // Flag indicating if an operation is running
-extern bool newCommandReceived;          // Set when a new command comes in
-extern unsigned long operationStartTime; // When the current operation started
-extern unsigned long operationTimeoutMs; // Default timeout (10 seconds)
-extern int currentOperationStep;         // Current step in operation sequence
-extern int expectedOperationStep;        // Expected step at this point
-extern bool operationEncoderState;       // True if encoder control is active during operation
-extern bool homingEncoderState;          // Stores the encoder control state before homing begins
-
-// State machine timing variables
-extern unsigned long valveActuationStartTime;
-extern const unsigned long VALVE_ACTUATION_TIME_MS;
-extern const unsigned long SAFETY_DELAY_AFTER_UNLOCK_MS;
-extern const unsigned long SAFETY_DELAY_BEFORE_MOVEMENT_MS;
-extern const unsigned long SAFETY_DELAY_AFTER_MOVEMENT_MS;
-extern const unsigned long SENSOR_VERIFICATION_DELAY_MS;
-
-// Lock/unlock operation status tracking (used by safety validation)
-extern bool lastLockOperationFailed;
-extern bool lastUnlockOperationFailed;
-extern String lastLockFailureDetails;
-extern String lastUnlockFailureDetails;
-extern unsigned long lockFailureTimestamp;
-extern unsigned long unlockFailureTimestamp;
-
+//=============================================================================
+// ENUMERATIONS
+//=============================================================================
 // Operation type enum
 enum OperationType
 {
@@ -56,6 +34,21 @@ enum OperationType
     OPERATION_TRAY_ADVANCE
 };
 
+// Abort reason enum
+enum AbortReason
+{
+    ABORT_REASON_ESTOP,
+    ABORT_REASON_MOTOR_TIMEOUT,
+    ABORT_REASON_OPERATION_TIMEOUT,
+    ABORT_REASON_SENSOR_MISMATCH,
+    ABORT_REASON_COMMUNICATION_LOSS,
+    ABORT_REASON_PNEUMATIC_FAILURE,
+    ABORT_REASON_UNKNOWN
+};
+
+//=============================================================================
+// STRUCTURE DEFINITIONS
+//=============================================================================
 // System state structure - captures all sensor and actuator states
 struct SystemState
 {
@@ -115,9 +108,6 @@ struct TrayTracking
     uint16_t totalUnloadsCompleted;
 };
 
-// Global variable declaration
-extern TrayTracking trayTracking;
-
 // Tray status structure
 struct TrayStatus
 {
@@ -127,8 +117,6 @@ struct TrayStatus
     unsigned long lastOperationTime;
     OperationType lastSuccessfulOperation;
 };
-
-extern TrayStatus trayStatus;
 
 // Operation status structure
 struct OperationStatus
@@ -141,21 +129,7 @@ struct OperationStatus
     char message[32];
 };
 
-extern OperationStatus currentOperation;
-
-// Abort reason enum
-enum AbortReason
-{
-    ABORT_REASON_ESTOP,
-    ABORT_REASON_MOTOR_TIMEOUT,
-    ABORT_REASON_OPERATION_TIMEOUT,
-    ABORT_REASON_SENSOR_MISMATCH,
-    ABORT_REASON_COMMUNICATION_LOSS,
-    ABORT_REASON_PNEUMATIC_FAILURE,
-    ABORT_REASON_UNKNOWN
-};
-
-// Safety validation results - per operation type
+// Safety validation results structure
 struct SafetyValidationResult
 {
     // Motor movement safety flags
@@ -220,30 +194,93 @@ struct SafetyValidationResult
 };
 
 //=============================================================================
-// FUNCTION DECLARATIONS
+// CONSTANTS AND TIMING PARAMETERS
 //=============================================================================
+extern const unsigned long VALVE_ACTUATION_TIME_MS;
+extern const unsigned long SAFETY_DELAY_AFTER_UNLOCK_MS;
+extern const unsigned long SAFETY_DELAY_BEFORE_MOVEMENT_MS;
+extern const unsigned long SAFETY_DELAY_AFTER_MOVEMENT_MS;
+extern const unsigned long SENSOR_VERIFICATION_DELAY_MS;
 
+//=============================================================================
+// SYSTEM STATE TRACKING
+//=============================================================================
+// Position tracking
+extern double commandedPositionMm; // Last commanded position, -1 means no command yet
+extern SystemState previousState;  // NOW DEFINED AFTER SystemState
+
+// Operation state tracking
+extern bool operationInProgress;         // Flag indicating if an operation is running
+extern bool newCommandReceived;          // Set when a new command comes in
+extern unsigned long operationStartTime; // When the current operation started
+extern unsigned long operationTimeoutMs; // Default timeout (10 seconds)
+extern int currentOperationStep;         // Current step in operation sequence
+extern int expectedOperationStep;        // Expected step at this point
+extern bool operationEncoderState;       // True if encoder control is active during operation
+extern bool homingEncoderState;          // Stores the encoder control state before homing begins
+
+// Timing and state machine variables
+extern unsigned long valveActuationStartTime;
+
+// Lock/unlock operation status tracking
+extern bool lastLockOperationFailed;
+extern bool lastUnlockOperationFailed;
+extern String lastLockFailureDetails;
+extern String lastUnlockFailureDetails;
+extern unsigned long lockFailureTimestamp;
+extern unsigned long unlockFailureTimestamp;
+
+// Global variable exports
+extern TrayTracking trayTracking;
+extern TrayStatus trayStatus;
+extern OperationStatus currentOperation;
+
+//=============================================================================
+// TIME HANDLING FUNCTIONS
+//=============================================================================
+// Safe time difference calculation that handles rollover
+unsigned long timeDiff(unsigned long current, unsigned long previous);
+
+// Safe timeout check that handles rollover
+bool timeoutElapsed(unsigned long current, unsigned long previous, unsigned long timeout);
+
+// Safe waiting check
+bool waitTimeReached(unsigned long current, unsigned long previous, unsigned long waitTime);
+
+//=============================================================================
+// SYSTEM STATE FUNCTIONS
+//=============================================================================
 // System state tracking functions
 SystemState captureSystemState();
 void printSystemState(const SystemState &state);
+void initSystemStateVariables();
+void resetSystemState(); // Function to reset the system state after a failure
 
+//=============================================================================
+// SAFETY FUNCTIONS
+//=============================================================================
 // Safety validation functions
 SafetyValidationResult validateSafety(const SystemState &state);
 void printSafetyStatus(const SafetyValidationResult &result);
+void abortOperation(AbortReason reason);
+const char *getAbortReasonString(AbortReason reason);
 
+//=============================================================================
+// MOTION AND POSITION FUNCTIONS
+//=============================================================================
 // Motor position helper functions
 bool isAtPosition(double currentPosition, double targetPosition);
-
-// Additional movement helper
 bool isMovingToPosition(double targetPosition, double currentTargetPositionMm);
 
-// Add to Utils.h in the FUNCTION DECLARATIONS section
+//=============================================================================
+// TRAY TRACKING AND OPERATION FUNCTIONS
+//=============================================================================
 void updateTrayTrackingFromSensors(const SystemState &state);
+void resetTrayTracking();
+void resetLockUnlockFailures();
 
 // Process tray operations
 void processTrayOperations();
-
-// Helper functions for specific operation types
 void processTrayLoading();
 void processTrayUnloading();
 void processTrayAdvance();
@@ -251,7 +288,7 @@ void processTrayAdvance();
 // Operation management
 void beginOperation();
 void endOperation();
-void updateOperationStep(int newStep); // New function for synchronized step tracking
+void updateOperationStep(int newStep);
 
 // Tray tracking management functions
 bool moveTray(int fromPosition, int toPosition);
@@ -265,16 +302,5 @@ int determineLoadingWorkflow();
 int determineUnloadingWorkflow();
 bool isPathClearForLoading(double startPosition, double targetPosition, const SystemState &state);
 bool isPathClearForUnloading(double startPosition, double targetPosition, const SystemState &state);
-
-void abortOperation(AbortReason reason);
-const char *getAbortReasonString(AbortReason reason);
-void resetSystemState(); // Function to reset the system state after a failure
-
-// Global variable declaration
-extern SystemState previousState;
-
-void resetLockUnlockFailures();
-void resetTrayTracking();
-void initSystemStateVariables();
 
 #endif // UTILS_H

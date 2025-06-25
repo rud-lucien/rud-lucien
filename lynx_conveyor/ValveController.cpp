@@ -346,7 +346,8 @@ bool waitForSensor(CylinderSensor &sensor, bool expectedState, unsigned long tim
     unsigned long startTime = millis();
     while (sensorRead(sensor) != expectedState)
     {
-        if (millis() - startTime > timeoutMs)
+        // Replace direct subtraction with timeoutElapsed helper
+        if (timeoutElapsed(millis(), startTime, timeoutMs))
         {
             Serial.print(F("[ERROR] Sensor timeout: waited "));
             Serial.print(timeoutMs);

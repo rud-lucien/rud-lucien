@@ -108,7 +108,8 @@ void processEthernetConnections()
         if (clients[i] && clients[i].connected())
         {
             // Check if client has been inactive too long
-            if (currentTime - clientLastActivityTime[i] > CLIENT_TIMEOUT_MS)
+            // CHANGED: using timeoutElapsed instead of direct subtraction
+            if (timeoutElapsed(currentTime, clientLastActivityTime[i], CLIENT_TIMEOUT_MS))
             {
                 Serial.print(F("[NETWORK] Closing inactive client: "));
                 Serial.print(clients[i].remoteIP());
@@ -119,9 +120,10 @@ void processEthernetConnections()
         }
     }
 
-    // Periodic connection testing (every 30 seconds)
+    // Periodic connection testing (every 60 seconds)
     static unsigned long lastConnectionTestTime = 0;
-    if (currentTime - lastConnectionTestTime > 60000)
+    // CHANGED: using timeoutElapsed instead of direct subtraction
+    if (timeoutElapsed(currentTime, lastConnectionTestTime, 60000))
     {
         lastConnectionTestTime = currentTime;
 
@@ -131,7 +133,8 @@ void processEthernetConnections()
             if (clients[i] && clients[i].connected())
             {
                 // Add grace period check here
-                if (currentTime - clientLastActivityTime[i] < 5000)
+                // CHANGED: using !timeoutElapsed for "less than" time check
+                if (!timeoutElapsed(currentTime, clientLastActivityTime[i], 5000))
                 {
                     // Skip new connections (less than 5 seconds old)
                     continue;
@@ -206,7 +209,8 @@ void testConnections()
     unsigned long currentTime = millis();
 
     // Test every 30 seconds
-    if (currentTime - lastConnectionTestTime < 30000)
+    // CHANGED: using !timeoutElapsed for "less than" time check
+    if (!timeoutElapsed(currentTime, lastConnectionTestTime, 30000))
     {
         return;
     }

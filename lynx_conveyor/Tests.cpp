@@ -221,7 +221,7 @@ bool testHomingRepeatability()
             }
             // Print status every 2 seconds for user feedback
             static unsigned long lastStatusPrint = 0;
-            if (currentTime - lastStatusPrint > 2000)
+            if (timeoutElapsed(currentTime, lastStatusPrint, 2000))
             {
                 Serial.print(F("[DIAGNOSTIC] Waiting for homing to complete. Current state: "));
                 switch (motorState)
@@ -272,7 +272,7 @@ bool testHomingRepeatability()
             }
             // Use a timeout longer than the internal one in executeHomingSequence (which is 60 seconds)
             // But DO NOT proceed if homing hasn't completed successfully
-            else if (currentTime - lastActionTime > 70000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 70000))
             { // 70 seconds (longer than the 60-second internal timeout)
                 Console.serialError(F("Timeout waiting for homing to complete."));
                 Serial.print(F("[DIAGNOSTIC] Current state: "));
@@ -312,7 +312,7 @@ bool testHomingRepeatability()
             {
                 return false;
             }
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 currentPhase = PHASE_MOVE_TO_POSITION;
                 lastActionTime = currentTime;
@@ -396,7 +396,7 @@ bool testHomingRepeatability()
                 return false;
             }
             // Add a timeout after a reasonable amount of time
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             { // Increased to 60 seconds
                 Console.serialError(F("Timeout waiting for move to complete."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -412,7 +412,7 @@ bool testHomingRepeatability()
             {
                 return false;
             }
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 currentPhase = PHASE_REPEAT_HOMING;
                 lastActionTime = currentTime;
@@ -507,7 +507,7 @@ bool testHomingRepeatability()
                 return false;
             }
             // Use a timeout longer than the internal one
-            else if (currentTime - lastActionTime > 70000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 70000))
             {
                 Console.serialError(F("Timeout waiting for repeat homing to complete."));
                 Console.serialError(F("Cannot proceed without successful homing. Aborting test."));
@@ -523,7 +523,7 @@ bool testHomingRepeatability()
             {
                 return false;
             }
-            if (currentTime - lastActionTime >= 2000)
+            if (timeoutElapsed(currentTime, lastActionTime, 2000))
             {                               // 2 second non-blocking pause
                 currentPhase = PHASE_START; // Move to next cycle after pause
             }
@@ -749,7 +749,7 @@ bool testPositionCycling()
                 return false;
             }
             // IMPROVEMENT 3: Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             { // 60-second timeout
                 Console.serialError(F("Timeout waiting for movement to Position 3."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -773,14 +773,14 @@ bool testPositionCycling()
                 Serial.print(F("[DIAGNOSTIC] Pausing at Position 3: "));
                 Serial.print(getMotorPositionMm());
                 Serial.print(F("mm, Waiting: "));
-                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(timeDiff(currentTime, lastActionTime) / 1000);
                 Serial.print(F("/"));
                 Serial.print(WAIT_TIME_MS / 1000);
                 Serial.println(F(" seconds"));
                 lastWaitPos3Print = currentTime;
             }
 
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 currentPhase = PHASE_MOVE_TO_POSITION_1;
                 lastActionTime = currentTime;
@@ -861,7 +861,7 @@ bool testPositionCycling()
                 return false;
             }
             // IMPROVEMENT 3: Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             { // 60-second timeout
                 Console.serialError(F("Timeout waiting for movement to Position 1."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -885,14 +885,14 @@ bool testPositionCycling()
                 Serial.print(F("[DIAGNOSTIC] Pausing at Position 1: "));
                 Serial.print(getMotorPositionMm());
                 Serial.print(F("mm, Waiting: "));
-                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(timeDiff(currentTime, lastActionTime) / 1000);
                 Serial.print(F("/"));
                 Serial.print(WAIT_TIME_MS / 1000);
                 Serial.println(F(" seconds"));
                 lastWaitPos1Print = currentTime;
             }
 
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 currentPhase = PHASE_MOVE_TO_POSITION_2;
                 lastActionTime = currentTime;
@@ -972,7 +972,7 @@ bool testPositionCycling()
                 return false;
             }
             // IMPROVEMENT 3: Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             { // 60-second timeout
                 Console.serialError(F("Timeout waiting for movement to Position 2."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -996,14 +996,14 @@ bool testPositionCycling()
                 Serial.print(F("[DIAGNOSTIC] Pausing at Position 2: "));
                 Serial.print(getMotorPositionMm());
                 Serial.print(F("mm, Waiting: "));
-                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(timeDiff(currentTime, lastActionTime) / 1000);
                 Serial.print(F("/"));
                 Serial.print(WAIT_TIME_MS / 1000);
                 Serial.println(F(" seconds"));
                 lastWaitPos2Print = currentTime;
             }
 
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 currentPhase = PHASE_MOVE_BACK_TO_POSITION_1;
                 lastActionTime = currentTime;
@@ -1095,7 +1095,7 @@ bool testPositionCycling()
                 return false;
             }
             // IMPROVEMENT 3: Add timeout handling
-            else if (currentTime - lastActionTime > 30000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 30000))
             { // 30-second timeout
                 Console.serialError(F("Timeout waiting for movement back to Position 1."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -1114,7 +1114,7 @@ bool testPositionCycling()
             // Short pause before next cycle
             // IMPROVEMENT 2: Add status updates during wait phases
             static unsigned long lastPauseCycleStatusPrint = 0;
-            if (currentTime - lastPauseCycleStatusPrint > 2000)
+            if (timeoutElapsed(currentTime, lastPauseCycleStatusPrint, 2000))
             {
                 Serial.print(F("[DIAGNOSTIC] Preparing for next cycle. Completed: "));
                 Serial.print(cyclesCompleted);
@@ -1123,7 +1123,7 @@ bool testPositionCycling()
                 lastPauseCycleStatusPrint = currentTime;
             }
 
-            if (currentTime - lastActionTime >= 2000)
+            if (timeoutElapsed(currentTime, lastActionTime, 2000))
             { // 2 second pause
                 currentPhase = PHASE_START;
             }
@@ -1448,7 +1448,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             { // 60-second timeout
                 Console.serialError(F("Timeout waiting for movement to Position 1."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -1491,7 +1491,7 @@ bool testTrayHandling()
             }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
-            if (currentTime - lastSettlingPrint > 2000)
+            if (timeoutElapsed(currentTime, lastSettlingPrint, 2000))
             {
                 Console.serialInfo(F("Waiting for tray to settle at Position 1..."));
                 lastSettlingPrint = currentTime;
@@ -1519,7 +1519,7 @@ bool testTrayHandling()
 
             if (valve1 && sensor1)
             {
-                if (safeValveOperation(*valve1, *sensor1, VALVE_POSITION_LOCK, 1000))
+                if (safeValveOperation(*valve1, *sensor1, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
                 {
                     Console.serialInfo(F("Tray locked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_TRAY_POS1;
@@ -1800,7 +1800,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             { // 60-second timeout
                 Console.serialError(F("Timeout waiting for movement to Position 3."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -1843,7 +1843,7 @@ bool testTrayHandling()
             }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
-            if (currentTime - lastSettlingPrint > 2000)
+            if (timeoutElapsed(currentTime, lastSettlingPrint, 2000))
             {
                 Console.serialInfo(F("Waiting for tray to settle at Position 3..."));
                 lastSettlingPrint = currentTime;
@@ -1975,14 +1975,14 @@ bool testTrayHandling()
             if (currentTime - lastWaitPos3Print > 2000)
             {
                 Serial.print(F("[DIAGNOSTIC] Waiting at Position 3 with tray locked. Elapsed: "));
-                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(timeDiff(currentTime, lastActionTime) / 1000);
                 Serial.print(F("/"));
                 Serial.print(WAIT_TIME_MS / 1000);
                 Serial.println(F(" seconds"));
                 lastWaitPos3Print = currentTime;
             }
 
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 Console.serialInfo(F("Moving empty shuttle back to Position 1..."));
                 currentPhase = PHASE_RETURN_TO_POS1_FROM_POS3_EMPTY;
@@ -2068,7 +2068,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             {
                 Console.serialError(F("Timeout waiting for empty shuttle return to Position 1."));
                 stopMotion();
@@ -2090,14 +2090,14 @@ bool testTrayHandling()
             if (currentTime - lastWaitPos1EmptyPrint > 2000)
             {
                 Serial.print(F("[DIAGNOSTIC] Waiting at Position 1 with empty shuttle. Elapsed: "));
-                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(timeDiff(currentTime, lastActionTime) / 1000);
                 Serial.print(F("/"));
                 Serial.print(WAIT_TIME_MS / 1000);
                 Serial.println(F(" seconds"));
                 lastWaitPos1EmptyPrint = currentTime;
             }
 
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 Console.serialInfo(F("Returning to Position 3 to pick up tray..."));
                 currentPhase = PHASE_RETURN_TO_POS3;
@@ -2193,7 +2193,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             {
                 Console.serialError(F("Timeout waiting for return to Position 3."));
                 stopMotion();
@@ -2424,7 +2424,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             { // 60-second timeout
                 Console.serialError(F("Timeout waiting for movement to Position 1 from Position 3."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -2466,7 +2466,7 @@ bool testTrayHandling()
             }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
-            if (currentTime - lastSettlingPrint > 2000)
+            if (timeoutElapsed(currentTime, lastSettlingPrint, 2000))
             {
                 Console.serialInfo(F("Waiting for tray to settle at Position 1 after return from Position 3..."));
                 lastSettlingPrint = currentTime;
@@ -2547,7 +2547,7 @@ bool testTrayHandling()
 
             if (valve1 && sensor1)
             {
-                if (safeValveOperation(*valve1, *sensor1, VALVE_POSITION_LOCK, 1000))
+                if (safeValveOperation(*valve1, *sensor1, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
                 {
                     Console.serialInfo(F("Tray locked at Position 1."));
                     currentPhase = PHASE_DELAY_AFTER_LOCK_TRAY_POS1_FROM_3;
@@ -2598,14 +2598,14 @@ bool testTrayHandling()
             if (currentTime - lastWaitPos1Print > 2000)
             {
                 Serial.print(F("[DIAGNOSTIC] Waiting at Position 1 with tray locked. Elapsed: "));
-                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(timeDiff(currentTime, lastActionTime) / 1000);
                 Serial.print(F("/"));
                 Serial.print(WAIT_TIME_MS / 1000);
                 Serial.println(F(" seconds"));
                 lastWaitPos1Print = currentTime;
             }
 
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 currentPhase = PHASE_LOCK_SHUTTLE_AT_POS1_FROM_3;
                 lastActionTime = currentTime;
@@ -2855,7 +2855,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             { // 60-second timeout
                 Console.serialError(F("Timeout waiting for movement to Position 2."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -2898,7 +2898,7 @@ bool testTrayHandling()
             }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
-            if (currentTime - lastSettlingPrint > 2000)
+            if (timeoutElapsed(currentTime, lastSettlingPrint, 2000))
             {
                 Console.serialInfo(F("Waiting for tray to settle at Position 2..."));
                 lastSettlingPrint = currentTime;
@@ -3030,14 +3030,14 @@ bool testTrayHandling()
             if (currentTime - lastWaitPos2Print > 2000)
             {
                 Serial.print(F("[DIAGNOSTIC] Waiting at Position 2 with tray locked. Elapsed: "));
-                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(timeDiff(currentTime, lastActionTime) / 1000);
                 Serial.print(F("/"));
                 Serial.print(WAIT_TIME_MS / 1000);
                 Serial.println(F(" seconds"));
                 lastWaitPos2Print = currentTime;
             }
 
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 Console.serialInfo(F("Moving empty shuttle back to Position 1..."));
                 currentPhase = PHASE_RETURN_TO_POS1_FROM_POS2_EMPTY;
@@ -3123,7 +3123,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             {
                 Console.serialError(F("Timeout waiting for empty shuttle return to Position 1."));
                 stopMotion();
@@ -3145,14 +3145,14 @@ bool testTrayHandling()
             if (currentTime - lastWaitPos1EmptyFromPos2Print > 2000)
             {
                 Serial.print(F("[DIAGNOSTIC] Waiting at Position 1 with empty shuttle from Position 2. Elapsed: "));
-                Serial.print((currentTime - lastActionTime) / 1000);
+                Serial.print(timeDiff(currentTime, lastActionTime) / 1000);
                 Serial.print(F("/"));
                 Serial.print(WAIT_TIME_MS / 1000);
                 Serial.println(F(" seconds"));
                 lastWaitPos1EmptyFromPos2Print = currentTime;
             }
 
-            if (currentTime - lastActionTime >= WAIT_TIME_MS)
+            if (timeoutElapsed(currentTime, lastActionTime, WAIT_TIME_MS))
             {
                 Console.serialInfo(F("Returning to Position 2 to pick up tray..."));
                 currentPhase = PHASE_RETURN_TO_POS2;
@@ -3248,7 +3248,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000)
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000))
             {
                 Console.serialError(F("Timeout waiting for return to Position 2."));
                 stopMotion();
@@ -3492,7 +3492,7 @@ bool testTrayHandling()
                 return false;
             }
             // Add timeout handling
-            else if (currentTime - lastActionTime > 60000) // 60-second timeout
+            else if (timeoutElapsed(currentTime, lastActionTime, 60000)) // 60-second timeout
             {
                 Console.serialError(F("Timeout waiting for movement back to Position 1."));
                 Console.serialError(F("Movement took too long. Aborting test."));
@@ -3535,7 +3535,7 @@ bool testTrayHandling()
             }
             // Wait 750ms for tray to fully settle
             static unsigned long lastSettlingPrint = 0;
-            if (currentTime - lastSettlingPrint > 2000)
+            if (timeoutElapsed(currentTime, lastSettlingPrint, 2000))
             {
                 Console.serialInfo(F("Waiting for tray to settle at Position 1 after cycle completion..."));
                 lastSettlingPrint = currentTime;
@@ -3629,7 +3629,7 @@ bool testTrayHandling()
             }
             // Short pause before next cycle
             static unsigned long lastPauseCycleStatusPrint = 0;
-            if (currentTime - lastPauseCycleStatusPrint > 2000)
+            if (timeoutElapsed(currentTime, lastPauseCycleStatusPrint, 2000))
             {
                 Serial.print(F("[DIAGNOSTIC] Preparing for next cycle. Completed: "));
                 Serial.print(cyclesCompleted);
@@ -3638,7 +3638,7 @@ bool testTrayHandling()
                 lastPauseCycleStatusPrint = currentTime;
             }
 
-            if (currentTime - lastActionTime >= 2000)
+            if (timeoutElapsed(currentTime, lastActionTime, 2000))
             { // 2 second pause
                 currentPhase = PHASE_START;
             }

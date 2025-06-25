@@ -65,6 +65,7 @@ struct PressureSensor {
 
 // Other constants
 #define PULSE_DURATION 100 // Minimum recommended pulse duration in milliseconds
+#define VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS 1000 // Timeout for valve sensor to confirm position change (1 second)
 
 
 
