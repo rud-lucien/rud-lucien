@@ -14,6 +14,7 @@
 #include "Utils.h"
 #include "EncoderController.h"
 #include "EthernetController.h"
+#include "LogHistory.h"
 
 //=============================================================================
 // COMMAND CONSTANTS

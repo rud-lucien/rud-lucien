@@ -39,6 +39,69 @@ bool checkSerialForAbortCommand()
     return false;
 }
 
+// bool checkEthernetForAbortCommand()
+// {
+//     if (!ethernetInitialized)
+//     {
+//         return false;
+//     }
+
+//     for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
+//     {
+//         EthernetClient &client = clients[i]; // Use reference to avoid copying
+
+//         if (client && client.connected() && client.available())
+//         {
+//             // Peek at the data without consuming it
+//             char buffer[10]; // Just need enough to check for "abort"
+//             int len = 0;
+
+//             // Peek at the available data (don't consume it yet)
+//             while (client.available() && len < sizeof(buffer) - 1)
+//             {
+//                 buffer[len] = client.read();
+//                 len++;
+
+//                 // Check if we've already found "abort"
+//                 buffer[len] = '\0'; // Null terminate
+//                 if (strstr(buffer, "abort") != NULL)
+//                 {
+//                     // Found "abort", consume the rest of the line
+//                     while (client.available())
+//                     {
+//                         char c = client.read();
+//                         if (c == '\n' || c == '\r')
+//                             break;
+//                     }
+
+//                     // Set the abort flag
+//                     requestTestAbort("ethernet client");
+//                     client.println(F("[ACK], Test abort requested"));
+//                     return true;
+//                 }
+
+//                 // If we've found a newline, stop looking in this chunk
+//                 if (buffer[len - 1] == '\n' || buffer[len - 1] == '\r')
+//                 {
+//                     break;
+//                 }
+//             }
+
+//             // If we didn't find "abort", consume this line so we don't check it again
+//             if (len > 0)
+//             {
+//                 while (client.available())
+//                 {
+//                     char c = client.read();
+//                     if (c == '\n' || c == '\r')
+//                         break;
+//                 }
+//             }
+//         }
+//     }
+//     return false;
+// }
+
 bool checkEthernetForAbortCommand()
 {
     if (!ethernetInitialized)
@@ -52,50 +115,55 @@ bool checkEthernetForAbortCommand()
 
         if (client && client.connected() && client.available())
         {
-            // Peek at the data without consuming it
-            char buffer[10]; // Just need enough to check for "abort"
+            // Read a complete line first (more efficient than character-by-character)
+            char buffer[64]; // Larger buffer to match command processor
             int len = 0;
 
-            // Peek at the available data (don't consume it yet)
+            // Read the available data into the buffer
             while (client.available() && len < sizeof(buffer) - 1)
             {
-                buffer[len] = client.read();
-                len++;
+                char c = client.read();
 
-                // Check if we've already found "abort"
-                buffer[len] = '\0'; // Null terminate
-                if (strstr(buffer, "abort") != NULL)
-                {
-                    // Found "abort", consume the rest of the line
-                    while (client.available())
-                    {
-                        char c = client.read();
-                        if (c == '\n' || c == '\r')
-                            break;
-                    }
-
-                    // Set the abort flag
-                    requestTestAbort("ethernet client");
-                    client.println(F("[ACK], Test abort requested"));
-                    return true;
-                }
-
-                // If we've found a newline, stop looking in this chunk
-                if (buffer[len - 1] == '\n' || buffer[len - 1] == '\r')
+                // Stop at newline
+                if (c == '\n' || c == '\r')
                 {
                     break;
                 }
+
+                buffer[len++] = c;
             }
 
-            // If we didn't find "abort", consume this line so we don't check it again
+            // Null terminate the buffer
+            buffer[len] = '\0';
+
+            // For debugging - log the command to serial only
             if (len > 0)
             {
-                while (client.available())
-                {
-                    char c = client.read();
-                    if (c == '\n' || c == '\r')
-                        break;
-                }
+                Serial.print(F("[ETHERNET ABORT CHECK] "));
+                Serial.println(buffer);
+            }
+
+            // More efficient: Check once for the "abort" string
+            if (strstr(buffer, "abort") != NULL)
+            {
+                // Set the abort flag
+                requestTestAbort("ethernet client");
+
+                // Send acknowledgment back to client only
+                client.println(F("[ACK], Test abort requested"));
+
+                // Log to serial monitor (not to all clients)
+                Serial.println(F("[INFO] Test abort requested via ethernet"));
+
+                return true;
+            }
+
+            // Consume any remaining data in the line (handles oversized lines)
+            while (client.available())
+            {
+                char c = client.read();
+                if (c == '\n' || c == '\r')
+                    break;
             }
         }
     }

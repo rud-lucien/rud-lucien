@@ -47,7 +47,8 @@ void handleSerialCommands()
         {
             commandBuffer[commandIndex] = '\0'; // Null-terminate the command
 
-            // Print the received command for debugging
+            // ADD THIS LINE: Log the command to history
+            Serial.print(F("[SERIAL COMMAND] "));
             Serial.println(commandBuffer);
 
             // Process the command using the shared function
@@ -101,11 +102,17 @@ void handleEthernetCommands()
                     // Process the command if it's not empty
                     if (j > 0)
                     {
-                        // Log the received command
-                        Serial.print(F("[NETWORK] Command from "));
-                        Serial.print(clients[i].remoteIP());
-                        Serial.print(F(": "));
-                        Serial.println(ethernetCommandBuffer);
+                        // Format a buffer with the client's IP information
+                        char commandWithSource[128];
+                        snprintf(commandWithSource, sizeof(commandWithSource),
+                                 "from %d.%d.%d.%d: %s",
+                                 clients[i].remoteIP()[0], clients[i].remoteIP()[1],
+                                 clients[i].remoteIP()[2], clients[i].remoteIP()[3],
+                                 ethernetCommandBuffer);
+
+                        // Log command to serial monitor only (not to connected clients)
+                        Serial.print(F("[NETWORK COMMAND] "));
+                        Serial.println(commandWithSource);
 
                         // Use the shared process function instead of duplicating logic
                         processCommand(ethernetCommandBuffer, &clients[i]);
@@ -245,49 +252,74 @@ CommandType getCommandType(const char *originalCommand)
         }
     }
 
+    // Extract first word (main command)
+    char firstWord[16] = {0};
+    int i = 0;
+    while (command[i] && !isspace(command[i]) && i < 15)
+    {
+        firstWord[i] = command[i];
+        i++;
+    }
+    firstWord[i] = '\0';
+
     // Emergency commands - always allowed
-    if (strstr(command, "motor stop") ||
-        strstr(command, "motor abort") ||
-        strstr(command, "stop") ||
-        strstr(command, "abort") ||
-        strstr(command, "estop"))
+    if (strcmp(firstWord, "stop") == 0 ||
+        strcmp(firstWord, "abort") == 0 ||
+        strcmp(firstWord, "estop") == 0 ||
+        (strcmp(firstWord, "motor") == 0 &&
+         (strncmp(command + 6, "stop", 4) == 0 ||
+          strncmp(command + 6, "abort", 5) == 0)))
     {
         return CMD_EMERGENCY;
     }
 
-    // Read-only commands - always allowed
-    if (strstr(command, "help") ||
-        strstr(command, "h ") ||
-        strstr(command, "H ") ||
+    // Help commands (simple prefix check)
+    if (strcmp(firstWord, "help") == 0 ||
+        strcmp(firstWord, "h") == 0 ||
+        strcmp(firstWord, "H") == 0)
+    {
+        return CMD_READ_ONLY;
+    }
 
-        // All status commands
-        strstr(command, "motor status") ||
-        strstr(command, "jog status") ||
-        strstr(command, "tray status") ||
-        strstr(command, "encoder status") ||
-        strstr(command, "network status") ||
+    // Status commands (exact pattern matching)
+    if (strcmp(firstWord, "motor") == 0 && strncmp(command + 6, "status", 6) == 0 ||
+        strcmp(firstWord, "jog") == 0 && strncmp(command + 4, "status", 6) == 0 ||
+        strcmp(firstWord, "tray") == 0 && strncmp(command + 5, "status", 6) == 0 ||
+        strcmp(firstWord, "encoder") == 0 && strncmp(command + 8, "status", 6) == 0 ||
+        strcmp(firstWord, "network") == 0 && strncmp(command + 8, "status", 6) == 0)
+    {
+        return CMD_READ_ONLY;
+    }
 
-        // All help subcommands
-        strstr(command, "lock help") ||
-        strstr(command, "unlock help") ||
-        strstr(command, "log help") ||
-        strstr(command, "system help") ||
-        strstr(command, "motor help") ||
-        strstr(command, "move help") ||
-        strstr(command, "jog help") ||
-        strstr(command, "tray help") ||
-        strstr(command, "test help") ||
-        strstr(command, "encoder help") ||
-        strstr(command, "network help") ||
+    // Help subcommands (exact matches)
+    if ((strcmp(firstWord, "lock") == 0 ||
+         strcmp(firstWord, "unlock") == 0 ||
+         strcmp(firstWord, "log") == 0 ||
+         strcmp(firstWord, "system") == 0 ||
+         strcmp(firstWord, "motor") == 0 ||
+         strcmp(firstWord, "move") == 0 ||
+         strcmp(firstWord, "jog") == 0 ||
+         strcmp(firstWord, "tray") == 0 ||
+         strcmp(firstWord, "test") == 0 ||
+         strcmp(firstWord, "encoder") == 0 ||
+         strcmp(firstWord, "network") == 0) &&
+        strstr(command, "help"))
+    {
+        return CMD_READ_ONLY;
+    }
 
-        // System information commands
-        strstr(command, "system state") ||
-        strstr(command, "system safety") ||
-        strstr(command, "system trays") ||
+    // System information commands
+    if (strcmp(firstWord, "system") == 0 &&
+        (strncmp(command + 7, "state", 5) == 0 ||
+         strncmp(command + 7, "safety", 6) == 0 ||
+         strncmp(command + 7, "trays", 5) == 0 ||
+         strncmp(command + 7, "history", 7) == 0))
+    {
+        return CMD_READ_ONLY;
+    }
 
-        // Other read-only commands that need exact matching
-        strstr(command, "log now") ||
-        // Much simpler checks for the exact commands without parameters
+    // Other read-only commands
+    if ((strcmp(firstWord, "log") == 0 && strncmp(command + 4, "now", 3) == 0) ||
         strcmp(command, "jog inc") == 0 ||
         strcmp(command, "jog speed") == 0 ||
         strcmp(command, "encoder multiplier") == 0)
@@ -296,7 +328,7 @@ CommandType getCommandType(const char *originalCommand)
     }
 
     // Test commands - special handling
-    if (strstr(command, "test"))
+    if (strcmp(firstWord, "test") == 0)
     {
         return CMD_TEST;
     }

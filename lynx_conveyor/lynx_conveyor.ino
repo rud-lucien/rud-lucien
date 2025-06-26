@@ -17,6 +17,7 @@
 #include "OutputManager.h"
 #include "EthernetController.h"
 
+
 // Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
 

@@ -21,7 +21,7 @@
 //=============================================================================
 
 // Motor & Motion parameters
-#define PULSES_PER_REV 3200                         // Motor configured for 3200 pulses per revolution
+#define PULSES_PER_REV 800                         // Motor configured for 800 pulses per revolution
 #define MM_PER_REV 52.23                            // Calibrated: 52.23mm travel per revolution
 #define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV) // ~61.27 pulses per mm
 
@@ -54,9 +54,9 @@
 
 // Position definitions (in mm from home)
 #define POSITION_HOME_MM 0.0        // Home position
-#define POSITION_1_MM 28.78         // Position 1 (28.78 mm)
-#define POSITION_2_MM 455.80        // Position 2 (455.80 mm)
-#define POSITION_3_MM 884.20        // Position 3 (884.20 mm)
+#define POSITION_1_MM 30.62         // Position 1 (30.62 mm)
+#define POSITION_2_MM 457.34        // Position 2 (457.34)
+#define POSITION_3_MM 885.89        // Position 3 (885.89 mm)
 #define POSITION_4_MM MAX_TRAVEL_MM // Position 4 (max = 1050 mm)
 
 // Position definitions in pulses (calculated from mm)

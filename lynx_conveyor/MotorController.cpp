@@ -1150,8 +1150,8 @@ void checkHomingProgress()
         return; // Don't process hardstop detection until initial delay is complete
     }
 
-    static const int32_t minimumMovementPulses = 5000;   // Minimum movement before detecting hardstop
-    static const int32_t minimumAdditionalPulses = 1000; // Must travel at least this much AFTER min distance
+    static const int32_t minimumMovementPulses = 200;   // Minimum movement before detecting hardstop
+    static const int32_t minimumAdditionalPulses = 100; // Must travel at least this much AFTER min distance
 
     MotorDriver::HlfbStates currentHlfbState = MOTOR_CONNECTOR.HlfbState();
     int32_t currentPosition = MOTOR_CONNECTOR.PositionRefCommanded();
@@ -1326,6 +1326,8 @@ void checkHomingProgress()
         // will be reset by resetHomingState() at the start of the *next* homing attempt.
     }
 }
+
+
 
 void completeHomingSequence()
 {

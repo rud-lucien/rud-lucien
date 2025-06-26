@@ -99,6 +99,10 @@ public:
     void message(const char *msg) { info(msg); }
     void message(const __FlashStringHelper *msg) { info(msg); }
 
+    // Operational info methods (also added to history)
+    void opInfo(const char *msg);
+    void opInfo(const __FlashStringHelper *msg);
+
     // Set the client if none is currently set
     void setClientIfNone(Stream *client)
     {
@@ -114,5 +118,6 @@ extern MultiPrint Console;
 
 // Initialize the output manager
 void initOutputManager();
+
 
 #endif // OUTPUT_MANAGER_H

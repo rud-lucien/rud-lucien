@@ -2080,6 +2080,10 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         cmdCode = 3;
     else if (strcmp(subcommand, "reset") == 0)
         cmdCode = 4;
+    else if (strcmp(subcommand, "history") == 0)
+        cmdCode = 5;
+    else if (strcmp(subcommand, "help") == 0)
+        cmdCode = 6;
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
@@ -2133,15 +2137,15 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         if (trayTracking.lastLoadTime > 0)
         {
             Console.print(F("  Last load: "));
-            Console.print(timeDiff(millis(), trayTracking.lastLoadTime) / 1000);
-            Console.println(F(" seconds ago"));
+            printHumanReadableTime(timeDiff(millis(), trayTracking.lastLoadTime) / 1000);
+            Console.println(F(" ago"));
         }
 
         if (trayTracking.lastUnloadTime > 0)
         {
             Console.print(F("  Last unload: "));
-            Console.print(timeDiff(millis(), trayTracking.lastUnloadTime) / 1000);
-            Console.println(F(" seconds ago"));
+            printHumanReadableTime(timeDiff(millis(), trayTracking.lastUnloadTime) / 1000);
+            Console.println(F(" ago"));
         }
         return true;
     }
@@ -2174,7 +2178,14 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         return true;
     }
 
-    case 5: // "help"
+    case 5: // "history"
+    {
+        Console.acknowledge(F("SYSTEM_HISTORY"));
+        opLogHistory.printHistory();
+        return true;
+    }
+
+    case 6: // "help"
     {
         Console.acknowledge(F("SYSTEM_HELP"));
         Console.println(F("\n===== SYSTEM COMMAND HELP ====="));
@@ -2207,12 +2218,21 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         Console.println(F("    > Use when system is in an inconsistent state"));
         Console.println(F("    > Emergency recovery function for error conditions"));
 
+        Console.println(F("  system,history - Display operation log history"));
+        Console.println(F("    > Shows recent operational messages in chronological order"));
+        Console.println(F("    > Useful for troubleshooting failures"));
+        Console.println(F("    > Captures the last 20 operational events"));
+
         Console.println(F("\nTROUBLESHOOTING:"));
         Console.println(F("  • For hardware issues: Check 'system,state' for sensor/valve status"));
         Console.println(F("  • For operation failures: Check 'system,safety' for constraints"));
         Console.println(F("  • For tray inconsistencies: Use 'system,trays' to verify positions"));
         Console.println(F("  • When stuck in error state: Try 'system,reset' to recover"));
         Console.println(F("  • After E-Stop activation: Use 'motor,clear' followed by 'system,reset'"));
+        Console.println(F("  • For debugging overnight failures: Use 'system,history' to see operational logs"));
+        Console.println(F("  • Review history to understand sequence of events leading to failures"));
+        Console.println(F("  • History logs are preserved until power cycle or buffer fills (20 entries)"));
+        Console.println(F("  • Log critical commands/operations before leaving system unattended"));
         Console.println(F("-------------------------------------------"));
 
         return true;
@@ -2223,7 +2243,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         // Unknown subcommand
         Console.error(F("Unknown system command: "));
         Console.println(subcommand);
-        Console.error(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,reset', or 'system,help'"));
+        Console.error(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,reset', 'system,history', or 'system,help'"));
         return false;
     }
     }
@@ -3662,6 +3682,7 @@ Commander::systemCommand_t API_tree[] = {
                             "  system,safety   - Display comprehensive safety validation status\r\n"
                             "  system,trays    - Display tray tracking and statistics\r\n"
                             "  system,reset    - Reset system state after failure to retry operation\r\n"
+                            "  system,history  - Display operation log history for troubleshooting\r\n"
                             "  system,help     - Display detailed instructions for system commands",
                   cmd_system_state),
 

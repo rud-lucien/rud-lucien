@@ -71,6 +71,85 @@ bool waitTimeReached(unsigned long current, unsigned long previous, unsigned lon
     return timeDiff(current, previous) >= waitTime;
 }
 
+// Helper function to print time in a human-readable format
+void printHumanReadableTime(unsigned long secondsAgo)
+{
+    if (secondsAgo < 60)
+    {
+        // Less than a minute
+        Console.print(secondsAgo);
+        Console.print(F(" second"));
+        if (secondsAgo != 1)
+            Console.print(F("s"));
+    }
+    else if (secondsAgo < 3600)
+    {
+        // Less than an hour
+        unsigned long minutes = secondsAgo / 60;
+        unsigned long seconds = secondsAgo % 60;
+        Console.print(minutes);
+        Console.print(F(" minute"));
+        if (minutes != 1)
+            Console.print(F("s"));
+        if (seconds > 0)
+        {
+            Console.print(F(" "));
+            Console.print(seconds);
+            Console.print(F(" second"));
+            if (seconds != 1)
+                Console.print(F("s"));
+        }
+    }
+    else if (secondsAgo < 86400)
+    {
+        // Less than a day
+        unsigned long hours = secondsAgo / 3600;
+        unsigned long minutes = (secondsAgo % 3600) / 60;
+        Console.print(hours);
+        Console.print(F(" hour"));
+        if (hours != 1)
+            Console.print(F("s"));
+        if (minutes > 0)
+        {
+            Console.print(F(" "));
+            Console.print(minutes);
+            Console.print(F(" minute"));
+            if (minutes != 1)
+                Console.print(F("s"));
+        }
+    }
+    else
+    {
+        // More than a day
+        unsigned long days = secondsAgo / 86400;
+        unsigned long hours = (secondsAgo % 86400) / 3600;
+        Console.print(days);
+        Console.print(F(" day"));
+        if (days != 1)
+            Console.print(F("s"));
+        if (hours > 0)
+        {
+            Console.print(F(" "));
+            Console.print(hours);
+            Console.print(F(" hour"));
+            if (hours != 1)
+                Console.print(F("s"));
+        }
+    }
+}
+
+// Formats time as hours:minutes:seconds since system startup
+void formatAbsoluteTime(unsigned long timeMs, char* buffer) {
+    // Calculate hours, minutes, seconds from milliseconds
+    unsigned long totalSeconds = timeMs / 1000;
+    unsigned long hours = totalSeconds / 3600;
+    unsigned long minutes = (totalSeconds % 3600) / 60;
+    unsigned long seconds = totalSeconds % 60;
+    
+    // Format as HH:MM:SS
+    snprintf(buffer, 12, "%02lu:%02lu:%02lu", hours, minutes, seconds);
+}
+
 // Generic tray movement function - core implementation
 bool moveTray(int fromPosition, int toPosition)
 {

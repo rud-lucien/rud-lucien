@@ -231,7 +231,9 @@ void testConnections()
                 if (!clients[i].print(" "))
                 {
                     Serial.print(F("[NETWORK] Detected stale connection: "));
-                    Serial.println(clients[i].remoteIP());
+                    Serial.print(clients[i].remoteIP());
+                    Serial.print(F(":"));
+                    Serial.println(clients[i].remotePort());
                     clients[i].stop();
                 }
             }

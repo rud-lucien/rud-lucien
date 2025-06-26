@@ -247,6 +247,12 @@ bool timeoutElapsed(unsigned long current, unsigned long previous, unsigned long
 // Safe waiting check
 bool waitTimeReached(unsigned long current, unsigned long previous, unsigned long waitTime);
 
+// Convert seconds to a human-readable format
+void printHumanReadableTime(unsigned long secondsAgo);
+
+// Format absolute time (milliseconds since startup) to HH:MM:SS format
+void formatAbsoluteTime(unsigned long timeMs, char* buffer);
+
 //=============================================================================
 // SYSTEM STATE FUNCTIONS
 //=============================================================================
