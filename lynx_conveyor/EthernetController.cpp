@@ -6,7 +6,12 @@ EthernetClient clients[MAX_ETHERNET_CLIENTS];
 bool ethernetInitialized = false;
 char ethernetCommandBuffer[MAX_PACKET_LENGTH];
 unsigned long clientLastActivityTime[MAX_ETHERNET_CLIENTS] = {0};
-const unsigned long CLIENT_TIMEOUT_MS = 120000; // 2 minute timeout
+
+// Timeout constants (all in milliseconds)
+const unsigned long CLIENT_TIMEOUT_MS = 180000;      // 3 minute inactivity timeout
+const unsigned long PING_TEST_INTERVAL_MS = 120000;   // 2 minute between ping tests
+const unsigned long PING_GRACE_PERIOD_MS = 15000;     // 15 seconds grace before pinging new clients
+const unsigned long TEST_CONNECTIONS_INTERVAL_MS = 30000; // 30 seconds for testConnections()
 
 // MAC address for the ClearCore
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
@@ -108,22 +113,23 @@ void processEthernetConnections()
         if (clients[i] && clients[i].connected())
         {
             // Check if client has been inactive too long
-            // CHANGED: using timeoutElapsed instead of direct subtraction
             if (timeoutElapsed(currentTime, clientLastActivityTime[i], CLIENT_TIMEOUT_MS))
             {
-                Serial.print(F("[NETWORK] Closing inactive client: "));
-                Serial.print(clients[i].remoteIP());
-                Serial.print(F(":"));
-                Serial.println(clients[i].remotePort());
+                char msg[96];
+                snprintf(msg, sizeof(msg), "[NETWORK] Closing inactive client: %d.%d.%d.%d:%d",
+                         clients[i].remoteIP()[0], clients[i].remoteIP()[1],
+                         clients[i].remoteIP()[2], clients[i].remoteIP()[3],
+                         clients[i].remotePort());
+                Serial.println(msg);
+                opLogHistory.addEntry(msg);
                 clients[i].stop();
             }
         }
     }
 
-    // Periodic connection testing (every 60 seconds)
+    // Periodic connection testing (every PING_TEST_INTERVAL_MS)
     static unsigned long lastConnectionTestTime = 0;
-    // CHANGED: using timeoutElapsed instead of direct subtraction
-    if (timeoutElapsed(currentTime, lastConnectionTestTime, 60000))
+    if (timeoutElapsed(currentTime, lastConnectionTestTime, PING_TEST_INTERVAL_MS))
     {
         lastConnectionTestTime = currentTime;
 
@@ -133,20 +139,22 @@ void processEthernetConnections()
             if (clients[i] && clients[i].connected())
             {
                 // Add grace period check here
-                // CHANGED: using !timeoutElapsed for "less than" time check
-                if (!timeoutElapsed(currentTime, clientLastActivityTime[i], 5000))
+                if (!timeoutElapsed(currentTime, clientLastActivityTime[i], PING_GRACE_PERIOD_MS))
                 {
-                    // Skip new connections (less than 5 seconds old)
+                    // Skip new connections (less than grace period old)
                     continue;
                 }
 
                 // Try to write a single byte to test connection
                 if (!clients[i].print(""))
                 {
-                    Serial.print(F("[NETWORK] Detected stale connection: "));
-                    Serial.print(clients[i].remoteIP());
-                    Serial.print(F(":"));
-                    Serial.println(clients[i].remotePort());
+                    char msg[96];
+                    snprintf(msg, sizeof(msg), "[NETWORK] Detected stale connection: %d.%d.%d.%d:%d",
+                             clients[i].remoteIP()[0], clients[i].remoteIP()[1],
+                             clients[i].remoteIP()[2], clients[i].remoteIP()[3],
+                             clients[i].remotePort());
+                    Serial.println(msg);
+                    opLogHistory.addEntry(msg);
                     clients[i].stop();
                 }
             }
@@ -169,6 +177,14 @@ void processEthernetConnections()
                 Serial.print(newClient.remoteIP());
                 Serial.print(F(":"));
                 Serial.println(newClient.remotePort());
+                {
+                    char msg[96];
+                    snprintf(msg, sizeof(msg), "[NETWORK] New client connected from %d.%d.%d.%d:%d",
+                             newClient.remoteIP()[0], newClient.remoteIP()[1],
+                             newClient.remoteIP()[2], newClient.remoteIP()[3],
+                             newClient.remotePort());
+                    opLogHistory.addEntry(msg);
+                }
 
                 // Replace client in this slot
                 clients[i] = newClient;
@@ -186,6 +202,9 @@ void processEthernetConnections()
         if (!clientAdded)
         {
             Console.serialWarning(F("[NETWORK] Rejected client - no free slots"));
+            {
+                opLogHistory.addEntry("[NETWORK] Rejected client - no free slots");
+            }
             newClient.println(F("ERROR: Too many connections"));
             newClient.stop();
         }
@@ -196,8 +215,10 @@ void processEthernetConnections()
     {
         if (clients[i] && !clients[i].connected())
         {
-            Serial.print(F("[NETWORK] Client disconnected: "));
-            Serial.println(i);
+            char msg[64];
+            snprintf(msg, sizeof(msg), "[NETWORK] Client disconnected: %d", i);
+            Serial.println(msg);
+            opLogHistory.addEntry(msg);
             clients[i].stop();
         }
     }
@@ -208,9 +229,8 @@ void testConnections()
     static unsigned long lastConnectionTestTime = 0;
     unsigned long currentTime = millis();
 
-    // Test every 30 seconds
-    // CHANGED: using !timeoutElapsed for "less than" time check
-    if (!timeoutElapsed(currentTime, lastConnectionTestTime, 30000))
+    // Test every TEST_CONNECTIONS_INTERVAL_MS
+    if (!timeoutElapsed(currentTime, lastConnectionTestTime, TEST_CONNECTIONS_INTERVAL_MS))
     {
         return;
     }
@@ -230,10 +250,13 @@ void testConnections()
                 // If this fails, the connection is stale
                 if (!clients[i].print(" "))
                 {
-                    Serial.print(F("[NETWORK] Detected stale connection: "));
-                    Serial.print(clients[i].remoteIP());
-                    Serial.print(F(":"));
-                    Serial.println(clients[i].remotePort());
+                    char msg[96];
+                    snprintf(msg, sizeof(msg), "[NETWORK] Detected stale connection: %d.%d.%d.%d:%d",
+                             clients[i].remoteIP()[0], clients[i].remoteIP()[1],
+                             clients[i].remoteIP()[2], clients[i].remoteIP()[3],
+                             clients[i].remotePort());
+                    Serial.println(msg);
+                    opLogHistory.addEntry(msg);
                     clients[i].stop();
                 }
             }
@@ -298,10 +321,11 @@ bool closeClientConnection(int index)
         int port = clients[index].remotePort();
         clients[index].stop();
 
-        Serial.print(F("[NETWORK] Manually closed connection from "));
-        Serial.print(ip);
-        Serial.print(F(":"));
-        Serial.println(port);
+        char msg[96];
+        snprintf(msg, sizeof(msg), "[NETWORK] Manually closed connection from %d.%d.%d.%d:%d",
+                 ip[0], ip[1], ip[2], ip[3], port);
+        Serial.println(msg);
+        opLogHistory.addEntry(msg);
         return true;
     }
     return false;
@@ -318,6 +342,10 @@ bool closeAllConnections()
             count++;
         }
     }
+    char msg[64];
+    snprintf(msg, sizeof(msg), "[NETWORK] Closed %d connections", count);
+    Serial.println(msg);
+    opLogHistory.addEntry(msg);
     Serial.print(F("[NETWORK] Closed "));
     Serial.print(count);
     Serial.println(F(" connections"));

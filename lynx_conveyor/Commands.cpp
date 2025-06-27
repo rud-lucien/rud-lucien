@@ -4,6 +4,29 @@
 extern LoggingManagement logging;
 extern const unsigned long DEFAULT_LOG_INTERVAL;
 
+// Binary search function for subcommand lookup
+int findSubcommandCode(const char *subcommand, const SubcommandInfo *commandTable, size_t tableSize)
+{
+    int left = 0;
+    int right = tableSize - 1;
+
+    while (left <= right)
+    {
+        int mid = left + (right - left) / 2;
+        int cmp = strcmp(subcommand, commandTable[mid].name);
+
+        if (cmp == 0)
+            return commandTable[mid].code; // Found - return the code
+
+        if (cmp < 0)
+            right = mid - 1;
+        else
+            left = mid + 1;
+    }
+
+    return 0; // Not found - return 0 (default case)
+}
+
 // ============================================================
 // Global Command Tree and Commander Object
 // ============================================================
@@ -39,6 +62,17 @@ bool cmd_print_help(char *args, CommandCaller *caller)
         return true;
     }
 }
+
+// Define the lock subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo LOCK_COMMANDS[] = {
+    {"1", 4},
+    {"2", 4},
+    {"3", 4},
+    {"all", 1},
+    {"help", 3},
+    {"shuttle", 2}};
+
+static const size_t LOCK_COMMAND_COUNT = sizeof(LOCK_COMMANDS) / sizeof(SubcommandInfo);
 
 // Lock a tray or shuttle
 bool cmd_lock(char *args, CommandCaller *caller)
@@ -76,28 +110,21 @@ bool cmd_lock(char *args, CommandCaller *caller)
     CylinderSensor *traySensor = NULL;
     int trayNum = 0;
 
-    // Helper function to map subcommand to an integer for switch
-    int cmdCode = 0;
-    if (strcmp(subcommand, "all") == 0)
-        cmdCode = 1;
-    else if (strcmp(subcommand, "shuttle") == 0)
-        cmdCode = 2;
-    else if (strcmp(subcommand, "help") == 0)
-        cmdCode = 3;
-    else if (strcmp(subcommand, "1") == 0 ||
-             strcmp(subcommand, "2") == 0 ||
-             strcmp(subcommand, "3") == 0)
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(subcommand, LOCK_COMMANDS, LOCK_COMMAND_COUNT);
+
+    // Handle tray numbers special case
+    if (cmdCode == 4)
     {
-        cmdCode = 4;
         trayNum = atoi(subcommand);
     }
-    // If none of the above, leave cmdCode as 0 (unknown command)
+
+    char msg[100];
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
     {
     case 1: // "all"
-        // Removed "lock all" functionality as requested
         Console.error(F("'lock,all' is not supported for safety reasons. Engage trays individually."));
         return false;
 
@@ -129,7 +156,6 @@ bool cmd_lock(char *args, CommandCaller *caller)
             // Verify actual position with sensor
             if (sensorRead(*sensor) == true)
             { // Sensor true = locked
-                // Success goes to both outputs
                 Console.acknowledge(F("SHUTTLE_ALREADY_LOCKED"));
             }
             else
@@ -143,7 +169,6 @@ bool cmd_lock(char *args, CommandCaller *caller)
         Console.serialInfo(F("Locking shuttle..."));
         if (safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
-            // Success acknowledgment to both outputs
             Console.acknowledge(F("SHUTTLE_LOCKED"));
             return true;
         }
@@ -201,12 +226,10 @@ bool cmd_lock(char *args, CommandCaller *caller)
         return true;
 
     case 4: // Tray numbers (1, 2, or 3)
-        // Try to parse as tray number
         trayNum = atoi(subcommand);
 
-        Console.serialInfo(F("Engaging tray "));
-        Serial.print(trayNum);
-        Serial.println(F(" with sensor verification..."));
+        sprintf(msg, "Engaging tray %d with sensor verification...", trayNum);
+        Console.serialInfo(msg);
 
         // Get the appropriate valve and sensor
         switch (trayNum)
@@ -229,9 +252,9 @@ bool cmd_lock(char *args, CommandCaller *caller)
 
         if (!trayValve || !traySensor)
         {
-            Console.error(F("Failed to access tray "));
-            Console.print(trayNum);
-            Console.serialInfo(F(" valve or sensor. Possible causes:"));
+            sprintf(msg, "Failed to access tray %d valve or sensor", trayNum);
+            Console.error(msg);
+            Console.serialInfo(F("Possible causes:"));
             Console.serialInfo(F("  - Hardware initialization issue"));
             Console.serialInfo(F("  - Valve controller not properly initialized"));
             Console.serialInfo(F("  - System memory corruption"));
@@ -242,16 +265,14 @@ bool cmd_lock(char *args, CommandCaller *caller)
         // Check current state first
         if (trayValve->position == VALVE_POSITION_LOCK)
         {
-            Console.serialInfo(F("Tray "));
-            Serial.print(trayNum);
-            Serial.println(F(" already engaged"));
+            sprintf(msg, "Tray %d already engaged", trayNum);
+            Console.serialInfo(msg);
 
             // Verify actual position with sensor
             if (sensorRead(*traySensor) == true)
             { // Sensor true = locked
-                Console.print(F("[ACK], TRAY_"));
-                Console.print(trayNum);
-                Console.println(F("_ALREADY_LOCKED"));
+                sprintf(msg, "TRAY_%d_ALREADY_LOCKED", trayNum);
+                Console.acknowledge(msg);
             }
             else
             {
@@ -263,26 +284,36 @@ bool cmd_lock(char *args, CommandCaller *caller)
         // Try locking with sensor feedback
         if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
-            Console.print(F("[ACK], TRAY_"));
-            Console.print(trayNum);
-            Console.println(F("_LOCKED"));
+            sprintf(msg, "TRAY_%d_LOCKED", trayNum);
+            Console.acknowledge(msg);
             return true;
         }
 
-        Console.print(F("[ERROR], Failed to engage tray "));
-        Console.println(trayNum);
+        sprintf(msg, "Failed to engage tray %d", trayNum);
+        Console.error(msg);
         Console.serialInfo(F("Check air pressure and valve functionality"));
         return false;
 
     default: // Unknown command
-        Console.print(F("[ERROR], Unknown lock subcommand: "));
-        Console.println(subcommand);
-        Console.error(F("Valid options are '1', '2', '3', 'shuttle', or 'help'"));
+        sprintf(msg, "Unknown lock subcommand: %s", subcommand);
+        Console.error(msg);
+        Console.serialInfo(F("Valid options are '1', '2', '3', 'shuttle', or 'help'"));
         return false;
     }
 
     return false; // Should never reach here
 }
+
+// Define the unlock subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo UNLOCK_COMMANDS[] = {
+    {"1", 4},
+    {"2", 4},
+    {"3", 4},
+    {"all", 1},
+    {"help", 3},
+    {"shuttle", 2}};
+
+static const size_t UNLOCK_COMMAND_COUNT = sizeof(UNLOCK_COMMANDS) / sizeof(SubcommandInfo);
 
 // Unlock a tray or shuttle
 bool cmd_unlock(char *args, CommandCaller *caller)
@@ -320,22 +351,16 @@ bool cmd_unlock(char *args, CommandCaller *caller)
     CylinderSensor *traySensor = NULL;
     int trayNum = 0;
 
-    // Helper function to map subcommand to an integer for switch
-    int cmdCode = 0;
-    if (strcmp(subcommand, "all") == 0)
-        cmdCode = 1;
-    else if (strcmp(subcommand, "shuttle") == 0)
-        cmdCode = 2;
-    else if (strcmp(subcommand, "help") == 0)
-        cmdCode = 3;
-    else if (strcmp(subcommand, "1") == 0 ||
-             strcmp(subcommand, "2") == 0 ||
-             strcmp(subcommand, "3") == 0)
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(subcommand, UNLOCK_COMMANDS, UNLOCK_COMMAND_COUNT);
+
+    // Handle tray numbers special case
+    if (cmdCode == 4)
     {
-        cmdCode = 4;
         trayNum = atoi(subcommand);
     }
-    // If none of the above, leave cmdCode as 0 (unknown command)
+
+    char msg[100];
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
@@ -344,7 +369,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         Console.serialInfo(F("Disengaging all valves with sensor verification..."));
         if (safeUnlockAllValves(1000))
         {
-            Console.print(F("[ACK], ALL_VALVES_UNLOCKED"));
+            Console.acknowledge(F("ALL_VALVES_UNLOCKED"));
             return true;
         }
         else
@@ -352,7 +377,6 @@ bool cmd_unlock(char *args, CommandCaller *caller)
             Console.error(F("Some valves could not be disengaged - check air pressure"));
             return false;
         }
-        break;
 
     case 2: // "shuttle"
         if (ccioBoardCount <= 0)
@@ -382,7 +406,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
             // Verify actual position with sensor
             if (sensorRead(*sensor) == false)
             { // Sensor false = unlocked
-                Console.print(F("[ACK], SHUTTLE_ALREADY_UNLOCKED"));
+                Console.acknowledge(F("SHUTTLE_ALREADY_UNLOCKED"));
             }
             else
             {
@@ -395,14 +419,13 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         Console.serialInfo(F("Unlocking shuttle..."));
         if (safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
-            Console.print(F("[ACK], SHUTTLE_UNLOCKED"));
+            Console.acknowledge(F("SHUTTLE_UNLOCKED"));
             return true;
         }
 
         Console.error(F("Failed to disengage shuttle - sensor did not confirm unlock"));
         Console.serialInfo(F("Check air pressure and valve functionality"));
         return false;
-        break;
 
     case 3: // "help"
         Console.acknowledge(F("UNLOCK_HELP"));
@@ -455,15 +478,12 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
-        break;
 
     case 4: // Tray numbers (1, 2, or 3)
-        // Try to parse as tray number
         trayNum = atoi(subcommand);
 
-        Console.serialInfo(F("Disengaging tray "));
-        Serial.print(trayNum);
-        Serial.println(F(" with sensor verification..."));
+        sprintf(msg, "Disengaging tray %d with sensor verification...", trayNum);
+        Console.serialInfo(msg);
 
         // Get the appropriate valve and sensor
         switch (trayNum)
@@ -486,9 +506,8 @@ bool cmd_unlock(char *args, CommandCaller *caller)
 
         if (!trayValve || !traySensor)
         {
-            Console.print(F("[ERROR], Failed to access tray "));
-            Console.print(trayNum);
-            Console.println(F(" valve or sensor."));
+            sprintf(msg, "Failed to access tray %d valve or sensor.", trayNum);
+            Console.error(msg);
             Console.serialInfo(F("Possible causes:"));
             Console.serialInfo(F("  - Hardware initialization issue"));
             Console.serialInfo(F("  - Valve controller not properly initialized"));
@@ -500,16 +519,14 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         // Check current state first
         if (trayValve->position == VALVE_POSITION_UNLOCK)
         {
-            Console.serialInfo(F("Tray "));
-            Serial.print(trayNum);
-            Serial.println(F(" already disengaged"));
+            sprintf(msg, "Tray %d already disengaged", trayNum);
+            Console.serialInfo(msg);
 
             // Verify actual position with sensor
             if (sensorRead(*traySensor) == false)
             { // Sensor false = unlocked
-                Console.print(F("[ACK], TRAY_"));
-                Console.print(trayNum);
-                Console.println(F("_ALREADY_UNLOCKED"));
+                sprintf(msg, "TRAY_%d_ALREADY_UNLOCKED", trayNum);
+                Console.acknowledge(msg);
             }
             else
             {
@@ -521,28 +538,34 @@ bool cmd_unlock(char *args, CommandCaller *caller)
         // Try unlocking with sensor feedback
         if (safeValveOperation(*trayValve, *traySensor, VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
-            Console.print(F("[ACK], TRAY_"));
-            Console.print(trayNum);
-            Console.println(F("_UNLOCKED"));
+            sprintf(msg, "TRAY_%d_UNLOCKED", trayNum);
+            Console.acknowledge(msg);
             return true;
         }
 
-        Console.print(F("[ERROR], Failed to disengage tray "));
-        Console.println(trayNum);
+        sprintf(msg, "Failed to disengage tray %d", trayNum);
+        Console.error(msg);
         Console.serialInfo(F("Check air pressure and valve functionality"));
         return false;
-        break;
 
     default: // Unknown command
-        Console.print(F("[ERROR], Unknown unlock subcommand: "));
-        Console.println(subcommand);
-        Console.error(F("Valid options are '1', '2', '3', 'shuttle', 'all', or 'help'"));
+        sprintf(msg, "Unknown unlock subcommand: %s", subcommand);
+        Console.error(msg);
+        Console.serialInfo(F("Valid options are '1', '2', '3', 'shuttle', 'all', or 'help'"));
         return false;
-        break;
     }
 
     return false; // Should never reach here
 }
+
+// Define the log subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo LOG_COMMANDS[] = {
+    {"help", 4},
+    {"now", 3},
+    {"off", 2},
+    {"on", 1}};
+
+static const size_t LOG_COMMAND_COUNT = sizeof(LOG_COMMANDS) / sizeof(SubcommandInfo);
 
 // Log command handler
 bool cmd_log(char *args, CommandCaller *caller)
@@ -562,7 +585,7 @@ bool cmd_log(char *args, CommandCaller *caller)
         return false;
     }
 
-    // Parse the first argument - we'll use commas as separators
+    // Parse the first argument - we'll use spaces as separators
     char *subcommand = strtok(trimmed, " ");
     if (subcommand == NULL)
     {
@@ -573,16 +596,10 @@ bool cmd_log(char *args, CommandCaller *caller)
     // Trim leading spaces from subcommand
     subcommand = trimLeadingSpaces(subcommand);
 
-    // Map subcommand to integer for switch statement
-    int cmdCode = 0;
-    if (strcmp(subcommand, "on") == 0)
-        cmdCode = 1;
-    else if (strcmp(subcommand, "off") == 0)
-        cmdCode = 2;
-    else if (strcmp(subcommand, "now") == 0)
-        cmdCode = 3;
-    else if (strcmp(subcommand, "help") == 0)
-        cmdCode = 4;
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(subcommand, LOG_COMMANDS, LOG_COMMAND_COUNT);
+
+    char msg[100];
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
@@ -602,13 +619,12 @@ bool cmd_log(char *args, CommandCaller *caller)
             if (parsedInterval > 0)
             {
                 interval = parsedInterval;
-                Console.serialInfo(F("Logging enabled with interval of "));
-                Serial.print(interval);
-                Serial.println(F(" ms"));
+                sprintf(msg, "Logging enabled with interval of %lu ms", interval);
+                Console.serialInfo(msg);
 
                 // Acknowledgment to both outputs
-                Console.print(F("[ACK], LOG_ENABLED_"));
-                Console.println(interval);
+                sprintf(msg, "LOG_ENABLED_%lu", interval);
+                Console.acknowledge(msg);
             }
             else
             {
@@ -616,20 +632,19 @@ bool cmd_log(char *args, CommandCaller *caller)
                 interval = DEFAULT_LOG_INTERVAL;
 
                 // Acknowledgment to both outputs
-                Console.print(F("[ACK], LOG_ENABLED_DEFAULT_"));
-                Console.println(DEFAULT_LOG_INTERVAL);
+                sprintf(msg, "LOG_ENABLED_DEFAULT_%lu", DEFAULT_LOG_INTERVAL);
+                Console.acknowledge(msg);
             }
         }
         else
         {
             // Use default interval
-            Console.serialInfo(F("Logging enabled with default interval of "));
-            Serial.print(DEFAULT_LOG_INTERVAL);
-            Serial.println(F(" ms"));
+            sprintf(msg, "Logging enabled with default interval of %lu ms", DEFAULT_LOG_INTERVAL);
+            Console.serialInfo(msg);
 
             // Acknowledgment to both outputs
-            Console.print(F("[ACK], LOG_ENABLED_DEFAULT_"));
-            Console.println(DEFAULT_LOG_INTERVAL);
+            sprintf(msg, "LOG_ENABLED_DEFAULT_%lu", DEFAULT_LOG_INTERVAL);
+            Console.acknowledge(msg);
         }
 
         logging.logInterval = interval;
@@ -732,6 +747,18 @@ bool cmd_log(char *args, CommandCaller *caller)
     return false; // Should never reach here
 }
 
+// Define the motor subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo MOTOR_COMMANDS[] = {
+    {"abort", 5},
+    {"clear", 3},
+    {"help", 7},
+    {"home", 4},
+    {"init", 1},
+    {"status", 2},
+    {"stop", 6}};
+
+static const size_t MOTOR_COMMAND_COUNT = sizeof(MOTOR_COMMANDS) / sizeof(SubcommandInfo);
+
 // Motor command handler for consolidated motor operations
 bool cmd_motor(char *args, CommandCaller *caller)
 {
@@ -758,81 +785,39 @@ bool cmd_motor(char *args, CommandCaller *caller)
         return false;
     }
 
-    // Trim leading spaces from subcommandn
+    // Trim leading spaces from subcommand
     subcommand = trimLeadingSpaces(subcommand);
 
     // Handle motor subcommands using switch for better readability
-    int subcommandCode = 0;
-    if (strcmp(subcommand, "init") == 0)
-        subcommandCode = 1;
-    else if (strcmp(subcommand, "status") == 0)
-        subcommandCode = 2;
-    else if (strcmp(subcommand, "clear") == 0)
-        subcommandCode = 3;
-    else if (strcmp(subcommand, "home") == 0)
-        subcommandCode = 4;
-    else if (strcmp(subcommand, "abort") == 0)
-        subcommandCode = 5;
-    else if (strcmp(subcommand, "stop") == 0)
-        subcommandCode = 6;
-    else if (strcmp(subcommand, "help") == 0)
-        subcommandCode = 7;
+    int subcommandCode = findSubcommandCode(subcommand, MOTOR_COMMANDS, MOTOR_COMMAND_COUNT);
+
+    char msg[100]; // Shared buffer for all formatted output
 
     switch (subcommandCode)
     {
-    case 1:
-    { // init
+    case 1: // init
+    {
         Console.serialInfo(F("Initializing motor..."));
 
         // Diagnostic: Print state before initialization
-        Serial.print(F("[DIAGNOSTIC] Motor state before init: "));
-        switch (motorState)
-        {
-        case MOTOR_STATE_IDLE:
-            Console.serialInfo(F("IDLE"));
-            break;
-        case MOTOR_STATE_MOVING:
-            Console.serialInfo(F("MOVING"));
-            break;
-        case MOTOR_STATE_HOMING:
-            Console.serialInfo(F("HOMING"));
-            break;
-        case MOTOR_STATE_FAULTED:
-            Console.serialInfo(F("FAULTED"));
-            break;
-        case MOTOR_STATE_NOT_READY:
-            Console.serialInfo(F("NOT READY"));
-            break;
-        default:
-            Console.serialInfo(F("UNKNOWN"));
-            break;
-        }
+        sprintf(msg, "[DIAGNOSTIC] Motor state before init: %s", 
+            motorState == MOTOR_STATE_IDLE ? "IDLE" :
+            motorState == MOTOR_STATE_MOVING ? "MOVING" :
+            motorState == MOTOR_STATE_HOMING ? "HOMING" :
+            motorState == MOTOR_STATE_FAULTED ? "FAULTED" :
+            motorState == MOTOR_STATE_NOT_READY ? "NOT READY" : "UNKNOWN");
+        Console.serialInfo(msg);
 
         initMotorSystem();
 
         // Diagnostic: Print state after initialization
-        Serial.print(F("[DIAGNOSTIC] Motor state after init: "));
-        switch (motorState)
-        {
-        case MOTOR_STATE_IDLE:
-            Console.serialInfo(F("IDLE"));
-            break;
-        case MOTOR_STATE_MOVING:
-            Console.serialInfo(F("MOVING"));
-            break;
-        case MOTOR_STATE_HOMING:
-            Console.serialInfo(F("HOMING"));
-            break;
-        case MOTOR_STATE_FAULTED:
-            Console.serialInfo(F("FAULTED"));
-            break;
-        case MOTOR_STATE_NOT_READY:
-            Console.serialInfo(F("NOT READY"));
-            break;
-        default:
-            Console.serialInfo(F("UNKNOWN"));
-            break;
-        }
+        sprintf(msg, "[DIAGNOSTIC] Motor state after init: %s", 
+            motorState == MOTOR_STATE_IDLE ? "IDLE" :
+            motorState == MOTOR_STATE_MOVING ? "MOVING" :
+            motorState == MOTOR_STATE_HOMING ? "HOMING" :
+            motorState == MOTOR_STATE_FAULTED ? "FAULTED" :
+            motorState == MOTOR_STATE_NOT_READY ? "NOT READY" : "UNKNOWN");
+        Console.serialInfo(msg);
 
         if (motorState == MOTOR_STATE_NOT_READY || motorState == MOTOR_STATE_FAULTED)
         {
@@ -845,38 +830,21 @@ bool cmd_motor(char *args, CommandCaller *caller)
             Console.acknowledge(F("MOTOR_INITIALIZED"));
             return true;
         }
-        break;
     }
 
-    case 2:
-    { // status
+    case 2: // status
+    {
         Console.acknowledge(F("MOTOR_STATUS"));
-
         Console.println(F("Motor Status:"));
 
         // Display motor state
-        Console.print(F("  State: "));
-        switch (motorState)
-        {
-        case MOTOR_STATE_IDLE:
-            Console.println(F("IDLE"));
-            break;
-        case MOTOR_STATE_MOVING:
-            Console.println(F("MOVING"));
-            break;
-        case MOTOR_STATE_HOMING:
-            Console.println(F("HOMING"));
-            break;
-        case MOTOR_STATE_FAULTED:
-            Console.println(F("FAULTED"));
-            break;
-        case MOTOR_STATE_NOT_READY:
-            Console.println(F("NOT READY"));
-            break;
-        default:
-            Console.println(F("UNKNOWN"));
-            break;
-        }
+        sprintf(msg, "  State: %s",
+            motorState == MOTOR_STATE_IDLE ? "IDLE" :
+            motorState == MOTOR_STATE_MOVING ? "MOVING" :
+            motorState == MOTOR_STATE_HOMING ? "HOMING" :
+            motorState == MOTOR_STATE_FAULTED ? "FAULTED" :
+            motorState == MOTOR_STATE_NOT_READY ? "NOT READY" : "UNKNOWN");
+        Console.println(msg);
 
         // Display homing status
         Console.print(F("  Homed: "));
@@ -889,20 +857,14 @@ bool cmd_motor(char *args, CommandCaller *caller)
             int32_t rawPosition = MOTOR_CONNECTOR.PositionRefCommanded();
             int32_t normalizedPosition = normalizeEncoderValue(rawPosition);
 
-            Console.print(F("  Current Position: "));
-            Console.print(calculatedPositionMm, 2);
-            Console.print(F(" mm ("));
-            Console.print(normalizedPosition);
-            Console.println(F(" counts)"));
+            sprintf(msg, "  Current Position: %.2f mm (%ld counts)", calculatedPositionMm, (long)normalizedPosition);
+            Console.println(msg);
 
-            // Add last completed position display using existing variables
             Console.print(F("  Last Completed Position: "));
             if (hasLastTarget)
             {
-                Console.print(lastTargetPositionMm, 2);
-                Console.print(F(" mm ("));
-                Console.print(normalizeEncoderValue(lastTargetPulses));
-                Console.println(F(" counts)"));
+                sprintf(msg, "%.2f mm (%ld counts)", lastTargetPositionMm, (long)normalizeEncoderValue(lastTargetPulses));
+                Console.println(msg);
             }
             else
             {
@@ -918,10 +880,8 @@ bool cmd_motor(char *args, CommandCaller *caller)
             if (motorState != MOTOR_STATE_NOT_READY)
             {
                 int32_t rawPosition = MOTOR_CONNECTOR.PositionRefCommanded();
-                Console.print(F("  Encoder Reading: "));
-                // Also normalize here
-                Console.print(normalizeEncoderValue(rawPosition));
-                Console.println(F(" counts (reference point not established)"));
+                sprintf(msg, "  Encoder Reading: %ld counts (reference point not established)", (long)normalizeEncoderValue(rawPosition));
+                Console.println(msg);
             }
             else
             {
@@ -933,51 +893,38 @@ bool cmd_motor(char *args, CommandCaller *caller)
         Console.println(F("  Velocity Settings:"));
 
         // Regular movement velocity
-        Console.print(F("    Move Operations: "));
-        Console.print(ppsToRpm(currentVelMax), 1);
-        Console.println(F(" RPM"));
+        sprintf(msg, "    Move Operations: %.1f RPM", ppsToRpm(currentVelMax));
+        Console.println(msg);
 
-        // Homing velocity - updated to show only the approach velocity we actually use
-        Console.print(F("    Homing: "));
-        Console.print(HOME_APPROACH_VELOCITY_RPM);
-        Console.println(F(" RPM"));
+        // Homing velocity
+        sprintf(msg, "    Homing: %d RPM", HOME_APPROACH_VELOCITY_RPM);
+        Console.println(msg);
 
         // Jog velocity and increment
-        Console.print(F("    Jogging: "));
-        Console.print(currentJogSpeedRpm);
-        Console.print(F(" RPM, "));
-        Console.print(currentJogIncrementMm, 2);
-        Console.println(F(" mm/jog"));
+        sprintf(msg, "    Jogging: %d RPM, %.2f mm/jog", currentJogSpeedRpm, currentJogIncrementMm);
+        Console.println(msg);
 
         // Only show current velocity if motor is moving
         if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING)
         {
             int32_t velocity = MOTOR_CONNECTOR.VelocityRefCommanded();
             double velocityRpm = (double)velocity * 60.0 / PULSES_PER_REV;
-            Console.print(F("    Current: "));
-            Console.print(velocityRpm, 1);
-            Console.print(F(" RPM ("));
-            Console.print(velocity);
-            Console.println(F(" pulses/sec)"));
+            sprintf(msg, "    Current: %.1f RPM (%ld pulses/sec)", velocityRpm, (long)velocity);
+            Console.println(msg);
         }
 
         // Display acceleration limit
-        Console.print(F("  Acceleration: "));
-        Console.print((double)currentAccelMax * 60.0 / PULSES_PER_REV, 1);
-        Console.println(F(" RPM/sec"));
+        sprintf(msg, "  Acceleration: %.1f RPM/sec", (double)currentAccelMax * 60.0 / PULSES_PER_REV);
+        Console.println(msg);
 
         // Display travel limits based on homing status
         Console.println(F("  Travel Limits:"));
         if (isHomed)
         {
-            // Display both mm and counts when homed
-            Console.print(F("    Range: 0.00 to "));
-            Console.print(MAX_TRAVEL_MM, 2);
-            Console.println(F(" mm"));
-            Console.print(F("            0 to "));
-            // MAX_TRAVEL_PULSES is already defined with the correct sign
-            Console.print(MAX_TRAVEL_PULSES);
-            Console.println(F(" counts"));
+            sprintf(msg, "    Range: 0.00 to %.2f mm", MAX_TRAVEL_MM);
+            Console.println(msg);
+            sprintf(msg, "            0 to %ld counts", (long)MAX_TRAVEL_PULSES);
+            Console.println(msg);
         }
         else
         {
@@ -986,14 +933,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
 
         // Display fault status
         Console.print(F("  Fault Status: "));
-        if (MOTOR_CONNECTOR.HlfbState() == ClearCore::MotorDriver::HLFB_ASSERTED)
-        {
-            Console.println(F("NO FAULT"));
-        }
-        else
-        {
-            Console.println(F("FAULT DETECTED"));
-        }
+        Console.println(MOTOR_CONNECTOR.HlfbState() == ClearCore::MotorDriver::HLFB_ASSERTED ? F("NO FAULT") : F("FAULT DETECTED"));
 
         // Display E-Stop status
         Console.print(F("  E-Stop: "));
@@ -1007,7 +947,6 @@ bool cmd_motor(char *args, CommandCaller *caller)
         }
 
         return true;
-        break;
     }
 
     case 3:
@@ -1200,18 +1139,30 @@ bool cmd_motor(char *args, CommandCaller *caller)
 
     default:
     {
-        Console.print(F("[ERROR], Unknown motor command: "));
-        Console.println(subcommand);
-        Console.error(F("Valid options are 'init', 'status', 'clear', 'home', 'abort', 'stop', or 'help'"));
+        sprintf(msg, "[ERROR], Unknown motor command: %s", subcommand);
+        Console.error(msg);
+        Console.serialInfo(F("Valid options are 'init', 'status', 'clear', 'home', 'abort', 'stop', or 'help'"));
         return false;
-        break;
     }
     }
 
     return false; // Should never reach here, but included for completeness
 }
 
-// Move command handler with support for absolute encoder counts
+// Define the move subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo MOVE_COMMANDS[] = {
+    {"1", 2},
+    {"2", 3},
+    {"3", 4},
+    {"4", 5},
+    {"counts", 7},
+    {"help", 9},
+    {"home", 1},
+    {"mm", 6},
+    {"rel", 8}};
+
+static const size_t MOVE_COMMAND_COUNT = sizeof(MOVE_COMMANDS) / sizeof(SubcommandInfo);
+
 bool cmd_move(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
@@ -1241,62 +1192,34 @@ bool cmd_move(char *args, CommandCaller *caller)
     subcommand = trimLeadingSpaces(subcommand);
 
     // State checks (in order of importance) for all movement commands
-    // 1. Check if motor is initialized
     if (motorState == MOTOR_STATE_NOT_READY)
     {
         Console.error(F("Motor is not initialized. Use 'motor,init' first."));
         return false;
     }
-
-    // 2. Check if E-Stop is active - most critical safety check
     if (isEStopActive())
     {
         Console.error(F("Cannot move while E-Stop is active"));
         Console.serialInfo(F("Release E-Stop and try again."));
         return false;
     }
-
-    // 3. Check for fault condition
     if (motorState == MOTOR_STATE_FAULTED)
     {
         Console.error(F("Motor is in fault state. Use 'motor,clear' first."));
         return false;
     }
-
-    // 4. Check if motor is already moving
     if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING)
     {
         Console.error(F("Motor is already moving. Use 'motor,abort' first."));
         return false;
     }
 
-    // Map subcommand to integer for switch statement
-    int cmdCode = 0;
-    if (strcmp(subcommand, "home") == 0)
-        cmdCode = 1;
-    else if (strcmp(subcommand, "1") == 0)
-        cmdCode = 2;
-    else if (strcmp(subcommand, "2") == 0)
-        cmdCode = 3;
-    else if (strcmp(subcommand, "3") == 0)
-        cmdCode = 4;
-    else if (strcmp(subcommand, "4") == 0)
-        cmdCode = 5;
-    else if (strcmp(subcommand, "mm") == 0)
-        cmdCode = 6;
-    else if (strcmp(subcommand, "counts") == 0)
-        cmdCode = 7;
-    else if (strcmp(subcommand, "rel") == 0)
-        cmdCode = 8;
-    else if (strcmp(subcommand, "help") == 0)
-        cmdCode = 9;
+    int cmdCode = findSubcommandCode(subcommand, MOVE_COMMANDS, MOVE_COMMAND_COUNT);
+    char msg[100];
 
-    // Use switch-case for cleaner flow control
     switch (cmdCode)
     {
     case 1: // "home"
-    {
-        // Check if motor is already homed
         if (isHomed)
         {
             Console.serialInfo(F("Moving to home position..."));
@@ -1316,18 +1239,13 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Motor is not homed. Use 'motor,home' first."));
             return false;
         }
-        break;
-    }
 
-    case 2: // "1" (Position 1)
-    {
-        // Check if motor is homed
+    case 2: // "1"
         if (!isHomed)
         {
             Console.error(F("Motor is not homed. Use 'motor,home' first."));
             return false;
         }
-
         Console.serialInfo(F("Moving to position 1..."));
         if (moveToPosition(POSITION_1))
         {
@@ -1339,18 +1257,13 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to position 1"));
             return false;
         }
-        break;
-    }
 
-    case 3: // "2" (Position 2)
-    {
-        // Check if motor is homed
+    case 3: // "2"
         if (!isHomed)
         {
             Console.error(F("Motor is not homed. Use 'motor,home' first."));
             return false;
         }
-
         Console.serialInfo(F("Moving to position 2..."));
         if (moveToPosition(POSITION_2))
         {
@@ -1362,18 +1275,13 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to position 2"));
             return false;
         }
-        break;
-    }
 
-    case 4: // "3" (Position 3)
-    {
-        // Check if motor is homed
+    case 4: // "3"
         if (!isHomed)
         {
             Console.error(F("Motor is not homed. Use 'motor,home' first."));
             return false;
         }
-
         Console.serialInfo(F("Moving to position 3..."));
         if (moveToPosition(POSITION_3))
         {
@@ -1385,18 +1293,13 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to position 3"));
             return false;
         }
-        break;
-    }
 
-    case 5: // "4" (Position 4)
-    {
-        // Check if motor is homed
+    case 5: // "4"
         if (!isHomed)
         {
             Console.error(F("Motor is not homed. Use 'motor,home' first."));
             return false;
         }
-
         Console.serialInfo(F("Moving to position 4..."));
         if (moveToPosition(POSITION_4))
         {
@@ -1408,50 +1311,38 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to position 4"));
             return false;
         }
-        break;
-    }
 
-    case 6: // "mm" (absolute position in mm)
+    case 6: // "mm"
     {
-        // Get the mm value from the next token
         char *mmStr = strtok(NULL, " ");
         if (mmStr == NULL)
         {
             Console.error(F("Missing mm value. Usage: move,mm,X"));
             return false;
         }
-
-        // Parse the mm value
         mmStr = trimLeadingSpaces(mmStr);
         double targetMm = atof(mmStr);
 
-        // Check if motor is homed for precise positioning
         if (!isHomed)
         {
             Console.error(F("Motor is not homed. Use 'motor,home' first."));
             Console.serialWarning(F("Moving to absolute positions without homing is unsafe."));
             return false;
         }
-
-        // Check if position is within bounds
         if (targetMm < 0.0 || targetMm > MAX_TRAVEL_MM)
         {
-            Console.error(F("Position out of range"));
-            Serial.print(F("[ERROR] Position out of range. Valid range: 0 to "));
-            Serial.print(MAX_TRAVEL_MM, 1);
-            Serial.println(F(" mm"));
+            sprintf(msg, "[ERROR] Position out of range. Valid range: 0 to %.1f mm", MAX_TRAVEL_MM);
+            Console.error(msg);
             return false;
         }
 
-        // Position is within bounds, proceed with movement
-        Console.serialInfo(F("Moving to absolute position: "));
-        Serial.print(targetMm, 2);
-        Serial.println(F(" mm"));
+        sprintf(msg, "Moving to absolute position: %.2f mm", targetMm);
+        Console.serialInfo(msg);
 
         if (moveToPositionMm(targetMm))
         {
-            Console.print(F("[ACK], MOVE_TO_MM_"));
-            Console.println(targetMm, 2);
+            sprintf(msg, "[ACK], MOVE_TO_MM_%.2f", targetMm);
+            Console.acknowledge(msg);
             return true;
         }
         else
@@ -1459,50 +1350,39 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to requested position."));
             return false;
         }
-        break;
     }
 
-    case 7: // "counts" (absolute position in encoder counts)
+    case 7: // "counts"
     {
-        // Get the counts value from the next token
         char *countsStr = strtok(NULL, " ");
         if (countsStr == NULL)
         {
             Console.error(F("Missing counts value. Usage: move,counts,X"));
             return false;
         }
-
-        // Parse the counts value
         countsStr = trimLeadingSpaces(countsStr);
         int32_t targetCounts = atol(countsStr);
 
-        // Check if motor is homed for precise positioning
         if (!isHomed)
         {
             Console.error(F("Motor is not homed. Use 'motor,home' first."));
             Console.serialWarning(F("Moving to absolute positions without homing is unsafe."));
             return false;
         }
-
-        // Check if position is within bounds
         if (targetCounts < 0 || targetCounts > MAX_TRAVEL_PULSES)
         {
-            Console.error(F("Position out of range"));
-            Console.serialInfo(F("Valid range: 0 to "));
-            Serial.print(MAX_TRAVEL_PULSES);
-            Serial.println(F(" counts"));
+            sprintf(msg, "[ERROR] Position out of range. Valid range: 0 to %ld counts", (long)MAX_TRAVEL_PULSES);
+            Console.error(msg);
             return false;
         }
 
-        // Position is within bounds, proceed with movement
-        Console.serialInfo(F("Moving to absolute position: "));
-        Serial.print(targetCounts);
-        Serial.println(F(" counts"));
+        sprintf(msg, "Moving to absolute position: %ld counts", (long)targetCounts);
+        Console.serialInfo(msg);
 
         if (moveToAbsolutePosition(targetCounts))
         {
-            Console.print(F("[ACK], MOVE_TO_COUNTS_"));
-            Console.println(targetCounts);
+            sprintf(msg, "[ACK], MOVE_TO_COUNTS_%ld", (long)targetCounts);
+            Console.acknowledge(msg);
             return true;
         }
         else
@@ -1510,24 +1390,19 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start movement to requested position."));
             return false;
         }
-        break;
     }
 
-    case 8: // "rel" (relative position in mm)
+    case 8: // "rel"
     {
-        // Get the mm value from the next token
         char *relStr = strtok(NULL, " ");
         if (relStr == NULL)
         {
             Console.error(F("Missing relative distance value. Usage: move,rel,X"));
             return false;
         }
-
-        // Parse the relative distance value
         relStr = trimLeadingSpaces(relStr);
         double relDistanceMm = atof(relStr);
 
-        // Check if motor is homed for precise positioning
         if (!isHomed)
         {
             Console.error(F("Motor is not homed. Use 'motor,home' first."));
@@ -1535,40 +1410,26 @@ bool cmd_move(char *args, CommandCaller *caller)
             return false;
         }
 
-        // Get current position
         double currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
         double targetPositionMm = currentPositionMm + relDistanceMm;
 
-        // Check if target position is within bounds
         if (targetPositionMm < 0.0 || targetPositionMm > MAX_TRAVEL_MM)
         {
-            Console.error(F("Target position out of range"));
-            Console.serialInfo(F("Valid range: 0 to "));
-            Serial.print(MAX_TRAVEL_MM, 1);
-            Serial.println(F(" mm"));
-            Console.serialInfo(F("Current position: "));
-            Serial.print(currentPositionMm, 2);
-            Serial.print(F(" mm, Requested move: "));
-            Serial.print(relDistanceMm, 2);
-            Serial.println(F(" mm"));
+            sprintf(msg, "Target position out of range. Valid range: 0 to %.1f mm", MAX_TRAVEL_MM);
+            Console.error(msg);
+            sprintf(msg, "Current position: %.2f mm, Requested move: %.2f mm", currentPositionMm, relDistanceMm);
+            Console.serialInfo(msg);
             return false;
         }
 
-        // Display move information
-        Console.serialInfo(F("Moving "));
-        Serial.print(relDistanceMm, 2);
-        Serial.print(F(" mm from current position ("));
-        Serial.print(currentPositionMm, 2);
-        Serial.print(F(" mm) to "));
-        Serial.print(targetPositionMm, 2);
-        Serial.println(F(" mm"));
+        sprintf(msg, "Moving %.2f mm from current position (%.2f mm) to %.2f mm",
+                relDistanceMm, currentPositionMm, targetPositionMm);
+        Console.serialInfo(msg);
 
         if (moveToPositionMm(targetPositionMm))
         {
-            Console.print(F("[ACK], MOVE_REL_"));
-            Console.print(relDistanceMm, 2);
-            Console.print(F("_TO_"));
-            Console.println(targetPositionMm, 2);
+            sprintf(msg, "[ACK], MOVE_REL_%.2f_TO_%.2f", relDistanceMm, targetPositionMm);
+            Console.acknowledge(msg);
             return true;
         }
         else
@@ -1576,48 +1437,39 @@ bool cmd_move(char *args, CommandCaller *caller)
             Console.error(F("Failed to start relative movement."));
             return false;
         }
-        break;
     }
 
     case 9: // "help"
-    {
         Console.acknowledge(F("MOVE_HELP"));
         Console.println(F("\n===== MOVE COMMAND HELP ====="));
-
         Console.println(F("\nPREREQUISITES:"));
         Console.println(F("  • Motor must be initialized (motor,init)"));
         Console.println(F("  • Motor must be homed for accurate positioning (motor,home)"));
         Console.println(F("  • E-Stop must be inactive"));
         Console.println(F("  • Motor must not be in fault state"));
         Console.println(F("  • No other movement can be in progress"));
-
         Console.println(F("\nCOMMAND TYPES:"));
         Console.println(F("  move,home - Move to home (zero) position"));
         Console.println(F("    > Reference position offset 5mm from hardstop"));
         Console.println(F("    > Always available after homing"));
-
         Console.println(F("  move,1 through move,4 - Move to predefined positions"));
         Console.println(F("    > Position 1: Loading position (28.7mm)"));
         Console.println(F("    > Position 2: Middle position (456.0mm)"));
         Console.println(F("    > Position 3: Unloading position (883.58mm)"));
         Console.println(F("    > Position 4: Max travel (1050.0mm)"));
-
         Console.println(F("  move,mm,X - Move to absolute position X in millimeters"));
         Console.println(F("    > Valid range: 0 to 1050.0 mm"));
         Console.println(F("    > Most intuitive way to specify exact positions"));
         Console.println(F("    > Example: move,mm,500.5 - moves to 500.5mm"));
-
         Console.println(F("  move,counts,X - Move to absolute position X in encoder counts"));
         Console.println(F("    > Valid range: 0 to 64,333 counts"));
         Console.println(F("    > Used for precise control or debugging"));
         Console.println(F("    > 1mm ≈ 61.27 counts (3200 pulses/rev ÷ 52.23mm/rev)"));
-
         Console.println(F("  move,rel,X - Move X millimeters relative to current position"));
         Console.println(F("    > Use positive values to move forward"));
         Console.println(F("    > Use negative values to move backward"));
         Console.println(F("    > Example: move,rel,-10 - moves 10mm backward"));
         Console.println(F("    > Movement is constrained to valid range (0-1050.0mm)"));
-
         Console.println(F("\nTROUBLESHOOTING:"));
         Console.println(F("  • If movement fails, check motor status with 'motor,status'"));
         Console.println(F("  • If at travel limits, you can only move within the allowed range"));
@@ -1625,25 +1477,29 @@ bool cmd_move(char *args, CommandCaller *caller)
         Console.println(F("  • For short, precise movements, consider using 'jog' commands"));
         Console.println(F("  • For interactive positioning, use 'encoder' handwheel control"));
         Console.println(F("-------------------------------------------"));
-
         return true;
-        break;
-    }
 
-    default: // Unknown command
-    {
-        Console.print(F("[ERROR], Invalid position: "));
-        Console.println(subcommand);
+    default:
+        sprintf(msg, "[ERROR], Invalid position: %s", subcommand);
+        Console.error(msg);
         Console.error(F("Valid options: home, 1, 2, 3, 4, counts, mm, rel, help"));
         return false;
-        break;
-    }
     }
 
     return false; // Should never reach here, but included for completeness
 }
 
-// Jog command handler
+// Define the jog subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo JOG_COMMANDS[] = {
+    {"+", 1},
+    {"-", 2},
+    {"help", 6},
+    {"inc", 3},
+    {"speed", 4},
+    {"status", 5}};
+
+static const size_t JOG_COMMAND_COUNT = sizeof(JOG_COMMANDS) / sizeof(SubcommandInfo);
+
 bool cmd_jog(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
@@ -1675,43 +1531,32 @@ bool cmd_jog(char *args, CommandCaller *caller)
     // State checks (in order of importance) for movement commands
     if (strcmp(subcommand, "+") == 0 || strcmp(subcommand, "-") == 0)
     {
-        // 1. Check if motor is initialized
         if (motorState == MOTOR_STATE_NOT_READY)
         {
             Console.error(F("Motor is not initialized. Use 'motor,init' first."));
             return false;
         }
-
-        // 2. Check if E-Stop is active - most critical safety check
         if (isEStopActive())
         {
             Console.error(F("Cannot jog while E-Stop is active"));
             Console.serialInfo(F("Release E-Stop and try again."));
             return false;
         }
-
-        // 3. Check for fault condition
         if (motorState == MOTOR_STATE_FAULTED)
         {
             Console.error(F("Motor is in fault state. Use 'motor,clear' first."));
             return false;
         }
-
-        // 4. Check if motor is homing
         if (motorState == MOTOR_STATE_HOMING)
         {
             Console.error(F("Cannot jog while homing is in progress."));
             return false;
         }
-
-        // 5. Check if motor is already moving
         if (motorState == MOTOR_STATE_MOVING)
         {
             Console.error(F("Motor is already moving. Use 'motor,abort' first."));
             return false;
         }
-
-        // 6. Check if motor is homed
         if (!isHomed)
         {
             Console.error(F("Motor is not homed. Use 'motor,home' command first."));
@@ -1719,58 +1564,32 @@ bool cmd_jog(char *args, CommandCaller *caller)
         }
     }
 
-    // Handle jog subcommands using switch for better readability
-    int subcommandCode = 0;
-    if (strcmp(subcommand, "+") == 0)
-        subcommandCode = 1;
-    else if (strcmp(subcommand, "-") == 0)
-        subcommandCode = 2;
-    else if (strcmp(subcommand, "inc") == 0)
-        subcommandCode = 3;
-    else if (strcmp(subcommand, "speed") == 0)
-        subcommandCode = 4;
-    else if (strcmp(subcommand, "status") == 0)
-        subcommandCode = 5;
-    else if (strcmp(subcommand, "help") == 0)
-        subcommandCode = 6;
+    int subcommandCode = findSubcommandCode(subcommand, JOG_COMMANDS, JOG_COMMAND_COUNT);
+    char msg[100];
 
     switch (subcommandCode)
     {
-    case 1:
-    { // jog forward (+)
-        // Calculate the target position by adding the jog increment to the current position
+    case 1: // jog forward (+)
+    {
         double currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
         double targetPositionMm = currentPositionMm + currentJogIncrementMm;
 
-        // Check if target position is within bounds
         if (targetPositionMm > MAX_TRAVEL_MM)
         {
             Console.error(F("Cannot jog beyond maximum position limit"));
-
-            Console.serialInfo(F("Maximum position: "));
-            Serial.print(MAX_TRAVEL_MM, 1);
-            Serial.println(F(" mm"));
-            Serial.print(F("  Current position: "));
-            Serial.print(currentPositionMm, 2);
-            Serial.println(F(" mm"));
+            sprintf(msg, "Maximum position: %.1f mm | Current position: %.2f mm", MAX_TRAVEL_MM, currentPositionMm);
+            Console.serialInfo(msg);
             return false;
         }
 
-        // Display jog information
-        Console.serialInfo(F("Jogging forward "));
-        Serial.print(currentJogIncrementMm, 2);
-        Serial.print(F(" mm from position "));
-        Serial.print(currentPositionMm, 2);
-        Serial.print(F(" mm to "));
-        Serial.print(targetPositionMm, 2);
-        Serial.println(F(" mm"));
+        sprintf(msg, "Jogging forward %.2f mm from position %.2f mm to %.2f mm",
+                currentJogIncrementMm, currentPositionMm, targetPositionMm);
+        Console.serialInfo(msg);
 
-        // Perform the jog movement using the jogMotor function
         if (jogMotor(true))
-        { // true = forward direction
-            Console.print(F("[ACK], JOG_FORWARD_"));
-            Console.print(currentJogIncrementMm, 2);
-            Console.println(F(" mm"));
+        {
+            sprintf(msg, "[ACK], JOG_FORWARD_%.2f mm", currentJogIncrementMm);
+            Console.acknowledge(msg);
             return true;
         }
         else
@@ -1778,41 +1597,29 @@ bool cmd_jog(char *args, CommandCaller *caller)
             Console.error(F("Failed to initiate jog movement"));
             return false;
         }
-        break;
     }
 
-    case 2:
-    { // jog backward (-)
-        // Calculate the target position by subtracting the jog increment from the current position
+    case 2: // jog backward (-)
+    {
         double currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
         double targetPositionMm = currentPositionMm - currentJogIncrementMm;
 
-        // Check if target position is within bounds
         if (targetPositionMm < 0.0)
         {
             Console.error(F("Cannot jog beyond minimum position limit"));
-
-            Console.serialInfo(F("  Current position: "));
-            Serial.print(currentPositionMm, 2);
-            Serial.println(F(" mm"));
+            sprintf(msg, "Current position: %.2f mm", currentPositionMm);
+            Console.serialInfo(msg);
             return false;
         }
 
-        // Display jog information
-        Console.serialInfo(F("Jogging backward "));
-        Serial.print(currentJogIncrementMm, 2);
-        Serial.print(F(" mm from position "));
-        Serial.print(currentPositionMm, 2);
-        Serial.print(F(" mm to "));
-        Serial.print(targetPositionMm, 2);
-        Serial.println(F(" mm"));
+        sprintf(msg, "Jogging backward %.2f mm from position %.2f mm to %.2f mm",
+                currentJogIncrementMm, currentPositionMm, targetPositionMm);
+        Console.serialInfo(msg);
 
-        // Perform the jog movement using the jogMotor function
         if (jogMotor(false))
-        { // false = backward direction
-            Console.print(F("[ACK], JOG_BACKWARD_"));
-            Console.print(currentJogIncrementMm, 2);
-            Console.println(F(" mm"));
+        {
+            sprintf(msg, "[ACK], JOG_BACKWARD_%.2f mm", currentJogIncrementMm);
+            Console.acknowledge(msg);
             return true;
         }
         else
@@ -1820,34 +1627,27 @@ bool cmd_jog(char *args, CommandCaller *caller)
             Console.error(F("Failed to initiate jog movement"));
             return false;
         }
-        break;
     }
 
-    case 3:
-    { // set/get increment
-        // Check if a value was provided
+    case 3: // set/get increment
+    {
         char *incStr = strtok(NULL, " ");
         if (incStr == NULL)
         {
-            // Just display the current increment
-            Console.print(F("[ACK], JOG_INC_"));
-            Console.print(currentJogIncrementMm, 2);
-            Console.println(F(" mm"));
+            sprintf(msg, "[ACK], JOG_INC_%.2f mm", currentJogIncrementMm);
+            Console.acknowledge(msg);
             return true;
         }
         else
         {
-            // Trim leading spaces from increment value
             incStr = trimLeadingSpaces(incStr);
 
-            // Handle "default" keyword
             if (strcmp(incStr, "default") == 0)
             {
                 if (setJogIncrement(DEFAULT_JOG_INCREMENT))
                 {
-                    Console.print(F("[INFO] Jog increment set to default ("));
-                    Console.print(currentJogIncrementMm, 2);
-                    Console.println(F(" mm)"));
+                    sprintf(msg, "[INFO] Jog increment set to default (%.2f mm)", currentJogIncrementMm);
+                    Console.serialInfo(msg);
                     return true;
                 }
                 else
@@ -1857,15 +1657,12 @@ bool cmd_jog(char *args, CommandCaller *caller)
                 }
             }
 
-            // Parse value as double
             double newIncrement = atof(incStr);
 
-            // Set new jog increment
             if (setJogIncrement(newIncrement))
             {
-                Console.print(F("[ACK], JOG_INC_SET_"));
-                Console.print(currentJogIncrementMm, 2);
-                Console.println(F(" mm"));
+                sprintf(msg, "[ACK], JOG_INC_SET_%.2f mm", currentJogIncrementMm);
+                Console.acknowledge(msg);
                 return true;
             }
             else
@@ -1874,34 +1671,27 @@ bool cmd_jog(char *args, CommandCaller *caller)
                 return false;
             }
         }
-        break;
     }
 
-    case 4:
-    { // set/get speed
-        // Check if a value was provided
+    case 4: // set/get speed
+    {
         char *speedStr = strtok(NULL, " ");
         if (speedStr == NULL)
         {
-            // Just display the current speed
-            Console.print(F("[INFO] Current jog speed: "));
-            Console.print(currentJogSpeedRpm);
-            Console.println(F(" RPM"));
+            sprintf(msg, "[INFO] Current jog speed: %d RPM", currentJogSpeedRpm);
+            Console.serialInfo(msg);
             return true;
         }
         else
         {
-            // Trim leading spaces from speed value
             speedStr = trimLeadingSpaces(speedStr);
 
-            // Handle "default" keyword
             if (strcmp(speedStr, "default") == 0)
             {
                 if (setJogSpeed(DEFAULT_JOG_SPEED, currentJogIncrementMm))
                 {
-                    Console.print(F("[ACK], JOG_SPEED_DEFAULT_"));
-                    Console.print(currentJogSpeedRpm);
-                    Console.println(F(" RPM)"));
+                    sprintf(msg, "[ACK], JOG_SPEED_DEFAULT_%d RPM", currentJogSpeedRpm);
+                    Console.acknowledge(msg);
                     return true;
                 }
                 else
@@ -1911,15 +1701,12 @@ bool cmd_jog(char *args, CommandCaller *caller)
                 }
             }
 
-            // Parse value as int
             int newSpeed = atoi(speedStr);
 
-            // Set new jog speed
             if (setJogSpeed(newSpeed, currentJogIncrementMm))
             {
-                Console.print(F("[ACK], JOG_SPEED_SET_"));
-                Console.println(currentJogSpeedRpm);
-                Console.println(F(" RPM"));
+                sprintf(msg, "[ACK], JOG_SPEED_SET_%d RPM", currentJogSpeedRpm);
+                Console.acknowledge(msg);
                 return true;
             }
             else
@@ -1928,51 +1715,37 @@ bool cmd_jog(char *args, CommandCaller *caller)
                 return false;
             }
         }
-        break;
     }
 
-    case 5:
-    { // status
+    case 5: // status
+    {
         Console.acknowledge(F("JOG_STATUS"));
-
-        // Display current jog settings
         Console.println(F("[INFO] Current jog settings:"));
 
-        // Jog increment
-        Console.print(F("  Increment: "));
-        Console.print(currentJogIncrementMm, 2);
-        Console.println(F(" mm"));
+        sprintf(msg, "  Increment: %.2f mm", currentJogIncrementMm);
+        Console.println(msg);
 
-        // Jog speed
-        Console.print(F("  Speed: "));
-        Console.print(currentJogSpeedRpm);
-        Console.println(F(" RPM"));
+        sprintf(msg, "  Speed: %d RPM", currentJogSpeedRpm);
+        Console.println(msg);
 
-        // Current position
         double currentPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
-        Console.print(F("  Current position: "));
-        Console.print(currentPositionMm, 2);
-        Console.println(F(" mm"));
+        sprintf(msg, "  Current position: %.2f mm", currentPositionMm);
+        Console.println(msg);
 
-        // Position limits for jogging from current position
         double maxForwardJog = MAX_TRAVEL_MM - currentPositionMm;
         double maxBackwardJog = currentPositionMm;
 
-        Console.print(F("  Max forward jog: "));
-        Console.print(maxForwardJog, 2);
-        Console.println(F(" mm"));
+        sprintf(msg, "  Max forward jog: %.2f mm", maxForwardJog);
+        Console.println(msg);
 
-        Console.print(F("  Max backward jog: "));
-        Console.print(maxBackwardJog, 2);
-        Console.println(F(" mm"));
+        sprintf(msg, "  Max backward jog: %.2f mm", maxBackwardJog);
+        Console.println(msg);
 
         return true;
-        break;
     }
 
-    case 6: // Add the new help case here
-    {       // help
-
+    case 6: // help
+    {
         Console.acknowledge(F("JOG_HELP"));
         Console.println(F("\n===== JOG MOVEMENT SYSTEM HELP ====="));
 
@@ -2035,21 +1808,30 @@ bool cmd_jog(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
-        break;
     }
 
     default:
     {
-        Console.print(F("[ERROR], Unknown jog command: "));
-        Console.println(subcommand);
-        Console.error(F("Valid options are '+', '-', 'inc', 'speed', 'status', or 'help'")); // Update this line too
+        sprintf(msg, "[ERROR], Unknown jog command: %s", subcommand);
+        Console.error(msg);
+        Console.error(F("Valid options are '+', '-', 'inc', 'speed', 'status', or 'help'"));
         return false;
-        break;
     }
     }
 
     return false; // Should never reach here, but included for completeness
 }
+
+// Define the system subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo SYSTEM_COMMANDS[] = {
+    {"help", 6},
+    {"history", 5},
+    {"reset", 4},
+    {"safety", 2},
+    {"state", 1},
+    {"trays", 3}};
+
+static const size_t SYSTEM_COMMAND_COUNT = sizeof(SYSTEM_COMMANDS) / sizeof(SubcommandInfo);
 
 bool cmd_system_state(char *args, CommandCaller *caller)
 {
@@ -2066,24 +1848,14 @@ bool cmd_system_state(char *args, CommandCaller *caller)
     // If no subcommand provided, display usage
     if (subcommand == NULL || strlen(subcommand) == 0)
     {
-        Console.error(F("Missing subcommand. Valid options: state, safety, trays, reset"));
+        Console.error(F("Missing subcommand. Valid options: state, safety, trays, history, reset"));
         return false;
     }
 
-    // Map subcommand to integer for switch statement
-    int cmdCode = 0;
-    if (strcmp(subcommand, "state") == 0)
-        cmdCode = 1;
-    else if (strcmp(subcommand, "safety") == 0)
-        cmdCode = 2;
-    else if (strcmp(subcommand, "trays") == 0)
-        cmdCode = 3;
-    else if (strcmp(subcommand, "reset") == 0)
-        cmdCode = 4;
-    else if (strcmp(subcommand, "history") == 0)
-        cmdCode = 5;
-    else if (strcmp(subcommand, "help") == 0)
-        cmdCode = 6;
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(subcommand, SYSTEM_COMMANDS, SYSTEM_COMMAND_COUNT);
+
+    char msg[100];
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
@@ -2117,34 +1889,36 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         updateTrayTrackingFromSensors(currentState);
         Console.acknowledge(F("TRAY_STATUS"));
 
-        Console.print(F("Total trays in system: "));
-        Console.println(trayTracking.totalTraysInSystem);
+        sprintf(msg, "Total trays in system: %d", trayTracking.totalTraysInSystem);
+        Console.println(msg);
 
         Console.println(F("\nPosition occupancy:"));
-        Console.print(F("  Position 1 (Loading): "));
-        Console.println(trayTracking.position1Occupied ? F("OCCUPIED") : F("EMPTY"));
-        Console.print(F("  Position 2 (Middle): "));
-        Console.println(trayTracking.position2Occupied ? F("OCCUPIED") : F("EMPTY"));
-        Console.print(F("  Position 3 (Unloading): "));
-        Console.println(trayTracking.position3Occupied ? F("OCCUPIED") : F("EMPTY"));
+        sprintf(msg, "  Position 1 (Loading): %s", trayTracking.position1Occupied ? "OCCUPIED" : "EMPTY");
+        Console.println(msg);
+        sprintf(msg, "  Position 2 (Middle): %s", trayTracking.position2Occupied ? "OCCUPIED" : "EMPTY");
+        Console.println(msg);
+        sprintf(msg, "  Position 3 (Unloading): %s", trayTracking.position3Occupied ? "OCCUPIED" : "EMPTY");
+        Console.println(msg);
 
         Console.println(F("\nOperation statistics:"));
-        Console.print(F("  Total loads completed: "));
-        Console.println(trayTracking.totalLoadsCompleted);
-        Console.print(F("  Total unloads completed: "));
-        Console.println(trayTracking.totalUnloadsCompleted);
+        sprintf(msg, "  Total loads completed: %d", trayTracking.totalLoadsCompleted);
+        Console.println(msg);
+        sprintf(msg, "  Total unloads completed: %d", trayTracking.totalUnloadsCompleted);
+        Console.println(msg);
 
         if (trayTracking.lastLoadTime > 0)
         {
+            unsigned long secondsAgo = timeDiff(millis(), trayTracking.lastLoadTime) / 1000;
             Console.print(F("  Last load: "));
-            printHumanReadableTime(timeDiff(millis(), trayTracking.lastLoadTime) / 1000);
+            printHumanReadableTime(secondsAgo);
             Console.println(F(" ago"));
         }
 
         if (trayTracking.lastUnloadTime > 0)
         {
+            unsigned long secondsAgo = timeDiff(millis(), trayTracking.lastUnloadTime) / 1000;
             Console.print(F("  Last unload: "));
-            printHumanReadableTime(timeDiff(millis(), trayTracking.lastUnloadTime) / 1000);
+            printHumanReadableTime(secondsAgo);
             Console.println(F(" ago"));
         }
         return true;
@@ -2152,7 +1926,6 @@ bool cmd_system_state(char *args, CommandCaller *caller)
 
     case 4: // "reset"
     {
-
         // Capture the current state before resetting
         SystemState preResetState = captureSystemState();
         bool wasFaulted = (preResetState.motorState == MOTOR_STATE_FAULTED);
@@ -2240,9 +2013,8 @@ bool cmd_system_state(char *args, CommandCaller *caller)
 
     default: // Unknown subcommand
     {
-        // Unknown subcommand
-        Console.error(F("Unknown system command: "));
-        Console.println(subcommand);
+        sprintf(msg, "Unknown system command: %s", subcommand);
+        Console.error(msg);
         Console.error(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,reset', 'system,history', or 'system,help'"));
         return false;
     }
@@ -2250,6 +2022,20 @@ bool cmd_system_state(char *args, CommandCaller *caller)
 
     return false; // Should never reach here
 }
+
+// Define the tray subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo TRAY_COMMANDS[] = {
+    {"gripped", 5},
+    {"help", 8},
+    {"load", 1}, // Base command, will check for "ready" or "request" separately
+    {"placed", 2},
+    {"released", 3},
+    {"removed", 6},
+    {"status", 7},
+    {"unload", 4} // Base command, will check for "ready" or "request" separately
+};
+
+static const size_t TRAY_COMMAND_COUNT = sizeof(TRAY_COMMANDS) / sizeof(SubcommandInfo);
 
 // Tray command handler
 bool cmd_tray(char *args, CommandCaller *caller)
@@ -2293,46 +2079,25 @@ bool cmd_tray(char *args, CommandCaller *caller)
         subcommand = trimLeadingSpaces(subcommand);
     }
 
-    // Map subcommand to integer for switch statement
-    int cmdCode = 0;
-    if (strcmp(subcommand, "load") == 0)
-    {
-        // Check if next token is "ready"
+    // First use binary search to find the base command
+    int cmdCode = findSubcommandCode(subcommand, TRAY_COMMANDS, TRAY_COMMAND_COUNT);
+
+    // Handle the compound commands for load and unload with the second parameter
+    if (cmdCode == 1 || cmdCode == 4)
+    { // "load" or "unload"
         char *action = strtok(NULL, " ");
         if (action != NULL && strcmp(action, "ready") == 0)
-            cmdCode = 9; // tray,load,ready
-        else if (action != NULL && strcmp(action, "request") == 0)
-            cmdCode = 1; // tray,load,request
-        else
-            cmdCode = 1; // Default to load case which will show proper error
+        {
+            // Convert to the corresponding "ready" command code
+            cmdCode = (cmdCode == 1) ? 9 : 10; // 9 for load,ready, 10 for unload,ready
+        }
+        // For all other cases, keep the original code (1 for load, 4 for unload)
     }
-    else if (strcmp(subcommand, "placed") == 0)
-        cmdCode = 2;
-    else if (strcmp(subcommand, "released") == 0)
-        cmdCode = 3;
-    else if (strcmp(subcommand, "unload") == 0)
-    {
-        // Check if next token is "ready" or "request"
-        char *action = strtok(NULL, " ");
-        if (action != NULL && strcmp(action, "ready") == 0)
-            cmdCode = 10; // tray,unload,ready
-        else if (action != NULL && strcmp(action, "request") == 0)
-            cmdCode = 4; // tray,unload,request
-        else
-            cmdCode = 4; // Default to unload case which will show proper error
-    }
-    else if (strcmp(subcommand, "gripped") == 0)
-        cmdCode = 5;
-    else if (strcmp(subcommand, "removed") == 0)
-        cmdCode = 6;
-    else if (strcmp(subcommand, "status") == 0)
-        cmdCode = 7;
-    else if (strcmp(subcommand, "help") == 0)
-        cmdCode = 8;
-    else
-    {
-        Console.print(F("[ERROR] Unknown tray command: "));
-        Console.println(subcommand);
+    else if (cmdCode == 0)
+    { // Command not found in binary search
+        char msg[100];
+        sprintf(msg, "[ERROR] Unknown tray command: %s", subcommand);
+        Console.error(msg);
         Console.error(F("Valid options: load,request | unload,request | load,ready | unload,ready | placed | gripped | removed | released | status | help"));
         return false;
     }
@@ -2380,11 +2145,11 @@ bool cmd_tray(char *args, CommandCaller *caller)
             // Provide specific details about which operation failed
             if (!safety.lockOperationSuccessful)
             {
-                Serial.println(safety.lockFailureDetails);
+                Console.serialInfo(safety.lockFailureDetails.c_str());
             }
             if (!safety.unlockOperationSuccessful)
             {
-                Serial.println(safety.unlockFailureDetails);
+                Console.serialInfo(safety.unlockFailureDetails.c_str());
             }
         }
         // Check operation sequence validity
@@ -2402,8 +2167,9 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         if (!safeToExecute)
         {
-            Console.print("[ERROR], ");
-            Console.println(errorReason);
+            char msg[100];
+            sprintf(msg, "[ERROR], %s", errorReason.c_str());
+            Console.error(msg);
             Console.serialInfo(F("Cannot execute tray commands while system is in an unsafe state"));
             Console.serialInfo(F("Use 'system,reset' to clear the alert and try again"));
             Console.serialInfo(F("For diagnosis, use 'system,safety' to see detailed system status"));
@@ -2411,31 +2177,25 @@ bool cmd_tray(char *args, CommandCaller *caller)
         }
     }
 
+    char msg[100];
+
     // Use switch-case for cleaner flow control
     switch (cmdCode)
     {
     case 1: // "load,request"
     {
-        // Mitsubishi robot is requesting to load a tray
-
-        // 1. Check if the system can accept a tray
         SystemState state = captureSystemState();
         updateTrayTrackingFromSensors(state);
-
-        // Define safety validation
         SafetyValidationResult safety = validateSafety(state);
 
-        // First check for motor readiness
         if (!safety.safeToMove)
         {
             Console.error(F("MOTOR_NOT_READY"));
-            Serial.println(safety.moveUnsafeReason);
+            Console.serialInfo(safety.moveUnsafeReason.c_str());
             Console.serialInfo(F("Motor must be initialized and homed before loading/unloading operations"));
             return false;
         }
 
-        // Check for full system BEFORE checking position 1
-        // Check if all positions are occupied (system is full)
         if (trayTracking.position1Occupied && trayTracking.position2Occupied && trayTracking.position3Occupied)
         {
             Console.error(F("SYSTEM_FULL"));
@@ -2443,7 +2203,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // 2. Verify position 1 is free and no operations are in progress
         if (trayTracking.position1Occupied)
         {
             Console.error(F("POSITION_OCCUPIED"));
@@ -2456,49 +2215,37 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // 3. Check tray loading safety
         if (!safety.safeToLoadTrayToPos1)
         {
             Console.error(F("UNSAFE_TO_LOAD"));
-            Serial.println(safety.loadTrayPos1UnsafeReason);
+            Console.serialInfo(safety.loadTrayPos1UnsafeReason.c_str());
             return false;
         }
 
-        // 4. Set the target position for position 1
         if (!moveToPositionMm(POSITION_1_MM))
         {
             Console.error(F("MOVE_FAILURE"));
             return false;
         }
 
-        // 5. System is ready to receive tray
         Console.acknowledge(F("READY_TO_RECEIVE"));
 
         // Add helpful message about the overall loading process
-        if (trayTracking.totalTraysInSystem == 0)
-        {
-            Console.serialInfo(F("First tray will be moved to position 3 after placement"));
-        }
-        else if (trayTracking.totalTraysInSystem == 1)
-        {
-            Console.serialInfo(F("Second tray will be moved to position 2 after placement"));
-        }
-        else
-        {
-            Console.serialInfo(F("Third tray will remain at position 1 after placement"));
-        }
+        sprintf(msg, "%s tray will be moved to position %s after placement",
+            trayTracking.totalTraysInSystem == 0 ? "First" :
+            trayTracking.totalTraysInSystem == 1 ? "Second" : "Third",
+            trayTracking.totalTraysInSystem == 0 ? "3" :
+            trayTracking.totalTraysInSystem == 1 ? "2" : "1");
+        Console.serialInfo(msg);
 
         return true;
-    } // End of case 1
+    }
 
     case 2: // "placed"
     {
-        // Mitsubishi robot has placed the tray
-        // Just mark position 1 as occupied without incrementing total
         trayTracking.position1Occupied = true;
         trayTracking.lastLoadTime = millis();
 
-        // 1. Verify tray sensor shows tray is present
         SystemState state = captureSystemState();
         if (!state.tray1Present)
         {
@@ -2507,13 +2254,11 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // 2. Lock the tray in position
-        DoubleSolenoidValve *valve = getTray1Valve(); // Tray 1 valve
-        CylinderSensor *sensor = getTray1Sensor();    // Add this line to get the sensor
+        DoubleSolenoidValve *valve = getTray1Valve();
+        CylinderSensor *sensor = getTray1Sensor();
 
         if (valve && sensor)
         {
-            // Check current state first
             if (valve->position != VALVE_POSITION_LOCK)
             {
                 if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
@@ -2524,16 +2269,12 @@ bool cmd_tray(char *args, CommandCaller *caller)
                     return false;
                 }
                 Console.acknowledge(F("TRAY_SECURED"));
-
-                // Only update the timestamp, not the count (workflow functions will handle counting)
                 trayTracking.lastLoadTime = millis();
                 return true;
             }
             else
             {
-                // Valve already in lock position
                 Console.acknowledge(F("TRAY_ALREADY_SECURED"));
-                // Only update the timestamp, not the count (workflow functions will handle counting)
                 trayTracking.lastLoadTime = millis();
                 return true;
             }
@@ -2543,33 +2284,23 @@ bool cmd_tray(char *args, CommandCaller *caller)
             Console.error(F("LOCK_FAILURE"));
             return false;
         }
-    } // End of case 2
+    }
 
     case 3: // "released"
     {
-        // Start the automated operation
         beginOperation();
-
-        // Set the operation details
         currentOperation.inProgress = true;
         currentOperation.type = OPERATION_LOADING;
         currentOperation.startTime = millis();
-
-        // No need to manually set target - it will be set in processTrayLoading()
-
         Console.acknowledge(F("STARTING_PROCESSING"));
         return true;
-    } // End of case 3
+    }
 
     case 4: // "unload,request"
     {
-        // Mitsubishi robot is requesting to unload a tray
-
-        // 1. Check if there are any trays in the system to unload
         SystemState state = captureSystemState();
         updateTrayTrackingFromSensors(state);
 
-        // Validate ONLY motor initialization/homing status, not full movement safety
         if (!state.isHomed || state.motorState == MOTOR_STATE_FAULTED ||
             state.motorState == MOTOR_STATE_NOT_READY)
         {
@@ -2585,30 +2316,23 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // 2. Check if an operation is already in progress
         if (operationInProgress)
         {
             Console.error(F("SYSTEM_BUSY"));
             return false;
         }
 
-        // 3. Check if there's a tray at position 1
         if (state.tray1Present)
         {
-            // Tray already at position 1
-            // Don't unlock the tray here - wait for tray,gripped command
-            // Just inform that the tray is ready to be gripped
             Console.serialInfo(F("Tray at position 1 (loading position) ready to be gripped"));
             Console.serialInfo(F("Tray at position 1 is locked and ready for gripping"));
             Console.acknowledge(F("TRAY_READY_FOR_GRIP"));
 
-            // Ensure tray is locked (in case it was somehow unlocked)
             DoubleSolenoidValve *valve = getTray1Valve();
             CylinderSensor *sensor = getTray1Sensor();
 
             if (valve && sensor && valve->position != VALVE_POSITION_LOCK)
             {
-                // Lock the tray if it's not already locked
                 safeValveOperation(*valve, *sensor, VALVE_POSITION_LOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS);
             }
 
@@ -2616,7 +2340,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
         }
         else
         {
-            // Need to start unloading operation to move a tray to position 1
             if (state.tray2Present)
             {
                 Console.serialInfo(F("Moving tray from position 2 to position 1 for unloading"));
@@ -2627,8 +2350,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
             }
 
             beginOperation();
-
-            // Set the operation details
             currentOperation.inProgress = true;
             currentOperation.type = OPERATION_UNLOADING;
             currentOperation.startTime = millis();
@@ -2636,25 +2357,20 @@ bool cmd_tray(char *args, CommandCaller *caller)
             Console.acknowledge(F("PREPARING_TRAY"));
             return true;
         }
-    } // End of case 4
+    }
 
     case 5: // "gripped"
     {
-        // Capture the current system state
         SystemState state = captureSystemState();
-
-        // Use the comprehensive safety validation system
         SafetyValidationResult safety = validateSafety(state);
 
-        // Check if it's safe to unlock the gripped tray
         if (!safety.safeToUnlockGrippedTray)
         {
             Console.error(F("UNSAFE_TO_UNLOCK"));
-            Serial.println(safety.grippedTrayUnlockUnsafeReason);
+            Console.serialInfo(safety.grippedTrayUnlockUnsafeReason.c_str());
             return false;
         }
 
-        // Get valve and sensor for tray 1
         DoubleSolenoidValve *valve = getTray1Valve();
         CylinderSensor *sensor = getTray1Sensor();
 
@@ -2665,14 +2381,12 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // Check if the tray is already unlocked
         if (valve->position == VALVE_POSITION_UNLOCK)
         {
             Console.acknowledge(F("TRAY_ALREADY_UNLOCKED"));
             return true;
         }
 
-        // Unlock the tray now that the robot has gripped it
         Console.serialInfo(F("Mitsubishi has gripped the tray. Unlocking tray at position 1..."));
         if (!safeValveOperation(*valve, *sensor, VALVE_POSITION_UNLOCK, VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS))
         {
@@ -2684,18 +2398,11 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         Console.acknowledge(F("TRAY_UNLOCKED"));
         Console.serialInfo(F("Mitsubishi can now remove the tray"));
-
-        // Update tray tracking if necessary
-        // (don't remove from tracking yet - that happens at tray,removed)
-
         return true;
-    } // End of case 5
+    }
 
     case 6: // "removed"
     {
-        // Mitsubishi robot has removed the tray from position 1
-
-        // 1. Verify tray sensor shows tray is no longer present
         SystemState state = captureSystemState();
         if (state.tray1Present)
         {
@@ -2704,59 +2411,47 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // 2. Update tracking information
         unloadFirstTray();
-
-        // 3. Manually increment the unload counter
-        // This ensures it's incremented even if unloadFirstTray() didn't do it
-        // (which happens when a tray was moved from position 3 to position 1)
         trayTracking.totalUnloadsCompleted++;
 
         Console.acknowledge(F("TRAY_REMOVAL_CONFIRMED"));
-        Serial.print(F("[INFO] Total unloads completed: "));
-        Serial.println(trayTracking.totalUnloadsCompleted);
-
+        sprintf(msg, "[INFO] Total unloads completed: %d", trayTracking.totalUnloadsCompleted);
+        Console.serialInfo(msg);
         return true;
-    } // End of case 6
+    }
 
     case 7: // "status"
     {
-        // Return machine-readable status of tray system
         SystemState state = captureSystemState();
         updateTrayTrackingFromSensors(state);
 
-        // Output total trays in system
-        Console.print(F("TRAYS_TOTAL:"));
-        Console.println(trayTracking.totalTraysInSystem);
+        sprintf(msg, "TRAYS_TOTAL:%d", trayTracking.totalTraysInSystem);
+        Console.println(msg);
 
-        // Output position occupancy (1=occupied, 0=empty)
-        Console.print(F("POS1:"));
-        Console.println(trayTracking.position1Occupied ? 1 : 0);
-        Console.print(F("POS2:"));
-        Console.println(trayTracking.position2Occupied ? 1 : 0);
-        Console.print(F("POS3:"));
-        Console.println(trayTracking.position3Occupied ? 1 : 0);
+        sprintf(msg, "POS1:%d", trayTracking.position1Occupied ? 1 : 0);
+        Console.println(msg);
+        sprintf(msg, "POS2:%d", trayTracking.position2Occupied ? 1 : 0);
+        Console.println(msg);
+        sprintf(msg, "POS3:%d", trayTracking.position3Occupied ? 1 : 0);
+        Console.println(msg);
 
-        // Output lock status (1=locked, 0=unlocked)
-        Console.print(F("LOCK1:"));
-        Console.println(state.tray1Locked ? 1 : 0);
-        Console.print(F("LOCK2:"));
-        Console.println(state.tray2Locked ? 1 : 0);
-        Console.print(F("LOCK3:"));
-        Console.println(state.tray3Locked ? 1 : 0);
+        sprintf(msg, "LOCK1:%d", state.tray1Locked ? 1 : 0);
+        Console.println(msg);
+        sprintf(msg, "LOCK2:%d", state.tray2Locked ? 1 : 0);
+        Console.println(msg);
+        sprintf(msg, "LOCK3:%d", state.tray3Locked ? 1 : 0);
+        Console.println(msg);
 
-        // Add pneumatic pressure status (1=sufficient, 0=insufficient)
-        Console.print(F("PRESSURE:"));
-        Console.println(isPressureSufficient() ? 1 : 0);
+        sprintf(msg, "PRESSURE:%d", isPressureSufficient() ? 1 : 0);
+        Console.println(msg);
 
-        // Output operation statistics
-        Console.print(F("LOADS:"));
-        Console.println(trayTracking.totalLoadsCompleted);
-        Console.print(F("UNLOADS:"));
-        Console.println(trayTracking.totalUnloadsCompleted);
+        sprintf(msg, "LOADS:%d", trayTracking.totalLoadsCompleted);
+        Console.println(msg);
+        sprintf(msg, "UNLOADS:%d", trayTracking.totalUnloadsCompleted);
+        Console.println(msg);
 
         return true;
-    } // End of case 7
+    }
 
     case 8: // "help"
     {
@@ -2815,14 +2510,12 @@ bool cmd_tray(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
-    } // End of case 8
+    }
 
     case 9: // "load,ready"
     {
-        // Check if the system is ready to receive a tray for loading
         SystemState state = captureSystemState();
 
-        // First, check if a loading operation is already in progress
         if (operationInProgress && currentOperation.type == OPERATION_LOADING)
         {
             Console.println(F("[BUSY], LOADING_OPERATION_IN_PROGRESS"));
@@ -2830,7 +2523,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return true;
         }
 
-        // Check for motor readiness
         if (motorState == MOTOR_STATE_NOT_READY || motorState == MOTOR_STATE_FAULTED || !isHomed)
         {
             Console.error(F("MOTOR_NOT_READY"));
@@ -2838,7 +2530,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // Check if system is full
         if (trayTracking.position1Occupied && trayTracking.position2Occupied && trayTracking.position3Occupied)
         {
             Console.error(F("SYSTEM_FULL"));
@@ -2846,7 +2537,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // Check if position 1 is occupied
         if (trayTracking.position1Occupied)
         {
             Console.error(F("POSITION1_OCCUPIED"));
@@ -2854,18 +2544,15 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // System is ready to load a tray
         Console.acknowledge(F("READY_TO_LOAD"));
         Console.serialInfo(F("System is ready to receive a tray at position 1"));
         return true;
-    } // End of case 9
+    }
 
     case 10: // "unload,ready"
     {
-        // Check if the system has a tray ready for unloading
         SystemState state = captureSystemState();
 
-        // First, check if an unloading operation is already in progress
         if (operationInProgress && currentOperation.type == OPERATION_UNLOADING)
         {
             Console.println(F("[BUSY], UNLOADING_OPERATION_IN_PROGRESS"));
@@ -2873,7 +2560,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return true;
         }
 
-        // Check if there are any trays in the system
         if (trayTracking.totalTraysInSystem == 0)
         {
             Console.error(F("NO_TRAYS_TO_UNLOAD"));
@@ -2881,10 +2567,8 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
 
-        // Check if there's a tray at position 1 and it's locked
         if (state.tray1Present && state.tray1Locked)
         {
-            // Tray is ready to be picked up
             Console.acknowledge(F("TRAY_READY_FOR_PICKUP"));
             Console.serialInfo(F("Tray at position 1 is locked and ready to be gripped"));
             return true;
@@ -2897,7 +2581,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
         }
         else if (!state.tray1Present && (state.tray2Present || state.tray3Present))
         {
-            // There are trays in the system but not at position 1
             Console.error(F("NO_TRAY_AT_POSITION1"));
             Console.serialInfo(F("No tray at position 1, but trays exist at other positions"));
             Console.serialInfo(F("Use tray,unload,request to move a tray to position 1"));
@@ -2909,19 +2592,28 @@ bool cmd_tray(char *args, CommandCaller *caller)
             Console.serialInfo(F("Tray tracking inconsistency detected"));
             return false;
         }
-    } // End of case 10
+    }
 
-    default: // Unknown command
+    default:
     {
-        Console.print(F("[ERROR] Unknown tray command: "));
-        Console.println(subcommand);
+        sprintf(msg, "[ERROR] Unknown tray command: %s", subcommand);
+        Console.error(msg);
         Console.error(F("Valid options: load,request | unload,request | load,ready | unload,ready | placed | gripped | removed | released | status | help"));
         return false;
-    } // End of default case
-    } // End of switch
+    }
+    }
 
     return false; // Should never reach here
-} // End of function
+}
+
+// Define the test subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo TEST_COMMANDS[] = {
+    {"help", 4},
+    {"home", 1},
+    {"position", 2},
+    {"tray", 3}};
+
+static const size_t TEST_COMMAND_COUNT = sizeof(TEST_COMMANDS) / sizeof(SubcommandInfo);
 
 bool cmd_test(char *args, CommandCaller *caller)
 {
@@ -2932,6 +2624,8 @@ bool cmd_test(char *args, CommandCaller *caller)
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
+
+    char msg[100];
 
     // Check for empty argument - show brief help to both outputs
     if (strlen(trimmed) == 0)
@@ -2973,16 +2667,8 @@ bool cmd_test(char *args, CommandCaller *caller)
         return false;
     }
 
-    // Map subcommand to integer for switch statement
-    int cmdCode = 0;
-    if (strcmp(subcommand, "home") == 0)
-        cmdCode = 1;
-    else if (strcmp(subcommand, "position") == 0)
-        cmdCode = 2;
-    else if (strcmp(subcommand, "tray") == 0)
-        cmdCode = 3;
-    else if (strcmp(subcommand, "help") == 0)
-        cmdCode = 4;
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(subcommand, TEST_COMMANDS, TEST_COMMAND_COUNT);
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
@@ -3001,13 +2687,11 @@ bool cmd_test(char *args, CommandCaller *caller)
             Console.error(F("Homing test failed or was aborted"));
             return false;
         }
-        break;
     }
 
     case 2: // "position"
     {
         Console.acknowledge(F("TEST_POSITION_STARTED"));
-
         Console.serialInfo(F("Starting position cycling test..."));
 
         if (testPositionCycling())
@@ -3020,13 +2704,11 @@ bool cmd_test(char *args, CommandCaller *caller)
             Console.error(F("Position test failed or was aborted"));
             return false;
         }
-        break;
     }
 
     case 3: // "tray"
     {
         Console.acknowledge(F("TEST_TRAY_STARTED"));
-
         Console.serialInfo(F("Starting tray handling test..."));
 
         // Add pneumatic pressure validation before starting the test
@@ -3048,7 +2730,6 @@ bool cmd_test(char *args, CommandCaller *caller)
             Console.error(F("Tray test failed or was aborted"));
             return false;
         }
-        break;
     }
 
     case 4: // "help"
@@ -3101,21 +2782,28 @@ bool cmd_test(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
-        break;
     }
 
     default: // Unknown command
     {
-        Console.print(F("[ERROR], Unknown test type: "));
-        Console.println(subcommand);
+        sprintf(msg, "[ERROR], Unknown test type: %s", subcommand);
+        Console.error(msg);
         Console.error(F("Valid options: home, position, tray, help"));
         return false;
-        break;
     }
     }
 
     return false; // Should never reach here
 }
+
+// Define the encoder subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo ENCODER_COMMANDS[] = {
+    {"disable", 2},
+    {"enable", 1},
+    {"help", 4},
+    {"multiplier", 3}};
+
+static const size_t ENCODER_COMMAND_COUNT = sizeof(ENCODER_COMMANDS) / sizeof(SubcommandInfo);
 
 bool cmd_encoder(char *args, CommandCaller *caller)
 {
@@ -3127,6 +2815,8 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
 
+    char msg[100];
+
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
@@ -3136,8 +2826,8 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         // Show simple status to both outputs
         if (encoderControlActive)
         {
-            Console.print(F("ENABLED:"));
-            Console.println(currentMultiplier);
+            sprintf(msg, "ENABLED:%d", currentMultiplier);
+            Console.println(msg);
         }
         else
         {
@@ -3155,16 +2845,15 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         if (encoderControlActive)
         {
             Console.serialInfo(F("\nMPG control is currently ENABLED"));
-            Serial.print(F("[STATUS] Current multiplier: x"));
-            Serial.println(currentMultiplier);
+            sprintf(msg, "[STATUS] Current multiplier: x%d", currentMultiplier);
+            Serial.println(msg);
 
             // Show position information if motor is homed
             if (isHomed)
             {
                 double positionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
-                Serial.print(F("[INFO] Current position: "));
-                Serial.print(positionMm, 2);
-                Serial.println(F(" mm"));
+                sprintf(msg, "[INFO] Current position: %.2f mm", positionMm);
+                Serial.println(msg);
             }
         }
         else
@@ -3183,21 +2872,17 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         }
 
         Console.serialInfo(F("\nMULTIPLIERS - Effect of one full handwheel rotation (100 pulses):"));
-        Serial.print(F("  x1: ~"));
-        Serial.print(100 * MULTIPLIER_X1 / PULSES_PER_MM, 2);
-        Serial.println(F(" mm (fine adjustment)"));
-        Serial.print(F("  x10: ~"));
-        Serial.print(100 * MULTIPLIER_X10 / PULSES_PER_MM, 2);
-        Serial.println(F(" mm (medium adjustment)"));
-        Serial.print(F("  x100: ~"));
-        Serial.print(100 * MULTIPLIER_X100 / PULSES_PER_MM, 2);
-        Serial.println(F(" mm (coarse adjustment)"));
+        sprintf(msg, "  x1: ~%.2f mm (fine adjustment)", 100 * MULTIPLIER_X1 / PULSES_PER_MM);
+        Serial.println(msg);
+        sprintf(msg, "  x10: ~%.2f mm (medium adjustment)", 100 * MULTIPLIER_X10 / PULSES_PER_MM);
+        Serial.println(msg);
+        sprintf(msg, "  x100: ~%.2f mm (coarse adjustment)", 100 * MULTIPLIER_X100 / PULSES_PER_MM);
+        Serial.println(msg);
 
         return true;
     }
 
-    // Parse the argument - make sure we're handling comma separators correctly too
-    // Replace commas with spaces first (if you're using spaces as delimiters)
+    // Parse the argument - replace commas with spaces
     for (int i = 0; trimmed[i] != '\0'; i++)
     {
         if (trimmed[i] == ',')
@@ -3217,16 +2902,8 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     // Trim leading spaces from subcommand
     subcommand = trimLeadingSpaces(subcommand);
 
-    // Map subcommand to integer for switch statement
-    int cmdCode = 0;
-    if (strcmp(subcommand, "enable") == 0)
-        cmdCode = 1;
-    else if (strcmp(subcommand, "disable") == 0)
-        cmdCode = 2;
-    else if (strcmp(subcommand, "multiplier") == 0)
-        cmdCode = 3;
-    else if (strcmp(subcommand, "help") == 0)
-        cmdCode = 4;
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(subcommand, ENCODER_COMMANDS, ENCODER_COMMAND_COUNT);
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
@@ -3278,18 +2955,16 @@ bool cmd_encoder(char *args, CommandCaller *caller)
 
         Console.acknowledge(F("ENCODER_ENABLED"));
 
-        Console.serialInfo(F("MPG handwheel control enabled - current position: "));
-        Serial.print(pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()), 2);
-        Serial.println(F(" mm"));
-        Serial.print(F("[INFO] Using multiplier x"));
-        Serial.print(getMultiplierName(currentMultiplier));
-        Serial.print(F(" ("));
-        Serial.print(currentMultiplier);
-        Serial.println(F(")"));
+        double posMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
+        sprintf(msg, "MPG handwheel control enabled - current position: %.2f mm", posMm);
+        Console.serialInfo(msg);
+
+        sprintf(msg, "[INFO] Using multiplier x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
+        Serial.println(msg);
+
         Console.serialInfo(F("Issue 'encoder,disable' when finished with manual control"));
 
         return true;
-        break;
     }
 
     case 2: // "disable"
@@ -3299,91 +2974,63 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.acknowledge(F("ENCODER_DISABLED"));
         Console.serialInfo(F("MPG handwheel control disabled"));
         return true;
-        break;
     }
 
     case 3: // "multiplier"
     {
-        // Look for the NEXT argument - this is the same approach used in move,mm,X
-        char *originalArgs = args; // Save the original args string
+        // Get the next token (the multiplier value)
+        char *multStr = strtok(NULL, " ");
 
-        // Find the "multiplier" substring within args
-        char *multiplierPos = strstr(originalArgs, "multiplier");
-        if (multiplierPos != NULL)
+        if (multStr != NULL)
         {
-            // Move past "multiplier"
-            multiplierPos += strlen("multiplier");
+            // Parse the multiplier value
+            int multiplier = atoi(multStr);
 
-            // Skip any spaces or commas
-            while (*multiplierPos && (*multiplierPos == ' ' || *multiplierPos == ','))
+            // Set the multiplier based on the input value
+            switch (multiplier)
             {
-                multiplierPos++;
+            case 1:
+                setEncoderMultiplier(1);
+                Console.acknowledge(F("ENCODER_MULT_1"));
+                Console.serialInfo(F("Multiplier set to x1 (fine adjustment)"));
+                break;
+            case 10:
+                setEncoderMultiplier(10);
+                Console.acknowledge(F("ENCODER_MULT_10"));
+                Console.serialInfo(F("Multiplier set to x10 (medium adjustment)"));
+                break;
+            case 100:
+                setEncoderMultiplier(100);
+                Console.acknowledge(F("ENCODER_MULT_100"));
+                Console.serialInfo(F("Multiplier set to x100 (coarse adjustment)"));
+                break;
+            default:
+                Console.error(F("Invalid multiplier. Use 1, 10, or 100."));
+                return false;
             }
 
-            // Now multiplierPos should point to the actual value
-            if (*multiplierPos)
-            {
-                // Parse the actual multiplier value
-                int multiplier = atoi(multiplierPos);
-
-                // Set the multiplier based on the input value
-                switch (multiplier)
-                {
-                case 1:
-                    setEncoderMultiplier(1);
-                    // Acknowledgment to both outputs
-                    Console.acknowledge(F("ENCODER_MULT_1"));
-                    // Additional info to Serial only
-                    Console.serialInfo(F("Multiplier set to x1 (fine adjustment)"));
-                    break;
-                case 10:
-                    setEncoderMultiplier(10);
-                    // Acknowledgment to both outputs
-                    Console.acknowledge(F("ENCODER_MULT_10"));
-                    // Additional info to Serial only
-                    Console.serialInfo(F("Multiplier set to x10 (medium adjustment)"));
-                    break;
-                case 100:
-                    setEncoderMultiplier(100);
-                    // Acknowledgment to both outputs
-                    Console.acknowledge(F("ENCODER_MULT_100"));
-                    // Additional info to Serial only
-                    Console.serialInfo(F("Multiplier set to x100 (coarse adjustment)"));
-                    break;
-                default:
-                    Console.error(F("Invalid multiplier. Use 1, 10, or 100."));
-                    return false;
-                }
-
-                // Show current multiplier and effect
-                Serial.print(F("[INFO] Current multiplier value: "));
-                Serial.println(currentMultiplier);
-                double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-                Serial.print(F("[INFO] One full rotation moves ~"));
-                Serial.print(mmPerRotation, 2);
-                Serial.println(F(" mm"));
-                return true;
-            }
+            sprintf(msg, "[INFO] Current multiplier value: %d", currentMultiplier);
+            Serial.println(msg);
+            double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
+            sprintf(msg, "[INFO] One full rotation moves ~%.2f mm", mmPerRotation);
+            Serial.println(msg);
+            return true;
         }
+        else
+        {
+            // No value provided, just display current multiplier
+            sprintf(msg, "[ACK], ENCODER_MULT_%d", currentMultiplier);
+            Console.println(msg);
 
-        Console.print(F("[ACK], ENCODER_MULT_"));
-        Console.println(currentMultiplier);
+            sprintf(msg, "[INFO] Current multiplier: x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
+            Serial.println(msg);
 
-        // If we get here, display the current multiplier
-        Serial.print(F("[INFO] Current multiplier: x"));
-        Serial.print(getMultiplierName(currentMultiplier));
-        Serial.print(F(" ("));
-        Serial.print(currentMultiplier);
-        Serial.println(F(")"));
+            double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
+            sprintf(msg, "[INFO] One full rotation moves ~%.2f mm", mmPerRotation);
+            Serial.println(msg);
 
-        // Show what one full rotation will move
-        double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-        Serial.print(F("[INFO] One full rotation moves ~"));
-        Serial.print(mmPerRotation, 2);
-        Serial.println(F(" mm"));
-
-        return true;
-        break;
+            return true;
+        }
     }
 
     case 4: // "help"
@@ -3435,16 +3082,14 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.println(F("-------------------------------------------"));
 
         return true;
-        break;
     }
 
     default: // Unknown command
     {
-        Console.print(F("[ERROR], Unknown encoder command: "));
-        Console.println(subcommand);
+        sprintf(msg, "[ERROR], Unknown encoder command: %s", subcommand);
+        Console.error(msg);
         Console.error(F("Valid options are 'enable', 'disable', 'multiplier', or 'help'"));
         return false;
-        break;
     }
     }
 
@@ -3457,9 +3102,19 @@ bool cmd_abort(char *args, CommandCaller *caller)
     return true;
 }
 
+// Define the network subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo NETWORK_COMMANDS[] = {
+    {"close", 2},
+    {"closeall", 3},
+    {"help", 4},
+    {"status", 1}};
+
+static const size_t NETWORK_COMMAND_COUNT = sizeof(NETWORK_COMMANDS) / sizeof(SubcommandInfo);
+
 // Network management command
 bool cmd_network(char *args, CommandCaller *caller)
 {
+    char msg[100];
     char *subcommand = strtok(args, " ");
 
     if (subcommand == nullptr)
@@ -3469,7 +3124,12 @@ bool cmd_network(char *args, CommandCaller *caller)
         return false;
     }
 
-    if (strcmp(subcommand, "status") == 0)
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(subcommand, NETWORK_COMMANDS, NETWORK_COMMAND_COUNT);
+
+    switch (cmdCode)
+    {
+    case 1: // "status"
     {
         Console.acknowledge(F("NETWORK_STATUS"));
 
@@ -3481,32 +3141,19 @@ bool cmd_network(char *args, CommandCaller *caller)
         {
             // Display IP address
             IPAddress ip = Ethernet.localIP();
-            Console.print(F("IP Address: "));
-            Console.print(ip[0]);
-            Console.print(F("."));
-            Console.print(ip[1]);
-            Console.print(F("."));
-            Console.print(ip[2]);
-            Console.print(F("."));
-            Console.println(ip[3]);
+            sprintf(msg, "IP Address: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+            Console.println(msg);
 
             // Display MAC address
             byte mac[6];
             Ethernet.MACAddress(mac);
-            Console.print(F("MAC Address: "));
-            for (int i = 0; i < 6; i++)
-            {
-                if (mac[i] < 16)
-                    Console.print(F("0"));
-                Console.print(mac[i], HEX);
-                if (i < 5)
-                    Console.print(F(":"));
-            }
-            Console.println();
+            sprintf(msg, "MAC Address: %02X:%02X:%02X:%02X:%02X:%02X",
+                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            Console.println(msg);
 
             // Display port
-            Console.print(F("Server Port: "));
-            Console.println(ETHERNET_PORT);
+            sprintf(msg, "Server Port: %d", ETHERNET_PORT);
+            Console.println(msg);
 
             // Get client count using the shared function
             int connectedCount = getConnectedClientCount();
@@ -3525,25 +3172,22 @@ bool cmd_network(char *args, CommandCaller *caller)
                 {
                     if (clients[i] && clients[i].connected())
                     {
-                        Console.print(F("  Client "));
-                        Console.print(i + 1);
-                        Console.print(F(": "));
-                        Console.print(clients[i].remoteIP());
-                        Console.print(F(":"));
-                        Console.println(clients[i].remotePort());
+                        IPAddress cip = clients[i].remoteIP();
+                        int cport = clients[i].remotePort();
+                        sprintf(msg, "  Client %d: %d.%d.%d.%d:%d", i + 1, cip[0], cip[1], cip[2], cip[3], cport);
+                        Console.println(msg);
                     }
                 }
             }
 
-            Console.print(F("Total Connections: "));
-            Console.print(connectedCount);
-            Console.print(F(" of "));
-            Console.println(MAX_ETHERNET_CLIENTS);
+            sprintf(msg, "Total Connections: %d of %d", connectedCount, MAX_ETHERNET_CLIENTS);
+            Console.println(msg);
         }
 
         return true;
     }
-    else if (strcmp(subcommand, "close") == 0)
+
+    case 2: // "close"
     {
         // Parse the client index
         char *indexStr = strtok(NULL, " ");
@@ -3564,22 +3208,20 @@ bool cmd_network(char *args, CommandCaller *caller)
             clients[index].stop();
 
             Console.acknowledge(F("CLIENT_DISCONNECTED"));
-            Console.print(F("Closed connection from "));
-            Console.print(ip);
-            Console.print(F(":"));
-            Console.println(port);
+            sprintf(msg, "Closed connection from %d.%d.%d.%d:%d", ip[0], ip[1], ip[2], ip[3], port);
+            Console.println(msg);
             return true;
         }
         else
         {
             Console.error(F("INVALID_CLIENT_INDEX"));
-            Console.serialInfo(F("Client index must be between 1 and "));
-            Console.serialInfo(String(MAX_ETHERNET_CLIENTS).c_str());
-            Console.serialInfo(F(" and the client must be connected"));
+            sprintf(msg, "Client index must be between 1 and %d and the client must be connected", MAX_ETHERNET_CLIENTS);
+            Console.serialInfo(msg);
             return false;
         }
     }
-    else if (strcmp(subcommand, "closeall") == 0)
+
+    case 3: // "closeall"
     {
         int count = 0;
         for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
@@ -3592,12 +3234,12 @@ bool cmd_network(char *args, CommandCaller *caller)
         }
 
         Console.acknowledge(F("ALL_CLIENTS_DISCONNECTED"));
-        Console.print(F("Closed "));
-        Console.print(count);
-        Console.println(F(" connections"));
+        sprintf(msg, "Closed %d connections", count);
+        Console.println(msg);
         return true;
     }
-    else if (strcmp(subcommand, "help") == 0)
+
+    case 4: // "help"
     {
         Console.acknowledge(F("NETWORK_HELP"));
         Console.println(F("\n===== NETWORK MANAGEMENT HELP ====="));
@@ -3623,9 +3265,8 @@ bool cmd_network(char *args, CommandCaller *caller)
         Console.println(F("    > Clients can reconnect after being closed"));
 
         Console.println(F("\nCONNECTION MANAGEMENT:"));
-        Console.println(F("  • System supports up to "));
-        Console.print(MAX_ETHERNET_CLIENTS);
-        Console.println(F(" simultaneous client connections"));
+        sprintf(msg, "  • System supports up to %d simultaneous client connections", MAX_ETHERNET_CLIENTS);
+        Console.println(msg);
         Console.println(F("  • Inactive connections time out after 2 minutes"));
         Console.println(F("  • System automatically checks for stale connections every 30s"));
         Console.println(F("  • Commands can be issued through any connected client"));
@@ -3639,12 +3280,16 @@ bool cmd_network(char *args, CommandCaller *caller)
 
         return true;
     }
-    else
+
+    default: // Unknown command
     {
         Console.error(F("UNKNOWN_SUBCOMMAND"));
         Console.println(F("Valid subcommands: status, close, closeall, help"));
         return false;
     }
+    }
+
+    return false; // Should never reach here
 }
 
 Commander commander;

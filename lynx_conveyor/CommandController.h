@@ -22,6 +22,17 @@ enum CommandType
     CMD_TEST       // Special handling for test commands
 };
 
+// Command lookup table structure
+struct CommandInfo {
+    const char* name;
+    CommandType type;
+    uint8_t flags;  // Bit flags for command properties
+};
+
+// Command flags
+#define CMD_FLAG_ASYNC      0x01  // Command is asynchronous
+#define CMD_FLAG_NO_HISTORY 0x02  // Command should not be logged to history
+
 //=============================================================================
 // GLOBAL VARIABLES
 //=============================================================================
@@ -45,7 +56,7 @@ extern Stream* persistentClient;
 void initTestFlags();
 
 // Command Processing
-bool processCommand(const char* rawCommand, Stream* output);
+bool processCommand(const char* rawCommand, Stream* output, const char* sourceTag = nullptr);
 void handleSerialCommands();
 void handleEthernetCommands();
 
@@ -62,5 +73,7 @@ const char *getOperationTypeName(int type);
 char *trimLeadingSpaces(char *str);
 void sendCommandRejection(const char *command, const char *reason);
 void requestTestAbort(const char *source);
+const CommandInfo* findCommand(const char* cmdName);
+bool isCommandExcludedFromHistory(const char *command); 
 
 #endif // COMMAND_CONTROLLER_H

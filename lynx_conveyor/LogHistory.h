@@ -3,6 +3,7 @@
 
 #include "Arduino.h"
 #include "OutputManager.h"
+#include "CommandController.h"
 
 //=============================================================================
 // CONSTANTS
@@ -49,7 +50,5 @@ public:
 // Global instance
 extern LogHistory opLogHistory;
 
-// Function to determine if a command should be logged to history
-bool isCommandExcludedFromHistory(const char* command);
 
 #endif // LOG_HISTORY_H

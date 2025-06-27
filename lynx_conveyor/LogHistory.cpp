@@ -1,5 +1,5 @@
 #include "LogHistory.h"
-#include "Utils.h" // For printHumanReadableTime
+#include "Utils.h" 
 
 //=============================================================================
 // GLOBAL INSTANCE
@@ -95,58 +95,59 @@ void LogHistory::clear()
 }
 
 // Function to filter commands that shouldn't be logged to history
-bool isCommandExcludedFromHistory(const char *command)
-{
-    // Get the first word (before comma or space)
-    char firstWord[16] = {0};
-    int i = 0;
-    while (command[i] && command[i] != ',' && command[i] != ' ' && i < 15) {
-        firstWord[i] = command[i];
-        i++;
-    }
-    firstWord[i] = '\0';
-    
-    // Quick exclusions by first word only (no further parsing needed)
-    if (strcmp(firstWord, "help") == 0 ||
-        strcmp(firstWord, "status") == 0 ||
-        strcmp(firstWord, "encoder") == 0 ||
-        strcmp(firstWord, "log") == 0) {
-        return true;
-    }
-    
-    // Check combined commands
-    if (strcmp(firstWord, "system") == 0) {
-        // Get second part
-        if (command[i] == ',') {
-            const char *secondPart = command + i + 1;
-            if (strcmp(secondPart, "state") == 0 ||
-                strcmp(secondPart, "safety") == 0 ||
-                strcmp(secondPart, "trays") == 0 ||
-                strcmp(secondPart, "history") == 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    if (strcmp(firstWord, "jog") == 0) {
-        if (command[i] == ',' && (strcmp(command+i+1, "inc") == 0 ||
-                                 strcmp(command+i+1, "speed") == 0)) {
-            return true;
-        }
-    }
-    
-    if (strcmp(firstWord, "network") == 0) {
-        if (command[i] == ',') {
-            const char *secondPart = command + i + 1;
-            if (strncmp(secondPart, "close", 5) == 0 ||
-                strcmp(secondPart, "status") == 0 ||
-                strcmp(secondPart, "closeall") == 0) {
-                return true;
-            }
-        }
-    }
-    
-    // Include all other commands
-    return false;
-}
+// bool isCommandExcludedFromHistory(const char *command)
+// {
+//     // Get the first word (before comma or space)
+//     char firstWord[16] = {0};
+//     int i = 0;
+//     while (command[i] && command[i] != ',' && command[i] != ' ' && i < 15) {
+//         firstWord[i] = command[i];
+//         i++;
+//     }
+//     firstWord[i] = '\0';
+
+//     // Quick exclusions by first word only (no further parsing needed)
+//     if (strcmp(firstWord, "help") == 0 ||
+//         strcmp(firstWord, "status") == 0 ||
+//         strcmp(firstWord, "encoder") == 0 ||
+//         strcmp(firstWord, "log") == 0) {
+//         return true;
+//     }
+
+//     // Check combined commands
+//     if (strcmp(firstWord, "system") == 0) {
+//         // Get second part
+//         if (command[i] == ',') {
+//             const char *secondPart = command + i + 1;
+//             if (strcmp(secondPart, "state") == 0 ||
+//                 strcmp(secondPart, "safety") == 0 ||
+//                 strcmp(secondPart, "trays") == 0 ||
+//                 strcmp(secondPart, "history") == 0) {
+//                 return true;
+//             }
+//         }
+//         return false;
+//     }
+
+//     if (strcmp(firstWord, "jog") == 0) {
+//         if (command[i] == ',' && (strcmp(command+i+1, "inc") == 0 ||
+//                                  strcmp(command+i+1, "speed") == 0)) {
+//             return true;
+//         }
+//     }
+
+//     if (strcmp(firstWord, "network") == 0) {
+//         if (command[i] == ',') {
+//             const char *secondPart = command + i + 1;
+//             if (strncmp(secondPart, "close", 5) == 0 ||
+//                 strcmp(secondPart, "status") == 0 ||
+//                 strcmp(secondPart, "closeall") == 0) {
+//                 return true;
+//             }
+//         }
+//     }
+
+//     // Include all other commands
+//     return false;
+// }
+

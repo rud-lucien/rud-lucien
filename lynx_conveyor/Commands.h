@@ -23,6 +23,14 @@
 // Command tree size
 #define COMMAND_SIZE 15 
 
+// Structure for subcommand lookup
+struct SubcommandInfo {
+    const char* name;  // Subcommand name
+    int code;          // Command code for switch statement
+};
+
+int findSubcommandCode(const char* subcommand, const SubcommandInfo* commandTable, size_t tableSize);
+
 //=============================================================================
 // EXTERNAL REFERENCES
 //=============================================================================

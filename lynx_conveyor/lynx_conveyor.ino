@@ -17,7 +17,6 @@
 #include "OutputManager.h"
 #include "EthernetController.h"
 
-
 // Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
 
@@ -159,7 +158,7 @@ void loop()
     // Pressure check using waitTimeReached helper for safe rollover handling
     static const unsigned long PRESSURE_CHECK_INTERVAL = 10000; // 10 seconds
     static unsigned long lastPressureCheckTime = 0;
-    
+
     if (waitTimeReached(currentTime, lastPressureCheckTime, PRESSURE_CHECK_INTERVAL))
     {
         if (!isPressureSufficient())

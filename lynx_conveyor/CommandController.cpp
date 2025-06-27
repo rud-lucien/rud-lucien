@@ -15,6 +15,52 @@ extern OperationStatus currentOperation; // This is referenced in sendCommandRej
 bool testInProgress = false;
 volatile bool testAbortRequested = false;
 
+// Command lookup table - MUST BE ALPHABETICALLY SORTED for binary search
+const CommandInfo COMMAND_TABLE[] = {
+    {"H", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"abort", CMD_EMERGENCY, 0},
+    {"encoder", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY | CMD_FLAG_ASYNC},
+    {"estop", CMD_EMERGENCY, 0},
+    {"h", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"help", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"jog", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"lock", CMD_MODIFYING, 0},
+    {"log", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"motor", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"move", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"network", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"stop", CMD_EMERGENCY, 0},
+    {"system", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"test", CMD_TEST, CMD_FLAG_ASYNC},
+    {"tray", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"unlock", CMD_MODIFYING, 0}};
+
+// Number of commands in the table
+const size_t COMMAND_TABLE_SIZE = sizeof(COMMAND_TABLE) / sizeof(CommandInfo);
+
+// Binary search function for command lookup
+const CommandInfo *findCommand(const char *cmdName)
+{
+    int left = 0;
+    int right = COMMAND_TABLE_SIZE - 1;
+
+    while (left <= right)
+    {
+        int mid = left + (right - left) / 2;
+        int cmp = strcmp(cmdName, COMMAND_TABLE[mid].name);
+
+        if (cmp == 0)
+            return &COMMAND_TABLE[mid]; // Found
+
+        if (cmp < 0)
+            right = mid - 1;
+        else
+            left = mid + 1;
+    }
+
+    return nullptr; // Not found
+}
+
 // Buffer for Ethernet commands - define it here to avoid duplication
 extern char ethernetCommandBuffer[];
 
@@ -47,12 +93,15 @@ void handleSerialCommands()
         {
             commandBuffer[commandIndex] = '\0'; // Null-terminate the command
 
-            // ADD THIS LINE: Log the command to history
             Serial.print(F("[SERIAL COMMAND] "));
             Serial.println(commandBuffer);
 
-            // Process the command using the shared function
-            processCommand(commandBuffer, &Serial); // Or whatever Stream object Console is
+            // Tag for operation log
+            char taggedCommand[96];
+            snprintf(taggedCommand, sizeof(taggedCommand), "[SERIAL COMMAND] %s", commandBuffer);
+
+            // Pass tag to processCommand
+            processCommand(commandBuffer, &Serial, taggedCommand);
 
             commandIndex = 0; // Reset buffer index
         }
@@ -66,7 +115,6 @@ void handleSerialCommands()
             {
                 // Command too long - prevent buffer overflow
                 commandIndex = sizeof(commandBuffer) - 1;
-                // Add notification of truncation
                 Console.serialError(F("Command truncated - exceeded maximum length"));
             }
         }
@@ -85,24 +133,19 @@ void handleEthernetCommands()
     {
         if (clients[i] && clients[i].connected() && clients[i].available())
         {
-            // Update activity timestamp when client sends data
             extern unsigned long clientLastActivityTime[];
             clientLastActivityTime[i] = millis();
 
-            // Read the command
             int j = 0;
             while (clients[i].available() && j < 63)
-            { // Standardize to 63 bytes + null terminator
+            {
                 char c = clients[i].read();
                 if (c == '\n' || c == '\r')
                 {
-                    // End of command
                     ethernetCommandBuffer[j] = '\0';
 
-                    // Process the command if it's not empty
                     if (j > 0)
                     {
-                        // Format a buffer with the client's IP information
                         char commandWithSource[128];
                         snprintf(commandWithSource, sizeof(commandWithSource),
                                  "from %d.%d.%d.%d: %s",
@@ -110,24 +153,23 @@ void handleEthernetCommands()
                                  clients[i].remoteIP()[2], clients[i].remoteIP()[3],
                                  ethernetCommandBuffer);
 
-                        // Log command to serial monitor only (not to connected clients)
                         Serial.print(F("[NETWORK COMMAND] "));
                         Serial.println(commandWithSource);
 
-                        // Use the shared process function instead of duplicating logic
-                        processCommand(ethernetCommandBuffer, &clients[i]);
+                        // Tag for operation log
+                        char taggedCommand[160];
+                        snprintf(taggedCommand, sizeof(taggedCommand), "[NETWORK COMMAND] %s", commandWithSource);
+
+                        processCommand(ethernetCommandBuffer, &clients[i], taggedCommand);
                     }
 
-                    // Reset for next command
                     j = 0;
                     continue;
                 }
 
-                // Store character in buffer
                 ethernetCommandBuffer[j++] = c;
             }
 
-            // If buffer is full but no newline found, warn and clear buffer
             if (j == 63)
             {
                 ethernetCommandBuffer[j] = '\0';
@@ -138,41 +180,39 @@ void handleEthernetCommands()
     }
 }
 
-bool processCommand(const char *rawCommand, Stream *output)
+// Updated processCommand to accept sourceTag
+bool processCommand(const char *rawCommand, Stream *output, const char *sourceTag)
 {
-    // Set current client
     Console.setCurrentClient(output);
 
-    // Check for abort command with priority
-    if (strncmp(rawCommand, "abort", 5) == 0)
+    char firstWord[16] = {0};
+    int i = 0;
+    while (rawCommand[i] && rawCommand[i] != ',' && rawCommand[i] != ' ' && i < 15)
+    {
+        firstWord[i] = rawCommand[i];
+        i++;
+    }
+    firstWord[i] = '\0';
+
+    const CommandInfo *cmdInfo = findCommand(firstWord);
+
+    if (cmdInfo && strcmp(cmdInfo->name, "abort") == 0)
     {
         requestTestAbort("command interface");
         Console.acknowledge(F("Test abort requested"));
         return true;
     }
 
-    // Check if this is a potentially async command
-    bool isAsyncCommand =
-        (strncmp(rawCommand, "motor,", 6) == 0) ||
-        (strncmp(rawCommand, "move,", 5) == 0) ||
-        (strncmp(rawCommand, "test,", 5) == 0) ||
-        (strncmp(rawCommand, "jog,", 4) == 0) ||
-        (strncmp(rawCommand, "tray,", 5) == 0) ||
-        (strncmp(rawCommand, "encoder,", 8) == 0) ||
-        (strncmp(rawCommand, "lock,", 5) == 0) ||
-        (strncmp(rawCommand, "unlock,", 7) == 0);
+    bool isAsyncCommand = (cmdInfo && (cmdInfo->flags & CMD_FLAG_ASYNC));
 
-    // Make a copy of the original command for permission checking
     char originalCommand[64];
     strncpy(originalCommand, rawCommand, 63);
     originalCommand[63] = '\0';
 
-    // Pre-process: Convert command for Commander API
     char processedCommand[64];
     strncpy(processedCommand, rawCommand, 63);
     processedCommand[63] = '\0';
 
-    // Replace all commas with spaces for the Commander API
     for (int i = 0; processedCommand[i]; i++)
     {
         if (processedCommand[i] == ',')
@@ -181,16 +221,21 @@ bool processCommand(const char *rawCommand, Stream *output)
         }
     }
 
-    // Check if this command can be executed
     if (canExecuteCommand(originalCommand))
     {
-        // Execute the command
+        // Use tag if provided, otherwise log the raw command
+        if (!isCommandExcludedFromHistory(originalCommand)) {
+            if (sourceTag && sourceTag[0]) {
+                opLogHistory.addEntry(sourceTag);
+            } else {
+                opLogHistory.addEntry(originalCommand);
+            }
+        }
+
         bool success = commander.execute(processedCommand, output);
 
-        // Handle error reporting if command not found
         if (!success)
         {
-            // Check if this looks like a valid main command
             bool isKnownCommand = false;
             for (size_t i = 0; i < API_tree_size; i++)
             {
@@ -201,15 +246,12 @@ bool processCommand(const char *rawCommand, Stream *output)
                     break;
                 }
             }
-
-            // Only print generic error if command wasn't found at all
             if (!isKnownCommand)
             {
                 Console.serialError(F("Command not found"));
             }
         }
 
-        // Only reset currentClient if it's not an async command
         if (!isAsyncCommand)
         {
             Console.setCurrentClient(nullptr);
@@ -218,7 +260,6 @@ bool processCommand(const char *rawCommand, Stream *output)
         return success;
     }
 
-    // Reset the client when done
     Console.setCurrentClient(nullptr);
     return false;
 }
@@ -238,102 +279,122 @@ void clearPersistentClient()
 // Command Validation Functions
 CommandType getCommandType(const char *originalCommand)
 {
-    // Make a local copy that we can modify
-    char command[64];
-    strncpy(command, originalCommand, 63);
-    command[63] = '\0';
-
-    // Convert commas to spaces for consistent pattern matching
-    for (int i = 0; command[i]; i++)
-    {
-        if (command[i] == ',')
-        {
-            command[i] = ' ';
-        }
-    }
-
     // Extract first word (main command)
     char firstWord[16] = {0};
     int i = 0;
-    while (command[i] && !isspace(command[i]) && i < 15)
+    while (originalCommand[i] && originalCommand[i] != ',' && originalCommand[i] != ' ' && i < 15)
     {
-        firstWord[i] = command[i];
+        firstWord[i] = originalCommand[i];
         i++;
     }
     firstWord[i] = '\0';
 
-    // Emergency commands - always allowed
-    if (strcmp(firstWord, "stop") == 0 ||
-        strcmp(firstWord, "abort") == 0 ||
-        strcmp(firstWord, "estop") == 0 ||
-        (strcmp(firstWord, "motor") == 0 &&
-         (strncmp(command + 6, "stop", 4) == 0 ||
-          strncmp(command + 6, "abort", 5) == 0)))
+    // Look up the command in our dispatch table
+    const CommandInfo *cmdInfo = findCommand(firstWord);
+    if (cmdInfo)
     {
-        return CMD_EMERGENCY;
+        // For most commands, just return the type from the table
+        if (strcmp(firstWord, "motor") != 0 && strcmp(firstWord, "system") != 0 &&
+            strcmp(firstWord, "jog") != 0)
+        {
+            return cmdInfo->type;
+        }
+
+        // Special handling for commands that need subcommand checking
+        if (strcmp(firstWord, "motor") == 0)
+        {
+            // Make a local copy that we can modify
+            char command[64];
+            strncpy(command, originalCommand, 63);
+            command[63] = '\0';
+
+            // Convert commas to spaces
+            for (int i = 0; command[i]; i++)
+            {
+                if (command[i] == ',')
+                {
+                    command[i] = ' ';
+                }
+            }
+
+            // Check for motor stop/abort which are emergency commands
+            if (strncmp(command + 6, "stop", 4) == 0 ||
+                strncmp(command + 6, "abort", 5) == 0)
+            {
+                return CMD_EMERGENCY;
+            }
+
+            // Check for motor status which is read-only
+            if (strncmp(command + 6, "status", 6) == 0)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // All other motor commands are modifying
+            return CMD_MODIFYING;
+        }
+
+        // Special handling for system commands
+        if (strcmp(firstWord, "system") == 0)
+        {
+            // Make a local copy that we can modify
+            char command[64];
+            strncpy(command, originalCommand, 63);
+            command[63] = '\0';
+
+            // Convert commas to spaces
+            for (int i = 0; command[i]; i++)
+            {
+                if (command[i] == ',')
+                {
+                    command[i] = ' ';
+                }
+            }
+
+            // These are all read-only
+            if (strncmp(command + 7, "state", 5) == 0 ||
+                strncmp(command + 7, "safety", 6) == 0 ||
+                strncmp(command + 7, "trays", 5) == 0 ||
+                strncmp(command + 7, "history", 7) == 0)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // system reset is modifying
+            return CMD_MODIFYING;
+        }
+
+        // Special handling for jog commands
+        if (strcmp(firstWord, "jog") == 0)
+        {
+            // Make a local copy that we can modify
+            char command[64];
+            strncpy(command, originalCommand, 63);
+            command[63] = '\0';
+
+            // Convert commas to spaces
+            for (int i = 0; command[i]; i++)
+            {
+                if (command[i] == ',')
+                {
+                    command[i] = ' ';
+                }
+            }
+
+            // Read-only jog commands
+            if (strncmp(command + 4, "status", 6) == 0 ||
+                strcmp(command, "jog inc") == 0 ||
+                strcmp(command, "jog speed") == 0)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // All other jog commands are modifying
+            return CMD_MODIFYING;
+        }
     }
 
-    // Help commands (simple prefix check)
-    if (strcmp(firstWord, "help") == 0 ||
-        strcmp(firstWord, "h") == 0 ||
-        strcmp(firstWord, "H") == 0)
-    {
-        return CMD_READ_ONLY;
-    }
-
-    // Status commands (exact pattern matching)
-    if (strcmp(firstWord, "motor") == 0 && strncmp(command + 6, "status", 6) == 0 ||
-        strcmp(firstWord, "jog") == 0 && strncmp(command + 4, "status", 6) == 0 ||
-        strcmp(firstWord, "tray") == 0 && strncmp(command + 5, "status", 6) == 0 ||
-        strcmp(firstWord, "encoder") == 0 && strncmp(command + 8, "status", 6) == 0 ||
-        strcmp(firstWord, "network") == 0 && strncmp(command + 8, "status", 6) == 0)
-    {
-        return CMD_READ_ONLY;
-    }
-
-    // Help subcommands (exact matches)
-    if ((strcmp(firstWord, "lock") == 0 ||
-         strcmp(firstWord, "unlock") == 0 ||
-         strcmp(firstWord, "log") == 0 ||
-         strcmp(firstWord, "system") == 0 ||
-         strcmp(firstWord, "motor") == 0 ||
-         strcmp(firstWord, "move") == 0 ||
-         strcmp(firstWord, "jog") == 0 ||
-         strcmp(firstWord, "tray") == 0 ||
-         strcmp(firstWord, "test") == 0 ||
-         strcmp(firstWord, "encoder") == 0 ||
-         strcmp(firstWord, "network") == 0) &&
-        strstr(command, "help"))
-    {
-        return CMD_READ_ONLY;
-    }
-
-    // System information commands
-    if (strcmp(firstWord, "system") == 0 &&
-        (strncmp(command + 7, "state", 5) == 0 ||
-         strncmp(command + 7, "safety", 6) == 0 ||
-         strncmp(command + 7, "trays", 5) == 0 ||
-         strncmp(command + 7, "history", 7) == 0))
-    {
-        return CMD_READ_ONLY;
-    }
-
-    // Other read-only commands
-    if ((strcmp(firstWord, "log") == 0 && strncmp(command + 4, "now", 3) == 0) ||
-        strcmp(command, "jog inc") == 0 ||
-        strcmp(command, "jog speed") == 0 ||
-        strcmp(command, "encoder multiplier") == 0)
-    {
-        return CMD_READ_ONLY;
-    }
-
-    // Test commands - special handling
-    if (strcmp(firstWord, "test") == 0)
-    {
-        return CMD_TEST;
-    }
-
-    // All other commands are modifying
+    // Unknown commands are treated as modifying (conservative approach)
     return CMD_MODIFYING;
 }
 
@@ -384,6 +445,31 @@ bool canExecuteCommand(const char *command)
 
     // Command is allowed
     return true;
+}
+
+// Function to filter commands that shouldn't be logged to history
+bool isCommandExcludedFromHistory(const char *command)
+{
+    // Extract first word
+    char firstWord[16] = {0};
+    int i = 0;
+    while (command[i] && command[i] != ',' && command[i] != ' ' && i < 15)
+    {
+        firstWord[i] = command[i];
+        i++;
+    }
+    firstWord[i] = '\0';
+
+    // Look up the command in our dispatch table
+    const CommandInfo *cmdInfo = findCommand(firstWord);
+    if (cmdInfo)
+    {
+        // Use the flag to determine if command should be excluded
+        return (cmdInfo->flags & CMD_FLAG_NO_HISTORY);
+    }
+
+    // By default, include command in history
+    return false;
 }
 
 //-------------------------------------------------------------------------

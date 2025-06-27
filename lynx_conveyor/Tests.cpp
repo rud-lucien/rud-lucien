@@ -39,69 +39,6 @@ bool checkSerialForAbortCommand()
     return false;
 }
 
-// bool checkEthernetForAbortCommand()
-// {
-//     if (!ethernetInitialized)
-//     {
-//         return false;
-//     }
-
-//     for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++)
-//     {
-//         EthernetClient &client = clients[i]; // Use reference to avoid copying
-
-//         if (client && client.connected() && client.available())
-//         {
-//             // Peek at the data without consuming it
-//             char buffer[10]; // Just need enough to check for "abort"
-//             int len = 0;
-
-//             // Peek at the available data (don't consume it yet)
-//             while (client.available() && len < sizeof(buffer) - 1)
-//             {
-//                 buffer[len] = client.read();
-//                 len++;
-
-//                 // Check if we've already found "abort"
-//                 buffer[len] = '\0'; // Null terminate
-//                 if (strstr(buffer, "abort") != NULL)
-//                 {
-//                     // Found "abort", consume the rest of the line
-//                     while (client.available())
-//                     {
-//                         char c = client.read();
-//                         if (c == '\n' || c == '\r')
-//                             break;
-//                     }
-
-//                     // Set the abort flag
-//                     requestTestAbort("ethernet client");
-//                     client.println(F("[ACK], Test abort requested"));
-//                     return true;
-//                 }
-
-//                 // If we've found a newline, stop looking in this chunk
-//                 if (buffer[len - 1] == '\n' || buffer[len - 1] == '\r')
-//                 {
-//                     break;
-//                 }
-//             }
-
-//             // If we didn't find "abort", consume this line so we don't check it again
-//             if (len > 0)
-//             {
-//                 while (client.available())
-//                 {
-//                     char c = client.read();
-//                     if (c == '\n' || c == '\r')
-//                         break;
-//                 }
-//             }
-//         }
-//     }
-//     return false;
-// }
-
 bool checkEthernetForAbortCommand()
 {
     if (!ethernetInitialized)
