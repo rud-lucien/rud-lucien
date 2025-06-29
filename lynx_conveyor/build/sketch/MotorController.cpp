@@ -124,10 +124,10 @@ void initMotorSystem()
 
     // Set velocity and acceleration limits using RPM values
     char msg[200];
-    sprintf(msg, "Setting velocity limit to %d RPM", MOTOR_VELOCITY_RPM);
+    sprintf(msg, "Setting velocity limit to %d RPM", LOADED_SHUTTLE_VELOCITY_RPM);
     Console.serialInfo(msg);
 
-    currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM); // CHANGED
+    currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM); // CHANGED
     MOTOR_CONNECTOR.VelMax(currentVelMax);
 
     // Set acceleration limit
@@ -314,8 +314,8 @@ bool moveToPosition(PositionTarget position)
         else
         {
             // For long moves, explicitly set to maximum velocity
-            currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, MOTOR_VELOCITY_RPM);
+            currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM);
+            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, LOADED_SHUTTLE_VELOCITY_RPM);
             Console.serialInfo(msg);
         }
     }
@@ -428,8 +428,8 @@ bool moveToPositionMm(double positionMm)
         else
         {
             // For long moves, explicitly set to maximum velocity
-            currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, MOTOR_VELOCITY_RPM);
+            currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM);
+            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, LOADED_SHUTTLE_VELOCITY_RPM);
             Console.serialInfo(msg);
         }
     }
@@ -545,8 +545,8 @@ bool moveRelative(double relativeMm)
         else
         {
             // For long moves, explicitly set to maximum velocity
-            currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
-            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, MOTOR_VELOCITY_RPM);
+            currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM);
+            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, LOADED_SHUTTLE_VELOCITY_RPM);
             Console.serialInfo(msg);
         }
     }
@@ -679,9 +679,9 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
     double distanceToMoveMm = (jogDistanceMm > 0) ? jogDistanceMm : currentJogIncrementMm;
 
     // Validate speed is reasonable
-    if (speedRpm < 10 || speedRpm > MOTOR_VELOCITY_RPM)
+    if (speedRpm < 10 || speedRpm > LOADED_SHUTTLE_VELOCITY_RPM)
     {
-        sprintf(msg, "Jog speed must be between 10 and %d RPM", MOTOR_VELOCITY_RPM);
+        sprintf(msg, "Jog speed must be between 10 and %d RPM", LOADED_SHUTTLE_VELOCITY_RPM);
         Console.serialError(msg);
         return false;
     }
@@ -725,7 +725,7 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
     else
     {
         // For long moves, explicitly set to maximum velocity if requested speed is higher
-        cappedSpeed = min(speedRpm, MOTOR_VELOCITY_RPM);
+        cappedSpeed = min(speedRpm, LOADED_SHUTTLE_VELOCITY_RPM);
 
         if (cappedSpeed != speedRpm)
         {
@@ -1230,7 +1230,7 @@ void checkHomingProgress()
             Console.serialInfo(msg);
 
             // Reset velocity to normal (or a specific offset velocity if desired)
-            int32_t normalVelPps = rpmToPps(MOTOR_VELOCITY_RPM); // Or a slower offset speed
+            int32_t normalVelPps = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM); // Or a slower offset speed
             MOTOR_CONNECTOR.VelMax(normalVelPps);
 
             // Move away from hardstop
@@ -1281,7 +1281,7 @@ void checkHomingProgress()
 void completeHomingSequence()
 {
     // Reset to normal operation parameters
-    currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+    currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM);
     currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
     MOTOR_CONNECTOR.VelMax(currentVelMax);
     MOTOR_CONNECTOR.AccelMax(currentAccelMax);
@@ -1344,7 +1344,7 @@ void abortHoming()
         MOTOR_CONNECTOR.MoveStopAbrupt();
 
         // Reset to normal operation parameters
-        currentVelMax = rpmToPps(MOTOR_VELOCITY_RPM);
+        currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM);
         currentAccelMax = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
         MOTOR_CONNECTOR.VelMax(currentVelMax);
         MOTOR_CONNECTOR.AccelMax(currentAccelMax);

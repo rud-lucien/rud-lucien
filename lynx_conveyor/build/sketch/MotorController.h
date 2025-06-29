@@ -23,13 +23,23 @@
 
 // Motor & Motion parameters
 #define PULSES_PER_REV 800                          // Motor configured for 800 pulses per revolution
-#define MM_PER_REV 53.98                            // Calibrated: 53.98 mm travel per revolution
+
+// CALIBRATION METHOD FOR MM_PER_REV:
+// 1. Record starting pulse count from motor controller
+// 2. Command motor to move a significant distance (e.g., several revolutions)
+// 3. Record ending pulse count from motor controller
+// 4. Use dial indicator to measure actual physical movement in mm
+// 5. Calculate: MM_PER_REV = (actual_movement_mm / pulse_difference) * PULSES_PER_REV
+// 6. Verify with multiple measurements and average for accuracy
+// NOTE: This value is critical for all position calculations - verify after any mechanical changes
+#define MM_PER_REV 53.98                            // Calibrated: 53.98 mm travel per revolution (measured via dial indicator)
+
 #define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV) // ~14.81 pulses per mm (800 / 53.98)
 
 // Motion profile parameters (in RPM units)
-#define MOTOR_VELOCITY_RPM 300         // Maximum velocity for motor operation (RPM)
-#define MAX_ACCEL_RPM_PER_SEC 2500     // Maximum acceleration in RPM/s
-#define EMPTY_SHUTTLE_VELOCITY_RPM 800 // Higher speed for empty shuttle movements
+#define LOADED_SHUTTLE_VELOCITY_RPM 300 // Velocity when moving with a tray (RPM)
+#define MAX_ACCEL_RPM_PER_SEC 2500      // Maximum acceleration in RPM/s
+#define EMPTY_SHUTTLE_VELOCITY_RPM 800  // Velocity when moving without a tray (RPM)
 
 // Motion direction control (1 for normal direction, -1 for reversed)
 #define MOTION_DIRECTION -1 // Set to -1 to reverse all motion
@@ -55,9 +65,9 @@
 
 // Position definitions (in mm from home)
 #define POSITION_HOME_MM 0.0        // Home position
-#define POSITION_1_MM 24.63         // Position 1 (31.17 mm)
-#define POSITION_2_MM 466.18        // Position 2 (457.34)
-#define POSITION_3_MM 908.69        // Position 3 (885.89 mm)
+#define POSITION_1_MM 24.63         // Position 1 (Tray loading position and tray 1 position)
+#define POSITION_2_MM 466.18        // Position 2 (Tray 2 position)
+#define POSITION_3_MM 908.69        // Position 3 (Tray 3 position)
 #define POSITION_4_MM MAX_TRAVEL_MM // Position 4 (max = 1050 mm)
 
 // Position definitions in pulses (calculated from mm)

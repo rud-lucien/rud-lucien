@@ -1,7 +1,115 @@
 /*
- Name:		lynx_linear_actuator.ino
+ Name:		lynx_conveyor.ino
  Created:	4/14/2025 12:00:17 PM
  Author:	rlucien
+ 
+ LYNX CONVEYOR CONTROLLER
+ ========================
+ 
+ SYSTEM PURPOSE:
+ This program controls an automated linear rail conveyor system designed for precise tray handling
+ and positioning. The system manages tray loading, transport between stations, unloading operations, 
+ and comprehensive safety monitoring with pneumatic shuttle and locking control.
+ 
+ CORE FUNCTIONALITY:
+ - Precise linear motion control with 3 tray loading positions plus home position
+ - Pneumatic shuttle system that can lock/unlock to grab and release trays during transport
+ - Individual pneumatic tray locks at each position (lock1, lock2, lock3) to secure trays
+ - Tray detection sensors throughout the system to track tray locations
+ - Pressure monitoring to ensure pneumatic systems have adequate pressure for operation
+ - Manual positioning control via MPG handwheel encoder interface
+ - Comprehensive logging with circular buffer for error diagnosis and system history
+ - Serial and Ethernet command interfaces with extensive help documentation
+ - Automated test sequences for system validation and troubleshooting
+ 
+ REQUIRED HARDWARE COMPONENTS:
+ 
+ 1. CONTROLLER & I/O:
+    - ClearCore Industrial I/O and Motion Controller (main controller)
+    - CCIO-8 Digital I/O Expansion (8-point expansion for additional sensors/outputs)
+    - CABLE-RIBBON6 (6 inch ribbon cable for CCIO connection)
+ 
+ 2. MOTION SYSTEM:
+    - NEMA 23 ClearPath-SDSK Model CPM-SDSK-2321S-RLS (servo motor with integrated drive)
+    - Linear rail system with precision positioning
+    
+    REQUIRED MOTOR CONFIGURATION (using Teknic ClearPath-MSP software):
+    - Input Resolution: 800 pulses per revolution
+    - Input Format: Step and Direction
+    - Torque Limit: 50%
+    - HLFB Output: ASG-POSITION WITH MEASURED TORQUE
+    - Homing: Enabled
+      * Homing Trigger: Upon Every Enable
+      * Homing Torque Limit: 40%
+      * Homing Mode: Normal
+      * Homing Style: User Seeks Home
+      * Precision Homing: Must be calibrated per installation
+      * Homing RPM: 50 RPM
+      * Acceleration/Deceleration: 1500 RPM/s
+    
+    MOTOR SETUP PROCEDURE:
+    1. Configure all settings above using Teknic ClearPath-MSP software
+    2. Load configuration to motor (download settings to motor memory)
+    3. Perform auto-tuning with realistic load conditions:
+       * Lock a tray to the shuttle to simulate actual operating load
+       * Set auto-tune torque limit to 50%
+       * Set auto-tune RPM to 350 RPM (matches operational velocity with tray)
+       * Run auto-tune sequence to optimize motor performance
+    4. Verify homing operation and position accuracy after installation
+    
+    NOTE: Motor must be configured and auto-tuned before use. Auto-tuning with 
+    actual load is critical for optimal performance and accuracy.
+ 
+ 3. FEEDBACK & CONTROL:
+    - CL-ENCDR-DFIN Encoder Input Adapter (for MPG handwheel manual control)
+    - MPG handwheel encoder (manual positioning interface)
+    - Tray detection sensors positioned throughout the conveyor system
+ 
+ 4. PNEUMATIC SYSTEM:
+    - Pneumatic shuttle mechanism with lock/unlock capability for tray grabbing
+    - Individual pneumatic tray locks at each of the 3 loading positions
+    - Pressure sensor for pneumatic system monitoring (minimum 21.75 PSI)
+    - Solenoid valves for shuttle and tray lock control
+    - Compressed air supply system
+ 
+ 5. POWER SYSTEM:
+    - IPC-5 DC Power Supply (350/500W, 75VDC output for motor power)
+    - POWER4-STRIP DC Bus Distribution Strip (power distribution)
+    - 24VDC supply for logic and pneumatics
+ 
+ 6. SAFETY SYSTEMS:
+    - Emergency stop (E-stop) circuit with normally closed contacts
+    - Pressure monitoring system (minimum 21.75 PSI threshold)
+    - Tray detection sensors for position tracking and safety validation
+    - Comprehensive error detection with historical logging
+ 
+ COMMUNICATION INTERFACES:
+ - Serial (USB): Direct command interface and diagnostics (115200 baud)
+ - Ethernet: Remote command interface and monitoring
+ - Extensive help system: Type "help" for available commands, "help <command>" for specific usage
+ - All commands include detailed help documentation and usage examples
+ 
+ USAGE:
+ 1. Configure ClearPath motor using Teknic ClearPath-MSP software (see MOTION SYSTEM requirements)
+ 2. Connect all hardware components per system documentation
+ 3. Power up system and connect via Serial or Ethernet
+ 4. Initialize motor system: "motor init"
+ 5. Home the system: "motor home" 
+ 6. Position control: "move 1" (positions 1-3) or "move <mm>"
+ 7. Tray operations: "tray load", "tray unload" 
+ 8. Tray locking: "lock1", "lock2", "lock3" for individual position locks
+ 9. Shuttle control: Lock shuttle to grab trays, unlock to release
+ 10. Manual control: Enable handwheel with "encoder enable"
+ 11. System monitoring: "system status", "motor status", pressure monitoring
+ 12. Help system: "help" for command list, "help <command>" for detailed usage
+ 13. Error diagnosis: Check circular buffer log when issues occur
+
+ SAFETY NOTES:
+ - Always ensure E-stop circuit is properly connected and functional
+ - Verify adequate air pressure (21.75+ PSI) before pneumatic operations
+ - System includes comprehensive safety monitoring and automatic fault detection
+ - Circular buffer maintains operation history for troubleshooting errors
+ - Use "system reset" to clear fault conditions after resolving issues
 */
 
 #include "Arduino.h"
