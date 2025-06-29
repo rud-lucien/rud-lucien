@@ -75,7 +75,7 @@ bool waitTimeReached(unsigned long current, unsigned long previous, unsigned lon
 void printHumanReadableTime(unsigned long secondsAgo)
 {
     char timeMsg[80];
-    
+
     if (secondsAgo < 60)
     {
         // Less than a minute
@@ -88,7 +88,7 @@ void printHumanReadableTime(unsigned long secondsAgo)
         unsigned long seconds = secondsAgo % 60;
         if (seconds > 0)
         {
-            sprintf(timeMsg, "%lu minute%s %lu second%s", 
+            sprintf(timeMsg, "%lu minute%s %lu second%s",
                     minutes, (minutes != 1) ? "s" : "",
                     seconds, (seconds != 1) ? "s" : "");
         }
@@ -104,7 +104,7 @@ void printHumanReadableTime(unsigned long secondsAgo)
         unsigned long minutes = (secondsAgo % 3600) / 60;
         if (minutes > 0)
         {
-            sprintf(timeMsg, "%lu hour%s %lu minute%s", 
+            sprintf(timeMsg, "%lu hour%s %lu minute%s",
                     hours, (hours != 1) ? "s" : "",
                     minutes, (minutes != 1) ? "s" : "");
         }
@@ -120,7 +120,7 @@ void printHumanReadableTime(unsigned long secondsAgo)
         unsigned long hours = (secondsAgo % 86400) / 3600;
         if (hours > 0)
         {
-            sprintf(timeMsg, "%lu day%s %lu hour%s", 
+            sprintf(timeMsg, "%lu day%s %lu hour%s",
                     days, (days != 1) ? "s" : "",
                     hours, (hours != 1) ? "s" : "");
         }
@@ -129,18 +129,19 @@ void printHumanReadableTime(unsigned long secondsAgo)
             sprintf(timeMsg, "%lu day%s", days, (days != 1) ? "s" : "");
         }
     }
-    
+
     Console.print(timeMsg);
 }
 
 // Formats time as hours:minutes:seconds since system startup
-void formatAbsoluteTime(unsigned long timeMs, char* buffer) {
+void formatAbsoluteTime(unsigned long timeMs, char *buffer)
+{
     // Calculate hours, minutes, seconds from milliseconds
     unsigned long totalSeconds = timeMs / 1000;
     unsigned long hours = totalSeconds / 3600;
     unsigned long minutes = (totalSeconds % 3600) / 60;
     unsigned long seconds = totalSeconds % 60;
-    
+
     // Format as HH:MM:SS
     snprintf(buffer, 12, "%02lu:%02lu:%02lu", hours, minutes, seconds);
 }
@@ -399,11 +400,11 @@ SystemState captureSystemState()
 void printSystemState(const SystemState &state)
 {
     char msg[200];
-    
+
     Console.println(F("[DIAGNOSTIC] System State:"));
 
     // Motor
-    const char* motorStateStr;
+    const char *motorStateStr;
     switch (state.motorState)
     {
     case MOTOR_STATE_IDLE:
@@ -441,7 +442,7 @@ void printSystemState(const SystemState &state)
         Console.println(F("  Position: UNKNOWN"));
     }
 
-    const char* hlfbStatusStr;
+    const char *hlfbStatusStr;
     switch (state.hlfbStatus)
     {
     case MotorDriver::HLFB_ASSERTED:
@@ -462,13 +463,13 @@ void printSystemState(const SystemState &state)
     Console.println(F("\n  Cylinder Sensors:"));
     sprintf(msg, "    Tray 1: %s", state.tray1CylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
     Console.println(msg);
-    
+
     sprintf(msg, "    Tray 2: %s", state.tray2CylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
     Console.println(msg);
-    
+
     sprintf(msg, "    Tray 3: %s", state.tray3CylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
     Console.println(msg);
-    
+
     sprintf(msg, "    Shuttle: %s", state.shuttleCylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
     Console.println(msg);
 
@@ -476,13 +477,13 @@ void printSystemState(const SystemState &state)
     Console.println(F("\n  Lock States:"));
     sprintf(msg, "    Tray 1: %s", state.tray1Locked ? "LOCKED" : "UNLOCKED");
     Console.println(msg);
-    
+
     sprintf(msg, "    Tray 2: %s", state.tray2Locked ? "LOCKED" : "UNLOCKED");
     Console.println(msg);
-    
+
     sprintf(msg, "    Tray 3: %s", state.tray3Locked ? "LOCKED" : "UNLOCKED");
     Console.println(msg);
-    
+
     sprintf(msg, "    Shuttle: %s", state.shuttleLocked ? "LOCKED" : "UNLOCKED");
     Console.println(msg);
 
@@ -490,10 +491,10 @@ void printSystemState(const SystemState &state)
     Console.println(F("\n  Tray Detection:"));
     sprintf(msg, "    Position 1: %s", state.tray1Present ? "TRAY PRESENT" : "NO TRAY");
     Console.println(msg);
-    
+
     sprintf(msg, "    Position 2: %s", state.tray2Present ? "TRAY PRESENT" : "NO TRAY");
     Console.println(msg);
-    
+
     sprintf(msg, "    Position 3: %s", state.tray3Present ? "TRAY PRESENT" : "NO TRAY");
     Console.println(msg);
 
@@ -512,7 +513,7 @@ void printSystemState(const SystemState &state)
 
     // Pneumatic system status
     float pressure = getPressurePsi();
-    sprintf(msg, "    Pneumatic System: %.1f PSI %s", pressure, 
+    sprintf(msg, "    Pneumatic System: %.1f PSI %s", pressure,
             (pressure < MIN_SAFE_PRESSURE) ? "(INSUFFICIENT)" : "(OK)");
     Console.println(msg);
 
@@ -1267,7 +1268,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
 void printSafetyStatus(const SafetyValidationResult &result)
 {
     char msg[300];
-    
+
     Console.println(F("[SAFETY] Validation Results:"));
 
     // Movement safety
@@ -1297,10 +1298,12 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
     // Tray locking safety with enhanced safety messages
     Console.println(F("  Tray Locking:"));
-    
+
     // Helper function to get tray lock status message
-    auto getTrayLockMessage = [](bool safe, bool operationInProgress, int operationType) -> const char* {
-        if (!safe) return nullptr; // Will be handled separately
+    auto getTrayLockMessage = [](bool safe, bool operationInProgress, int operationType) -> const char *
+    {
+        if (!safe)
+            return nullptr; // Will be handled separately
         if (operationInProgress && operationType == OPERATION_LOADING)
             return "SAFE TO LOCK - Part of loading sequence";
         else if (operationInProgress && operationType == OPERATION_UNLOADING)
@@ -1308,7 +1311,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         else
             return "SAFE TO LOCK - Tray present and system ready";
     };
-    
+
     if (result.safeToLockTray1)
     {
         sprintf(msg, "    Tray 1: %s", getTrayLockMessage(true, operationInProgress, currentOperation.type));
@@ -1344,7 +1347,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
     // Shuttle actuation safety
     Console.println(F("  Shuttle Control:"));
-    
+
     if (result.safeToLockShuttle)
     {
         if (operationInProgress && currentOperation.type == OPERATION_LOADING &&
@@ -1362,7 +1365,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         sprintf(msg, "    Lock: UNSAFE - %s", result.shuttleLockUnsafeReason.c_str());
         Console.println(msg);
     }
-    
+
     if (result.safeToUnlockShuttle)
     {
         if (operationInProgress && currentOperation.type == OPERATION_LOADING &&
@@ -1383,7 +1386,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
     // Lock/unlock operation status
     Console.println(F("\n  Lock/Unlock Operations:"));
-    
+
     if (result.lockOperationSuccessful)
     {
         Console.println(F("    Lock Operations: SUCCESSFUL - No recent lock failures"));
@@ -1469,12 +1472,12 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
     // Operational sequence validation
     Console.println(F("\n  Operational Sequence:"));
-    
+
     if (result.safeToAcceptNewCommand)
     {
         if (operationInProgress)
         {
-            const char* opTypeStr;
+            const char *opTypeStr;
             switch (currentOperation.type)
             {
             case OPERATION_LOADING:
@@ -1506,7 +1509,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         if (operationInProgress)
         {
             unsigned long elapsedTime = timeDiff(millis(), operationStartTime);
-            sprintf(msg, "    Operation Timing: WITHIN TIMEOUT - Elapsed: %lu.%lu s / %lu s", 
+            sprintf(msg, "    Operation Timing: WITHIN TIMEOUT - Elapsed: %lu.%lu s / %lu s",
                     elapsedTime / 1000, (elapsedTime % 1000) / 100, operationTimeoutMs / 1000);
             Console.println(msg);
         }
@@ -1520,7 +1523,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
         sprintf(msg, "    Operation Timing: TIMEOUT - %s", result.operationSequenceMessage.c_str());
         Console.println(msg);
     }
-    
+
     if (result.operationSequenceValid)
     {
         if (operationInProgress)
@@ -1532,7 +1535,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
             }
             else
             {
-                sprintf(msg, "    Operation Sequence: VALID - Current step: %d (expected: %d)", 
+                sprintf(msg, "    Operation Sequence: VALID - Current step: %d (expected: %d)",
                         currentOperationStep, expectedOperationStep);
                 Console.println(msg);
             }
@@ -1555,10 +1558,10 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
     // Tray loading operations
     Console.println(F("\n  Tray Loading Operations:"));
-    
+
     if (result.safeToLoadTrayToPos1)
     {
-        const char* loadContext;
+        const char *loadContext;
         if (trayTracking.totalTraysInSystem == 0)
             loadContext = " - Ready for first tray";
         else if (trayTracking.totalTraysInSystem == 1)
@@ -1567,7 +1570,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
             loadContext = " - Ready for third tray";
         else
             loadContext = " - Ready for tray";
-            
+
         sprintf(msg, "    Position 1: SAFE TO LOAD%s", loadContext);
         Console.println(msg);
     }
@@ -1599,7 +1602,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
     // Tray unloading operations
     Console.println(F("\n  Tray Unloading Operations:"));
-    
+
     if (result.safeToUnloadTrayFromPos1)
     {
         Console.println(F("    Position 1: SAFE TO UNLOAD - Tray ready for removal"));
@@ -1632,7 +1635,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
     // System Summary
     Console.println(F("\n  System Summary:"));
-    
+
     if (result.operationSequenceValid && result.trayPositionValid && result.commandStateValid &&
         (result.targetPositionValid || !operationInProgress))
     {
@@ -1640,7 +1643,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
         if (operationInProgress)
         {
-            const char* opTypeStr;
+            const char *opTypeStr;
             switch (currentOperation.type)
             {
             case OPERATION_LOADING:
@@ -1834,7 +1837,7 @@ void processTrayLoading()
     // Target position based on tray tracking
     static double targetPosition = 0;
     static bool isShuttleNeeded = false;
-    
+
     // Single message buffer for all sprintf operations in this function
     char messageBuffer[150];
 
@@ -2503,7 +2506,7 @@ void processTrayUnloading()
     // Variables to track which tray is being unloaded
     static double sourcePosition = 0;
     static bool needsMovementToPos1 = false;
-    
+
     // Single message buffer for all sprintf operations in this function
     char messageBuffer[150];
 
@@ -3348,7 +3351,7 @@ void resetSystemState()
 {
     // Track overall reset success
     bool resetSuccessful = true;
-    
+
     // Single message buffer for all sprintf operations in this function
     char messageBuffer[150];
 

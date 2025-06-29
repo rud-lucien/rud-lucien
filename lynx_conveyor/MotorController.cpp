@@ -359,7 +359,7 @@ bool moveToPosition(int positionNumber)
 bool moveToPositionMm(double positionMm)
 {
     char msg[200];
-    
+
     // Safety check - prevent movement beyond physical limits
     if (positionMm < 0 || positionMm > MAX_TRAVEL_MM)
     {
@@ -810,9 +810,9 @@ MotorState updateMotorState()
 void printMotorStatus()
 {
     char messageBuffer[800]; // Single buffer for the complete status message
-    
+
     // Determine HLFB status string
-    const char* hlfbStatus;
+    const char *hlfbStatus;
     switch (MOTOR_CONNECTOR.HlfbState())
     {
     case MotorDriver::HLFB_ASSERTED:
@@ -828,7 +828,7 @@ void printMotorStatus()
     }
 
     // Determine alert status
-    const char* alertStatus;
+    const char *alertStatus;
     if (MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
     {
         alertStatus = "Alerts present (see alert details below)";
@@ -842,23 +842,22 @@ void printMotorStatus()
     double accelRpmPerSec = (double)currentAccelMax * 60.0 / PULSES_PER_REV;
 
     // Build the complete status message
-    sprintf(messageBuffer, 
-        "[INFO] Motor Status:\n"
-        "  Enabled: %s\n"
-        "  Moving: %s\n" 
-        "  Position: %ld pulses\n"
-        "  Current Velocity Limit: %.1f RPM\n"
-        "  Current Acceleration Limit: %.1f RPM/s\n"
-        "  HLFB Status: %s\n"
-        "  %s",
-        MOTOR_CONNECTOR.EnableRequest() ? "Yes" : "No",
-        isMotorAtPosition() ? "No" : "Yes", 
-        normalizeEncoderValue(MOTOR_CONNECTOR.PositionRefCommanded()),
-        ppsToRpm(currentVelMax),
-        accelRpmPerSec,
-        hlfbStatus,
-        alertStatus
-    );
+    sprintf(messageBuffer,
+            "[INFO] Motor Status:\n"
+            "  Enabled: %s\n"
+            "  Moving: %s\n"
+            "  Position: %ld pulses\n"
+            "  Current Velocity Limit: %.1f RPM\n"
+            "  Current Acceleration Limit: %.1f RPM/s\n"
+            "  HLFB Status: %s\n"
+            "  %s",
+            MOTOR_CONNECTOR.EnableRequest() ? "Yes" : "No",
+            isMotorAtPosition() ? "No" : "Yes",
+            normalizeEncoderValue(MOTOR_CONNECTOR.PositionRefCommanded()),
+            ppsToRpm(currentVelMax),
+            accelRpmPerSec,
+            hlfbStatus,
+            alertStatus);
 
     // Send the complete status message
     Console.print(messageBuffer);
@@ -872,9 +871,9 @@ void printMotorStatus()
 
 void printMotorAlerts()
 {
-    char messageBuffer[400]; // Single buffer for alert messages
+    char messageBuffer[400];  // Single buffer for alert messages
     char alertList[300] = ""; // Build list of active alerts
-    
+
     if (MOTOR_CONNECTOR.AlertReg().bit.MotionCanceledInAlert)
     {
         strcat(alertList, "    MotionCanceledInAlert\n");
@@ -899,14 +898,14 @@ void printMotorAlerts()
     {
         strcat(alertList, "    MotorFaulted\n");
     }
-    
+
     // Remove the trailing newline if present
     int len = strlen(alertList);
-    if (len > 0 && alertList[len-1] == '\n')
+    if (len > 0 && alertList[len - 1] == '\n')
     {
-        alertList[len-1] = '\0';
+        alertList[len - 1] = '\0';
     }
-    
+
     sprintf(messageBuffer, "  Alert Details:\n%s", alertList);
     Console.serialError(messageBuffer);
 }
@@ -1413,8 +1412,8 @@ void checkMoveProgress()
                     lastSetVelocity = newVelocity;
 
                     // Optional: Log velocity changes (for debugging)
-                    // sprintf(msg, "[DECEL] Distance: %.2fmm, Velocity: %d RPM, Position: %.2fmm (%ld pulses), Target: %.2fmm, HLFB: %s, Moving: %s, Direction: %s, Delta: %d RPM", 
-                    //         distanceToTargetMm, 
+                    // sprintf(msg, "[DECEL] Distance: %.2fmm, Velocity: %d RPM, Position: %.2fmm (%ld pulses), Target: %.2fmm, HLFB: %s, Moving: %s, Direction: %s, Delta: %d RPM",
+                    //         distanceToTargetMm,
                     //         (int)ppsToRpm(newVelocity),
                     //         pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded()),
                     //         MOTOR_CONNECTOR.PositionRefCommanded(),
@@ -1591,7 +1590,7 @@ int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVeloci
             // For long moves, use a longer deceleration distance (2x normal)
             longMoveDecelStartDistance = min(moveDistance * 0.3f, 150.0f);
 
-            // sprintf(msg, "[DECEL] Long move detected (%.2fmm) - Deceleration starts at %.2fmm from target", 
+            // sprintf(msg, "[DECEL] Long move detected (%.2fmm) - Deceleration starts at %.2fmm from target",
             //         totalMoveDistance, longMoveDecelStartDistance);
             // Console.serialDiagnostic(msg);
         }
@@ -1615,9 +1614,10 @@ int32_t calculateDeceleratedVelocity(float distanceToTargetMm, int32_t maxVeloci
             int32_t targetVelocity = minVelocityPPS + ratio * (maxVelocity - minVelocityPPS);
 
             // Additional logging to track deceleration
-            if (distanceToTargetMm < 50.0f && (int)distanceToTargetMm % 10 == 0) {
+            if (distanceToTargetMm < 50.0f && (int)distanceToTargetMm % 10 == 0)
+            {
                 // char msg[100];
-                // sprintf(msg, "[DECEL] Long move: %.2fmm to target, Velocity: %d RPM", 
+                // sprintf(msg, "[DECEL] Long move: %.2fmm to target, Velocity: %d RPM",
                 //         distanceToTargetMm, (int)ppsToRpm(targetVelocity));
                 // Console.serialDiagnostic(msg);
             }

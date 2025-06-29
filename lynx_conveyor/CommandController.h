@@ -4,7 +4,7 @@
 //=============================================================================
 // INCLUDES
 //=============================================================================
-#include "Commands.h" 
+#include "Commands.h"
 #include "EthernetController.h"
 #include "OutputManager.h"
 #include "Utils.h"
@@ -23,15 +23,16 @@ enum CommandType
 };
 
 // Command lookup table structure
-struct CommandInfo {
-    const char* name;
+struct CommandInfo
+{
+    const char *name;
     CommandType type;
-    uint8_t flags;  // Bit flags for command properties
+    uint8_t flags; // Bit flags for command properties
 };
 
 // Command flags
-#define CMD_FLAG_ASYNC      0x01  // Command is asynchronous
-#define CMD_FLAG_NO_HISTORY 0x02  // Command should not be logged to history
+#define CMD_FLAG_ASYNC 0x01      // Command is asynchronous
+#define CMD_FLAG_NO_HISTORY 0x02 // Command should not be logged to history
 
 //=============================================================================
 // GLOBAL VARIABLES
@@ -47,7 +48,7 @@ extern bool testInProgress;
 extern volatile bool testAbortRequested;
 
 // Client tracking for async operations
-extern Stream* persistentClient;
+extern Stream *persistentClient;
 
 //=============================================================================
 // FUNCTION DECLARATIONS
@@ -56,7 +57,7 @@ extern Stream* persistentClient;
 void initTestFlags();
 
 // Command Processing
-bool processCommand(const char* rawCommand, Stream* output, const char* sourceTag = nullptr);
+bool processCommand(const char *rawCommand, Stream *output, const char *sourceTag = nullptr);
 void handleSerialCommands();
 void handleEthernetCommands();
 
@@ -65,7 +66,7 @@ CommandType getCommandType(const char *command);
 bool canExecuteCommand(const char *command);
 
 // Client Management
-Stream* getPersistentClient();
+Stream *getPersistentClient();
 void clearPersistentClient();
 
 // Utility Functions
@@ -73,7 +74,7 @@ const char *getOperationTypeName(int type);
 char *trimLeadingSpaces(char *str);
 void sendCommandRejection(const char *command, const char *reason);
 void requestTestAbort(const char *source);
-const CommandInfo* findCommand(const char* cmdName);
-bool isCommandExcludedFromHistory(const char *command); 
+const CommandInfo *findCommand(const char *cmdName);
+bool isCommandExcludedFromHistory(const char *command);
 
 #endif // COMMAND_CONTROLLER_H

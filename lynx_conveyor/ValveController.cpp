@@ -65,56 +65,64 @@ void initSensorSystem()
     Console.serialInfo(F("Sensor system initialized"));
 }
 
-void initPressureSensor() {
+void initPressureSensor()
+{
     // Initialize the pressure sensor
     airPressureSensor.analogPin = PRESSURE_SENSOR_PIN;
     airPressureSensor.minPressure = 0.0f;
     airPressureSensor.maxPressure = MAX_PRESSURE;
-    
+
     // Set the resolution of the ADC for better precision
     analogReadResolution(12); // 12-bit resolution for more precise readings
-    
+
     Console.serialInfo(F("Pressure sensor initialized on pin A11"));
-    
+
     // Read and report the initial pressure
     float initialPressure = readPressure(airPressureSensor);
     char msg[200];
     sprintf(msg, "Initial system pressure: %.2f PSI", initialPressure);
     Console.serialInfo(msg);
-    
+
     // Check if pressure is sufficient for valve operation
-    if (!isPressureSufficient()) {
+    if (!isPressureSufficient())
+    {
         Console.serialWarning(F("System pressure below minimum threshold (21.75 PSI) - Valve operations may be unreliable"));
     }
 }
 
 // Implement the pressure reading functions:
-float readPressureVoltage(const PressureSensor &sensor) {
+float readPressureVoltage(const PressureSensor &sensor)
+{
     int analogValue = analogRead(sensor.analogPin);
-    return (analogValue / 4095.0) * 10.0;  // For 12-bit resolution (4095)
+    return (analogValue / 4095.0) * 10.0; // For 12-bit resolution (4095)
 }
 
-float readPressure(const PressureSensor &sensor) {
+float readPressure(const PressureSensor &sensor)
+{
     float voltage = readPressureVoltage(sensor);
     return (voltage / 10.0) * sensor.maxPressure;
 }
 
-float getPressurePsi() {
+float getPressurePsi()
+{
     return readPressure(airPressureSensor);
 }
 
-bool isPressureSufficient() {
+bool isPressureSufficient()
+{
     float currentPressure = readPressure(airPressureSensor);
     return currentPressure >= MIN_SAFE_PRESSURE;
 }
 
-void printPressureStatus() {
+void printPressureStatus()
+{
     char msg[200];
     float currentPressure = readPressure(airPressureSensor);
     sprintf(msg, "Air Pressure: %.2f PSI", currentPressure);
     Console.serialInfo(msg);
-    
-    if (currentPressure < MIN_SAFE_PRESSURE) {
+
+    if (currentPressure < MIN_SAFE_PRESSURE)
+    {
         Console.serialWarning(F("Pressure below minimum threshold for safe valve operation (21.75 PSI)"));
     }
 }
@@ -126,7 +134,6 @@ void initValveSystem(bool hasCCIOBoard)
 
     // Initialize the pressure sensor regardless of CCIO status
     initPressureSensor();
-
 
     if (!hasCCIO)
     {
@@ -206,9 +213,10 @@ void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target)
     }
 
     // Check if pressure is sufficient before actuating the valve
-    if (!isPressureSufficient()) {
+    if (!isPressureSufficient())
+    {
         char msg[200];
-        sprintf(msg, "Cannot actuate valve - System pressure too low. Current: %.2f PSI, Minimum required: %.2f PSI", 
+        sprintf(msg, "Cannot actuate valve - System pressure too low. Current: %.2f PSI, Minimum required: %.2f PSI",
                 readPressure(airPressureSensor), MIN_SAFE_PRESSURE);
         Console.serialError(msg);
         return;
@@ -270,7 +278,7 @@ bool sensorRead(CylinderSensor &sensor)
 void printValveStatus(const DoubleSolenoidValve &valve, const char *valveName)
 {
     char msg[200];
-    sprintf(msg, " %s: %s", valveName, 
+    sprintf(msg, " %s: %s", valveName,
             valve.position == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
     Console.serialDiagnostic(msg);
 }
@@ -281,7 +289,7 @@ void printSensorStatus(const CylinderSensor &sensor, const char *sensorName)
     bool sensorState = sensorRead(const_cast<CylinderSensor &>(sensor));
 
     // IMPORTANT: TRUE means UNLOCKED, FALSE means LOCKED
-    sprintf(msg, " %s Sensor: %s", sensorName, 
+    sprintf(msg, " %s Sensor: %s", sensorName,
             sensorState ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
     Console.serialDiagnostic(msg);
 }
@@ -365,31 +373,37 @@ bool safeValveOperation(DoubleSolenoidValve &valve, CylinderSensor &sensor,
     bool success = waitForSensor(sensor, expectedSensorState, timeoutMs);
 
     // If operation failed, record it with valve type and position info
-    if (!success) {
+    if (!success)
+    {
         // Determine valve type and position
-        const char* valveType = "unknown";
+        const char *valveType = "unknown";
         int valvePosition = 0;
-        
+
         // Compare valve address to determine which valve it is
-        if (&valve == getTray1Valve()) {
+        if (&valve == getTray1Valve())
+        {
             valveType = "tray";
             valvePosition = 1;
-        } 
-        else if (&valve == getTray2Valve()) {
+        }
+        else if (&valve == getTray2Valve())
+        {
             valveType = "tray";
             valvePosition = 2;
         }
-        else if (&valve == getTray3Valve()) {
+        else if (&valve == getTray3Valve())
+        {
             valveType = "tray";
             valvePosition = 3;
         }
-        else if (&valve == getShuttleValve()) {
+        else if (&valve == getShuttleValve())
+        {
             valveType = "shuttle";
             valvePosition = 0;
         }
-        
+
         // Record the failure based on operation type
-        if (targetPosition == VALVE_POSITION_LOCK) {
+        if (targetPosition == VALVE_POSITION_LOCK)
+        {
             // Call the function to record a lock failure
             lastLockOperationFailed = true;
             lastLockFailureDetails = F("Failed to lock ");
@@ -397,8 +411,10 @@ bool safeValveOperation(DoubleSolenoidValve &valve, CylinderSensor &sensor,
             lastLockFailureDetails += F(" at position ");
             lastLockFailureDetails += String(valvePosition);
             lastLockFailureDetails += F(" - sensor didn't confirm");
-            lockFailureTimestamp = millis();  // Record the timestamp
-        } else {
+            lockFailureTimestamp = millis(); // Record the timestamp
+        }
+        else
+        {
             // Call the function to record an unlock failure
             lastUnlockOperationFailed = true;
             lastUnlockFailureDetails = F("Failed to unlock ");
@@ -406,16 +422,15 @@ bool safeValveOperation(DoubleSolenoidValve &valve, CylinderSensor &sensor,
             lastUnlockFailureDetails += F(" at position ");
             lastUnlockFailureDetails += String(valvePosition);
             lastUnlockFailureDetails += F(" - sensor didn't confirm");
-            unlockFailureTimestamp = millis();  // Record the timestamp
+            unlockFailureTimestamp = millis(); // Record the timestamp
         }
-        
+
         char msg[200];
-        sprintf(msg, "Valve operation failed: %s", 
-                targetPosition == VALVE_POSITION_LOCK ? 
-                lastLockFailureDetails.c_str() : lastUnlockFailureDetails.c_str());
+        sprintf(msg, "Valve operation failed: %s",
+                targetPosition == VALVE_POSITION_LOCK ? lastLockFailureDetails.c_str() : lastUnlockFailureDetails.c_str());
         Console.serialError(msg);
     }
-    
+
     return success;
 }
 
@@ -453,8 +468,6 @@ bool safeUnlockAllValves(unsigned long timeoutMs)
 
     return allSucceeded;
 }
-
-
 
 // Create an array for tray detection sensors for easier batch operations
 CylinderSensor *allTrayDetectSensors[3] = {

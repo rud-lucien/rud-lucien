@@ -21,15 +21,16 @@
 //=============================================================================
 
 // Command tree size
-#define COMMAND_SIZE 15 
+#define COMMAND_SIZE 15
 
 // Structure for subcommand lookup
-struct SubcommandInfo {
-    const char* name;  // Subcommand name
-    int code;          // Command code for switch statement
+struct SubcommandInfo
+{
+    const char *name; // Subcommand name
+    int code;         // Command code for switch statement
 };
 
-int findSubcommandCode(const char* subcommand, const SubcommandInfo* commandTable, size_t tableSize);
+int findSubcommandCode(const char *subcommand, const SubcommandInfo *commandTable, size_t tableSize);
 
 //=============================================================================
 // EXTERNAL REFERENCES
@@ -75,7 +76,7 @@ bool cmd_unlock(char *args, CommandCaller *caller);
 bool cmd_log(char *args, CommandCaller *caller);
 bool cmd_system_state(char *args, CommandCaller *caller); // New state command
 bool cmd_test(char *args, CommandCaller *caller);         // Test command for diagnostics
-bool cmd_network(char *args, CommandCaller *caller); // Network configuration command
+bool cmd_network(char *args, CommandCaller *caller);      // Network configuration command
 
 //-----------------------------------------------------------------------------
 // Encoder Control Commands

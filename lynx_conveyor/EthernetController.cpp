@@ -8,9 +8,9 @@ char ethernetCommandBuffer[MAX_PACKET_LENGTH];
 unsigned long clientLastActivityTime[MAX_ETHERNET_CLIENTS] = {0};
 
 // Timeout constants (all in milliseconds)
-const unsigned long CLIENT_TIMEOUT_MS = 180000;      // 3 minute inactivity timeout
-const unsigned long PING_TEST_INTERVAL_MS = 120000;   // 2 minute between ping tests
-const unsigned long PING_GRACE_PERIOD_MS = 15000;     // 15 seconds grace before pinging new clients
+const unsigned long CLIENT_TIMEOUT_MS = 180000;           // 3 minute inactivity timeout
+const unsigned long PING_TEST_INTERVAL_MS = 120000;       // 2 minute between ping tests
+const unsigned long PING_GRACE_PERIOD_MS = 15000;         // 15 seconds grace before pinging new clients
 const unsigned long TEST_CONNECTIONS_INTERVAL_MS = 30000; // 30 seconds for testConnections()
 
 // MAC address for the ClearCore
@@ -174,7 +174,7 @@ void processEthernetConnections()
             {
                 // Found a free slot
                 char msg[200];
-                sprintf(msg, "[NETWORK] New client connected from %d.%d.%d.%d:%d", 
+                sprintf(msg, "[NETWORK] New client connected from %d.%d.%d.%d:%d",
                         newClient.remoteIP()[0], newClient.remoteIP()[1],
                         newClient.remoteIP()[2], newClient.remoteIP()[3],
                         newClient.remotePort());

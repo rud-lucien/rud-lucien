@@ -21,9 +21,9 @@
 extern bool testInProgress;
 extern volatile bool testAbortRequested;
 
-bool checkSerialForAbortCommand() ; // Check for 'abort' command in serial buffer
+bool checkSerialForAbortCommand();   // Check for 'abort' command in serial buffer
 bool checkEthernetForAbortCommand(); // Check for 'abort' command in Ethernet buffer
-void requestTestAbort(const char* source);
+void requestTestAbort(const char *source);
 bool handleTestAbort();
 bool testHomingRepeatability(); // Test homing repeatability over multiple cycles
 bool testPositionCycling();     // Test cycling through all positions
