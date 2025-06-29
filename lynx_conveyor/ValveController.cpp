@@ -78,9 +78,9 @@ void initPressureSensor() {
     
     // Read and report the initial pressure
     float initialPressure = readPressure(airPressureSensor);
-    Serial.print(F("[INFO] Initial system pressure: "));
-    Serial.print(initialPressure);
-    Serial.println(F(" PSI"));
+    char msg[200];
+    sprintf(msg, "Initial system pressure: %.2f PSI", initialPressure);
+    Console.serialInfo(msg);
     
     // Check if pressure is sufficient for valve operation
     if (!isPressureSufficient()) {
@@ -109,10 +109,10 @@ bool isPressureSufficient() {
 }
 
 void printPressureStatus() {
+    char msg[200];
     float currentPressure = readPressure(airPressureSensor);
-    Serial.print(F("Air Pressure: "));
-    Serial.print(currentPressure);
-    Serial.println(F(" PSI"));
+    sprintf(msg, "Air Pressure: %.2f PSI", currentPressure);
+    Console.serialInfo(msg);
     
     if (currentPressure < MIN_SAFE_PRESSURE) {
         Console.serialWarning(F("Pressure below minimum threshold for safe valve operation (21.75 PSI)"));
@@ -207,12 +207,10 @@ void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target)
 
     // Check if pressure is sufficient before actuating the valve
     if (!isPressureSufficient()) {
-        Console.serialError(F("Cannot actuate valve - System pressure too low"));
-        Serial.print(F("[INFO] Current pressure: "));
-        Serial.print(readPressure(airPressureSensor));
-        Serial.print(F(" PSI, Minimum required: "));
-        Serial.print(MIN_SAFE_PRESSURE);
-        Serial.println(F(" PSI"));
+        char msg[200];
+        sprintf(msg, "Cannot actuate valve - System pressure too low. Current: %.2f PSI, Minimum required: %.2f PSI", 
+                readPressure(airPressureSensor), MIN_SAFE_PRESSURE);
+        Console.serialError(msg);
         return;
     }
 
@@ -271,22 +269,21 @@ bool sensorRead(CylinderSensor &sensor)
 
 void printValveStatus(const DoubleSolenoidValve &valve, const char *valveName)
 {
-    Console.diagnostic(F(" "));
-    Serial.print(valveName);
-    Serial.print(F(": "));
-    Serial.println(valve.position == VALVE_POSITION_UNLOCK ? F("Unlocked") : F("Locked"));
+    char msg[200];
+    sprintf(msg, " %s: %s", valveName, 
+            valve.position == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
+    Console.serialDiagnostic(msg);
 }
 
 void printSensorStatus(const CylinderSensor &sensor, const char *sensorName)
 {
-    Console.serialDiagnostic(F(" "));
-    Serial.print(sensorName);
-    Serial.print(F(" Sensor: "));
+    char msg[200];
     bool sensorState = sensorRead(const_cast<CylinderSensor &>(sensor));
 
     // IMPORTANT: TRUE means UNLOCKED, FALSE means LOCKED
-    Serial.print(sensorState ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
-    Serial.println();
+    sprintf(msg, " %s Sensor: %s", sensorName, 
+            sensorState ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
+    Console.serialDiagnostic(msg);
 }
 
 // ----------------- Batch operations -----------------
@@ -311,15 +308,11 @@ void printAllValveStatus()
     Console.serialDiagnostic(F(" Current valve positions:"));
 
     // First print pressure status
+    char msg[200];
     float currentPressure = readPressure(airPressureSensor);
-    Serial.print(F(" System Pressure: "));
-    Serial.print(currentPressure);
-    Serial.print(F(" PSI "));
-    if (currentPressure < MIN_SAFE_PRESSURE) {
-        Serial.println(F("(INSUFFICIENT)"));
-    } else {
-        Serial.println(F("(OK)"));
-    }
+    sprintf(msg, " System Pressure: %.2f PSI %s", currentPressure,
+            currentPressure < MIN_SAFE_PRESSURE ? "(INSUFFICIENT)" : "(OK)");
+    Console.serialDiagnostic(msg);
 
     for (int i = 0; i < valveCount; i++)
     {
@@ -349,9 +342,9 @@ bool waitForSensor(CylinderSensor &sensor, bool expectedState, unsigned long tim
         // Replace direct subtraction with timeoutElapsed helper
         if (timeoutElapsed(millis(), startTime, timeoutMs))
         {
-            Serial.print(F("[ERROR] Sensor timeout: waited "));
-            Serial.print(timeoutMs);
-            Serial.println(F("ms for expected state"));
+            char msg[200];
+            sprintf(msg, "Sensor timeout: waited %lu ms for expected state", timeoutMs);
+            Console.serialError(msg);
             return false; // Timeout occurred
         }
         delay(10); // Short delay to prevent excessive CPU usage
@@ -416,9 +409,11 @@ bool safeValveOperation(DoubleSolenoidValve &valve, CylinderSensor &sensor,
             unlockFailureTimestamp = millis();  // Record the timestamp
         }
         
-        Console.print(F("[ERROR] Valve operation failed: "));
-        Console.println(targetPosition == VALVE_POSITION_LOCK ? 
-                     lastLockFailureDetails : lastUnlockFailureDetails);
+        char msg[200];
+        sprintf(msg, "Valve operation failed: %s", 
+                targetPosition == VALVE_POSITION_LOCK ? 
+                lastLockFailureDetails.c_str() : lastUnlockFailureDetails.c_str());
+        Console.serialError(msg);
     }
     
     return success;
@@ -469,13 +464,12 @@ const int trayDetectSensorCount = 3;
 void printTrayDetectionStatus()
 {
     Console.serialDiagnostic(F(" Tray Detection Status:"));
+    char msg[200];
     for (int i = 0; i < trayDetectSensorCount; i++)
     {
         bool trayDetected = sensorRead(*allTrayDetectSensors[i]);
-        Serial.print(F("  Tray "));
-        Serial.print(i + 1);
-        Serial.print(F(": "));
-        Serial.println(trayDetected ? F("DETECTED") : F("Not Present"));
+        sprintf(msg, "  Tray %d: %s", i + 1, trayDetected ? "DETECTED" : "Not Present");
+        Console.serialDiagnostic(msg);
     }
 }
 

@@ -225,24 +225,3 @@ void handleSerialCommands()
     }
 }
 
-/*TODO: implement handleEthernetCommands after setting up ethernet*/
-// void handleEthernetCommands(EthernetClient& client) {
-//     static char commandBuffer[64];
-//     static uint8_t commandIndex = 0;
-
-//     while (client.available()) {
-//         char c = client.read();
-
-//         // Similar logic to handleSerialCommands
-
-//         if (c == '\n') {
-//             commandBuffer[commandIndex] = '\0';
-
-//             // Use ethernetCommand instead of serialCommand
-//             Console.ethernetCommand(commandBuffer);
-
-//             // Rest of the command processing
-//             // ...
-//         }
-//     }
-// }

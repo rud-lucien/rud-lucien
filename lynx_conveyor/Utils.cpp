@@ -74,30 +74,27 @@ bool waitTimeReached(unsigned long current, unsigned long previous, unsigned lon
 // Helper function to print time in a human-readable format
 void printHumanReadableTime(unsigned long secondsAgo)
 {
+    char timeMsg[80];
+    
     if (secondsAgo < 60)
     {
         // Less than a minute
-        Console.print(secondsAgo);
-        Console.print(F(" second"));
-        if (secondsAgo != 1)
-            Console.print(F("s"));
+        sprintf(timeMsg, "%lu second%s", secondsAgo, (secondsAgo != 1) ? "s" : "");
     }
     else if (secondsAgo < 3600)
     {
         // Less than an hour
         unsigned long minutes = secondsAgo / 60;
         unsigned long seconds = secondsAgo % 60;
-        Console.print(minutes);
-        Console.print(F(" minute"));
-        if (minutes != 1)
-            Console.print(F("s"));
         if (seconds > 0)
         {
-            Console.print(F(" "));
-            Console.print(seconds);
-            Console.print(F(" second"));
-            if (seconds != 1)
-                Console.print(F("s"));
+            sprintf(timeMsg, "%lu minute%s %lu second%s", 
+                    minutes, (minutes != 1) ? "s" : "",
+                    seconds, (seconds != 1) ? "s" : "");
+        }
+        else
+        {
+            sprintf(timeMsg, "%lu minute%s", minutes, (minutes != 1) ? "s" : "");
         }
     }
     else if (secondsAgo < 86400)
@@ -105,17 +102,15 @@ void printHumanReadableTime(unsigned long secondsAgo)
         // Less than a day
         unsigned long hours = secondsAgo / 3600;
         unsigned long minutes = (secondsAgo % 3600) / 60;
-        Console.print(hours);
-        Console.print(F(" hour"));
-        if (hours != 1)
-            Console.print(F("s"));
         if (minutes > 0)
         {
-            Console.print(F(" "));
-            Console.print(minutes);
-            Console.print(F(" minute"));
-            if (minutes != 1)
-                Console.print(F("s"));
+            sprintf(timeMsg, "%lu hour%s %lu minute%s", 
+                    hours, (hours != 1) ? "s" : "",
+                    minutes, (minutes != 1) ? "s" : "");
+        }
+        else
+        {
+            sprintf(timeMsg, "%lu hour%s", hours, (hours != 1) ? "s" : "");
         }
     }
     else
@@ -123,19 +118,19 @@ void printHumanReadableTime(unsigned long secondsAgo)
         // More than a day
         unsigned long days = secondsAgo / 86400;
         unsigned long hours = (secondsAgo % 86400) / 3600;
-        Console.print(days);
-        Console.print(F(" day"));
-        if (days != 1)
-            Console.print(F("s"));
         if (hours > 0)
         {
-            Console.print(F(" "));
-            Console.print(hours);
-            Console.print(F(" hour"));
-            if (hours != 1)
-                Console.print(F("s"));
+            sprintf(timeMsg, "%lu day%s %lu hour%s", 
+                    days, (days != 1) ? "s" : "",
+                    hours, (hours != 1) ? "s" : "");
+        }
+        else
+        {
+            sprintf(timeMsg, "%lu day%s", days, (days != 1) ? "s" : "");
         }
     }
+    
+    Console.print(timeMsg);
 }
 
 // Formats time as hours:minutes:seconds since system startup
@@ -403,157 +398,151 @@ SystemState captureSystemState()
 // Print the current system state for diagnostics
 void printSystemState(const SystemState &state)
 {
+    char msg[200];
+    
     Console.println(F("[DIAGNOSTIC] System State:"));
 
     // Motor
-    Console.print(F("  Motor: "));
+    const char* motorStateStr;
     switch (state.motorState)
     {
     case MOTOR_STATE_IDLE:
-        Console.println(F("IDLE"));
+        motorStateStr = "IDLE";
         break;
     case MOTOR_STATE_MOVING:
-        Console.println(F("MOVING"));
+        motorStateStr = "MOVING";
         break;
     case MOTOR_STATE_HOMING:
-        Console.println(F("HOMING"));
+        motorStateStr = "HOMING";
         break;
     case MOTOR_STATE_FAULTED:
-        Console.println(F("FAULTED"));
+        motorStateStr = "FAULTED";
         break;
     case MOTOR_STATE_NOT_READY:
-        Console.println(F("NOT_READY"));
+        motorStateStr = "NOT_READY";
+        break;
+    default:
+        motorStateStr = "UNKNOWN";
         break;
     }
+    sprintf(msg, "  Motor: %s", motorStateStr);
+    Console.println(msg);
 
-    Console.print(F("  Homed: "));
-    Console.println(state.isHomed ? F("YES") : F("NO"));
+    sprintf(msg, "  Homed: %s", state.isHomed ? "YES" : "NO");
+    Console.println(msg);
 
-    Console.print(F("  Position: "));
     if (state.isHomed)
     {
-        Console.print(state.currentPositionMm);
-        Console.println(F(" mm"));
+        sprintf(msg, "  Position: %.2f mm", state.currentPositionMm);
+        Console.println(msg);
     }
     else
     {
-        Console.println(F("UNKNOWN"));
+        Console.println(F("  Position: UNKNOWN"));
     }
 
-    Console.print(F("  HLFB Status: "));
+    const char* hlfbStatusStr;
     switch (state.hlfbStatus)
     {
     case MotorDriver::HLFB_ASSERTED:
-        Console.println(F("ASSERTED (In Position/Ready)"));
+        hlfbStatusStr = "ASSERTED (In Position/Ready)";
         break;
     case MotorDriver::HLFB_DEASSERTED:
-        Console.println(F("DEASSERTED (Moving/Fault)"));
+        hlfbStatusStr = "DEASSERTED (Moving/Fault)";
         break;
     case MotorDriver::HLFB_UNKNOWN:
     default:
-        Console.println(F("UNKNOWN"));
+        hlfbStatusStr = "UNKNOWN";
         break;
     }
+    sprintf(msg, "  HLFB Status: %s", hlfbStatusStr);
+    Console.println(msg);
 
     // Cylinder sensors (raw readings)
     Console.println(F("\n  Cylinder Sensors:"));
-    Console.print(F("    Tray 1: "));
-    Console.println(state.tray1CylinderActivated ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
-
-    Console.print(F("    Tray 2: "));
-    Console.println(state.tray2CylinderActivated ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
-
-    Console.print(F("    Tray 3: "));
-    Console.println(state.tray3CylinderActivated ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
-
-    Console.print(F("    Shuttle: "));
-    Console.println(state.shuttleCylinderActivated ? F("ACTIVATED (UNLOCKED)") : F("NOT ACTIVATED (LOCKED)"));
+    sprintf(msg, "    Tray 1: %s", state.tray1CylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
+    Console.println(msg);
+    
+    sprintf(msg, "    Tray 2: %s", state.tray2CylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
+    Console.println(msg);
+    
+    sprintf(msg, "    Tray 3: %s", state.tray3CylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
+    Console.println(msg);
+    
+    sprintf(msg, "    Shuttle: %s", state.shuttleCylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
+    Console.println(msg);
 
     // Lock states (derived from sensor readings)
     Console.println(F("\n  Lock States:"));
-    Console.print(F("    Tray 1: "));
-    Console.println(state.tray1Locked ? F("LOCKED") : F("UNLOCKED"));
-
-    Console.print(F("    Tray 2: "));
-    Console.println(state.tray2Locked ? F("LOCKED") : F("UNLOCKED"));
-
-    Console.print(F("    Tray 3: "));
-    Console.println(state.tray3Locked ? F("LOCKED") : F("UNLOCKED"));
-
-    Console.print(F("    Shuttle: "));
-    Console.println(state.shuttleLocked ? F("LOCKED") : F("UNLOCKED"));
+    sprintf(msg, "    Tray 1: %s", state.tray1Locked ? "LOCKED" : "UNLOCKED");
+    Console.println(msg);
+    
+    sprintf(msg, "    Tray 2: %s", state.tray2Locked ? "LOCKED" : "UNLOCKED");
+    Console.println(msg);
+    
+    sprintf(msg, "    Tray 3: %s", state.tray3Locked ? "LOCKED" : "UNLOCKED");
+    Console.println(msg);
+    
+    sprintf(msg, "    Shuttle: %s", state.shuttleLocked ? "LOCKED" : "UNLOCKED");
+    Console.println(msg);
 
     // Tray presence detection
     Console.println(F("\n  Tray Detection:"));
-    Console.print(F("    Position 1: "));
-    Console.println(state.tray1Present ? F("TRAY PRESENT") : F("NO TRAY"));
-
-    Console.print(F("    Position 2: "));
-    Console.println(state.tray2Present ? F("TRAY PRESENT") : F("NO TRAY"));
-
-    Console.print(F("    Position 3: "));
-    Console.println(state.tray3Present ? F("TRAY PRESENT") : F("NO TRAY"));
+    sprintf(msg, "    Position 1: %s", state.tray1Present ? "TRAY PRESENT" : "NO TRAY");
+    Console.println(msg);
+    
+    sprintf(msg, "    Position 2: %s", state.tray2Present ? "TRAY PRESENT" : "NO TRAY");
+    Console.println(msg);
+    
+    sprintf(msg, "    Position 3: %s", state.tray3Present ? "TRAY PRESENT" : "NO TRAY");
+    Console.println(msg);
 
     // Safety systems
     Console.println(F("\n  Safety Systems:"));
-    Console.print(F("    E-Stop: "));
-    Console.println(state.eStopActive ? F("ACTIVE (Emergency Stop)") : F("INACTIVE (Normal Operation)"));
+    sprintf(msg, "    E-Stop: %s", state.eStopActive ? "ACTIVE (Emergency Stop)" : "INACTIVE (Normal Operation)");
+    Console.println(msg);
 
     // Hardware status
     Console.println(F("\n  Hardware Status:"));
-    Console.print(F("    CCIO Board: "));
-    Console.println(state.ccioBoardPresent ? F("PRESENT") : F("NOT DETECTED"));
+    sprintf(msg, "    CCIO Board: %s", state.ccioBoardPresent ? "PRESENT" : "NOT DETECTED");
+    Console.println(msg);
 
-    // network status
-    Console.print(F("    Network Clients: "));
-    Console.print(getConnectedClientCount());
-    Console.println(F(" connected"));
+    sprintf(msg, "    Network Clients: %d connected", getConnectedClientCount());
+    Console.println(msg);
 
     // Pneumatic system status
-    Console.print(F("    Pneumatic System: "));
     float pressure = getPressurePsi();
-    Console.print(pressure);
-    Console.print(F(" PSI "));
-    if (pressure < MIN_SAFE_PRESSURE)
-    {
-        Console.println(F("(INSUFFICIENT)"));
-    }
-    else
-    {
-        Console.println(F("(OK)"));
-    }
+    sprintf(msg, "    Pneumatic System: %.1f PSI %s", pressure, 
+            (pressure < MIN_SAFE_PRESSURE) ? "(INSUFFICIENT)" : "(OK)");
+    Console.println(msg);
 
-    // summary of critical safety conditions
+    // Summary of critical safety conditions
     Console.println(F("\n  Safety Summary:"));
 
     // Check if any tray is locked while motor is moving
     bool unsafeMotion = state.motorState == MOTOR_STATE_MOVING &&
                         (state.tray1Locked || state.tray2Locked || state.tray3Locked);
-    Console.print(F("    Safe Motion: "));
-    Console.println(unsafeMotion ? F("NO - TRAYS LOCKED DURING MOTION") : F("YES"));
+    sprintf(msg, "    Safe Motion: %s", unsafeMotion ? "NO - TRAYS LOCKED DURING MOTION" : "YES");
+    Console.println(msg);
 
     // Check for missing trays that are locked
     bool missingTraysLocked = (state.tray1Locked && !state.tray1Present) ||
                               (state.tray2Locked && !state.tray2Present) ||
                               (state.tray3Locked && !state.tray3Present);
-    Console.print(F("    Tray/Lock Mismatch: "));
-    Console.println(missingTraysLocked ? F("YES - LOCK WITHOUT TRAY") : F("NO"));
+    sprintf(msg, "    Tray/Lock Mismatch: %s", missingTraysLocked ? "YES - LOCK WITHOUT TRAY" : "NO");
+    Console.println(msg);
 
     // Encoder status
     Console.println(F("\n  MPG Handwheel:"));
-    Console.print(F("    Status: "));
-    Console.println(encoderControlActive ? F("ENABLED") : F("DISABLED"));
+    sprintf(msg, "    Status: %s", encoderControlActive ? "ENABLED" : "DISABLED");
+    Console.println(msg);
 
     if (encoderControlActive)
     {
-        Console.print(F("    Multiplier: x"));
-        Console.print(getMultiplierName(currentMultiplier));
-        Console.print(F(" ("));
-
         // Calculate how much one full rotation moves (100 pulses typical for MPG handwheels)
         double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-        Console.print(mmPerRotation, 2);
-        Console.println(F(" mm/rotation)"));
+        sprintf(msg, "    Multiplier: x%s (%.2f mm/rotation)", getMultiplierName(currentMultiplier), mmPerRotation);
+        Console.println(msg);
     }
 
     Console.println(F("-------------------------------------------"));
@@ -1277,433 +1266,373 @@ SafetyValidationResult validateSafety(const SystemState &state)
 // Function to print out safety validation results
 void printSafetyStatus(const SafetyValidationResult &result)
 {
+    char msg[300];
+    
     Console.println(F("[SAFETY] Validation Results:"));
 
     // Movement safety
-    Console.print(F("  Motor Movement: "));
     if (result.safeToMove)
     {
-        Console.println(F("SAFE - System ready for movement"));
+        Console.println(F("  Motor Movement: SAFE - System ready for movement"));
     }
     else
     {
-        Console.print(F("UNSAFE - "));
-        Console.println(result.moveUnsafeReason);
+        sprintf(msg, "  Motor Movement: UNSAFE - %s", result.moveUnsafeReason.c_str());
+        Console.println(msg);
     }
 
     // Pneumatic pressure safety status
-    Console.print(F("  Pneumatic System: "));
     if (result.pneumaticPressureSufficient)
     {
-        Console.print(F("SAFE - "));
-        Console.print(getPressurePsi());
-        Console.println(F(" PSI (sufficient pressure for valve operations)"));
+        sprintf(msg, "  Pneumatic System: SAFE - %.1f PSI (sufficient pressure for valve operations)", getPressurePsi());
+        Console.println(msg);
     }
     else
     {
-        Console.print(F("UNSAFE - "));
-        Console.println(result.pressureUnsafeReason);
-        Console.print(F("    Current pressure: "));
-        Console.print(getPressurePsi());
-        Console.print(F(" PSI, Minimum required: "));
-        Console.println(MIN_SAFE_PRESSURE);
+        sprintf(msg, "  Pneumatic System: UNSAFE - %s", result.pressureUnsafeReason.c_str());
+        Console.println(msg);
+        sprintf(msg, "    Current pressure: %.1f PSI, Minimum required: %.1f", getPressurePsi(), MIN_SAFE_PRESSURE);
+        Console.println(msg);
     }
 
     // Tray locking safety with enhanced safety messages
     Console.println(F("  Tray Locking:"));
-    Console.print(F("    Tray 1: "));
+    
+    // Helper function to get tray lock status message
+    auto getTrayLockMessage = [](bool safe, bool operationInProgress, int operationType) -> const char* {
+        if (!safe) return nullptr; // Will be handled separately
+        if (operationInProgress && operationType == OPERATION_LOADING)
+            return "SAFE TO LOCK - Part of loading sequence";
+        else if (operationInProgress && operationType == OPERATION_UNLOADING)
+            return "SAFE TO LOCK - Part of unloading sequence";
+        else
+            return "SAFE TO LOCK - Tray present and system ready";
+    };
+    
     if (result.safeToLockTray1)
     {
-        // Enhanced message with contextual information
-        if (operationInProgress && currentOperation.type == OPERATION_LOADING)
-        {
-            Console.println(F("SAFE TO LOCK - Part of loading sequence"));
-        }
-        else if (operationInProgress && currentOperation.type == OPERATION_UNLOADING)
-        {
-            Console.println(F("SAFE TO LOCK - Part of unloading sequence"));
-        }
-        else
-        {
-            Console.println(F("SAFE TO LOCK - Tray present and system ready"));
-        }
+        sprintf(msg, "    Tray 1: %s", getTrayLockMessage(true, operationInProgress, currentOperation.type));
+        Console.println(msg);
     }
     else
     {
-        Console.print(F("UNSAFE TO LOCK - "));
-        Console.println(result.tray1LockUnsafeReason);
+        sprintf(msg, "    Tray 1: UNSAFE TO LOCK - %s", result.tray1LockUnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    Console.print(F("    Tray 2: "));
     if (result.safeToLockTray2)
     {
-        // Enhanced message with contextual information
-        if (operationInProgress && currentOperation.type == OPERATION_LOADING)
-        {
-            Console.println(F("SAFE TO LOCK - Part of loading sequence"));
-        }
-        else if (operationInProgress && currentOperation.type == OPERATION_UNLOADING)
-        {
-            Console.println(F("SAFE TO LOCK - Part of unloading sequence"));
-        }
-        else
-        {
-            Console.println(F("SAFE TO LOCK - Tray present and system ready"));
-        }
+        sprintf(msg, "    Tray 2: %s", getTrayLockMessage(true, operationInProgress, currentOperation.type));
+        Console.println(msg);
     }
     else
     {
-        Console.print(F("UNSAFE TO LOCK - "));
-        Console.println(result.tray2LockUnsafeReason);
+        sprintf(msg, "    Tray 2: UNSAFE TO LOCK - %s", result.tray2LockUnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    Console.print(F("    Tray 3: "));
     if (result.safeToLockTray3)
     {
-        // Enhanced message with contextual information
-        if (operationInProgress && currentOperation.type == OPERATION_LOADING)
-        {
-            Console.println(F("SAFE TO LOCK - Part of loading sequence"));
-        }
-        else if (operationInProgress && currentOperation.type == OPERATION_UNLOADING)
-        {
-            Console.println(F("SAFE TO LOCK - Part of unloading sequence"));
-        }
-        else
-        {
-            Console.println(F("SAFE TO LOCK - Tray present and system ready"));
-        }
+        sprintf(msg, "    Tray 3: %s", getTrayLockMessage(true, operationInProgress, currentOperation.type));
+        Console.println(msg);
     }
     else
     {
-        Console.print(F("UNSAFE TO LOCK - "));
-        Console.println(result.tray3LockUnsafeReason);
+        sprintf(msg, "    Tray 3: UNSAFE TO LOCK - %s", result.tray3LockUnsafeReason.c_str());
+        Console.println(msg);
     }
 
     // Shuttle actuation safety
     Console.println(F("  Shuttle Control:"));
-    Console.print(F("    Lock: "));
+    
     if (result.safeToLockShuttle)
     {
-        // Enhanced shuttle lock message
         if (operationInProgress && currentOperation.type == OPERATION_LOADING &&
             (currentOperationStep == 2 || currentOperationStep == 3))
         {
-            Console.println(F("SAFE - Part of tray loading sequence"));
+            Console.println(F("    Lock: SAFE - Part of tray loading sequence"));
         }
         else
         {
-            Console.println(F("SAFE - System ready for shuttle locking"));
+            Console.println(F("    Lock: SAFE - System ready for shuttle locking"));
         }
     }
     else
     {
-        Console.print(F("UNSAFE - "));
-        Console.println(result.shuttleLockUnsafeReason);
+        sprintf(msg, "    Lock: UNSAFE - %s", result.shuttleLockUnsafeReason.c_str());
+        Console.println(msg);
     }
-    Console.print(F("    Unlock: "));
+    
     if (result.safeToUnlockShuttle)
     {
-        // Enhanced shuttle unlock message
         if (operationInProgress && currentOperation.type == OPERATION_LOADING &&
             (currentOperationStep == 4 || currentOperationStep == 5))
         {
-            Console.println(F("SAFE - Part of tray loading sequence"));
+            Console.println(F("    Unlock: SAFE - Part of tray loading sequence"));
         }
         else
         {
-            Console.println(F("SAFE - System ready for shuttle unlocking"));
+            Console.println(F("    Unlock: SAFE - System ready for shuttle unlocking"));
         }
     }
     else
     {
-        Console.print(F("UNSAFE - "));
-        Console.println(result.shuttleUnlockUnsafeReason);
+        sprintf(msg, "    Unlock: UNSAFE - %s", result.shuttleUnlockUnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    // Add this new section for lock/unlock operation status
+    // Lock/unlock operation status
     Console.println(F("\n  Lock/Unlock Operations:"));
-    Console.print(F("    Lock Operations: "));
+    
     if (result.lockOperationSuccessful)
     {
-        Console.println(F("SUCCESSFUL - No recent lock failures"));
+        Console.println(F("    Lock Operations: SUCCESSFUL - No recent lock failures"));
     }
     else
     {
-        Console.print(F("FAILED - "));
-        Console.println(result.lockFailureDetails);
+        sprintf(msg, "    Lock Operations: FAILED - %s", result.lockFailureDetails.c_str());
+        Console.println(msg);
 
-        // Add timestamp if available
         if (lockFailureTimestamp > 0)
         {
             unsigned long elapsedTime = timeDiff(millis(), lockFailureTimestamp) / 1000;
-            Console.print(F("              Failure occurred "));
-            Console.print(elapsedTime);
-            Console.println(F(" seconds ago"));
+            sprintf(msg, "              Failure occurred %lu seconds ago", elapsedTime);
+            Console.println(msg);
         }
     }
 
-    Console.print(F("    Unlock Operations: "));
     if (result.unlockOperationSuccessful)
     {
-        Console.println(F("SUCCESSFUL - No recent unlock failures"));
+        Console.println(F("    Unlock Operations: SUCCESSFUL - No recent unlock failures"));
     }
     else
     {
-        Console.print(F("FAILED - "));
-        Console.println(result.unlockFailureDetails);
+        sprintf(msg, "    Unlock Operations: FAILED - %s", result.unlockFailureDetails.c_str());
+        Console.println(msg);
 
-        // Add timestamp if available
         if (unlockFailureTimestamp > 0)
         {
             unsigned long elapsedTime = timeDiff(millis(), unlockFailureTimestamp) / 1000;
-            Console.print(F("              Failure occurred "));
-            Console.print(elapsedTime);
-            Console.println(F(" seconds ago"));
+            sprintf(msg, "              Failure occurred %lu seconds ago", elapsedTime);
+            Console.println(msg);
         }
     }
 
-    // Also update the system summary section to include lock/unlock status
     if (!result.lockOperationSuccessful || !result.unlockOperationSuccessful)
     {
-        Console.print(F("    Recovery: Use 'tray,released' or 'tray,gripped' to retry "));
-        Console.println(F("the operation, or 'system,reset' to clear the alert"));
+        Console.println(F("    Recovery: Use 'tray,released' or 'tray,gripped' to retry the operation, or 'system,reset' to clear the alert"));
     }
 
-    // Continue with existing code for System State Validation
+    // System State Validation
     Console.println(F("\n  System State Validation:"));
 
     // Command/Actual State
-    Console.print(F("    Command/Actual State: "));
     if (result.commandStateValid)
     {
-        Console.println(F("VALID - System position matches commanded position"));
+        Console.println(F("    Command/Actual State: VALID - System position matches commanded position"));
     }
     else
     {
-        Console.print(F("INVALID - "));
-        Console.println(result.stateValidationMessage);
+        sprintf(msg, "    Command/Actual State: INVALID - %s", result.stateValidationMessage.c_str());
+        Console.println(msg);
     }
 
     // Tray Positions
-    Console.print(F("    Tray Positions: "));
     if (result.trayPositionValid)
     {
-        Console.println(F("VALID - Tray presence matches expected positions"));
+        Console.println(F("    Tray Positions: VALID - Tray presence matches expected positions"));
     }
     else
     {
-        Console.print(F("INVALID - "));
-        Console.println(result.stateValidationMessage);
+        sprintf(msg, "    Tray Positions: INVALID - %s", result.stateValidationMessage.c_str());
+        Console.println(msg);
     }
 
     // Target Position
-    Console.print(F("    Target Position: "));
     if (result.targetPositionValid)
     {
         if (hasCurrentTarget)
         {
-            Console.print(F("VALID - Target position "));
-            Console.print(currentTargetPositionMm);
-            Console.println(F(" mm is within safe range"));
+            sprintf(msg, "    Target Position: VALID - Target position %.2f mm is within safe range", currentTargetPositionMm);
+            Console.println(msg);
         }
         else
         {
-            Console.println(F("VALID - No target position currently set"));
+            Console.println(F("    Target Position: VALID - No target position currently set"));
         }
     }
     else
     {
-        Console.print(F("INVALID - "));
-        Console.println(result.stateValidationMessage);
+        sprintf(msg, "    Target Position: INVALID - %s", result.stateValidationMessage.c_str());
+        Console.println(msg);
     }
 
-    // Operational sequence validation with enhanced messages
+    // Operational sequence validation
     Console.println(F("\n  Operational Sequence:"));
-    Console.print(F("    Accept New Commands: "));
+    
     if (result.safeToAcceptNewCommand)
     {
         if (operationInProgress)
         {
-            Console.print(F("SAFE - Current operation: "));
-
-            // Show current operation type and step for context
+            const char* opTypeStr;
             switch (currentOperation.type)
             {
             case OPERATION_LOADING:
-                Console.print(F("LOADING"));
+                opTypeStr = "LOADING";
                 break;
             case OPERATION_UNLOADING:
-                Console.print(F("UNLOADING"));
+                opTypeStr = "UNLOADING";
                 break;
             default:
-                Console.print(F("OTHER"));
+                opTypeStr = "OTHER";
                 break;
             }
-            Console.print(F(" (Step "));
-            Console.print(currentOperationStep);
-            Console.println(F(")"));
+            sprintf(msg, "    Accept New Commands: SAFE - Current operation: %s (Step %d)", opTypeStr, currentOperationStep);
+            Console.println(msg);
         }
         else
         {
-            Console.println(F("SAFE - No operation in progress"));
+            Console.println(F("    Accept New Commands: SAFE - No operation in progress"));
         }
     }
     else
     {
-        Console.print(F("UNSAFE - "));
-        Console.println(result.operationSequenceMessage);
+        sprintf(msg, "    Accept New Commands: UNSAFE - %s", result.operationSequenceMessage.c_str());
+        Console.println(msg);
     }
 
-    Console.print(F("    Operation Timing: "));
     if (result.operationWithinTimeout)
     {
         if (operationInProgress)
         {
-            // Show elapsed time information for active operations
             unsigned long elapsedTime = timeDiff(millis(), operationStartTime);
-            Console.print(F("WITHIN TIMEOUT - Elapsed: "));
-            Console.print(elapsedTime / 1000);
-            Console.print(F("."));
-            Console.print((elapsedTime % 1000) / 100);
-            Console.print(F("s / "));
-            Console.print(operationTimeoutMs / 1000);
-            Console.println(F("s"));
+            sprintf(msg, "    Operation Timing: WITHIN TIMEOUT - Elapsed: %lu.%lu s / %lu s", 
+                    elapsedTime / 1000, (elapsedTime % 1000) / 100, operationTimeoutMs / 1000);
+            Console.println(msg);
         }
         else
         {
-            Console.println(F("WITHIN TIMEOUT - No operation active"));
+            Console.println(F("    Operation Timing: WITHIN TIMEOUT - No operation active"));
         }
     }
     else
     {
-        Console.print(F("TIMEOUT - "));
-        Console.println(result.operationSequenceMessage);
+        sprintf(msg, "    Operation Timing: TIMEOUT - %s", result.operationSequenceMessage.c_str());
+        Console.println(msg);
     }
-    Console.print(F("    Operation Sequence: "));
+    
     if (result.operationSequenceValid)
     {
         if (operationInProgress)
         {
-            Console.print(F("VALID - Current step: "));
-            Console.print(currentOperationStep);
             if (currentOperationStep == expectedOperationStep)
             {
-                Console.println(F(" (as expected)"));
+                sprintf(msg, "    Operation Sequence: VALID - Current step: %d (as expected)", currentOperationStep);
+                Console.println(msg);
             }
             else
             {
-                Console.print(F(" (expected: "));
-                Console.print(expectedOperationStep);
-                Console.println(F(")"));
+                sprintf(msg, "    Operation Sequence: VALID - Current step: %d (expected: %d)", 
+                        currentOperationStep, expectedOperationStep);
+                Console.println(msg);
             }
         }
         else
         {
-            Console.println(F("VALID - No operation in progress"));
+            Console.println(F("    Operation Sequence: VALID - No operation in progress"));
         }
     }
     else
     {
-        Console.print(F("INVALID - "));
-        Console.println(result.operationSequenceMessage);
+        sprintf(msg, "    Operation Sequence: INVALID - %s", result.operationSequenceMessage.c_str());
+        Console.println(msg);
 
-        // Add recovery guidance when appropriate
         if (result.operationSequenceMessage.indexOf(F("sequence mismatch")) >= 0)
         {
             Console.println(F("            Use 'system,reset' to reset the system"));
         }
     }
 
-    // Add detailed tray loading safety information
+    // Tray loading operations
     Console.println(F("\n  Tray Loading Operations:"));
-    Console.print(F("    Position 1: "));
+    
     if (result.safeToLoadTrayToPos1)
     {
-        Console.print(F("SAFE TO LOAD"));
-        // Add context about tray loading sequence
+        const char* loadContext;
         if (trayTracking.totalTraysInSystem == 0)
-        {
-            Console.println(F(" - Ready for first tray"));
-        }
+            loadContext = " - Ready for first tray";
         else if (trayTracking.totalTraysInSystem == 1)
-        {
-            Console.println(F(" - Ready for second tray"));
-        }
+            loadContext = " - Ready for second tray";
         else if (trayTracking.totalTraysInSystem == 2)
-        {
-            Console.println(F(" - Ready for third tray"));
-        }
+            loadContext = " - Ready for third tray";
         else
-        {
-            Console.println(F(" - Ready for tray"));
-        }
+            loadContext = " - Ready for tray";
+            
+        sprintf(msg, "    Position 1: SAFE TO LOAD%s", loadContext);
+        Console.println(msg);
     }
     else
     {
-        Console.print(F("UNSAFE TO LOAD - "));
-        Console.println(result.loadTrayPos1UnsafeReason);
+        sprintf(msg, "    Position 1: UNSAFE TO LOAD - %s", result.loadTrayPos1UnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    Console.print(F("    Position 2: "));
     if (result.safeToLoadTrayToPos2)
     {
-        Console.println(F("SAFE TO LOAD - Direct loading possible"));
+        Console.println(F("    Position 2: SAFE TO LOAD - Direct loading possible"));
     }
     else
     {
-        Console.print(F("UNSAFE TO LOAD - "));
-        Console.println(result.loadTrayPos2UnsafeReason);
+        sprintf(msg, "    Position 2: UNSAFE TO LOAD - %s", result.loadTrayPos2UnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    Console.print(F("    Position 3: "));
     if (result.safeToLoadTrayToPos3)
     {
-        Console.println(F("SAFE TO LOAD - Direct loading possible"));
+        Console.println(F("    Position 3: SAFE TO LOAD - Direct loading possible"));
     }
     else
     {
-        Console.print(F("UNSAFE TO LOAD - "));
-        Console.println(result.loadTrayPos3UnsafeReason);
+        sprintf(msg, "    Position 3: UNSAFE TO LOAD - %s", result.loadTrayPos3UnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    // Add detailed tray unloading safety information
+    // Tray unloading operations
     Console.println(F("\n  Tray Unloading Operations:"));
-    Console.print(F("    Position 1: "));
+    
     if (result.safeToUnloadTrayFromPos1)
     {
-        Console.println(F("SAFE TO UNLOAD - Tray ready for removal"));
+        Console.println(F("    Position 1: SAFE TO UNLOAD - Tray ready for removal"));
     }
     else
     {
-        Console.print(F("UNSAFE TO UNLOAD - "));
-        Console.println(result.unloadTrayPos1UnsafeReason);
+        sprintf(msg, "    Position 1: UNSAFE TO UNLOAD - %s", result.unloadTrayPos1UnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    Console.print(F("    Position 2: "));
     if (result.safeToUnloadTrayFromPos2)
     {
-        Console.println(F("SAFE TO UNLOAD - Tray ready for removal"));
+        Console.println(F("    Position 2: SAFE TO UNLOAD - Tray ready for removal"));
     }
     else
     {
-        Console.print(F("UNSAFE TO UNLOAD - "));
-        Console.println(result.unloadTrayPos2UnsafeReason);
+        sprintf(msg, "    Position 2: UNSAFE TO UNLOAD - %s", result.unloadTrayPos2UnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    Console.print(F("    Position 3: "));
     if (result.safeToUnloadTrayFromPos3)
     {
-        Console.println(F("SAFE TO UNLOAD - Tray ready for removal"));
+        Console.println(F("    Position 3: SAFE TO UNLOAD - Tray ready for removal"));
     }
     else
     {
-        Console.print(F("UNSAFE TO UNLOAD - "));
-        Console.println(result.unloadTrayPos3UnsafeReason);
+        sprintf(msg, "    Position 3: UNSAFE TO UNLOAD - %s", result.unloadTrayPos3UnsafeReason.c_str());
+        Console.println(msg);
     }
 
-    // Add overall system status at the end
+    // System Summary
     Console.println(F("\n  System Summary:"));
+    
     if (result.operationSequenceValid && result.trayPositionValid && result.commandStateValid &&
         (result.targetPositionValid || !operationInProgress))
     {
@@ -1711,23 +1640,21 @@ void printSafetyStatus(const SafetyValidationResult &result)
 
         if (operationInProgress)
         {
-            Console.print(F("    Current Operation: "));
-            // Show current operation type for context
+            const char* opTypeStr;
             switch (currentOperation.type)
             {
             case OPERATION_LOADING:
-                Console.print(F("LOADING"));
+                opTypeStr = "LOADING";
                 break;
             case OPERATION_UNLOADING:
-                Console.print(F("UNLOADING"));
+                opTypeStr = "UNLOADING";
                 break;
             default:
-                Console.print(F("OTHER"));
+                opTypeStr = "OTHER";
                 break;
             }
-            Console.print(F(" (Step "));
-            Console.print(currentOperationStep);
-            Console.println(F(")"));
+            sprintf(msg, "    Current Operation: %s (Step %d)", opTypeStr, currentOperationStep);
+            Console.println(msg);
         }
     }
     else
@@ -1737,29 +1664,28 @@ void printSafetyStatus(const SafetyValidationResult &result)
         if (!result.operationSequenceValid)
         {
             Console.println(F("    Reason: Operation sequence error detected"));
-            Console.print(F("            "));
-            Console.println(result.operationSequenceMessage);
+            sprintf(msg, "            %s", result.operationSequenceMessage.c_str());
+            Console.println(msg);
         }
         else if (!result.trayPositionValid)
         {
             Console.println(F("    Reason: Tray position error detected"));
-            Console.print(F("            "));
-            Console.println(result.stateValidationMessage);
+            sprintf(msg, "            %s", result.stateValidationMessage.c_str());
+            Console.println(msg);
         }
         else if (!result.targetPositionValid && operationInProgress)
         {
             Console.println(F("    Reason: Target position error detected"));
-            Console.print(F("            "));
-            Console.println(result.stateValidationMessage);
+            sprintf(msg, "            %s", result.stateValidationMessage.c_str());
+            Console.println(msg);
         }
         else if (!result.commandStateValid)
         {
             Console.println(F("    Reason: Motor position error detected"));
-            Console.print(F("            "));
-            Console.println(result.stateValidationMessage);
+            sprintf(msg, "            %s", result.stateValidationMessage.c_str());
+            Console.println(msg);
         }
 
-        // Add specific recovery guidance based on detected issues
         Console.println(F("    Recovery: Use 'system,reset' to reset system state and try again"));
     }
 }
@@ -1908,6 +1834,9 @@ void processTrayLoading()
     // Target position based on tray tracking
     static double targetPosition = 0;
     static bool isShuttleNeeded = false;
+    
+    // Single message buffer for all sprintf operations in this function
+    char messageBuffer[150];
 
     switch (currentOperationStep)
     {
@@ -2194,8 +2123,8 @@ void processTrayLoading()
             return;
         }
 
-        Serial.print(F("[INFO] Moving tray to position "));
-        Serial.println(targetPosition);
+        sprintf(messageBuffer, "Moving tray to position %d", targetPosition);
+        Console.serialInfo(messageBuffer);
         // Advance to movement monitoring step
         updateOperationStep(8);
     }
@@ -2240,9 +2169,8 @@ void processTrayLoading()
             if (positionError <= POSITION_WARNING_TOLERANCE)
             {
                 // Close enough to continue - log warning but continue operation
-                Serial.print(F("[WARNING] Position error of "));
-                Serial.print(positionError);
-                Serial.println(F("mm is within tolerance - continuing"));
+                sprintf(messageBuffer, "Position error of %.1fmm is within tolerance - continuing", positionError);
+                Console.serialWarning(messageBuffer);
 
                 // Continue with the loading sequence despite small position error
                 safetyDelayStartTime = currentMillis;
@@ -2252,13 +2180,12 @@ void processTrayLoading()
             {
                 // Major position error - mark as failure but still end the operation
                 Console.error(F("TARGET_POSITION_ERROR"));
-                Serial.print(F("[ERROR] Position error of "));
-                Serial.print(positionError);
-                Serial.println(F("mm exceeds tolerance"));
+                sprintf(messageBuffer, "Position error of %.1fmm exceeds tolerance", positionError);
+                Console.serialError(messageBuffer);
 
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
-                strncpy(currentOperation.message, "[ERROR] TARGET_POSITION_FAILURE", sizeof(currentOperation.message));
+                strncpy(currentOperation.message, "TARGET_POSITION_FAILURE", sizeof(currentOperation.message));
 
                 // CRITICAL: Always call endOperation() to clean up state
                 // This ensures the system doesn't remain in "busy" state
@@ -2378,8 +2305,8 @@ void processTrayLoading()
                 return;
             }
             valveActuationStartTime = currentMillis;
-            Serial.print(F("[INFO] Initiated tray lock valve actuation at position "));
-            Serial.println(targetPosition);
+            sprintf(messageBuffer, "Initiated tray lock valve actuation at position %d", targetPosition);
+            Console.serialInfo(messageBuffer);
         }
         else
         {
@@ -2404,7 +2331,7 @@ void processTrayLoading()
             loadThirdTray();
 
             // Operation complete
-            Serial.println(F("[INFO] Tray loading at position 1 completed successfully"));
+            Console.serialInfo(F("Tray loading at position 1 completed successfully"));
             currentOperation.inProgress = false;
             currentOperation.success = true;
             strncpy(currentOperation.message, "SUCCESS", sizeof(currentOperation.message));
@@ -2480,7 +2407,7 @@ void processTrayLoading()
             Console.serialError(F("Failed to start movement to loading position"));
             currentOperation.inProgress = false;
             currentOperation.success = false;
-            strncpy(currentOperation.message, "[ERROR] RETURN_MOVE_FAILURE", sizeof(currentOperation.message));
+            strncpy(currentOperation.message, "RETURN_MOVE_FAILURE", sizeof(currentOperation.message));
             return;
         }
         // Advance to next step (watching for conveyor return)
@@ -2515,9 +2442,8 @@ void processTrayLoading()
             if (positionError <= POSITION_WARNING_TOLERANCE)
             {
                 // Close enough to continue - log warning but mark operation as successful
-                Serial.print(F("[WARNING] Position error of "));
-                Serial.print(positionError);
-                Serial.println(F("mm is within tolerance - continuing"));
+                sprintf(messageBuffer, "Position error of %.1fmm is within tolerance - continuing", positionError);
+                Console.serialWarning(messageBuffer);
 
                 // Operation complete with warning
                 Console.acknowledge(F("TRAY LOADING COMPLETE"));
@@ -2529,18 +2455,17 @@ void processTrayLoading()
             {
                 // Major position error - mark as failure but still end the operation
                 Console.error(F("POSITION_ERROR"));
-                Serial.print(F("[ERROR] Position error of "));
-                Serial.print(positionError);
-                Serial.println(F("mm exceeds tolerance"));
+                sprintf(messageBuffer, "Position error of %.1fmm exceeds tolerance", positionError);
+                Console.serialError(messageBuffer);
 
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
-                strncpy(currentOperation.message, "[ERROR] RETURN_FAILURE", sizeof(currentOperation.message));
+                strncpy(currentOperation.message, "RETURN_FAILURE", sizeof(currentOperation.message));
             }
 
             // Always output load completed counter regardless of success/failure
-            Serial.print(F("[INFO] Total loads completed: "));
-            Serial.println(trayTracking.totalLoadsCompleted);
+            sprintf(messageBuffer, "Total loads completed: %d", trayTracking.totalLoadsCompleted);
+            Console.serialInfo(messageBuffer);
 
             // CRITICAL: Always call endOperation() to clean up state
             // This ensures the system doesn't remain in "busy" state
@@ -2555,8 +2480,8 @@ void processTrayLoading()
         currentOperation.success = true;
         strncpy(currentOperation.message, "[INFO] SUCCESS", sizeof(currentOperation.message));
 
-        Serial.print(F("[INFO] Total loads completed: "));
-        Serial.println(trayTracking.totalLoadsCompleted);
+        sprintf(messageBuffer, "Total loads completed: %d", trayTracking.totalLoadsCompleted);
+        Console.serialInfo(messageBuffer);
 
         // Ensure tray tracking matches sensor readings
         state = captureSystemState();
@@ -2578,6 +2503,9 @@ void processTrayUnloading()
     // Variables to track which tray is being unloaded
     static double sourcePosition = 0;
     static bool needsMovementToPos1 = false;
+    
+    // Single message buffer for all sprintf operations in this function
+    char messageBuffer[150];
 
     switch (currentOperationStep)
     {
@@ -2725,8 +2653,8 @@ void processTrayUnloading()
             return;
         }
 
-        Serial.print(F("[INFO] Moving to position "));
-        Serial.println(sourcePosition);
+        sprintf(messageBuffer, "Moving to position %d", sourcePosition);
+        Console.serialInfo(messageBuffer);
 
         // Advance to movement monitoring step
         updateOperationStep(3);
@@ -2772,9 +2700,8 @@ void processTrayUnloading()
             if (positionError <= POSITION_WARNING_TOLERANCE)
             {
                 // Close enough to continue - log warning but continue operation
-                Serial.print(F("[WARNING] Position error of "));
-                Serial.print(positionError);
-                Serial.println(F("mm is within tolerance - continuing"));
+                sprintf(messageBuffer, "Position error of %.2fmm is within tolerance - continuing", positionError);
+                Console.serialWarning(messageBuffer);
 
                 // Continue with the unloading sequence despite small position error
                 safetyDelayStartTime = currentMillis;
@@ -2784,13 +2711,12 @@ void processTrayUnloading()
             {
                 // Major position error - mark as failure but still end the operation
                 Console.error(F("SOURCE_POSITION_ERROR"));
-                Serial.print(F("[ERROR] Position error of "));
-                Serial.print(positionError);
-                Serial.println(F("mm exceeds tolerance"));
+                sprintf(messageBuffer, "Position error of %.2fmm exceeds tolerance", positionError);
+                Console.serialError(messageBuffer);
 
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
-                strncpy(currentOperation.message, "[ERROR] SOURCE_POSITION_FAILURE", sizeof(currentOperation.message));
+                strncpy(currentOperation.message, "SOURCE_POSITION_FAILURE", sizeof(currentOperation.message));
 
                 // CRITICAL: Always call endOperation() to clean up state
                 endOperation();
@@ -3019,9 +2945,8 @@ void processTrayUnloading()
             if (positionError <= POSITION_WARNING_TOLERANCE)
             {
                 // Close enough to continue - log warning but mark operation as successful
-                Serial.print(F("[WARNING] Position error of "));
-                Serial.print(positionError);
-                Serial.println(F("mm is within tolerance - continuing"));
+                sprintf(messageBuffer, "Position error of %.2fmm is within tolerance - continuing", positionError);
+                Console.serialWarning(messageBuffer);
 
                 // Continue with the unloading sequence despite small position error
                 safetyDelayStartTime = currentMillis;
@@ -3031,13 +2956,12 @@ void processTrayUnloading()
             {
                 // Major position error - mark as failure but still end the operation
                 Console.error(F("POSITION_ERROR"));
-                Serial.print(F("[ERROR] Position error of "));
-                Serial.print(positionError);
-                Serial.println(F("mm exceeds tolerance"));
+                sprintf(messageBuffer, "Position error of %.2fmm exceeds tolerance", positionError);
+                Console.serialError(messageBuffer);
 
                 currentOperation.inProgress = false;
                 currentOperation.success = false;
-                strncpy(currentOperation.message, "[ERROR] POSITION_FAILURE", sizeof(currentOperation.message));
+                strncpy(currentOperation.message, "POSITION_FAILURE", sizeof(currentOperation.message));
 
                 // CRITICAL: Always call endOperation() to clean up state
                 // This ensures the system doesn't remain in "busy" state
@@ -3340,8 +3264,9 @@ void abortOperation(AbortReason reason)
     motorState = MOTOR_STATE_FAULTED;
 
     // Log the abort with clear reason
-    Serial.print(F("[ABORT] Operation aborted: "));
-    Serial.println(getAbortReasonString(reason));
+    char abortMessage[128];
+    sprintf(abortMessage, "[ABORT] Operation aborted: %s", getAbortReasonString(reason));
+    Console.serialError(abortMessage);
 
     // Update operation status
     currentOperation.inProgress = false;
@@ -3355,7 +3280,7 @@ void abortOperation(AbortReason reason)
     endOperation();
 
     // Provide information about recovery
-    Serial.println(F("[RECOVERY] To reset system and try again, use the 'system,reset' command"));
+    Console.serialInfo(F("[RECOVERY] To reset system and try again, use the 'system,reset' command"));
 }
 
 // Helper function to update operation steps
@@ -3367,8 +3292,9 @@ void updateOperationStep(int newStep)
     expectedOperationStep = newStep;
 
     // For debugging
-    Serial.print(F("[DIAGNOSTIC] Operation step updated: "));
-    Serial.println(newStep);
+    char diagnosticMessage[64];
+    sprintf(diagnosticMessage, "Operation step updated: %d", newStep);
+    Console.serialDiagnostic(diagnosticMessage);
 }
 
 void resetTrayTracking()
@@ -3422,6 +3348,9 @@ void resetSystemState()
 {
     // Track overall reset success
     bool resetSuccessful = true;
+    
+    // Single message buffer for all sprintf operations in this function
+    char messageBuffer[150];
 
     // Call the initialization function to set all variables to default values
     initSystemStateVariables();
@@ -3434,7 +3363,7 @@ void resetSystemState()
     trayTracking.totalUnloadsCompleted = 0;
     trayTracking.lastLoadTime = 0;
     trayTracking.lastUnloadTime = 0;
-    Serial.println(F("[INFO] Tray tracking state reset"));
+    Console.serialInfo(F("Tray tracking state reset"));
 
     // Enhanced fault clearing with retry logic
     if (motorState == MOTOR_STATE_FAULTED)
@@ -3445,9 +3374,8 @@ void resetSystemState()
         const int maxClearAttempts = 3;
 
         // Print initial message about fault clearing attempts
-        Serial.print(F("[INFO] Motor faults detected - will attempt clearing up to "));
-        Serial.print(maxClearAttempts);
-        Serial.println(F(" times"));
+        sprintf(messageBuffer, "Motor faults detected - will attempt clearing up to %d times", maxClearAttempts);
+        Console.serialInfo(messageBuffer);
 
         while (!faultCleared && clearAttempts < maxClearAttempts)
         {
@@ -3455,10 +3383,8 @@ void resetSystemState()
 
             // Initiate fault clearing process
             clearMotorFaults();
-            Serial.print(F("[INFO] Attempt "));
-            Serial.print(clearAttempts);
-            Serial.print(F("/"));
-            Serial.println(maxClearAttempts);
+            sprintf(messageBuffer, "Attempt %d/%d", clearAttempts, maxClearAttempts);
+            Console.serialInfo(messageBuffer);
 
             // Wait for fault clearing to complete
             unsigned long startTime = millis();
@@ -3474,7 +3400,7 @@ void resetSystemState()
             // Check if fault clearing timed out
             if (isFaultClearingInProgress())
             {
-                Serial.println(F("[WARNING] Fault clearing timed out"));
+                Console.serialWarning(F("Fault clearing timed out"));
                 // Force fault clearing process to end
                 faultClearState = FAULT_CLEAR_FINISHED;
                 processFaultClearing(); // Process one more time to finish
@@ -3484,12 +3410,12 @@ void resetSystemState()
             if (!MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
             {
                 faultCleared = true;
-                Serial.println(F("[SUCCESS] Motor faults cleared successfully"));
+                Console.serialInfo(F("[SUCCESS] Motor faults cleared successfully"));
                 break; // Exit the retry loop
             }
             else
             {
-                Serial.println(F("[WARNING] Faults still present after clearing attempt"));
+                Console.serialWarning(F("Faults still present after clearing attempt"));
                 printMotorAlerts();
                 // Add a brief delay between attempts
                 delay(500);
@@ -3498,7 +3424,7 @@ void resetSystemState()
 
         if (!faultCleared)
         {
-            Serial.println(F("[ERROR] Failed to clear motor faults - Try 'motor,clear' command or cycle system power"));
+            Console.serialError(F("Failed to clear motor faults - Try 'motor,clear' command or cycle system power"));
             resetSuccessful = false; // Mark reset as unsuccessful
         }
     }
@@ -3507,30 +3433,30 @@ void resetSystemState()
     if (resetSuccessful && !MOTOR_CONNECTOR.EnableRequest() && !isEStopActive())
     {
         MOTOR_CONNECTOR.EnableRequest(true);
-        Serial.println(F("[INFO] Re-enabling motor"));
+        Console.serialInfo(F("Re-enabling motor"));
     }
 
     // Update motor state if not currently faulted (alerts check is already in the condition)
     if (resetSuccessful && motorState == MOTOR_STATE_FAULTED && !MOTOR_CONNECTOR.StatusReg().bit.AlertsPresent)
     {
         motorState = MOTOR_STATE_IDLE;
-        Serial.println(F("[INFO] Motor state reset to IDLE"));
+        Console.serialInfo(F("Motor state reset to IDLE"));
     }
 
     // Always update tray tracking regardless of motor state
     SystemState state = captureSystemState();
     updateTrayTrackingFromSensors(state);
-    Serial.println(F("[INFO] Tray tracking synchronized with sensors"));
+    Console.serialInfo(F("Tray tracking synchronized with sensors"));
 
     // Log the reset action with appropriate status
     if (resetSuccessful)
     {
-        Serial.println(F("[SUCCESS] System state has been fully reset"));
+        Console.serialInfo(F("[SUCCESS] System state has been fully reset"));
         Console.acknowledge(F("SYSTEM_RESET_COMPLETE"));
     }
     else
     {
-        Serial.println(F("[WARNING] System reset partially completed - motor faults persist"));
+        Console.serialWarning(F("System reset partially completed - motor faults persist"));
         Console.error(F("MOTOR_FAULT_PERSIST"));
     }
 }

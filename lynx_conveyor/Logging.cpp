@@ -7,16 +7,17 @@ const unsigned long DEFAULT_LOG_INTERVAL = 250; // Default interval of 500ms
 
 void logSystemState()
 {
-    Serial.print(F("[LOG] "));
+    char msg[800]; // Large buffer for the complete log message
+    char section[200]; // Buffer for building individual sections
+    
+    strcpy(msg, "[LOG] ");
 
     // 1. VALVES section - Enhanced to include sensor feedback
-    Serial.print(F("Valves: "));
+    strcat(msg, "Valves: ");
     const char *updatedValveNames[4] = {"Lock1", "Lock2", "Lock3", "Shuttle"};
-
-    // Get the appropriate valves and sensors
+    
     DoubleSolenoidValve *valves[4] = {
         getTray1Valve(), getTray2Valve(), getTray3Valve(), getShuttleValve()};
-
     CylinderSensor *sensors[4] = {
         getTray1Sensor(), getTray2Sensor(), getTray3Sensor(), getShuttleSensor()};
 
@@ -24,187 +25,108 @@ void logSystemState()
     {
         if (valves[i])
         {
-            Serial.print(updatedValveNames[i]);
-            Serial.print(F("="));
-
-            // Determine commanded position
             bool isLocked = (valves[i]->position == VALVE_POSITION_LOCK);
-
-            // Read actual sensor state
             bool sensorState = sensorRead(*sensors[i]);
-
-            // Verify if they match (sensor state should be TRUE when locked)
             bool positionVerified = (sensorState == !isLocked);
-
-            // Display position with verification indicator
-            if (isLocked)
-            {
-                Serial.print(positionVerified ? F("LOCKED") : F("LOCKED?"));
-            }
-            else
-            {
-                Serial.print(positionVerified ? F("UNLOCKED") : F("UNLOCKED?"));
-            }
-
-            // Add ? indicator for mismatches
-            if (!positionVerified)
-            {
-                Serial.print(F("[!]"));
-            }
-
-            // Add comma except after last item
-            if (i < valveCount - 1)
-            {
-                Serial.print(F(", "));
-            }
+            
+            sprintf(section, "%s=%s%s%s", 
+                updatedValveNames[i],
+                isLocked ? (positionVerified ? "LOCKED" : "LOCKED?") : (positionVerified ? "UNLOCKED" : "UNLOCKED?"),
+                positionVerified ? "" : "[!]",
+                (i < valveCount - 1) ? ", " : "");
+            strcat(msg, section);
         }
     }
 
     // 2. SENSORS section
-    Serial.print(F(" | Sensors: "));
-    Serial.print(F("Tray1="));
-    Serial.print(sensorRead(tray1DetectSensor) ? F("PRESENT") : F("EMPTY"));
-    Serial.print(F(", Tray2="));
-    Serial.print(sensorRead(tray2DetectSensor) ? F("PRESENT") : F("EMPTY"));
-    Serial.print(F(", Tray3="));
-    Serial.print(sensorRead(tray3DetectSensor) ? F("PRESENT") : F("EMPTY"));
+    sprintf(section, " | Sensors: Tray1=%s, Tray2=%s, Tray3=%s",
+        sensorRead(tray1DetectSensor) ? "PRESENT" : "EMPTY",
+        sensorRead(tray2DetectSensor) ? "PRESENT" : "EMPTY",
+        sensorRead(tray3DetectSensor) ? "PRESENT" : "EMPTY");
+    strcat(msg, section);
 
     // 3. SYSTEM section
-    Serial.print(F(" | System: "));
-    Serial.print(F("Motor="));
+    const char* motorStateStr;
     switch (motorState)
     {
-    case MOTOR_STATE_IDLE:
-        Serial.print(F("IDLE"));
-        break;
-    case MOTOR_STATE_MOVING:
-        Serial.print(F("MOVING"));
-        break;
-    case MOTOR_STATE_HOMING:
-        Serial.print(F("HOMING"));
-        break;
-    case MOTOR_STATE_FAULTED:
-        Serial.print(F("FAULTED"));
-        break;
-    case MOTOR_STATE_NOT_READY:
-        Serial.print(F("NOT_READY"));
-        break;
-    default:
-        Serial.print(F("UNKNOWN"));
-        break;
+        case MOTOR_STATE_IDLE: motorStateStr = "IDLE"; break;
+        case MOTOR_STATE_MOVING: motorStateStr = "MOVING"; break;
+        case MOTOR_STATE_HOMING: motorStateStr = "HOMING"; break;
+        case MOTOR_STATE_FAULTED: motorStateStr = "FAULTED"; break;
+        case MOTOR_STATE_NOT_READY: motorStateStr = "NOT_READY"; break;
+        default: motorStateStr = "UNKNOWN"; break;
     }
-
-    Serial.print(F(", Homed="));
-    Serial.print(isHomed ? F("YES") : F("NO"));
-
-    Serial.print(F(", E-Stop="));
-    Serial.print(isEStopActive() ? F("TRIGGERED") : F("RELEASED"));
-
-    Serial.print(F(", HLFB="));
-    bool hlfbAsserted = MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED;
-    Serial.print(hlfbAsserted ? F("ASSERTED") : F("NOT_ASSERTED"));
-
-    Serial.print(F(", Clients="));
-    int clientCount = getConnectedClientCount();
-    Serial.print(clientCount);
-
-    Serial.print(F(", Pressure="));
+    
     float pressure = getPressurePsi();
-    Serial.print(pressure);
-    Serial.print(F(" PSI"));
-    if (pressure < MIN_SAFE_PRESSURE)
-    {
-        Serial.print(F(" (LOW)"));
-    }
+    sprintf(section, " | System: Motor=%s, Homed=%s, E-Stop=%s, HLFB=%s, Clients=%d, Pressure=%.1f PSI%s",
+        motorStateStr,
+        isHomed ? "YES" : "NO",
+        isEStopActive() ? "TRIGGERED" : "RELEASED",
+        (MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED) ? "ASSERTED" : "NOT_ASSERTED",
+        getConnectedClientCount(),
+        pressure,
+        (pressure < MIN_SAFE_PRESSURE) ? " (LOW)" : "");
+    strcat(msg, section);
 
-    // 4. POSITION GROUP with improved naming
-    Serial.print(F(" | Position: "));
+    // 4. POSITION section
     double calculatedPositionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
     int32_t currentPulses = normalizeEncoderValue(MOTOR_CONNECTOR.PositionRefCommanded());
-    Serial.print(calculatedPositionMm, 2);
-    Serial.print(F("mm ("));
-    Serial.print(currentPulses);
-    Serial.print(F(" counts)"));
-
-    // Target information
-    Serial.print(F(", Target="));
-    if (motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING)
+    
+    sprintf(section, " | Position: %.2fmm (%ld counts), Target=", calculatedPositionMm, currentPulses);
+    strcat(msg, section);
+    
+    if ((motorState == MOTOR_STATE_MOVING || motorState == MOTOR_STATE_HOMING) && hasCurrentTarget)
     {
-        if (hasCurrentTarget)
-        {
-            Serial.print(currentTargetPositionMm, 2);
-            Serial.print(F("mm ("));
-            Serial.print(normalizeEncoderValue(currentTargetPulses));
-            Serial.print(F(" counts)"));
-        }
-        else
-        {
-            Serial.print(F("None"));
-        }
+        sprintf(section, "%.2fmm (%ld counts)", currentTargetPositionMm, normalizeEncoderValue(currentTargetPulses));
     }
     else
     {
-        Serial.print(F("None"));
+        strcpy(section, "None");
     }
-
-    // Last target position
-    Serial.print(F(", LastTarget="));
+    strcat(msg, section);
+    
+    strcat(msg, ", LastTarget=");
     if (hasLastTarget)
     {
-        Serial.print(lastTargetPositionMm, 2);
-        Serial.print(F("mm ("));
-        Serial.print(normalizeEncoderValue(lastTargetPulses));
-        Serial.print(F(" counts)"));
+        sprintf(section, "%.2fmm (%ld counts)", lastTargetPositionMm, normalizeEncoderValue(lastTargetPulses));
     }
     else
     {
-        Serial.print(F("None"));
+        strcpy(section, "None");
     }
+    strcat(msg, section);
 
-    // 5. VELOCITY GROUP with improved naming
-    Serial.print(F(" | Velocity: "));
+    // 5. VELOCITY section
     double currentVelocityRpm = abs((double)MOTOR_CONNECTOR.VelocityRefCommanded() * 60.0 / PULSES_PER_REV);
-    Serial.print(currentVelocityRpm, 1);
-    Serial.print(F("RPM"));
+    sprintf(section, " | Velocity: %.1fRPM", currentVelocityRpm);
+    strcat(msg, section);
+    
     if (currentVelocityRpm > 0)
     {
-        Serial.print(F(" ("));
-        Serial.print((int)(currentVelocityRpm * 100 / ppsToRpm(currentVelMax)));
-        Serial.print(F("%)"));
+        sprintf(section, " (%d%%)", (int)(currentVelocityRpm * 100 / ppsToRpm(currentVelMax)));
+        strcat(msg, section);
     }
+    
+    sprintf(section, ", Limits: %.0fRPM/%.0fRPM/s", 
+        ppsToRpm(currentVelMax), 
+        (double)currentAccelMax * 60.0 / PULSES_PER_REV);
+    strcat(msg, section);
 
-    // Limits (condensed)
-    Serial.print(F(", Limits: "));
-    Serial.print(ppsToRpm(currentVelMax), 0);
-    Serial.print(F("RPM/"));
-    Serial.print((double)currentAccelMax * 60.0 / PULSES_PER_REV, 0);
-    Serial.print(F("RPM/s"));
-
-    // 6. JOG SETTINGS GROUP - removed (D) indicators
-    Serial.print(F(" | Jog: "));
-    Serial.print(currentJogIncrementMm, 1);
-    Serial.print(F("mm/"));
-    Serial.print(currentJogSpeedRpm);
-    Serial.print(F("RPM"));
-
-    // Encoder status
-    Serial.print(F(" | MPG: "));
+    // 6. JOG and MPG sections
+    sprintf(section, " | Jog: %.1fmm/%dRPM | MPG: ", currentJogIncrementMm, currentJogSpeedRpm);
+    strcat(msg, section);
+    
     if (encoderControlActive)
     {
-        Serial.print(F("ON x"));
-        Serial.print(getMultiplierName(currentMultiplier));
-
-        // Add mm/rotation information in a compact format
         double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-        Serial.print(F(" ("));
-        Serial.print(mmPerRotation, 2);
-        Serial.print(F("mm/rot)"));
+        sprintf(section, "ON x%s (%.2fmm/rot)", getMultiplierName(currentMultiplier), mmPerRotation);
     }
     else
     {
-        Serial.print(F("OFF"));
+        strcpy(section, "OFF");
     }
+    strcat(msg, section);
 
-    // End the line
-    Serial.println();
+    // Output the complete message
+    Serial.println(msg);
 }

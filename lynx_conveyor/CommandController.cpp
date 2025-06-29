@@ -93,8 +93,9 @@ void handleSerialCommands()
         {
             commandBuffer[commandIndex] = '\0'; // Null-terminate the command
 
-            Serial.print(F("[SERIAL COMMAND] "));
-            Serial.println(commandBuffer);
+            char logMsg[128];
+            snprintf(logMsg, sizeof(logMsg), "[SERIAL COMMAND] %s", commandBuffer);
+            Console.serialInfo(logMsg);
 
             // Tag for operation log
             char taggedCommand[96];
@@ -153,8 +154,9 @@ void handleEthernetCommands()
                                  clients[i].remoteIP()[2], clients[i].remoteIP()[3],
                                  ethernetCommandBuffer);
 
-                        Serial.print(F("[NETWORK COMMAND] "));
-                        Serial.println(commandWithSource);
+                        char logMsg[200];
+                        snprintf(logMsg, sizeof(logMsg), "[NETWORK COMMAND] %s", commandWithSource);
+                        Console.serialInfo(logMsg);
 
                         // Tag for operation log
                         char taggedCommand[160];

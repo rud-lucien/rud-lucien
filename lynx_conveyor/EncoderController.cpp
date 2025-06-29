@@ -154,11 +154,10 @@ void processEncoderInput()
             // Check against limits
             if (targetPositionMm < 0 || targetPositionMm > MAX_TRAVEL_MM)
             {
-                Serial.print(F("[WARNING] Encoder movement rejected: target position "));
-                Serial.print(targetPositionMm);
-                Serial.print(F(" mm is outside allowed range (0 to "));
-                Serial.print(MAX_TRAVEL_MM);
-                Serial.println(F(" mm)"));
+                char msg[200];
+                sprintf(msg, "Encoder movement rejected: target position %.2f mm is outside allowed range (0 to %.2f mm)", 
+                        targetPositionMm, MAX_TRAVEL_MM);
+                Console.serialWarning(msg);
             }
             else
             {
@@ -180,15 +179,11 @@ void processEncoderInput()
                 }
 
                 // Update the move message to use displaySteps
-                Serial.print(F("[MPG] Move: "));
-                Serial.print(displaySteps); // Use displaySteps for more intuitive direction display
-                Serial.print(F(" steps (x"));
-                Serial.print(getMultiplierName(currentMultiplier));
-                Serial.print(F(", "));
-                Serial.print(scaledVelocity / 1000); // Show in thousands for cleaner display
-                Serial.print(F("k pps) → "));
-                Serial.print(targetPositionMm, 2); // Show with 2 decimal places
-                Serial.println(F(" mm"));
+                char msg[200];
+                sprintf(msg, "MPG Move: %ld steps (x%s, %ldk pps) → %.2f mm", 
+                        displaySteps, getMultiplierName(currentMultiplier), 
+                        scaledVelocity / 1000, targetPositionMm);
+                Console.serialDiagnostic(msg);
 
                 // Set velocity for this move
                 MOTOR_CONNECTOR.VelMax(scaledVelocity);
@@ -242,14 +237,13 @@ void enableEncoderControl(bool enable)
         lastEncoderPosition = 0;
         lastEncoderUpdateTime = millis();
 
-        Serial.print(F("[INFO] MPG handwheel control enabled - current position: "));
-        Serial.print(currentPositionMm);
-        Serial.println(F(" mm"));
-        Serial.print(F("[INFO] Using multiplier x"));
-        Serial.print(getMultiplierName(currentMultiplier));
-        Serial.print(F(" ("));
-        Serial.print(currentMultiplier);
-        Serial.println(F(")"));
+        char msg[200];
+        sprintf(msg, "MPG handwheel control enabled - current position: %.2f mm", currentPositionMm);
+        Console.serialInfo(msg);
+        
+        sprintf(msg, "Using multiplier x%s (%.1f)", getMultiplierName(currentMultiplier), currentMultiplier);
+        Console.serialInfo(msg);
+        
         Console.serialInfo(F("Issue 'encoder,disable' when finished with manual control"));
     }
     else
@@ -262,22 +256,24 @@ void enableEncoderControl(bool enable)
 // Set the multiplier (x1, x10, x100)
 void setEncoderMultiplier(int multiplier)
 {
+    char msg[200];
+    
     switch (multiplier)
     {
     case 1:
         currentMultiplier = MULTIPLIER_X1;
-        Serial.print(F("[INFO] MPG multiplier set to x1 (fine control): "));
-        Serial.println(currentMultiplier);
+        sprintf(msg, "MPG multiplier set to x1 (fine control): %.1f", currentMultiplier);
+        Console.serialInfo(msg);
         break;
     case 10:
         currentMultiplier = MULTIPLIER_X10;
-        Serial.print(F("[INFO] MPG multiplier set to x10 (medium control): "));
-        Serial.println(currentMultiplier);
+        sprintf(msg, "MPG multiplier set to x10 (medium control): %.1f", currentMultiplier);
+        Console.serialInfo(msg);
         break;
     case 100:
         currentMultiplier = MULTIPLIER_X100;
-        Serial.print(F("[INFO] MPG multiplier set to x100 (coarse control): "));
-        Serial.println(currentMultiplier);
+        sprintf(msg, "MPG multiplier set to x100 (coarse control): %.1f", currentMultiplier);
+        Console.serialInfo(msg);
         break;
     default:
         Console.serialError(F("Invalid multiplier. Use 1, 10, or 100"));
@@ -286,7 +282,6 @@ void setEncoderMultiplier(int multiplier)
 
     // Useful diagnostic information
     float mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-    Serial.print(F("[INFO] One full rotation moves ~"));
-    Serial.print(mmPerRotation, 2);
-    Serial.println(F(" mm"));
+    sprintf(msg, "One full rotation moves ~%.2f mm", mmPerRotation);
+    Console.serialInfo(msg);
 }

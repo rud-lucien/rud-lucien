@@ -179,50 +179,47 @@ bool cmd_lock(char *args, CommandCaller *caller)
 
     case 3: // "help"
         Console.acknowledge(F("LOCK_HELP"));
-        Console.println(F("\n===== LOCK COMMAND HELP ====="));
-
-        Console.println(F("\nOVERVIEW:"));
-        Console.println(F("  The lock command engages pneumatic locks on trays and the shuttle,"));
-        Console.println(F("  securing them in position. All operations include sensor verification"));
-        Console.println(F("  to confirm successful locking."));
-
-        Console.println(F("\nCOMMAND REFERENCE:"));
-        Console.println(F("  lock,1 - Engage lock on tray at position 1 (loading position)"));
-        Console.println(F("    > Verified by cylinder position sensor"));
-        Console.println(F("    > Will report success only when sensor confirms lock"));
-
-        Console.println(F("  lock,2 - Engage lock on tray at position 2 (middle position)"));
-        Console.println(F("    > Verified by cylinder position sensor"));
-        Console.println(F("    > Will report success only when sensor confirms lock"));
-
-        Console.println(F("  lock,3 - Engage lock on tray at position 3 (unloading position)"));
-        Console.println(F("    > Verified by cylinder position sensor"));
-        Console.println(F("    > Will report success only when sensor confirms lock"));
-
-        Console.println(F("  lock,shuttle - Engage lock on the shuttle"));
-        Console.println(F("    > Prevents shuttle from moving between positions"));
-        Console.println(F("    > Verified by cylinder position sensor"));
-        Console.println(F("    > Required before unlocking any trays for safety"));
-
-        Console.println(F("\nSAFETY NOTES:"));
-        Console.println(F("  • 'lock,all' is not supported for safety reasons"));
-        Console.println(F("  • Always lock the shuttle before unlocking any trays"));
-        Console.println(F("  • System uses sensor verification to confirm actual locking"));
-        Console.println(F("  • Sufficient pneumatic pressure is required for all valve operations"));
-        Console.println(F("  • Failed locking may indicate mechanical issues or low air pressure"));
-
-        Console.println(F("\nSENSOR VERIFICATION:"));
-        Console.println(F("  • Each lock has a corresponding sensor that confirms its position"));
-        Console.println(F("  • Command waits up to 1 second for sensor to confirm lock"));
-        Console.println(F("  • Returns success only when sensor confirms the lock operation"));
-        Console.println(F("  • Sensor mismatches are shown in status logs with [!] indicator"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If lock fails, check air pressure"));
-        Console.println(F("  • Verify sensor connections if lock command doesn't register"));
-        Console.println(F("  • Use 'system,state' to see detailed valve and sensor status"));
-        Console.println(F("  • For persistent issues, check valve functionality"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== LOCK COMMAND HELP =====\n"
+            "\nOVERVIEW:\n"
+            "  The lock command engages pneumatic locks on trays and the shuttle,\n"
+            "  securing them in position. All operations include sensor verification\n"
+            "  to confirm successful locking.\n"
+            "\nCOMMAND REFERENCE:\n"
+            "  lock,1 - Engage lock on tray at position 1 (loading position)\n"
+            "    > Verified by cylinder position sensor\n"
+            "    > Will report success only when sensor confirms lock\n"
+            "\n"
+            "  lock,2 - Engage lock on tray at position 2 (middle position)\n"
+            "    > Verified by cylinder position sensor\n"
+            "    > Will report success only when sensor confirms lock\n"
+            "\n"
+            "  lock,3 - Engage lock on tray at position 3 (unloading position)\n"
+            "    > Verified by cylinder position sensor\n"
+            "    > Will report success only when sensor confirms lock\n"
+            "\n"
+            "  lock,shuttle - Engage lock on the shuttle\n"
+            "    > Prevents shuttle from moving between positions\n"
+            "    > Verified by cylinder position sensor\n"
+            "    > Required before unlocking any trays for safety\n"
+            "\nSAFETY NOTES:\n"
+            "  • 'lock,all' is not supported for safety reasons\n"
+            "  • Always lock the shuttle before unlocking any trays\n"
+            "  • System uses sensor verification to confirm actual locking\n"
+            "  • Sufficient pneumatic pressure is required for all valve operations\n"
+            "  • Failed locking may indicate mechanical issues or low air pressure\n"
+            "\nSENSOR VERIFICATION:\n"
+            "  • Each lock has a corresponding sensor that confirms its position\n"
+            "  • Command waits up to 1 second for sensor to confirm lock\n"
+            "  • Returns success only when sensor confirms the lock operation\n"
+            "  • Sensor mismatches are shown in status logs with [!] indicator\n"
+            "\nTROUBLESHOOTING:\n"
+            "  • If lock fails, check air pressure\n"
+            "  • Verify sensor connections if lock command doesn't register\n"
+            "  • Use 'system,state' to see detailed valve and sensor status\n"
+            "  • For persistent issues, check valve functionality\n"
+            "-------------------------------------------"
+        ));
         return true;
 
     case 4: // Tray numbers (1, 2, or 3)
@@ -429,53 +426,50 @@ bool cmd_unlock(char *args, CommandCaller *caller)
 
     case 3: // "help"
         Console.acknowledge(F("UNLOCK_HELP"));
-        Console.println(F("\n===== UNLOCK COMMAND HELP ====="));
-
-        Console.println(F("\nOVERVIEW:"));
-        Console.println(F("  The unlock command disengages pneumatic locks on trays and the shuttle,"));
-        Console.println(F("  allowing them to be removed or permitting shuttle movement. All operations"));
-        Console.println(F("  include sensor verification to confirm successful unlocking."));
-
-        Console.println(F("\nCOMMAND REFERENCE:"));
-        Console.println(F("  unlock,1 - Disengage lock on tray at position 1 (loading position)"));
-        Console.println(F("    > Verified by cylinder position sensor"));
-        Console.println(F("    > Will report success only when sensor confirms unlock"));
-
-        Console.println(F("  unlock,2 - Disengage lock on tray at position 2 (middle position)"));
-        Console.println(F("    > Verified by cylinder position sensor"));
-        Console.println(F("    > Will report success only when sensor confirms unlock"));
-
-        Console.println(F("  unlock,3 - Disengage lock on tray at position 3 (unloading position)"));
-        Console.println(F("    > Verified by cylinder position sensor"));
-        Console.println(F("    > Will report success only when sensor confirms unlock"));
-
-        Console.println(F("  unlock,shuttle - Disengage lock on the shuttle"));
-        Console.println(F("    > Allows shuttle to move between positions"));
-        Console.println(F("    > Verified by cylinder position sensor"));
-
-        Console.println(F("  unlock,all - Disengage all locks in the system"));
-        Console.println(F("    > Emergency recovery function"));
-        Console.println(F("    > Uses sensor verification for all valves"));
-        Console.println(F("    > Reports success only when all sensors confirm unlock"));
-
-        Console.println(F("\nSAFETY NOTES:"));
-        Console.println(F("  • Ensure trays are properly supported before unlocking"));
-        Console.println(F("  • System uses sensor verification to confirm actual unlocking"));
-        Console.println(F("  • Failed unlocking may indicate mechanical issues"));
-        Console.println(F("  • Sufficient pneumatic pressure is required for all valve operations"));
-
-        Console.println(F("\nSENSOR VERIFICATION:"));
-        Console.println(F("  • Each lock has a corresponding sensor that confirms its position"));
-        Console.println(F("  • Command waits up to 1 second for sensor to confirm unlock"));
-        Console.println(F("  • Returns success only when sensor confirms the unlock operation"));
-        Console.println(F("  • Sensor mismatches are shown in status logs with [!] indicator"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If unlock fails, check air pressure"));
-        Console.println(F("  • Verify sensor connections if unlock command doesn't register"));
-        Console.println(F("  • Use 'system,state' to see detailed valve and sensor status"));
-        Console.println(F("  • For persistent issues, check valve functionality"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== UNLOCK COMMAND HELP =====\n"
+            "\nOVERVIEW:\n"
+            "  The unlock command disengages pneumatic locks on trays and the shuttle,\n"
+            "  allowing them to be removed or permitting shuttle movement. All operations\n"
+            "  include sensor verification to confirm successful unlocking.\n"
+            "\nCOMMAND REFERENCE:\n"
+            "  unlock,1 - Disengage lock on tray at position 1 (loading position)\n"
+            "    > Verified by cylinder position sensor\n"
+            "    > Will report success only when sensor confirms unlock\n"
+            "\n"
+            "  unlock,2 - Disengage lock on tray at position 2 (middle position)\n"
+            "    > Verified by cylinder position sensor\n"
+            "    > Will report success only when sensor confirms unlock\n"
+            "\n"
+            "  unlock,3 - Disengage lock on tray at position 3 (unloading position)\n"
+            "    > Verified by cylinder position sensor\n"
+            "    > Will report success only when sensor confirms unlock\n"
+            "\n"
+            "  unlock,shuttle - Disengage lock on the shuttle\n"
+            "    > Allows shuttle to move between positions\n"
+            "    > Verified by cylinder position sensor\n"
+            "\n"
+            "  unlock,all - Disengage all locks in the system\n"
+            "    > Emergency recovery function\n"
+            "    > Uses sensor verification for all valves\n"
+            "    > Reports success only when all sensors confirm unlock\n"
+            "\nSAFETY NOTES:\n"
+            "  • Ensure trays are properly supported before unlocking\n"
+            "  • System uses sensor verification to confirm actual unlocking\n"
+            "  • Failed unlocking may indicate mechanical issues\n"
+            "  • Sufficient pneumatic pressure is required for all valve operations\n"
+            "\nSENSOR VERIFICATION:\n"
+            "  • Each lock has a corresponding sensor that confirms its position\n"
+            "  • Command waits up to 1 second for sensor to confirm unlock\n"
+            "  • Returns success only when sensor confirms the unlock operation\n"
+            "  • Sensor mismatches are shown in status logs with [!] indicator\n"
+            "\nTROUBLESHOOTING:\n"
+            "  • If unlock fails, check air pressure\n"
+            "  • Verify sensor connections if unlock command doesn't register\n"
+            "  • Use 'system,state' to see detailed valve and sensor status\n"
+            "  • For persistent issues, check valve functionality\n"
+            "-------------------------------------------"
+        ));
 
         return true;
 
@@ -678,61 +672,56 @@ bool cmd_log(char *args, CommandCaller *caller)
     case 4: // "help"
     {
         Console.acknowledge(F("LOG_HELP"));
-        Console.println(F("\n===== LOGGING SYSTEM HELP ====="));
-
-        Console.println(F("\nOVERVIEW:"));
-        Console.println(F("  The logging system captures complete system state at regular intervals"));
-        Console.println(F("  or on demand, providing detailed information for debugging and monitoring."));
-
-        Console.println(F("\nCOMMAND REFERENCE:"));
-        Console.println(F("  log,on[,interval] - Enable periodic logging"));
-        Console.println(F("    > interval = Optional logging frequency in milliseconds"));
-        Console.println(F("    > Default interval: 250 ms (4 logs per second)"));
-        Console.println(F("    > Example: log,on,1000 - Log every 1 second"));
-        Console.println(F("    > Example: log,on - Log every 250ms (default)"));
-
-        Console.println(F("  log,off - Disable periodic logging"));
-        Console.println(F("    > Stops the automatic logging of system state"));
-        Console.println(F("    > Does not affect manual logging with log,now"));
-
-        Console.println(F("  log,now - Log system state immediately"));
-        Console.println(F("    > Records a single log entry regardless of periodic settings"));
-        Console.println(F("    > Useful for capturing state at specific moments"));
-
-        Console.println(F("\nLOG CONTENT:"));
-        Console.println(F("  • Valves - Lock status of all trays and shuttle with sensor verification"));
-        Console.println(F("    > [!] indicator shows sensor/command mismatch"));
-        Console.println(F("  • Pneumatics - Air pressure status (sufficient/insufficient)"));
-        Console.println(F("    > Critical for valve actuation and safe operations"));
-        Console.println(F("  • Sensors - Tray presence detection at each position"));
-        Console.println(F("  • System - Motor state, homing status, E-Stop and HLFB status"));
-        Console.println(F("  • Position - Current, target, and last positions (mm and counts)"));
-        Console.println(F("  • Velocity - Current speed, percentage of max, and speed limits"));
-        Console.println(F("  • Jog - Current jog increment and speed settings"));
-        Console.println(F("  • MPG - Handwheel control status, multiplier, and mm/rotation"));
-
-        Console.println(F("\nOUTPUT DESTINATION:"));
-        Console.println(F("  • Logs are only sent to the serial port"));
-        Console.println(F("  • Ethernet clients do not receive log output"));
-        Console.println(F("  • Connect via USB serial to view logs"));
-
-        Console.println(F("\nPERFORMANCE CONSIDERATIONS:"));
-        Console.println(F("  • Default 250ms interval is optimal for most debugging"));
-        Console.println(F("  • Very frequent logging (< 100ms) may impact system responsiveness"));
-        Console.println(F("  • For long-term monitoring, consider 1000-5000ms intervals"));
-
-        Console.println(F("\nREADING LOG OUTPUT:"));
-        Console.println(F("  • Each section is separated by | characters for readability"));
-        Console.println(F("  • Position values shown in both mm and encoder counts"));
-        Console.println(F("  • Lock status shows ? if sensor doesn't match expected state"));
-        Console.println(F("  • Velocity shown with percentage of maximum when moving"));
-
-        Console.println(F("\nTROUBLESHOOTING TIPS:"));
-        Console.println(F("  • Use log,now before and after commands to track state changes"));
-        Console.println(F("  • Watch for sensor/valve mismatches [!] indicating hardware issues"));
-        Console.println(F("  • Compare HLFB status with motor state to identify drive problems"));
-        Console.println(F("  • Verify position values match expected targets during movements"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== LOGGING SYSTEM HELP =====\n"
+            "\nOVERVIEW:\n"
+            "  The logging system captures complete system state at regular intervals\n"
+            "  or on demand, providing detailed information for debugging and monitoring.\n"
+            "\nCOMMAND REFERENCE:\n"
+            "  log,on[,interval] - Enable periodic logging\n"
+            "    > interval = Optional logging frequency in milliseconds\n"
+            "    > Default interval: 250 ms (4 logs per second)\n"
+            "    > Example: log,on,1000 - Log every 1 second\n"
+            "    > Example: log,on - Log every 250ms (default)\n"
+            "\n"
+            "  log,off - Disable periodic logging\n"
+            "    > Stops the automatic logging of system state\n"
+            "    > Does not affect manual logging with log,now\n"
+            "\n"
+            "  log,now - Log system state immediately\n"
+            "    > Records a single log entry regardless of periodic settings\n"
+            "    > Useful for capturing state at specific moments\n"
+            "\nLOG CONTENT:\n"
+            "  • Valves - Lock status of all trays and shuttle with sensor verification\n"
+            "    > [!] indicator shows sensor/command mismatch\n"
+            "  • Pneumatics - Air pressure status (sufficient/insufficient)\n"
+            "    > Critical for valve actuation and safe operations\n"
+            "  • Sensors - Tray presence detection at each position\n"
+            "  • System - Motor state, homing status, E-Stop and HLFB status\n"
+            "  • Position - Current, target, and last positions (mm and counts)\n"
+            "  • Velocity - Current speed, percentage of max, and speed limits\n"
+            "  • Jog - Current jog increment and speed settings\n"
+            "  • MPG - Handwheel control status, multiplier, and mm/rotation\n"
+            "\nOUTPUT DESTINATION:\n"
+            "  • Logs are only sent to the serial port\n"
+            "  • Ethernet clients do not receive log output\n"
+            "  • Connect via USB serial to view logs\n"
+            "\nPERFORMANCE CONSIDERATIONS:\n"
+            "  • Default 250ms interval is optimal for most debugging\n"
+            "  • Very frequent logging (< 100ms) may impact system responsiveness\n"
+            "  • For long-term monitoring, consider 1000-5000ms intervals\n"
+            "\nREADING LOG OUTPUT:\n"
+            "  • Each section is separated by | characters for readability\n"
+            "  • Position values shown in both mm and encoder counts\n"
+            "  • Lock status shows ? if sensor doesn't match expected state\n"
+            "  • Velocity shown with percentage of maximum when moving\n"
+            "\nTROUBLESHOOTING TIPS:\n"
+            "  • Use log,now before and after commands to track state changes\n"
+            "  • Watch for sensor/valve mismatches [!] indicating hardware issues\n"
+            "  • Compare HLFB status with motor state to identify drive problems\n"
+            "  • Verify position values match expected targets during movements\n"
+            "-------------------------------------------"
+        ));
 
         return true;
     }
@@ -1080,58 +1069,59 @@ bool cmd_motor(char *args, CommandCaller *caller)
     case 7: // help
     {
         Console.acknowledge(F("MOTOR_HELP"));
-        Console.println(F("\n===== MOTOR CONTROL SYSTEM HELP ====="));
-
-        Console.println(F("\nCOMMAND REFERENCE:"));
-        Console.println(F("  motor,init - Initialize motor system and prepare for operation"));
-        Console.println(F("    > Must be run after power-up before any other motor commands"));
-        Console.println(F("    > Configures motor parameters and communication"));
-        Console.println(F("    > Does not move the motor or establish position reference"));
-
-        Console.println(F("  motor,home - Find home position and establish reference point"));
-        Console.println(F("    > Required before absolute positioning commands can be used"));
-        Console.println(F("    > Motor will move slowly until it contacts the home limit switch"));
-        Console.println(F("    > After contact, motor backs off to establish precise zero position"));
-        Console.println(F("    > Home position is offset 5mm from physical limit for safety"));
-
-        Console.println(F("  motor,status - Display detailed motor status and configuration"));
-        Console.println(F("    > Shows current state, position, velocity settings, and limits"));
-        Console.println(F("    > Use to verify proper operation or troubleshoot issues"));
-
-        Console.println(F("  motor,clear - Clear motor fault condition"));
-        Console.println(F("    > Use after resolving the condition that caused the fault"));
-        Console.println(F("    > Common faults: excessive load, hitting physical limit, E-Stop"));
-
-        Console.println(F("  motor,abort - Gracefully stop current movement"));
-        Console.println(F("    > Controlled deceleration to stop the motor"));
-        Console.println(F("    > Position information is maintained"));
-        Console.println(F("    > Use to cancel a movement without generating a fault"));
-
-        Console.println(F("  motor,stop - Emergency stop motor movement immediately"));
-        Console.println(F("    > Immediate halt of motor operation"));
-        Console.println(F("    > May cause position inaccuracy"));
-        Console.println(F("    > Use only when necessary to prevent damage or injury"));
-
-        Console.println(F("\nTYPICAL SEQUENCE:"));
-        Console.println(F("  1. motor,init   - Initialize the motor system"));
-        Console.println(F("  2. motor,home   - Establish reference position"));
-        Console.println(F("  3. move,X       - Move to desired positions"));
-        Console.println(F("  4. jog commands - Make fine adjustments"));
-        Console.println(F("  5. encoder      - Use handwheel for manual control"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If motor won't move: Check E-Stop, then run motor,status"));
-        Console.println(F("  • After fault: Use motor,clear to reset fault condition"));
-        Console.println(F("  • If position seems incorrect: Re-home the system"));
-        Console.println(F("  • Unexpected behavior: Check that motor is initialized"));
-        Console.println(F("  • Jerky movement: Try using slower speed or smaller increments"));
-
-        Console.println(F("\nSAFETY NOTES:"));
-        Console.println(F("  • Always ensure proper clearance before moving the shuttle"));
-        Console.println(F("  • Use E-Stop if unexpected movement occurs"));
-        Console.println(F("  • After E-Stop, clear faults before resuming operation"));
-        Console.println(F("  • Motor movements will halt automatically at travel limits"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== MOTOR CONTROL SYSTEM HELP =====\n"
+            "\nCOMMAND REFERENCE:\n"
+            "  motor,init - Initialize motor system and prepare for operation\n"
+            "    > Must be run after power-up before any other motor commands\n"
+            "    > Configures motor parameters and communication\n"
+            "    > Does not move the motor or establish position reference\n"
+            "\n"
+            "  motor,home - Find home position and establish reference point\n"
+            "    > Required before absolute positioning commands can be used\n"
+            "    > Motor will move slowly until it contacts the home limit switch\n"
+            "    > After contact, motor backs off to establish precise zero position\n"
+            "    > Home position is offset 5mm from physical limit for safety\n"
+            "\n"
+            "  motor,status - Display detailed motor status and configuration\n"
+            "    > Shows current state, position, velocity settings, and limits\n"
+            "    > Use to verify proper operation or troubleshoot issues\n"
+            "\n"
+            "  motor,clear - Clear motor fault condition\n"
+            "    > Use after resolving the condition that caused the fault\n"
+            "    > Common faults: excessive load, hitting physical limit, E-Stop\n"
+            "\n"
+            "  motor,abort - Gracefully stop current movement\n"
+            "    > Controlled deceleration to stop the motor\n"
+            "    > Position information is maintained\n"
+            "    > Use to cancel a movement without generating a fault\n"
+            "\n"
+            "  motor,stop - Emergency stop motor movement immediately\n"
+            "    > Immediate halt of motor operation\n"
+            "    > May cause position inaccuracy\n"
+            "    > Use only when necessary to prevent damage or injury\n"
+            "\n"
+            "TYPICAL SEQUENCE:\n"
+            "  1. motor,init   - Initialize the motor system\n"
+            "  2. motor,home   - Establish reference position\n"
+            "  3. move,X       - Move to desired positions\n"
+            "  4. jog commands - Make fine adjustments\n"
+            "  5. encoder      - Use handwheel for manual control\n"
+            "\n"
+            "TROUBLESHOOTING:\n"
+            "  • If motor won't move: Check E-Stop, then run motor,status\n"
+            "  • After fault: Use motor,clear to reset fault condition\n"
+            "  • If position seems incorrect: Re-home the system\n"
+            "  • Unexpected behavior: Check that motor is initialized\n"
+            "  • Jerky movement: Try using slower speed or smaller increments\n"
+            "\n"
+            "SAFETY NOTES:\n"
+            "  • Always ensure proper clearance before moving the shuttle\n"
+            "  • Use E-Stop if unexpected movement occurs\n"
+            "  • After E-Stop, clear faults before resuming operation\n"
+            "  • Motor movements will halt automatically at travel limits\n"
+            "-------------------------------------------"
+        ));
 
         return true;
         break;
@@ -1441,42 +1431,46 @@ bool cmd_move(char *args, CommandCaller *caller)
 
     case 9: // "help"
         Console.acknowledge(F("MOVE_HELP"));
-        Console.println(F("\n===== MOVE COMMAND HELP ====="));
-        Console.println(F("\nPREREQUISITES:"));
-        Console.println(F("  • Motor must be initialized (motor,init)"));
-        Console.println(F("  • Motor must be homed for accurate positioning (motor,home)"));
-        Console.println(F("  • E-Stop must be inactive"));
-        Console.println(F("  • Motor must not be in fault state"));
-        Console.println(F("  • No other movement can be in progress"));
-        Console.println(F("\nCOMMAND TYPES:"));
-        Console.println(F("  move,home - Move to home (zero) position"));
-        Console.println(F("    > Reference position offset 5mm from hardstop"));
-        Console.println(F("    > Always available after homing"));
-        Console.println(F("  move,1 through move,4 - Move to predefined positions"));
-        Console.println(F("    > Position 1: Loading position (28.7mm)"));
-        Console.println(F("    > Position 2: Middle position (456.0mm)"));
-        Console.println(F("    > Position 3: Unloading position (883.58mm)"));
-        Console.println(F("    > Position 4: Max travel (1050.0mm)"));
-        Console.println(F("  move,mm,X - Move to absolute position X in millimeters"));
-        Console.println(F("    > Valid range: 0 to 1050.0 mm"));
-        Console.println(F("    > Most intuitive way to specify exact positions"));
-        Console.println(F("    > Example: move,mm,500.5 - moves to 500.5mm"));
-        Console.println(F("  move,counts,X - Move to absolute position X in encoder counts"));
-        Console.println(F("    > Valid range: 0 to 64,333 counts"));
-        Console.println(F("    > Used for precise control or debugging"));
-        Console.println(F("    > 1mm ≈ 61.27 counts (3200 pulses/rev ÷ 52.23mm/rev)"));
-        Console.println(F("  move,rel,X - Move X millimeters relative to current position"));
-        Console.println(F("    > Use positive values to move forward"));
-        Console.println(F("    > Use negative values to move backward"));
-        Console.println(F("    > Example: move,rel,-10 - moves 10mm backward"));
-        Console.println(F("    > Movement is constrained to valid range (0-1050.0mm)"));
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If movement fails, check motor status with 'motor,status'"));
-        Console.println(F("  • If at travel limits, you can only move within the allowed range"));
-        Console.println(F("  • After E-Stop, clear faults with 'motor,clear' before moving"));
-        Console.println(F("  • For short, precise movements, consider using 'jog' commands"));
-        Console.println(F("  • For interactive positioning, use 'encoder' handwheel control"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== MOVE COMMAND HELP =====\n"
+            "\nPREREQUISITES:\n"
+            "  • Motor must be initialized (motor,init)\n"
+            "  • Motor must be homed for accurate positioning (motor,home)\n"
+            "  • E-Stop must be inactive\n"
+            "  • Motor must not be in fault state\n"
+            "  • No other movement can be in progress\n"
+            "\n"
+            "COMMAND TYPES:\n"
+            "  move,home - Move to home (zero) position\n"
+            "    > Reference position offset 5mm from hardstop\n"
+            "    > Always available after homing\n"
+            "  move,1 through move,4 - Move to predefined positions\n"
+            "    > Position 1: Loading position (28.7mm)\n"
+            "    > Position 2: Middle position (456.0mm)\n"
+            "    > Position 3: Unloading position (883.58mm)\n"
+            "    > Position 4: Max travel (1050.0mm)\n"
+            "  move,mm,X - Move to absolute position X in millimeters\n"
+            "    > Valid range: 0 to 1050.0 mm\n"
+            "    > Most intuitive way to specify exact positions\n"
+            "    > Example: move,mm,500.5 - moves to 500.5mm\n"
+            "  move,counts,X - Move to absolute position X in encoder counts\n"
+            "    > Valid range: 0 to 64,333 counts\n"
+            "    > Used for precise control or debugging\n"
+            "    > 1mm ≈ 61.27 counts (3200 pulses/rev ÷ 52.23mm/rev)\n"
+            "  move,rel,X - Move X millimeters relative to current position\n"
+            "    > Use positive values to move forward\n"
+            "    > Use negative values to move backward\n"
+            "    > Example: move,rel,-10 - moves 10mm backward\n"
+            "    > Movement is constrained to valid range (0-1050.0mm)\n"
+            "\n"
+            "TROUBLESHOOTING:\n"
+            "  • If movement fails, check motor status with 'motor,status'\n"
+            "  • If at travel limits, you can only move within the allowed range\n"
+            "  • After E-Stop, clear faults with 'motor,clear' before moving\n"
+            "  • For short, precise movements, consider using 'jog' commands\n"
+            "  • For interactive positioning, use 'encoder' handwheel control\n"
+            "-------------------------------------------"
+        ));
         return true;
 
     default:
@@ -1747,65 +1741,66 @@ bool cmd_jog(char *args, CommandCaller *caller)
     case 6: // help
     {
         Console.acknowledge(F("JOG_HELP"));
-        Console.println(F("\n===== JOG MOVEMENT SYSTEM HELP ====="));
-
-        Console.println(F("\nOVERVIEW:"));
-        Console.println(F("  The jog system provides precise, incremental movements in either direction"));
-        Console.println(F("  for accurate positioning and testing. Each jog moves the motor by a fixed"));
-        Console.println(F("  distance that you can configure."));
-
-        Console.println(F("\nCOMMAND REFERENCE:"));
-        Console.println(F("  jog,+ - Move forward by one increment"));
-        Console.println(F("    > Each press moves exactly one increment in the forward direction"));
-        Console.println(F("    > Movement stops automatically after the increment is completed"));
-        Console.println(F("  jog,- - Move backward by one increment"));
-        Console.println(F("    > Each press moves exactly one increment in the backward direction"));
-        Console.println(F("    > Movement stops automatically after the increment is completed"));
-        Console.println(F("  jog,inc,X - Set movement increment size"));
-        Console.println(F("    > X = distance in millimeters (example: jog,inc,5.0)"));
-        Console.println(F("    > Using jog,inc without a value displays the current setting"));
-        Console.println(F("    > Using jog,inc,default resets to standard increment"));
-        Console.println(F("  jog,speed,X - Set movement speed"));
-        Console.println(F("    > X = speed in RPM (example: jog,speed,300)"));
-        Console.println(F("    > Using jog,speed without a value displays the current setting"));
-        Console.println(F("    > Using jog,speed,default resets to standard speed"));
-        Console.println(F("  jog,status - Display current jog settings and position information"));
-
-        Console.println(F("\nJOG VS. HANDWHEEL COMPARISON:"));
-        Console.println(F("  Jog System (jog command):"));
-        Console.println(F("    • Fixed, precise movements with each command"));
-        Console.println(F("    • Better for repeatable, exact positioning"));
-        Console.println(F("    • Simple to use via command line"));
-        Console.println(F("    • Good for testing and calibration"));
-        Console.println(F("    • Can be used in scripts and automated sequences"));
-
-        Console.println(F("  Handwheel System (encoder command):"));
-        Console.println(F("    • Continuous, manual control with physical handwheel"));
-        Console.println(F("    • Better for interactive positioning and fine adjustments"));
-        Console.println(F("    • More intuitive for operators doing manual work"));
-        Console.println(F("    • Allows variable speed based on rotation speed"));
-        Console.println(F("    • Provides tactile feedback during positioning"));
-
-        Console.println(F("\nWHEN TO USE JOG:"));
-        Console.println(F("  • For test sequences that need repeatable movements"));
-        Console.println(F("  • When working remotely via serial connection"));
-        Console.println(F("  • When you need precisely measured movements"));
-        Console.println(F("  • For calibration procedures"));
-        Console.println(F("  • When you don't have access to the physical handwheel"));
-
-        Console.println(F("\nUSAGE TIPS:"));
-        Console.println(F("  • Set a smaller increment (1-5mm) for precise positioning"));
-        Console.println(F("  • Set a larger increment (10-50mm) for faster travel"));
-        Console.println(F("  • Use jog,status to see your current position and limits"));
-        Console.println(F("  • The motor must be homed before jogging can be used"));
-        Console.println(F("  • Jogging is automatically limited to prevent over-travel"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If jog commands fail, check if motor is initialized and homed"));
-        Console.println(F("  • If at travel limit, you can only jog in the opposite direction"));
-        Console.println(F("  • After E-Stop, clear any faults before attempting to jog"));
-        Console.println(F("  • If motor is already moving, wait for it to complete or use motor,abort"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== JOG MOVEMENT SYSTEM HELP =====\n"
+            "\nOVERVIEW:\n"
+            "  The jog system provides precise, incremental movements in either direction\n"
+            "  for accurate positioning and testing. Each jog moves the motor by a fixed\n"
+            "  distance that you can configure.\n"
+            "\n"
+            "COMMAND REFERENCE:\n"
+            "  jog,+ - Move forward by one increment\n"
+            "    > Each press moves exactly one increment in the forward direction\n"
+            "    > Movement stops automatically after the increment is completed\n"
+            "  jog,- - Move backward by one increment\n"
+            "    > Each press moves exactly one increment in the backward direction\n"
+            "    > Movement stops automatically after the increment is completed\n"
+            "  jog,inc,X - Set movement increment size\n"
+            "    > X = distance in millimeters (example: jog,inc,5.0)\n"
+            "    > Using jog,inc without a value displays the current setting\n"
+            "    > Using jog,inc,default resets to standard increment\n"
+            "  jog,speed,X - Set movement speed\n"
+            "    > X = speed in RPM (example: jog,speed,300)\n"
+            "    > Using jog,speed without a value displays the current setting\n"
+            "    > Using jog,speed,default resets to standard speed\n"
+            "  jog,status - Display current jog settings and position information\n"
+            "\n"
+            "JOG VS. HANDWHEEL COMPARISON:\n"
+            "  Jog System (jog command):\n"
+            "    • Fixed, precise movements with each command\n"
+            "    • Better for repeatable, exact positioning\n"
+            "    • Simple to use via command line\n"
+            "    • Good for testing and calibration\n"
+            "    • Can be used in scripts and automated sequences\n"
+            "\n"
+            "  Handwheel System (encoder command):\n"
+            "    • Continuous, manual control with physical handwheel\n"
+            "    • Better for interactive positioning and fine adjustments\n"
+            "    • More intuitive for operators doing manual work\n"
+            "    • Allows variable speed based on rotation speed\n"
+            "    • Provides tactile feedback during positioning\n"
+            "\n"
+            "WHEN TO USE JOG:\n"
+            "  • For test sequences that need repeatable movements\n"
+            "  • When working remotely via serial connection\n"
+            "  • When you need precisely measured movements\n"
+            "  • For calibration procedures\n"
+            "  • When you don't have access to the physical handwheel\n"
+            "\n"
+            "USAGE TIPS:\n"
+            "  • Set a smaller increment (1-5mm) for precise positioning\n"
+            "  • Set a larger increment (10-50mm) for faster travel\n"
+            "  • Use jog,status to see your current position and limits\n"
+            "  • The motor must be homed before jogging can be used\n"
+            "  • Jogging is automatically limited to prevent over-travel\n"
+            "\n"
+            "TROUBLESHOOTING:\n"
+            "  • If jog commands fail, check if motor is initialized and homed\n"
+            "  • If at travel limit, you can only jog in the opposite direction\n"
+            "  • After E-Stop, clear any faults before attempting to jog\n"
+            "  • If motor is already moving, wait for it to complete or use motor,abort\n"
+            "-------------------------------------------"
+        ));
 
         return true;
     }
@@ -1961,52 +1956,53 @@ bool cmd_system_state(char *args, CommandCaller *caller)
     case 6: // "help"
     {
         Console.acknowledge(F("SYSTEM_HELP"));
-        Console.println(F("\n===== SYSTEM COMMAND HELP ====="));
-
-        Console.println(F("\nOVERVIEW:"));
-        Console.println(F("  The system command provides access to core system functions,"));
-        Console.println(F("  status information, and diagnostic capabilities. Use these"));
-        Console.println(F("  commands to monitor and manage the overall system state."));
-
-        Console.println(F("\nCOMMAND REFERENCE:"));
-        Console.println(F("  system,state - Display comprehensive system state"));
-        Console.println(F("    > Shows all sensor readings, valve positions, and motor status"));
-        Console.println(F("    > Provides complete snapshot of current hardware state"));
-        Console.println(F("    > Use for diagnostics and troubleshooting"));
-
-        Console.println(F("  system,safety - Display safety validation status"));
-        Console.println(F("    > Shows detailed safety checks and their current status"));
-        Console.println(F("    > Reports any safety constraints preventing operations"));
-        Console.println(F("    > Provides reasons why operations might be blocked"));
-
-        Console.println(F("  system,trays - Display tray tracking information"));
-        Console.println(F("    > Shows which positions are occupied"));
-        Console.println(F("    > Reports total number of trays in the system"));
-        Console.println(F("    > Provides statistics on load/unload operations"));
-        Console.println(F("    > Shows timestamps of recent operations"));
-
-        Console.println(F("  system,reset - Reset system state after failure"));
-        Console.println(F("    > Clears fault conditions"));
-        Console.println(F("    > Aborts any in-progress operations"));
-        Console.println(F("    > Use when system is in an inconsistent state"));
-        Console.println(F("    > Emergency recovery function for error conditions"));
-
-        Console.println(F("  system,history - Display operation log history"));
-        Console.println(F("    > Shows recent operational messages in chronological order"));
-        Console.println(F("    > Useful for troubleshooting failures"));
-        Console.println(F("    > Captures the last 20 operational events"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • For hardware issues: Check 'system,state' for sensor/valve status"));
-        Console.println(F("  • For operation failures: Check 'system,safety' for constraints"));
-        Console.println(F("  • For tray inconsistencies: Use 'system,trays' to verify positions"));
-        Console.println(F("  • When stuck in error state: Try 'system,reset' to recover"));
-        Console.println(F("  • After E-Stop activation: Use 'motor,clear' followed by 'system,reset'"));
-        Console.println(F("  • For debugging overnight failures: Use 'system,history' to see operational logs"));
-        Console.println(F("  • Review history to understand sequence of events leading to failures"));
-        Console.println(F("  • History logs are preserved until power cycle or buffer fills (20 entries)"));
-        Console.println(F("  • Log critical commands/operations before leaving system unattended"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== SYSTEM COMMAND HELP =====\n"
+            "\nOVERVIEW:\n"
+            "  The system command provides access to core system functions,\n"
+            "  status information, and diagnostic capabilities. Use these\n"
+            "  commands to monitor and manage the overall system state.\n"
+            "\n"
+            "COMMAND REFERENCE:\n"
+            "  system,state - Display comprehensive system state\n"
+            "    > Shows all sensor readings, valve positions, and motor status\n"
+            "    > Provides complete snapshot of current hardware state\n"
+            "    > Use for diagnostics and troubleshooting\n"
+            "\n"
+            "  system,safety - Display safety validation status\n"
+            "    > Shows detailed safety checks and their current status\n"
+            "    > Reports any safety constraints preventing operations\n"
+            "    > Provides reasons why operations might be blocked\n"
+            "\n"
+            "  system,trays - Display tray tracking information\n"
+            "    > Shows which positions are occupied\n"
+            "    > Reports total number of trays in the system\n"
+            "    > Provides statistics on load/unload operations\n"
+            "    > Shows timestamps of recent operations\n"
+            "\n"
+            "  system,reset - Reset system state after failure\n"
+            "    > Clears fault conditions\n"
+            "    > Aborts any in-progress operations\n"
+            "    > Use when system is in an inconsistent state\n"
+            "    > Emergency recovery function for error conditions\n"
+            "\n"
+            "  system,history - Display operation log history\n"
+            "    > Shows recent operational messages in chronological order\n"
+            "    > Useful for troubleshooting failures\n"
+            "    > Captures the last 20 operational events\n"
+            "\n"
+            "TROUBLESHOOTING:\n"
+            "  • For hardware issues: Check 'system,state' for sensor/valve status\n"
+            "  • For operation failures: Check 'system,safety' for constraints\n"
+            "  • For tray inconsistencies: Use 'system,trays' to verify positions\n"
+            "  • When stuck in error state: Try 'system,reset' to recover\n"
+            "  • After E-Stop activation: Use 'motor,clear' followed by 'system,reset'\n"
+            "  • For debugging overnight failures: Use 'system,history' to see operational logs\n"
+            "  • Review history to understand sequence of events leading to failures\n"
+            "  • History logs are preserved until power cycle or buffer fills (20 entries)\n"
+            "  • Log critical commands/operations before leaving system unattended\n"
+            "-------------------------------------------"
+        ));
 
         return true;
     }
@@ -2082,6 +2078,9 @@ bool cmd_tray(char *args, CommandCaller *caller)
     // First use binary search to find the base command
     int cmdCode = findSubcommandCode(subcommand, TRAY_COMMANDS, TRAY_COMMAND_COUNT);
 
+    // Shared buffer for all formatted output in this function
+    char msg[100];
+
     // Handle the compound commands for load and unload with the second parameter
     if (cmdCode == 1 || cmdCode == 4)
     { // "load" or "unload"
@@ -2095,7 +2094,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
     }
     else if (cmdCode == 0)
     { // Command not found in binary search
-        char msg[100];
         sprintf(msg, "[ERROR] Unknown tray command: %s", subcommand);
         Console.error(msg);
         Console.error(F("Valid options: load,request | unload,request | load,ready | unload,ready | placed | gripped | removed | released | status | help"));
@@ -2167,7 +2165,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         if (!safeToExecute)
         {
-            char msg[100];
             sprintf(msg, "[ERROR], %s", errorReason.c_str());
             Console.error(msg);
             Console.serialInfo(F("Cannot execute tray commands while system is in an unsafe state"));
@@ -2176,8 +2173,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
             return false;
         }
     }
-
-    char msg[100];
 
     // Use switch-case for cleaner flow control
     switch (cmdCode)
@@ -2456,58 +2451,60 @@ bool cmd_tray(char *args, CommandCaller *caller)
     case 8: // "help"
     {
         Console.acknowledge(F("TRAY_HELP"));
-        Console.println(F("\n===== TRAY SYSTEM HELP ====="));
-        Console.println(F("\nTRAY LOADING SEQUENCE:"));
-        Console.println(F("  1. tray,load,request - Request permission to load a tray"));
-        Console.println(F("     > System will validate position 1 is empty and move shuttle there"));
-        Console.println(F("     > System responds with 'READY_TO_RECEIVE' when ready"));
-        Console.println(F("  2. tray,load,ready - Check if system is ready to receive a tray"));
-        Console.println(F("     > Returns [ACK] READY_TO_LOAD if system can accept a tray"));
-        Console.println(F("     > Returns [BUSY] if system is processing another tray"));
-        Console.println(F("     > Returns [ERROR] with reason if system cannot accept a tray"));
-        Console.println(F("  3. tray,placed - Notify system that tray has been physically placed"));
-        Console.println(F("     > System will lock the tray at position 1"));
-        Console.println(F("     > System responds with 'TRAY_SECURED' when complete"));
-        Console.println(F("  4. tray,released - Notify system to start processing the tray"));
-        Console.println(F("     > System will move tray to appropriate position based on system state"));
-        Console.println(F("     > First tray goes to position 3, second to position 2, third stays at position 1"));
-
-        Console.println(F("\nTRAY UNLOADING SEQUENCE:"));
-        Console.println(F("  1. tray,unload,request - Request permission to unload a tray"));
-        Console.println(F("     > If tray at position 1, system prepares it (shuttle retracted, tray locked)"));
-        Console.println(F("     > If tray at positions 2 or 3, system moves it to position 1 first"));
-        Console.println(F("     > System responds with 'TRAY_READY_FOR_GRIP' when at position 1"));
-        Console.println(F("  2. tray,unload,ready - Check if a tray is ready for pickup"));
-        Console.println(F("     > Returns [ACK] TRAY_READY_FOR_PICKUP if a tray is available"));
-        Console.println(F("     > Returns [BUSY] if system is preparing a tray for unloading"));
-        Console.println(F("     > Returns [ERROR] with reason if no tray is available"));
-        Console.println(F("     > This command can be used during operations"));
-        Console.println(F("  3. tray,gripped - Notify system that robot has gripped the tray"));
-        Console.println(F("     > Robot must have secure grip on tray before sending this command"));
-        Console.println(F("     > System unlocks the tray and responds with 'TRAY_UNLOCKED'"));
-        Console.println(F("  4. tray,removed - Notify system that tray has been physically removed"));
-        Console.println(F("     > System updates internal tracking"));
-        Console.println(F("     > System responds with 'TRAY_REMOVAL_CONFIRMED'"));
-
-        Console.println(F("\nTRAY STATUS COMMAND:"));
-        Console.println(F("  tray,status - Returns machine-readable status information"));
-        Console.println(F("  Returned values:"));
-        Console.println(F("    TRAYS_TOTAL:[0-3] - Total number of trays in system"));
-        Console.println(F("    POS1:[0|1] - Position 1 occupancy (0=empty, 1=occupied)"));
-        Console.println(F("    POS2:[0|1] - Position 2 occupancy (0=empty, 1=occupied)"));
-        Console.println(F("    POS3:[0|1] - Position 3 occupancy (0=empty, 1=occupied)"));
-        Console.println(F("    LOCK1:[0|1] - Position 1 lock status (0=unlocked, 1=locked)"));
-        Console.println(F("    LOCK2:[0|1] - Position 2 lock status (0=unlocked, 1=locked)"));
-        Console.println(F("    LOCK3:[0|1] - Position 3 lock status (0=unlocked, 1=locked)"));
-        Console.println(F("    PRESSURE:[0|1] - Pneumatic pressure status (0=insufficient, 1=sufficient)"));
-        Console.println(F("    LOADS:[number] - Total number of loads completed"));
-        Console.println(F("    UNLOADS:[number] - Total number of unloads completed"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If an operation fails, use 'system,reset' to reset the system state"));
-        Console.println(F("  • Use 'system,trays' for human-readable tray system status"));
-        Console.println(F("  • Use 'system,safety' to diagnose safety constraint issues"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== TRAY SYSTEM HELP =====\n"
+            "\nTRAY LOADING SEQUENCE:\n"
+            "  1. tray,load,request - Request permission to load a tray\n"
+            "     > System will validate position 1 is empty and move shuttle there\n"
+            "     > System responds with 'READY_TO_RECEIVE' when ready\n"
+            "  2. tray,load,ready - Check if system is ready to receive a tray\n"
+            "     > Returns [ACK] READY_TO_LOAD if system can accept a tray\n"
+            "     > Returns [BUSY] if system is processing another tray\n"
+            "     > Returns [ERROR] with reason if system cannot accept a tray\n"
+            "  3. tray,placed - Notify system that tray has been physically placed\n"
+            "     > System will lock the tray at position 1\n"
+            "     > System responds with 'TRAY_SECURED' when complete\n"
+            "  4. tray,released - Notify system to start processing the tray\n"
+            "     > System will move tray to appropriate position based on system state\n"
+            "     > First tray goes to position 3, second to position 2, third stays at position 1\n"
+            "\n"
+            "TRAY UNLOADING SEQUENCE:\n"
+            "  1. tray,unload,request - Request permission to unload a tray\n"
+            "     > If tray at position 1, system prepares it (shuttle retracted, tray locked)\n"
+            "     > If tray at positions 2 or 3, system moves it to position 1 first\n"
+            "     > System responds with 'TRAY_READY_FOR_GRIP' when at position 1\n"
+            "  2. tray,unload,ready - Check if a tray is ready for pickup\n"
+            "     > Returns [ACK] TRAY_READY_FOR_PICKUP if a tray is available\n"
+            "     > Returns [BUSY] if system is preparing a tray for unloading\n"
+            "     > Returns [ERROR] with reason if no tray is available\n"
+            "     > This command can be used during operations\n"
+            "  3. tray,gripped - Notify system that robot has gripped the tray\n"
+            "     > Robot must have secure grip on tray before sending this command\n"
+            "     > System unlocks the tray and responds with 'TRAY_UNLOCKED'\n"
+            "  4. tray,removed - Notify system that tray has been physically removed\n"
+            "     > System updates internal tracking\n"
+            "     > System responds with 'TRAY_REMOVAL_CONFIRMED'\n"
+            "\n"
+            "TRAY STATUS COMMAND:\n"
+            "  tray,status - Returns machine-readable status information\n"
+            "  Returned values:\n"
+            "    TRAYS_TOTAL:[0-3] - Total number of trays in system\n"
+            "    POS1:[0|1] - Position 1 occupancy (0=empty, 1=occupied)\n"
+            "    POS2:[0|1] - Position 2 occupancy (0=empty, 1=occupied)\n"
+            "    POS3:[0|1] - Position 3 occupancy (0=empty, 1=occupied)\n"
+            "    LOCK1:[0|1] - Position 1 lock status (0=unlocked, 1=locked)\n"
+            "    LOCK2:[0|1] - Position 2 lock status (0=unlocked, 1=locked)\n"
+            "    LOCK3:[0|1] - Position 3 lock status (0=unlocked, 1=locked)\n"
+            "    PRESSURE:[0|1] - Pneumatic pressure status (0=insufficient, 1=sufficient)\n"
+            "    LOADS:[number] - Total number of loads completed\n"
+            "    UNLOADS:[number] - Total number of unloads completed\n"
+            "\n"
+            "TROUBLESHOOTING:\n"
+            "  • If an operation fails, use 'system,reset' to reset the system state\n"
+            "  • Use 'system,trays' for human-readable tray system status\n"
+            "  • Use 'system,safety' to diagnose safety constraint issues\n"
+            "-------------------------------------------"
+        ));
 
         return true;
     }
@@ -2735,51 +2732,52 @@ bool cmd_test(char *args, CommandCaller *caller)
     case 4: // "help"
     {
         Console.acknowledge(F("TEST_HELP"));
-        Console.println(F("\n===== TEST SYSTEM HELP ====="));
-
-        Console.println(F("\nOVERVIEW:"));
-        Console.println(F("  The test system provides automated sequences for validating"));
-        Console.println(F("  system functionality and repeatability. Tests are designed"));
-        Console.println(F("  to verify proper operation of critical system components."));
-
-        Console.println(F("\nAVAILABLE TESTS:"));
-        Console.println(F("  test,home - Homing repeatability test"));
-        Console.println(F("    > Performs multiple homing operations to test precision"));
-        Console.println(F("    > Moves between home position and test position"));
-        Console.println(F("    > Useful for verifying encoder and limit switch reliability"));
-        Console.println(F("    > Test runs for approximately 20 cycles"));
-
-        Console.println(F("  test,position - Position cycling test"));
-        Console.println(F("    > Cycles through positions used in tray loading"));
-        Console.println(F("    > Tests movements between positions 1, 2, and 3"));
-        Console.println(F("    > Verifies motor accuracy and repeatability"));
-        Console.println(F("    > Test runs for approximately 10 cycles"));
-
-        Console.println(F("  test,tray - Comprehensive tray handling test"));
-        Console.println(F("    > Tests complete tray movement operations"));
-        Console.println(F("    > Includes valve operations for locking/unlocking"));
-        Console.println(F("    > Verifies sensors, positioning, and control sequences"));
-        Console.println(F("    > Most thorough test of the entire system"));
-
-        Console.println(F("\nRUNNING TESTS:"));
-        Console.println(F("  • Motor must be initialized (motor,init) before testing"));
-        Console.println(F("  • Home position must be established for position tests"));
-        Console.println(F("  • E-Stop must be inactive"));
-        Console.println(F("  • Tests can be aborted by typing 'abort' during execution"));
-        Console.println(F("  • Status messages display progress throughout the test"));
-
-        Console.println(F("\nTRAY TEST REQUIREMENTS:"));
-        Console.println(F("  • A tray must be present at position 1 to start"));
-        Console.println(F("  • Positions 2 and 3 must be clear initially"));
-        Console.println(F("  • Air system must be functioning properly"));
-        Console.println(F("  • All valves and sensors must be operational"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If a test fails, check the specific error message"));
-        Console.println(F("  • For position errors: verify motor operation with 'move' commands"));
-        Console.println(F("  • For valve errors: check air pressure and connections"));
-        Console.println(F("  • For sensor errors: verify sensor readings with 'system,state'"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== TEST SYSTEM HELP =====\n"
+            "\nOVERVIEW:\n"
+            "  The test system provides automated sequences for validating\n"
+            "  system functionality and repeatability. Tests are designed\n"
+            "  to verify proper operation of critical system components.\n"
+            "\n"
+            "AVAILABLE TESTS:\n"
+            "  test,home - Homing repeatability test\n"
+            "    > Performs multiple homing operations to test precision\n"
+            "    > Moves between home position and test position\n"
+            "    > Useful for verifying encoder and limit switch reliability\n"
+            "    > Test runs for approximately 20 cycles\n"
+            "\n"
+            "  test,position - Position cycling test\n"
+            "    > Cycles through positions used in tray loading\n"
+            "    > Tests movements between positions 1, 2, and 3\n"
+            "    > Verifies motor accuracy and repeatability\n"
+            "    > Test runs for approximately 10 cycles\n"
+            "\n"
+            "  test,tray - Comprehensive tray handling test\n"
+            "    > Tests complete tray movement operations\n"
+            "    > Includes valve operations for locking/unlocking\n"
+            "    > Verifies sensors, positioning, and control sequences\n"
+            "    > Most thorough test of the entire system\n"
+            "\n"
+            "RUNNING TESTS:\n"
+            "  • Motor must be initialized (motor,init) before testing\n"
+            "  • Home position must be established for position tests\n"
+            "  • E-Stop must be inactive\n"
+            "  • Tests can be aborted by typing 'abort' during execution\n"
+            "  • Status messages display progress throughout the test\n"
+            "\n"
+            "TRAY TEST REQUIREMENTS:\n"
+            "  • A tray must be present at position 1 to start\n"
+            "  • Positions 2 and 3 must be clear initially\n"
+            "  • Air system must be functioning properly\n"
+            "  • All valves and sensors must be operational\n"
+            "\n"
+            "TROUBLESHOOTING:\n"
+            "  • If a test fails, check the specific error message\n"
+            "  • For position errors: verify motor operation with 'move' commands\n"
+            "  • For valve errors: check air pressure and connections\n"
+            "  • For sensor errors: verify sensor readings with 'system,state'\n"
+            "-------------------------------------------"
+        ));
 
         return true;
     }
@@ -2846,14 +2844,14 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         {
             Console.serialInfo(F("\nMPG control is currently ENABLED"));
             sprintf(msg, "[STATUS] Current multiplier: x%d", currentMultiplier);
-            Serial.println(msg);
+            Console.serialInfo(msg);
 
             // Show position information if motor is homed
             if (isHomed)
             {
                 double positionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
                 sprintf(msg, "[INFO] Current position: %.2f mm", positionMm);
-                Serial.println(msg);
+                Console.serialInfo(msg);
             }
         }
         else
@@ -2873,11 +2871,11 @@ bool cmd_encoder(char *args, CommandCaller *caller)
 
         Console.serialInfo(F("\nMULTIPLIERS - Effect of one full handwheel rotation (100 pulses):"));
         sprintf(msg, "  x1: ~%.2f mm (fine adjustment)", 100 * MULTIPLIER_X1 / PULSES_PER_MM);
-        Serial.println(msg);
+        Console.serialInfo(msg);
         sprintf(msg, "  x10: ~%.2f mm (medium adjustment)", 100 * MULTIPLIER_X10 / PULSES_PER_MM);
-        Serial.println(msg);
+        Console.serialInfo(msg);
         sprintf(msg, "  x100: ~%.2f mm (coarse adjustment)", 100 * MULTIPLIER_X100 / PULSES_PER_MM);
-        Serial.println(msg);
+        Console.serialInfo(msg);
 
         return true;
     }
@@ -2960,7 +2958,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.serialInfo(msg);
 
         sprintf(msg, "[INFO] Using multiplier x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
-        Serial.println(msg);
+        Console.serialInfo(msg);
 
         Console.serialInfo(F("Issue 'encoder,disable' when finished with manual control"));
 
@@ -3010,10 +3008,10 @@ bool cmd_encoder(char *args, CommandCaller *caller)
             }
 
             sprintf(msg, "[INFO] Current multiplier value: %d", currentMultiplier);
-            Serial.println(msg);
+            Console.serialInfo(msg);
             double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
             sprintf(msg, "[INFO] One full rotation moves ~%.2f mm", mmPerRotation);
-            Serial.println(msg);
+            Console.serialInfo(msg);
             return true;
         }
         else
@@ -3023,11 +3021,11 @@ bool cmd_encoder(char *args, CommandCaller *caller)
             Console.println(msg);
 
             sprintf(msg, "[INFO] Current multiplier: x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
-            Serial.println(msg);
+            Console.serialInfo(msg);
 
             double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
             sprintf(msg, "[INFO] One full rotation moves ~%.2f mm", mmPerRotation);
-            Serial.println(msg);
+            Console.serialInfo(msg);
 
             return true;
         }
@@ -3036,50 +3034,51 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     case 4: // "help"
     {
         Console.acknowledge(F("ENCODER_HELP"));
-        Console.println(F("\n===== MPG HANDWHEEL SYSTEM HELP ====="));
-
-        Console.println(F("\nSETUP SEQUENCE:"));
-        Console.println(F("  1. 'motor,init' - Initialize the motor system"));
-        Console.println(F("  2. 'motor,home' - Home the motor to establish reference position"));
-        Console.println(F("  3. 'encoder,enable' - Activate MPG handwheel control"));
-        Console.println(F("  4. 'encoder,multiplier,X' - Set desired precision (X = 1, 10, or 100)"));
-
-        Console.println(F("\nCOMMAND REFERENCE:"));
-        Console.println(F("  encoder,enable - Activate handwheel control mode"));
-        Console.println(F("    > Motor position will respond directly to handwheel rotation"));
-        Console.println(F("    > One full rotation (100 pulses) moves distance based on multiplier"));
-        Console.println(F("  encoder,disable - Deactivate handwheel control mode"));
-        Console.println(F("    > Returns system to command-based position control"));
-        Console.println(F("  encoder,multiplier,X - Set movement precision"));
-        Console.println(F("    > X=1: Fine adjustment (~1.63mm per rotation)"));
-        Console.println(F("    > X=10: Medium adjustment (~16.3mm per rotation)"));
-        Console.println(F("    > X=100: Coarse adjustment (~163mm per rotation)"));
-
-        Console.println(F("\nAUTOMATIC DISABLING CONDITIONS:"));
-        Console.println(F("  • E-Stop activation - Safety override disables all motor control"));
-        Console.println(F("  • Motor fault condition - Requires 'motor,clear' to reset"));
-        Console.println(F("  • Power cycle or system reset"));
-        Console.println(F("  • When 'move' or 'jog' commands are issued"));
-
-        Console.println(F("\nMOVEMENT CONSTRAINTS:"));
-        Console.println(F("  • Hard limit at 0mm (home position)"));
-        Console.println(F("  • Hard limit at maximum travel position (~1050mm)"));
-        Console.println(F("  • Movement stops automatically at travel limits"));
-        Console.println(F("  • No movement allowed if motor is in fault state"));
-
-        Console.println(F("\nUSAGE TIPS:"));
-        Console.println(F("  • Start with x1 multiplier for precise positioning"));
-        Console.println(F("  • Use x10 or x100 for longer movements"));
-        Console.println(F("  • Monitor current position using 'motor,status' command"));
-        Console.println(F("  • Use 'encoder,disable' when finished with manual control"));
-        Console.println(F("  • Slow, steady handwheel rotation produces smoother movement"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If encoder doesn't respond: Check if motor is initialized and homed"));
-        Console.println(F("  • Erratic movement: Try lower multiplier setting"));
-        Console.println(F("  • No movement at limits: System is preventing over-travel"));
-        Console.println(F("  • After E-Stop: Must re-enable encoder control manually"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "\n===== MPG HANDWHEEL SYSTEM HELP =====\n"
+            "\nSETUP SEQUENCE:\n"
+            "  1. 'motor,init' - Initialize the motor system\n"
+            "  2. 'motor,home' - Home the motor to establish reference position\n"
+            "  3. 'encoder,enable' - Activate MPG handwheel control\n"
+            "  4. 'encoder,multiplier,X' - Set desired precision (X = 1, 10, or 100)\n"
+            "\n"
+            "COMMAND REFERENCE:\n"
+            "  encoder,enable - Activate handwheel control mode\n"
+            "    > Motor position will respond directly to handwheel rotation\n"
+            "    > One full rotation (100 pulses) moves distance based on multiplier\n"
+            "  encoder,disable - Deactivate handwheel control mode\n"
+            "    > Returns system to command-based position control\n"
+            "  encoder,multiplier,X - Set movement precision\n"
+            "    > X=1: Fine adjustment (~1.63mm per rotation)\n"
+            "    > X=10: Medium adjustment (~16.3mm per rotation)\n"
+            "    > X=100: Coarse adjustment (~163mm per rotation)\n"
+            "\n"
+            "AUTOMATIC DISABLING CONDITIONS:\n"
+            "  • E-Stop activation - Safety override disables all motor control\n"
+            "  • Motor fault condition - Requires 'motor,clear' to reset\n"
+            "  • Power cycle or system reset\n"
+            "  • When 'move' or 'jog' commands are issued\n"
+            "\n"
+            "MOVEMENT CONSTRAINTS:\n"
+            "  • Hard limit at 0mm (home position)\n"
+            "  • Hard limit at maximum travel position (~1050mm)\n"
+            "  • Movement stops automatically at travel limits\n"
+            "  • No movement allowed if motor is in fault state\n"
+            "\n"
+            "USAGE TIPS:\n"
+            "  • Start with x1 multiplier for precise positioning\n"
+            "  • Use x10 or x100 for longer movements\n"
+            "  • Monitor current position using 'motor,status' command\n"
+            "  • Use 'encoder,disable' when finished with manual control\n"
+            "  • Slow, steady handwheel rotation produces smoother movement\n"
+            "\n"
+            "TROUBLESHOOTING:\n"
+            "  • If encoder doesn't respond: Check if motor is initialized and homed\n"
+            "  • Erratic movement: Try lower multiplier setting\n"
+            "  • No movement at limits: System is preventing over-travel\n"
+            "  • After E-Stop: Must re-enable encoder control manually\n"
+            "-------------------------------------------"
+        ));
 
         return true;
     }
@@ -3114,8 +3113,23 @@ static const size_t NETWORK_COMMAND_COUNT = sizeof(NETWORK_COMMANDS) / sizeof(Su
 // Network management command
 bool cmd_network(char *args, CommandCaller *caller)
 {
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+
+    // Check for empty argument
+    if (strlen(trimmed) == 0)
+    {
+        Console.error(F("Missing subcommand. Usage: network,<status|close|closeall|help>"));
+        return false;
+    }
+
     char msg[100];
-    char *subcommand = strtok(args, " ");
+    char *subcommand = strtok(trimmed, " ");
 
     if (subcommand == nullptr)
     {
@@ -3142,28 +3156,28 @@ bool cmd_network(char *args, CommandCaller *caller)
             // Display IP address
             IPAddress ip = Ethernet.localIP();
             sprintf(msg, "IP Address: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-            Console.println(msg);
+            Console.serialInfo(msg);
 
             // Display MAC address
             byte mac[6];
             Ethernet.MACAddress(mac);
             sprintf(msg, "MAC Address: %02X:%02X:%02X:%02X:%02X:%02X",
                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-            Console.println(msg);
+            Console.serialInfo(msg);
 
             // Display port
             sprintf(msg, "Server Port: %d", ETHERNET_PORT);
-            Console.println(msg);
+            Console.serialInfo(msg);
 
             // Get client count using the shared function
             int connectedCount = getConnectedClientCount();
 
             // Display connected clients
-            Console.println(F("\nConnected Clients:"));
+            Console.serialInfo(F("\nConnected Clients:"));
 
             if (connectedCount == 0)
             {
-                Console.println(F("  No clients connected"));
+                Console.serialInfo(F("  No clients connected"));
             }
             else
             {
@@ -3175,13 +3189,13 @@ bool cmd_network(char *args, CommandCaller *caller)
                         IPAddress cip = clients[i].remoteIP();
                         int cport = clients[i].remotePort();
                         sprintf(msg, "  Client %d: %d.%d.%d.%d:%d", i + 1, cip[0], cip[1], cip[2], cip[3], cport);
-                        Console.println(msg);
+                        Console.serialInfo(msg);
                     }
                 }
             }
 
             sprintf(msg, "Total Connections: %d of %d", connectedCount, MAX_ETHERNET_CLIENTS);
-            Console.println(msg);
+            Console.serialInfo(msg);
         }
 
         return true;
@@ -3209,7 +3223,7 @@ bool cmd_network(char *args, CommandCaller *caller)
 
             Console.acknowledge(F("CLIENT_DISCONNECTED"));
             sprintf(msg, "Closed connection from %d.%d.%d.%d:%d", ip[0], ip[1], ip[2], ip[3], port);
-            Console.println(msg);
+            Console.serialInfo(msg);
             return true;
         }
         else
@@ -3235,56 +3249,60 @@ bool cmd_network(char *args, CommandCaller *caller)
 
         Console.acknowledge(F("ALL_CLIENTS_DISCONNECTED"));
         sprintf(msg, "Closed %d connections", count);
-        Console.println(msg);
+        Console.serialInfo(msg);
         return true;
     }
 
     case 4: // "help"
     {
         Console.acknowledge(F("NETWORK_HELP"));
-        Console.println(F("\n===== NETWORK MANAGEMENT HELP ====="));
-
-        Console.println(F("\nOVERVIEW:"));
-        Console.println(F("  The network system provides commands to monitor and manage"));
-        Console.println(F("  Ethernet connections to the conveyor controller."));
-
-        Console.println(F("\nCOMMAND REFERENCE:"));
-        Console.println(F("  network,status - Display network status and connections"));
-        Console.println(F("    > Shows IP address, MAC address, and port"));
-        Console.println(F("    > Lists all currently connected clients"));
-        Console.println(F("    > Displays connection count and maximum capacity"));
-
-        Console.println(F("  network,close,X - Close a specific client connection"));
-        Console.println(F("    > X = Client number from the status display (1-based)"));
-        Console.println(F("    > Example: network,close,1 - closes the first client"));
-        Console.println(F("    > Useful for disconnecting individual stale connections"));
-
-        Console.println(F("  network,closeall - Close all client connections"));
-        Console.println(F("    > Forcibly disconnects all connected clients"));
-        Console.println(F("    > Use to recover from connection management issues"));
-        Console.println(F("    > Clients can reconnect after being closed"));
-
-        Console.println(F("\nCONNECTION MANAGEMENT:"));
+        Console.println(F(
+            "\n===== NETWORK MANAGEMENT HELP =====\n"
+            "\nOVERVIEW:\n"
+            "  The network system provides commands to monitor and manage\n"
+            "  Ethernet connections to the conveyor controller.\n"
+            "\n"
+            "COMMAND REFERENCE:\n"
+            "  network,status - Display network status and connections\n"
+            "    > Shows IP address, MAC address, and port\n"
+            "    > Lists all currently connected clients\n"
+            "    > Displays connection count and maximum capacity\n"
+            "\n"
+            "  network,close,X - Close a specific client connection\n"
+            "    > X = Client number from the status display (1-based)\n"
+            "    > Example: network,close,1 - closes the first client\n"
+            "    > Useful for disconnecting individual stale connections\n"
+            "\n"
+            "  network,closeall - Close all client connections\n"
+            "    > Forcibly disconnects all connected clients\n"
+            "    > Use to recover from connection management issues\n"
+            "    > Clients can reconnect after being closed\n"
+            "\n"
+            "CONNECTION MANAGEMENT:\n"
+        ));
         sprintf(msg, "  • System supports up to %d simultaneous client connections", MAX_ETHERNET_CLIENTS);
         Console.println(msg);
-        Console.println(F("  • Inactive connections time out after 2 minutes"));
-        Console.println(F("  • System automatically checks for stale connections every 30s"));
-        Console.println(F("  • Commands can be issued through any connected client"));
-
-        Console.println(F("\nTROUBLESHOOTING:"));
-        Console.println(F("  • If unable to connect: Check IP address and network settings"));
-        Console.println(F("  • If 'no free slots' error: Use network,status to check connections"));
-        Console.println(F("  • For stale connections: Use network,close or network,closeall"));
-        Console.println(F("  • When cable is disconnected, all clients will be closed automatically"));
-        Console.println(F("-------------------------------------------"));
+        Console.println(F(
+            "  • Inactive connections time out after 2 minutes\n"
+            "  • System automatically checks for stale connections every 30s\n"
+            "  • Commands can be issued through any connected client\n"
+            "\n"
+            "TROUBLESHOOTING:\n"
+            "  • If unable to connect: Check IP address and network settings\n"
+            "  • If 'no free slots' error: Use network,status to check connections\n"
+            "  • For stale connections: Use network,close or network,closeall\n"
+            "  • When cable is disconnected, all clients will be closed automatically\n"
+            "-------------------------------------------"
+        ));
 
         return true;
     }
 
     default: // Unknown command
     {
-        Console.error(F("UNKNOWN_SUBCOMMAND"));
-        Console.println(F("Valid subcommands: status, close, closeall, help"));
+        sprintf(msg, "Unknown network subcommand: %s", subcommand);
+        Console.error(msg);
+        Console.serialInfo(F("Valid options are 'status', 'close', 'closeall', or 'help'"));
         return false;
     }
     }

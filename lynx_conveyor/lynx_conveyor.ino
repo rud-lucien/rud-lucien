@@ -44,8 +44,9 @@ void setup()
 
     // Get count of CCIO-8 boards
     ccioBoardCount = CcioMgr.CcioCount();
-    Serial.print(F("[INFO] Discovered CCIO boards: "));
-    Serial.println(ccioBoardCount);
+    char msg[50];
+    sprintf(msg, "[INFO] Discovered CCIO boards: %d", ccioBoardCount);
+    Console.serialInfo(msg);
 
     // Now initialize sensor systems
     Console.serialInfo(F("Initializing sensor systems..."));
@@ -135,8 +136,9 @@ void loop()
     if (operationInProgress &&
         (!safety.operationWithinTimeout || !safety.operationSequenceValid))
     {
-        Console.print(F("[ERROR] SAFETY VIOLATION: "));
-        Console.println(safety.operationSequenceMessage);
+        char errorMsg[200];
+        sprintf(errorMsg, "SAFETY VIOLATION: %s", safety.operationSequenceMessage.c_str());
+        Console.error(errorMsg);
 
         // Emergency stop or other recovery action
         // Use the failureReason from safety validation

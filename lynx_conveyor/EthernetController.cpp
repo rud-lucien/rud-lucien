@@ -21,15 +21,15 @@ void initEthernetController(bool useDhcp)
     Console.serialInfo(F("Starting Ethernet initialization..."));
 
     // Print link status for debugging
-    Serial.print(F("Ethernet physical link status: "));
+    char msg[200];
     if (Ethernet.linkStatus() == LinkOFF)
     {
-        Console.serialWarning(F("DISCONNECTED - cable may not be connected"));
+        Console.serialWarning(F("Ethernet physical link status: DISCONNECTED - cable may not be connected"));
         // Important: Continue anyway to initialize the Ethernet chip
     }
     else
     {
-        Console.serialInfo(F("CONNECTED"));
+        Console.serialInfo(F("Ethernet physical link status: CONNECTED"));
     }
 
     // Initialize Ethernet interface
@@ -41,7 +41,7 @@ void initEthernetController(bool useDhcp)
         result = Ethernet.begin(mac);
         if (result == 0)
         {
-            Console.error(F("DHCP failed! Falling back to static IP"));
+            Console.serialError(F("DHCP failed! Falling back to static IP"));
             // Fall back to static IP
             IPAddress ip(192, 168, 0, 177);
             IPAddress dns(8, 8, 8, 8);
@@ -63,13 +63,13 @@ void initEthernetController(bool useDhcp)
 
     // Print assigned IP address
     IPAddress ip = Ethernet.localIP();
-    Serial.print(F("Ethernet IP address: "));
-    Serial.println(ip);
+    sprintf(msg, "Ethernet IP address: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    Console.serialInfo(msg);
 
     // Start the server
     server.begin();
-    Serial.print(F("Server started on port "));
-    Serial.println(ETHERNET_PORT);
+    sprintf(msg, "Server started on port %d", ETHERNET_PORT);
+    Console.serialInfo(msg);
 
     // Mark as initialized regardless of link status
     ethernetInitialized = true;
@@ -115,12 +115,12 @@ void processEthernetConnections()
             // Check if client has been inactive too long
             if (timeoutElapsed(currentTime, clientLastActivityTime[i], CLIENT_TIMEOUT_MS))
             {
-                char msg[96];
+                char msg[200];
                 snprintf(msg, sizeof(msg), "[NETWORK] Closing inactive client: %d.%d.%d.%d:%d",
                          clients[i].remoteIP()[0], clients[i].remoteIP()[1],
                          clients[i].remoteIP()[2], clients[i].remoteIP()[3],
                          clients[i].remotePort());
-                Serial.println(msg);
+                Console.serialInfo(msg);
                 opLogHistory.addEntry(msg);
                 clients[i].stop();
             }
@@ -148,12 +148,12 @@ void processEthernetConnections()
                 // Try to write a single byte to test connection
                 if (!clients[i].print(""))
                 {
-                    char msg[96];
+                    char msg[200];
                     snprintf(msg, sizeof(msg), "[NETWORK] Detected stale connection: %d.%d.%d.%d:%d",
                              clients[i].remoteIP()[0], clients[i].remoteIP()[1],
                              clients[i].remoteIP()[2], clients[i].remoteIP()[3],
                              clients[i].remotePort());
-                    Serial.println(msg);
+                    Console.serialDiagnostic(msg);
                     opLogHistory.addEntry(msg);
                     clients[i].stop();
                 }
@@ -173,18 +173,13 @@ void processEthernetConnections()
             if (!clients[i] || !clients[i].connected())
             {
                 // Found a free slot
-                Serial.print(F("[NETWORK] New client connected from "));
-                Serial.print(newClient.remoteIP());
-                Serial.print(F(":"));
-                Serial.println(newClient.remotePort());
-                {
-                    char msg[96];
-                    snprintf(msg, sizeof(msg), "[NETWORK] New client connected from %d.%d.%d.%d:%d",
-                             newClient.remoteIP()[0], newClient.remoteIP()[1],
-                             newClient.remoteIP()[2], newClient.remoteIP()[3],
-                             newClient.remotePort());
-                    opLogHistory.addEntry(msg);
-                }
+                char msg[200];
+                sprintf(msg, "[NETWORK] New client connected from %d.%d.%d.%d:%d", 
+                        newClient.remoteIP()[0], newClient.remoteIP()[1],
+                        newClient.remoteIP()[2], newClient.remoteIP()[3],
+                        newClient.remotePort());
+                Console.serialInfo(msg);
+                opLogHistory.addEntry(msg);
 
                 // Replace client in this slot
                 clients[i] = newClient;
@@ -202,9 +197,7 @@ void processEthernetConnections()
         if (!clientAdded)
         {
             Console.serialWarning(F("[NETWORK] Rejected client - no free slots"));
-            {
-                opLogHistory.addEntry("[NETWORK] Rejected client - no free slots");
-            }
+            opLogHistory.addEntry("[NETWORK] Rejected client - no free slots");
             newClient.println(F("ERROR: Too many connections"));
             newClient.stop();
         }
@@ -215,9 +208,9 @@ void processEthernetConnections()
     {
         if (clients[i] && !clients[i].connected())
         {
-            char msg[64];
+            char msg[200];
             snprintf(msg, sizeof(msg), "[NETWORK] Client disconnected: %d", i);
-            Serial.println(msg);
+            Console.serialDiagnostic(msg);
             opLogHistory.addEntry(msg);
             clients[i].stop();
         }
@@ -250,12 +243,12 @@ void testConnections()
                 // If this fails, the connection is stale
                 if (!clients[i].print(" "))
                 {
-                    char msg[96];
+                    char msg[200];
                     snprintf(msg, sizeof(msg), "[NETWORK] Detected stale connection: %d.%d.%d.%d:%d",
                              clients[i].remoteIP()[0], clients[i].remoteIP()[1],
                              clients[i].remoteIP()[2], clients[i].remoteIP()[3],
                              clients[i].remotePort());
-                    Serial.println(msg);
+                    Console.serialDiagnostic(msg);
                     opLogHistory.addEntry(msg);
                     clients[i].stop();
                 }
@@ -321,10 +314,10 @@ bool closeClientConnection(int index)
         int port = clients[index].remotePort();
         clients[index].stop();
 
-        char msg[96];
+        char msg[200];
         snprintf(msg, sizeof(msg), "[NETWORK] Manually closed connection from %d.%d.%d.%d:%d",
                  ip[0], ip[1], ip[2], ip[3], port);
-        Serial.println(msg);
+        Console.serialInfo(msg);
         opLogHistory.addEntry(msg);
         return true;
     }
@@ -342,12 +335,9 @@ bool closeAllConnections()
             count++;
         }
     }
-    char msg[64];
+    char msg[200];
     snprintf(msg, sizeof(msg), "[NETWORK] Closed %d connections", count);
-    Serial.println(msg);
+    Console.serialInfo(msg);
     opLogHistory.addEntry(msg);
-    Serial.print(F("[NETWORK] Closed "));
-    Serial.print(count);
-    Serial.println(F(" connections"));
     return count > 0;
 }
