@@ -3,7 +3,7 @@
     "configurations": [
         {
             "name": "Arduino",
-            "compilerPath": "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4\\bin\\arm-none-eabi-g++",
+            "compilerPath": "/Users/rlucien/Library/Arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/arm-none-eabi-g++",
             "compilerArgs": [
                 "-mthumb",
                 "-mcpu=cortex-m4",
@@ -21,23 +21,24 @@
             ],
             "intelliSenseMode": "gcc-x64",
             "includePath": [
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\ClearCore\\hardware\\sam\\1.7.0\\cores\\arduino\\api",
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\CMSIS\\4.5.0\\CMSIS\\Include\\",
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\ClearCore\\hardware\\sam\\1.7.0\\variants\\clearcore\\Third Party\\SAME53\\CMSIS\\Device\\Include",
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\ClearCore\\hardware\\sam\\1.7.0\\Teknic\\libClearCore\\inc",
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\ClearCore\\hardware\\sam\\1.7.0\\Teknic\\LwIP\\LwIP\\src\\include",
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\ClearCore\\hardware\\sam\\1.7.0\\Teknic\\LwIP\\LwIP\\port\\include",
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\ClearCore\\hardware\\sam\\1.7.0\\cores\\arduino",
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\ClearCore\\hardware\\sam\\1.7.0\\variants\\clearcore",
-                "c:\\users\\rlucien\\appdata\\local\\arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4\\arm-none-eabi\\include\\c++\\7.2.1",
-                "c:\\users\\rlucien\\appdata\\local\\arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4\\arm-none-eabi\\include\\c++\\7.2.1\\arm-none-eabi",
-                "c:\\users\\rlucien\\appdata\\local\\arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4\\arm-none-eabi\\include\\c++\\7.2.1\\backward",
-                "c:\\users\\rlucien\\appdata\\local\\arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4\\lib\\gcc\\arm-none-eabi\\7.2.1\\include",
-                "c:\\users\\rlucien\\appdata\\local\\arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4\\lib\\gcc\\arm-none-eabi\\7.2.1\\include-fixed",
-                "c:\\users\\rlucien\\appdata\\local\\arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4\\arm-none-eabi\\include"
+                "/Users/rlucien/Library/Arduino15/packages/ClearCore/hardware/sam/1.7.0/cores/arduino/api",
+                "/Users/rlucien/Library/Arduino15/packages/arduino/tools/CMSIS/4.5.0/CMSIS/Include/",
+                "/Users/rlucien/Library/Arduino15/packages/ClearCore/hardware/sam/1.7.0/variants/clearcore/Third Party/SAME53/CMSIS/Device/Include",
+                "/Users/rlucien/Library/Arduino15/packages/ClearCore/hardware/sam/1.7.0/Teknic/libClearCore/inc",
+                "/Users/rlucien/Library/Arduino15/packages/ClearCore/hardware/sam/1.7.0/Teknic/LwIP/LwIP/src/include",
+                "/Users/rlucien/Library/Arduino15/packages/ClearCore/hardware/sam/1.7.0/Teknic/LwIP/LwIP/port/include",
+                "/Users/rlucien/Library/Arduino15/packages/ClearCore/hardware/sam/1.7.0/cores/arduino",
+                "/Users/rlucien/Library/Arduino15/packages/ClearCore/hardware/sam/1.7.0/variants/clearcore",
+                "/Users/rlucien/Documents/Arduino/libraries/Commander-API/src",
+                "/Users/rlucien/Library/Arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/arm-none-eabi/include/c++/7.2.1",
+                "/Users/rlucien/Library/Arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/arm-none-eabi/include/c++/7.2.1/arm-none-eabi",
+                "/Users/rlucien/Library/Arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/arm-none-eabi/include/c++/7.2.1/backward",
+                "/Users/rlucien/Library/Arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/lib/gcc/arm-none-eabi/7.2.1/include",
+                "/Users/rlucien/Library/Arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/lib/gcc/arm-none-eabi/7.2.1/include-fixed",
+                "/Users/rlucien/Library/Arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/arm-none-eabi/include"
             ],
             "forcedInclude": [
-                "C:\\Users\\rlucien\\AppData\\Local\\Arduino15\\packages\\ClearCore\\hardware\\sam\\1.7.0\\cores\\arduino\\Arduino.h"
+                "/Users/rlucien/Library/Arduino15/packages/ClearCore/hardware/sam/1.7.0/cores/arduino/Arduino.h"
             ],
             "cStandard": "c11",
             "cppStandard": "c++11",

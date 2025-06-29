@@ -1,0 +1,16 @@
+*.cache
+lynx_conveyor/.vscode/arduino.json
+lynx_conveyor/.vscode/arduino.json
+lynx_conveyor/.vscode/c_cpp_properties.json
+/lynx_conveyor/.vscode
+*.json
+*.o
+*.d
+*.map
+*.eep
+*.json
+*.json
+*.bin
+*.a
+*.elf
+*.json
