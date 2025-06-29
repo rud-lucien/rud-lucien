@@ -16,3 +16,4 @@ lynx_conveyor/.vscode/c_cpp_properties.json
 *.json
 .DS_Store
 lynx_conveyor/build/
+lynx_conveyor/build/sketch
