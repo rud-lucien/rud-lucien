@@ -219,8 +219,7 @@ bool cmd_lock(char *args, CommandCaller *caller)
             "  • Verify sensor connections if lock command doesn't register\n"
             "  • Use 'system,state' to see detailed valve and sensor status\n"
             "  • For persistent issues, check valve functionality\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
         return true;
 
     case 4: // Tray numbers (1, 2, or 3)
@@ -469,8 +468,7 @@ bool cmd_unlock(char *args, CommandCaller *caller)
             "  • Verify sensor connections if unlock command doesn't register\n"
             "  • Use 'system,state' to see detailed valve and sensor status\n"
             "  • For persistent issues, check valve functionality\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
 
@@ -721,8 +719,7 @@ bool cmd_log(char *args, CommandCaller *caller)
             "  • Watch for sensor/valve mismatches [!] indicating hardware issues\n"
             "  • Compare HLFB status with motor state to identify drive problems\n"
             "  • Verify position values match expected targets during movements\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
     }
@@ -790,23 +787,23 @@ bool cmd_motor(char *args, CommandCaller *caller)
         Console.serialInfo(F("Initializing motor..."));
 
         // Diagnostic: Print state before initialization
-        sprintf(msg, "[DIAGNOSTIC] Motor state before init: %s", 
-            motorState == MOTOR_STATE_IDLE ? "IDLE" :
-            motorState == MOTOR_STATE_MOVING ? "MOVING" :
-            motorState == MOTOR_STATE_HOMING ? "HOMING" :
-            motorState == MOTOR_STATE_FAULTED ? "FAULTED" :
-            motorState == MOTOR_STATE_NOT_READY ? "NOT READY" : "UNKNOWN");
+        sprintf(msg, "[DIAGNOSTIC] Motor state before init: %s",
+                motorState == MOTOR_STATE_IDLE ? "IDLE" : motorState == MOTOR_STATE_MOVING  ? "MOVING"
+                                                      : motorState == MOTOR_STATE_HOMING    ? "HOMING"
+                                                      : motorState == MOTOR_STATE_FAULTED   ? "FAULTED"
+                                                      : motorState == MOTOR_STATE_NOT_READY ? "NOT READY"
+                                                                                            : "UNKNOWN");
         Console.serialInfo(msg);
 
         initMotorSystem();
 
         // Diagnostic: Print state after initialization
-        sprintf(msg, "[DIAGNOSTIC] Motor state after init: %s", 
-            motorState == MOTOR_STATE_IDLE ? "IDLE" :
-            motorState == MOTOR_STATE_MOVING ? "MOVING" :
-            motorState == MOTOR_STATE_HOMING ? "HOMING" :
-            motorState == MOTOR_STATE_FAULTED ? "FAULTED" :
-            motorState == MOTOR_STATE_NOT_READY ? "NOT READY" : "UNKNOWN");
+        sprintf(msg, "[DIAGNOSTIC] Motor state after init: %s",
+                motorState == MOTOR_STATE_IDLE ? "IDLE" : motorState == MOTOR_STATE_MOVING  ? "MOVING"
+                                                      : motorState == MOTOR_STATE_HOMING    ? "HOMING"
+                                                      : motorState == MOTOR_STATE_FAULTED   ? "FAULTED"
+                                                      : motorState == MOTOR_STATE_NOT_READY ? "NOT READY"
+                                                                                            : "UNKNOWN");
         Console.serialInfo(msg);
 
         if (motorState == MOTOR_STATE_NOT_READY || motorState == MOTOR_STATE_FAULTED)
@@ -829,11 +826,11 @@ bool cmd_motor(char *args, CommandCaller *caller)
 
         // Display motor state
         sprintf(msg, "  State: %s",
-            motorState == MOTOR_STATE_IDLE ? "IDLE" :
-            motorState == MOTOR_STATE_MOVING ? "MOVING" :
-            motorState == MOTOR_STATE_HOMING ? "HOMING" :
-            motorState == MOTOR_STATE_FAULTED ? "FAULTED" :
-            motorState == MOTOR_STATE_NOT_READY ? "NOT READY" : "UNKNOWN");
+                motorState == MOTOR_STATE_IDLE ? "IDLE" : motorState == MOTOR_STATE_MOVING  ? "MOVING"
+                                                      : motorState == MOTOR_STATE_HOMING    ? "HOMING"
+                                                      : motorState == MOTOR_STATE_FAULTED   ? "FAULTED"
+                                                      : motorState == MOTOR_STATE_NOT_READY ? "NOT READY"
+                                                                                            : "UNKNOWN");
         Console.println(msg);
 
         // Display homing status
@@ -1121,8 +1118,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
             "  • Use E-Stop if unexpected movement occurs\n"
             "  • After E-Stop, clear faults before resuming operation\n"
             "  • Motor movements will halt automatically at travel limits\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
         break;
@@ -1470,8 +1466,7 @@ bool cmd_move(char *args, CommandCaller *caller)
             "  • After E-Stop, clear faults with 'motor,clear' before moving\n"
             "  • For short, precise movements, consider using 'jog' commands\n"
             "  • For interactive positioning, use 'encoder' handwheel control\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
         return true;
 
     default:
@@ -1800,8 +1795,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
             "  • If at travel limit, you can only jog in the opposite direction\n"
             "  • After E-Stop, clear any faults before attempting to jog\n"
             "  • If motor is already moving, wait for it to complete or use motor,abort\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
     }
@@ -2002,8 +1996,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
             "  • Review history to understand sequence of events leading to failures\n"
             "  • History logs are preserved until power cycle or buffer fills (20 entries)\n"
             "  • Log critical commands/operations before leaving system unattended\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
     }
@@ -2228,10 +2221,10 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         // Add helpful message about the overall loading process
         sprintf(msg, "%s tray will be moved to position %s after placement",
-            trayTracking.totalTraysInSystem == 0 ? "First" :
-            trayTracking.totalTraysInSystem == 1 ? "Second" : "Third",
-            trayTracking.totalTraysInSystem == 0 ? "3" :
-            trayTracking.totalTraysInSystem == 1 ? "2" : "1");
+                trayTracking.totalTraysInSystem == 0 ? "First" : trayTracking.totalTraysInSystem == 1 ? "Second"
+                                                                                                      : "Third",
+                trayTracking.totalTraysInSystem == 0 ? "3" : trayTracking.totalTraysInSystem == 1 ? "2"
+                                                                                                  : "1");
         Console.serialInfo(msg);
 
         return true;
@@ -2504,8 +2497,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
             "  • If an operation fails, use 'system,reset' to reset the system state\n"
             "  • Use 'system,trays' for human-readable tray system status\n"
             "  • Use 'system,safety' to diagnose safety constraint issues\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
     }
@@ -2777,8 +2769,7 @@ bool cmd_test(char *args, CommandCaller *caller)
             "  • For position errors: verify motor operation with 'move' commands\n"
             "  • For valve errors: check air pressure and connections\n"
             "  • For sensor errors: verify sensor readings with 'system,state'\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
     }
@@ -3078,8 +3069,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
             "  • Erratic movement: Try lower multiplier setting\n"
             "  • No movement at limits: System is preventing over-travel\n"
             "  • After E-Stop: Must re-enable encoder control manually\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
     }
@@ -3163,7 +3153,7 @@ bool cmd_network(char *args, CommandCaller *caller)
             byte mac[6];
             Ethernet.MACAddress(mac);
             sprintf(msg, "MAC Address: %02X:%02X:%02X:%02X:%02X:%02X",
-                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+                    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             Console.serialInfo(msg);
 
             // Display port
@@ -3279,8 +3269,7 @@ bool cmd_network(char *args, CommandCaller *caller)
             "    > Use to recover from connection management issues\n"
             "    > Clients can reconnect after being closed\n"
             "\n"
-            "CONNECTION MANAGEMENT:\n"
-        ));
+            "CONNECTION MANAGEMENT:\n"));
         sprintf(msg, "  • System supports up to %d simultaneous client connections", MAX_ETHERNET_CLIENTS);
         Console.println(msg);
         Console.println(F(
@@ -3293,8 +3282,7 @@ bool cmd_network(char *args, CommandCaller *caller)
             "  • If 'no free slots' error: Use network,status to check connections\n"
             "  • For stale connections: Use network,close or network,closeall\n"
             "  • When cable is disconnected, all clients will be closed automatically\n"
-            "-------------------------------------------"
-        ));
+            "-------------------------------------------"));
 
         return true;
     }

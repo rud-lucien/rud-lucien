@@ -120,5 +120,4 @@ extern MultiPrint Console;
 // Initialize the output manager
 void initOutputManager();
 
-
 #endif // OUTPUT_MANAGER_H

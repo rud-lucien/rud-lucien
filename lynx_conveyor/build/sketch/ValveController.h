@@ -32,10 +32,11 @@ struct CylinderSensor
 };
 
 // Pressure Sensor Structure
-struct PressureSensor {
-    uint8_t analogPin;            // Analog input pin
-    float minPressure;            // Minimum pressure in PSI
-    float maxPressure;            // Maximum pressure in PSI
+struct PressureSensor
+{
+    uint8_t analogPin; // Analog input pin
+    float minPressure; // Minimum pressure in PSI
+    float maxPressure; // Maximum pressure in PSI
 };
 
 //=============================================================================
@@ -57,7 +58,7 @@ struct PressureSensor {
 #define TRAY_2_CYLINDER_SENSOR_PIN 5    // ClearCore IO-5 - Detects Tray 2 cylinder position
 #define TRAY_3_CYLINDER_SENSOR_PIN A9   // ClearCore A9 - Detects Tray 3 cylinder position
 #define SHUTTLE_CYLINDER_SENSOR_PIN A10 // ClearCore A10 - Detects Shuttle cylinder position
-#define PRESSURE_SENSOR_PIN A11 // ClearCore A11 - Air pressure sensor
+#define PRESSURE_SENSOR_PIN A11         // ClearCore A11 - Air pressure sensor
 
 // Tray detection sensors on IO pins of ClearCore main board
 #define TRAY_1_DETECT_PIN 1 // ClearCore IO-1 - Detects tray at position 1
@@ -65,10 +66,8 @@ struct PressureSensor {
 #define TRAY_3_DETECT_PIN 3 // ClearCore IO-3 - Detects tray at position 3
 
 // Other constants
-#define PULSE_DURATION 100 // Minimum recommended pulse duration in milliseconds
+#define PULSE_DURATION 100                        // Minimum recommended pulse duration in milliseconds
 #define VALVE_SENSOR_CONFIRMATION_TIMEOUT_MS 1000 // Timeout for valve sensor to confirm position change (1 second)
-
-
 
 //=============================================================================
 // GLOBAL VARIABLES

@@ -188,10 +188,10 @@ struct SafetyValidationResult
     AbortReason failureReason;
 
     // Lock/unlock operation status
-    bool lockOperationSuccessful;     // Set to false if a lock operation recently failed
-    bool unlockOperationSuccessful;   // Set to false if an unlock operation recently failed
-    String lockFailureDetails;        // Details about which lock operation failed
-    String unlockFailureDetails;      // Details about which unlock operation failed
+    bool lockOperationSuccessful;   // Set to false if a lock operation recently failed
+    bool unlockOperationSuccessful; // Set to false if an unlock operation recently failed
+    String lockFailureDetails;      // Details about which lock operation failed
+    String unlockFailureDetails;    // Details about which unlock operation failed
 };
 
 //=============================================================================
@@ -252,7 +252,7 @@ bool waitTimeReached(unsigned long current, unsigned long previous, unsigned lon
 void printHumanReadableTime(unsigned long secondsAgo);
 
 // Format absolute time (milliseconds since startup) to HH:MM:SS format
-void formatAbsoluteTime(unsigned long timeMs, char* buffer);
+void formatAbsoluteTime(unsigned long timeMs, char *buffer);
 
 //=============================================================================
 // SYSTEM STATE FUNCTIONS

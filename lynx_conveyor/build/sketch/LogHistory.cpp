@@ -1,6 +1,6 @@
 #line 1 "/Users/rlucien/Documents/GitHub/rud-lucien/lynx_conveyor/LogHistory.cpp"
 #include "LogHistory.h"
-#include "Utils.h" 
+#include "Utils.h"
 
 //=============================================================================
 // GLOBAL INSTANCE
@@ -67,7 +67,7 @@ void LogHistory::printHistory()
         // Build complete log entry message
         char timeBuffer[12];
         formatAbsoluteTime(entries[idx].timestamp, timeBuffer);
-        
+
         char logEntry[200];
         sprintf(logEntry, "[%s] %s", timeBuffer, entries[idx].message);
         Console.println(logEntry);
@@ -89,6 +89,3 @@ void LogHistory::clear()
     head = 0;
     count = 0;
 }
-
-
-

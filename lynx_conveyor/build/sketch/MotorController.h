@@ -22,7 +22,7 @@
 //=============================================================================
 
 // Motor & Motion parameters
-#define PULSES_PER_REV 800                         // Motor configured for 800 pulses per revolution
+#define PULSES_PER_REV 800                          // Motor configured for 800 pulses per revolution
 #define MM_PER_REV 53.98                            // Calibrated: 53.98 mm travel per revolution
 #define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV) // ~14.81 pulses per mm (800 / 53.98)
 

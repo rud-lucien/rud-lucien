@@ -116,7 +116,7 @@ bool testHomingRepeatability()
     // Set test flag
     testInProgress = true;
 
-    char messageBuffer[200]; // Single buffer for all formatted messages in this function
+    char messageBuffer[200];                 // Single buffer for all formatted messages in this function
     const int NUM_CYCLES = 20;               // Number of test cycles to run
     const double TEST_POSITION_MM = 150.0;   // Position to move to during each cycle
     const unsigned long WAIT_TIME_MS = 5000; // Wait time between operations (5 sec)
@@ -195,13 +195,13 @@ bool testHomingRepeatability()
         switch (currentPhase)
         {
         case PHASE_START:
-            {
-                sprintf(messageBuffer, "Starting cycle %d of %d", cyclesCompleted + 1, NUM_CYCLES);
-                Console.serialInfo(messageBuffer);
-                currentPhase = PHASE_INITIAL_HOMING;
-                lastActionTime = currentTime;
-                break;
-            }
+        {
+            sprintf(messageBuffer, "Starting cycle %d of %d", cyclesCompleted + 1, NUM_CYCLES);
+            Console.serialInfo(messageBuffer);
+            currentPhase = PHASE_INITIAL_HOMING;
+            lastActionTime = currentTime;
+            break;
+        }
 
         case PHASE_INITIAL_HOMING:
             if (handleTestAbort())
@@ -229,7 +229,7 @@ bool testHomingRepeatability()
             static unsigned long lastStatusPrint = 0;
             if (timeoutElapsed(currentTime, lastStatusPrint, 2000))
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -248,7 +248,7 @@ bool testHomingRepeatability()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Waiting for homing to complete. Current state: %s, Homed: %s", 
+                sprintf(messageBuffer, "Waiting for homing to complete. Current state: %s, Homed: %s",
                         stateStr, isHomed ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastStatusPrint = currentTime;
@@ -280,7 +280,7 @@ bool testHomingRepeatability()
             else if (timeoutElapsed(currentTime, lastActionTime, 70000))
             { // 70 seconds (longer than the 60-second internal timeout)
                 Console.serialError(F("Timeout waiting for homing to complete."));
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -350,7 +350,7 @@ bool testHomingRepeatability()
             static unsigned long lastMoveStatusPrint = 0;
             if (currentTime - lastMoveStatusPrint > 2000)
             { // Print every 2 seconds
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -369,8 +369,8 @@ bool testHomingRepeatability()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), TEST_POSITION_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), TEST_POSITION_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastMoveStatusPrint = currentTime;
@@ -443,7 +443,7 @@ bool testHomingRepeatability()
             static unsigned long lastRepeatStatusPrint = 0;
             if (currentTime - lastRepeatStatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -462,7 +462,7 @@ bool testHomingRepeatability()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Waiting for repeat homing to complete. State: %s, Homed: %s", 
+                sprintf(messageBuffer, "Waiting for repeat homing to complete. State: %s, Homed: %s",
                         stateStr, isHomed ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastRepeatStatusPrint = currentTime;
@@ -479,7 +479,7 @@ bool testHomingRepeatability()
             if (motorState == MOTOR_STATE_IDLE && isHomed)
             {
                 cyclesCompleted++;
-                sprintf(messageBuffer, "Cycle %d completed. Position after homing: %.1fmm", 
+                sprintf(messageBuffer, "Cycle %d completed. Position after homing: %.1fmm",
                         cyclesCompleted, getMotorPositionMm());
                 Console.serialInfo(messageBuffer);
 
@@ -553,7 +553,7 @@ bool testPositionCycling()
     // Set test flag
     testInProgress = true;
 
-    char messageBuffer[200]; // Single buffer for all formatted messages in this function
+    char messageBuffer[200];                 // Single buffer for all formatted messages in this function
     const int NUM_CYCLES = 10;               // Number of test cycles to run
     const unsigned long WAIT_TIME_MS = 5000; // Fixed 5-second wait time at each position
     int cyclesCompleted = 0;
@@ -632,41 +632,41 @@ bool testPositionCycling()
         switch (currentPhase)
         {
         case PHASE_START:
-            {
-                sprintf(messageBuffer, "Starting cycle %d of %d", cyclesCompleted + 1, NUM_CYCLES);
-                Console.serialInfo(messageBuffer);
+        {
+            sprintf(messageBuffer, "Starting cycle %d of %d", cyclesCompleted + 1, NUM_CYCLES);
+            Console.serialInfo(messageBuffer);
 
-                if (handleTestAbort())
+            if (handleTestAbort())
+            {
+                return false;
+            }
+
+            // IMPROVEMENT 1: Replace blocking code with non-blocking state pattern
+            // First check we're at position 1
+            if (abs(getMotorPositionMm() - POSITION_1_MM) > POSITION_TOLERANCE_MM)
+            {
+                Console.serialInfo(F("Moving to Position 1 to begin test"));
+                if (!moveToPosition(POSITION_1))
                 {
+                    Console.serialError(F("Failed to move to Position 1. Aborting test."));
+                    testRunning = false;
+                    testInProgress = false;
                     return false;
                 }
-
-                // IMPROVEMENT 1: Replace blocking code with non-blocking state pattern
-                // First check we're at position 1
-                if (abs(getMotorPositionMm() - POSITION_1_MM) > POSITION_TOLERANCE_MM)
-                {
-                    Console.serialInfo(F("Moving to Position 1 to begin test"));
-                    if (!moveToPosition(POSITION_1))
-                    {
-                        Console.serialError(F("Failed to move to Position 1. Aborting test."));
-                        testRunning = false;
-                        testInProgress = false;
-                        return false;
-                    }
-                    // Set up for next phase without waiting
-                    currentPhase = PHASE_WAIT_FOR_MOVE_TO_1;
-                    lastActionTime = currentTime;
-                    // Continue execution instead of returning true
-                }
-                else
-                {
-                    // Already at position 1, proceed to first movement
-                    currentPhase = PHASE_MOVE_TO_POSITION_3;
-                    lastActionTime = currentTime;
-                }
-                // Remove the return true statement
-                break; // Exit the switch case, not the function
+                // Set up for next phase without waiting
+                currentPhase = PHASE_WAIT_FOR_MOVE_TO_1;
+                lastActionTime = currentTime;
+                // Continue execution instead of returning true
             }
+            else
+            {
+                // Already at position 1, proceed to first movement
+                currentPhase = PHASE_MOVE_TO_POSITION_3;
+                lastActionTime = currentTime;
+            }
+            // Remove the return true statement
+            break; // Exit the switch case, not the function
+        }
 
         case PHASE_MOVE_TO_POSITION_3:
             if (handleTestAbort())
@@ -695,7 +695,7 @@ bool testPositionCycling()
             static unsigned long lastPos3StatusPrint = 0;
             if (currentTime - lastPos3StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -714,8 +714,8 @@ bool testPositionCycling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_3_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_3_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastPos3StatusPrint = currentTime;
@@ -758,8 +758,8 @@ bool testPositionCycling()
             static unsigned long lastWaitPos3Print = 0;
             if (currentTime - lastWaitPos3Print > 2000)
             {
-                sprintf(messageBuffer, "Pausing at Position 3: %.1fmm, Waiting: %lu/%lu seconds", 
-                        getMotorPositionMm(), 
+                sprintf(messageBuffer, "Pausing at Position 3: %.1fmm, Waiting: %lu/%lu seconds",
+                        getMotorPositionMm(),
                         timeDiff(currentTime, lastActionTime) / 1000,
                         WAIT_TIME_MS / 1000);
                 Console.serialDiagnostic(messageBuffer);
@@ -800,7 +800,7 @@ bool testPositionCycling()
             static unsigned long lastPos1StatusPrint = 0;
             if (currentTime - lastPos1StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -819,8 +819,8 @@ bool testPositionCycling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_1_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_1_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastPos1StatusPrint = currentTime;
@@ -863,8 +863,8 @@ bool testPositionCycling()
             static unsigned long lastWaitPos1Print = 0;
             if (currentTime - lastWaitPos1Print > 2000)
             {
-                sprintf(messageBuffer, "Pausing at Position 1: %.1fmm, Waiting: %lu/%lu seconds", 
-                        getMotorPositionMm(), 
+                sprintf(messageBuffer, "Pausing at Position 1: %.1fmm, Waiting: %lu/%lu seconds",
+                        getMotorPositionMm(),
                         timeDiff(currentTime, lastActionTime) / 1000,
                         WAIT_TIME_MS / 1000);
                 Console.serialDiagnostic(messageBuffer);
@@ -905,7 +905,7 @@ bool testPositionCycling()
             static unsigned long lastPos2StatusPrint = 0;
             if (currentTime - lastPos2StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -924,8 +924,8 @@ bool testPositionCycling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_2_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_2_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastPos2StatusPrint = currentTime;
@@ -967,8 +967,8 @@ bool testPositionCycling()
             static unsigned long lastWaitPos2Print = 0;
             if (currentTime - lastWaitPos2Print > 2000)
             {
-                sprintf(messageBuffer, "Pausing at Position 2: %.1fmm, Waiting: %lu/%lu seconds", 
-                        getMotorPositionMm(), 
+                sprintf(messageBuffer, "Pausing at Position 2: %.1fmm, Waiting: %lu/%lu seconds",
+                        getMotorPositionMm(),
                         timeDiff(currentTime, lastActionTime) / 1000,
                         WAIT_TIME_MS / 1000);
                 Console.serialDiagnostic(messageBuffer);
@@ -1009,7 +1009,7 @@ bool testPositionCycling()
             static unsigned long lastPosBack1StatusPrint = 0;
             if (currentTime - lastPosBack1StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -1028,8 +1028,8 @@ bool testPositionCycling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_1_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_1_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastPosBack1StatusPrint = currentTime;
@@ -1124,7 +1124,7 @@ bool testTrayHandling()
     // Set test flag
     testInProgress = true;
 
-    char messageBuffer[250]; // Single buffer for all formatted messages in this function
+    char messageBuffer[250];                               // Single buffer for all formatted messages in this function
     const int NUM_CYCLES = 30;                             // Number of test cycles to run
     const unsigned long WAIT_TIME_MS = 5000;               // Fixed 5-second wait time at each position
     const unsigned long VALVE_DELAY_MS = 1000;             // Delay between valve operations to prevent race conditions
@@ -1359,7 +1359,7 @@ bool testTrayHandling()
             static unsigned long lastInitMoveStatusPrint = 0;
             if (currentTime - lastInitMoveStatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -1378,8 +1378,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_1_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_1_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastInitMoveStatusPrint = currentTime;
@@ -1706,7 +1706,7 @@ bool testTrayHandling()
             static unsigned long lastPos3StatusPrint = 0;
             if (currentTime - lastPos3StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -1725,8 +1725,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_3_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_3_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastPos3StatusPrint = currentTime;
@@ -1922,7 +1922,7 @@ bool testTrayHandling()
             static unsigned long lastWaitPos3Print = 0;
             if (currentTime - lastWaitPos3Print > 2000)
             {
-                sprintf(messageBuffer, "Waiting at Position 3 with tray locked. Elapsed: %lu/%lu seconds", 
+                sprintf(messageBuffer, "Waiting at Position 3 with tray locked. Elapsed: %lu/%lu seconds",
                         timeDiff(currentTime, lastActionTime) / 1000,
                         WAIT_TIME_MS / 1000);
                 Console.serialDiagnostic(messageBuffer);
@@ -1968,7 +1968,7 @@ bool testTrayHandling()
             static unsigned long lastEmptyReturnStatusPrint = 0;
             if (currentTime - lastEmptyReturnStatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -1987,8 +1987,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Empty return status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_1_MM, stateStr, 
+                sprintf(messageBuffer, "Empty return status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_1_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastEmptyReturnStatusPrint = currentTime;
@@ -2031,7 +2031,7 @@ bool testTrayHandling()
             static unsigned long lastWaitPos1EmptyPrint = 0;
             if (currentTime - lastWaitPos1EmptyPrint > 2000)
             {
-                sprintf(messageBuffer, "Waiting at Position 1 with empty shuttle. Elapsed: %lu/%lu seconds", 
+                sprintf(messageBuffer, "Waiting at Position 1 with empty shuttle. Elapsed: %lu/%lu seconds",
                         timeDiff(currentTime, lastActionTime) / 1000, WAIT_TIME_MS / 1000);
                 Console.serialDiagnostic(messageBuffer);
                 lastWaitPos1EmptyPrint = currentTime;
@@ -2076,7 +2076,7 @@ bool testTrayHandling()
             static unsigned long lastReturnToPos3StatusPrint = 0;
             if (currentTime - lastReturnToPos3StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -2095,8 +2095,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Return status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_3_MM, stateStr, 
+                sprintf(messageBuffer, "Return status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_3_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastReturnToPos3StatusPrint = currentTime;
@@ -2312,7 +2312,7 @@ bool testTrayHandling()
             static unsigned long lastPos1From3StatusPrint = 0;
             if (currentTime - lastPos1From3StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -2331,8 +2331,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_1_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_1_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastPos1From3StatusPrint = currentTime;
@@ -2527,7 +2527,7 @@ bool testTrayHandling()
             static unsigned long lastWaitPos1Print = 0;
             if (currentTime - lastWaitPos1Print > 2000)
             {
-                sprintf(messageBuffer, "Waiting at Position 1 with tray locked. Elapsed: %lu/%lu seconds", 
+                sprintf(messageBuffer, "Waiting at Position 1 with tray locked. Elapsed: %lu/%lu seconds",
                         timeDiff(currentTime, lastActionTime) / 1000, WAIT_TIME_MS / 1000);
                 Console.serialDiagnostic(messageBuffer);
                 lastWaitPos1Print = currentTime;
@@ -2736,7 +2736,7 @@ bool testTrayHandling()
             static unsigned long lastPos2StatusPrint = 0;
             if (currentTime - lastPos2StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -2755,8 +2755,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_2_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_2_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastPos2StatusPrint = currentTime;
@@ -2952,7 +2952,7 @@ bool testTrayHandling()
             static unsigned long lastWaitPos2Print = 0;
             if (currentTime - lastWaitPos2Print > 2000)
             {
-                sprintf(messageBuffer, "Waiting at Position 2 with tray locked. Elapsed: %lu/%lu seconds", 
+                sprintf(messageBuffer, "Waiting at Position 2 with tray locked. Elapsed: %lu/%lu seconds",
                         timeDiff(currentTime, lastActionTime) / 1000, WAIT_TIME_MS / 1000);
                 Console.serialDiagnostic(messageBuffer);
                 lastWaitPos2Print = currentTime;
@@ -2997,7 +2997,7 @@ bool testTrayHandling()
             static unsigned long lastEmptyReturnFromPos2StatusPrint = 0;
             if (currentTime - lastEmptyReturnFromPos2StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -3016,8 +3016,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Empty return status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_1_MM, stateStr, 
+                sprintf(messageBuffer, "Empty return status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_1_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastEmptyReturnFromPos2StatusPrint = currentTime;
@@ -3060,7 +3060,7 @@ bool testTrayHandling()
             static unsigned long lastWaitPos1EmptyFromPos2Print = 0;
             if (currentTime - lastWaitPos1EmptyFromPos2Print > 2000)
             {
-                sprintf(messageBuffer, "Waiting at Position 1 with empty shuttle from Position 2. Elapsed: %lu/%lu seconds", 
+                sprintf(messageBuffer, "Waiting at Position 1 with empty shuttle from Position 2. Elapsed: %lu/%lu seconds",
                         timeDiff(currentTime, lastActionTime) / 1000, WAIT_TIME_MS / 1000);
                 Console.serialDiagnostic(messageBuffer);
                 lastWaitPos1EmptyFromPos2Print = currentTime;
@@ -3105,7 +3105,7 @@ bool testTrayHandling()
             static unsigned long lastReturnToPos2StatusPrint = 0;
             if (currentTime - lastReturnToPos2StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -3124,8 +3124,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Return status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_2_MM, stateStr, 
+                sprintf(messageBuffer, "Return status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_2_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastReturnToPos2StatusPrint = currentTime;
@@ -3341,7 +3341,7 @@ bool testTrayHandling()
             static unsigned long lastMoveBackPos1StatusPrint = 0;
             if (currentTime - lastMoveBackPos1StatusPrint > 2000)
             {
-                const char* stateStr = "UNKNOWN";
+                const char *stateStr = "UNKNOWN";
                 switch (motorState)
                 {
                 case MOTOR_STATE_IDLE:
@@ -3360,8 +3360,8 @@ bool testTrayHandling()
                     stateStr = "NOT_READY";
                     break;
                 }
-                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s", 
-                        getMotorPositionMm(), POSITION_1_MM, stateStr, 
+                sprintf(messageBuffer, "Move status - Position: %.1fmm, Target: %.1fmm, State: %s, StepsComplete: %s",
+                        getMotorPositionMm(), POSITION_1_MM, stateStr,
                         MOTOR_CONNECTOR.StepsComplete() ? "YES" : "NO");
                 Console.serialDiagnostic(messageBuffer);
                 lastMoveBackPos1StatusPrint = currentTime;

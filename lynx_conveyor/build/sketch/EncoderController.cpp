@@ -156,7 +156,7 @@ void processEncoderInput()
             if (targetPositionMm < 0 || targetPositionMm > MAX_TRAVEL_MM)
             {
                 char msg[200];
-                sprintf(msg, "Encoder movement rejected: target position %.2f mm is outside allowed range (0 to %.2f mm)", 
+                sprintf(msg, "Encoder movement rejected: target position %.2f mm is outside allowed range (0 to %.2f mm)",
                         targetPositionMm, MAX_TRAVEL_MM);
                 Console.serialWarning(msg);
             }
@@ -181,8 +181,8 @@ void processEncoderInput()
 
                 // Update the move message to use displaySteps
                 char msg[200];
-                sprintf(msg, "MPG Move: %ld steps (x%s, %ldk pps) → %.2f mm", 
-                        displaySteps, getMultiplierName(currentMultiplier), 
+                sprintf(msg, "MPG Move: %ld steps (x%s, %ldk pps) → %.2f mm",
+                        displaySteps, getMultiplierName(currentMultiplier),
                         scaledVelocity / 1000, targetPositionMm);
                 Console.serialDiagnostic(msg);
 
@@ -241,10 +241,10 @@ void enableEncoderControl(bool enable)
         char msg[200];
         sprintf(msg, "MPG handwheel control enabled - current position: %.2f mm", currentPositionMm);
         Console.serialInfo(msg);
-        
+
         sprintf(msg, "Using multiplier x%s (%.1f)", getMultiplierName(currentMultiplier), currentMultiplier);
         Console.serialInfo(msg);
-        
+
         Console.serialInfo(F("Issue 'encoder,disable' when finished with manual control"));
     }
     else
@@ -258,7 +258,7 @@ void enableEncoderControl(bool enable)
 void setEncoderMultiplier(int multiplier)
 {
     char msg[200];
-    
+
     switch (multiplier)
     {
     case 1:

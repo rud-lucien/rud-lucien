@@ -227,10 +227,14 @@ bool processCommand(const char *rawCommand, Stream *output, const char *sourceTa
     if (canExecuteCommand(originalCommand))
     {
         // Use tag if provided, otherwise log the raw command
-        if (!isCommandExcludedFromHistory(originalCommand)) {
-            if (sourceTag && sourceTag[0]) {
+        if (!isCommandExcludedFromHistory(originalCommand))
+        {
+            if (sourceTag && sourceTag[0])
+            {
                 opLogHistory.addEntry(sourceTag);
-            } else {
+            }
+            else
+            {
                 opLogHistory.addEntry(originalCommand);
             }
         }
