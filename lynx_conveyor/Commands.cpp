@@ -1125,7 +1125,7 @@ bool cmd_motor(char *args, CommandCaller *caller)
 
     default:
     {
-        sprintf(msg, "[ERROR], Unknown motor command: %s", subcommand);
+        sprintf(msg, "Unknown motor command: %s", subcommand);
         Console.error(msg);
         Console.serialInfo(F("Valid options are 'init', 'status', 'clear', 'home', 'abort', 'stop', or 'help'"));
         return false;
@@ -1317,7 +1317,7 @@ bool cmd_move(char *args, CommandCaller *caller)
         }
         if (targetMm < 0.0 || targetMm > MAX_TRAVEL_MM)
         {
-            sprintf(msg, "[ERROR] Position out of range. Valid range: 0 to %.1f mm", MAX_TRAVEL_MM);
+            sprintf(msg, "Position out of range. Valid range: 0 to %.1f mm", MAX_TRAVEL_MM);
             Console.error(msg);
             return false;
         }
@@ -1357,7 +1357,7 @@ bool cmd_move(char *args, CommandCaller *caller)
         }
         if (targetCounts < 0 || targetCounts > MAX_TRAVEL_PULSES)
         {
-            sprintf(msg, "[ERROR] Position out of range. Valid range: 0 to %ld counts", (long)MAX_TRAVEL_PULSES);
+            sprintf(msg, "Position out of range. Valid range: 0 to %ld counts", (long)MAX_TRAVEL_PULSES);
             Console.error(msg);
             return false;
         }
@@ -1469,7 +1469,7 @@ bool cmd_move(char *args, CommandCaller *caller)
         return true;
 
     default:
-        sprintf(msg, "[ERROR], Invalid position: %s", subcommand);
+        sprintf(msg, "Invalid position: %s", subcommand);
         Console.error(msg);
         Console.error(F("Valid options: home, 1, 2, 3, 4, counts, mm, rel, help"));
         return false;
@@ -1635,7 +1635,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
             {
                 if (setJogIncrement(DEFAULT_JOG_INCREMENT))
                 {
-                    sprintf(msg, "[INFO] Jog increment set to default (%.2f mm)", currentJogIncrementMm);
+                    sprintf(msg, "Jog increment set to default (%.2f mm)", currentJogIncrementMm);
                     Console.serialInfo(msg);
                     return true;
                 }
@@ -1667,7 +1667,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
         char *speedStr = strtok(NULL, " ");
         if (speedStr == NULL)
         {
-            sprintf(msg, "[INFO] Current jog speed: %d RPM", currentJogSpeedRpm);
+            sprintf(msg, "Current jog speed: %d RPM", currentJogSpeedRpm);
             Console.serialInfo(msg);
             return true;
         }
@@ -1801,7 +1801,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
 
     default:
     {
-        sprintf(msg, "[ERROR], Unknown jog command: %s", subcommand);
+        sprintf(msg, "Unknown jog command: %s", subcommand);
         Console.error(msg);
         Console.error(F("Valid options are '+', '-', 'inc', 'speed', 'status', or 'help'"));
         return false;
@@ -1876,9 +1876,12 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         // Display tray system status
         SystemState currentState = captureSystemState();
         updateTrayTrackingFromSensors(currentState);
-        Console.acknowledge(F("TRAY_STATUS"));
 
-        sprintf(msg, "Total trays in system: %d", trayTracking.totalTraysInSystem);
+        sprintf(msg, "[TRAY], %d", trayTracking.totalTraysInSystem);
+        Console.println(msg);
+        // Console.acknowledge(F("TRAY_STATUS"));
+
+        sprintf(msg, "Total trays in system: %d", trayTracking.totalTraysInSystem); // helps mitsubishi find out how many trays are on the system
         Console.println(msg);
 
         Console.println(F("\nPosition occupancy:"));
@@ -2087,7 +2090,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
     }
     else if (cmdCode == 0)
     { // Command not found in binary search
-        sprintf(msg, "[ERROR] Unknown tray command: %s", subcommand);
+        sprintf(msg, "Unknown tray command: %s", subcommand);
         Console.error(msg);
         Console.error(F("Valid options: load,request | unload,request | load,ready | unload,ready | placed | gripped | removed | released | status | help"));
         return false;
@@ -2158,7 +2161,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         if (!safeToExecute)
         {
-            sprintf(msg, "[ERROR], %s", errorReason.c_str());
+            sprintf(msg, "%s", errorReason.c_str());
             Console.error(msg);
             Console.serialInfo(F("Cannot execute tray commands while system is in an unsafe state"));
             Console.serialInfo(F("Use 'system,reset' to clear the alert and try again"));
@@ -2403,7 +2406,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         trayTracking.totalUnloadsCompleted++;
 
         Console.acknowledge(F("TRAY_REMOVAL_CONFIRMED"));
-        sprintf(msg, "[INFO] Total unloads completed: %d", trayTracking.totalUnloadsCompleted);
+        sprintf(msg, "Total unloads completed: %d", trayTracking.totalUnloadsCompleted);
         Console.serialInfo(msg);
         return true;
     }
@@ -2585,7 +2588,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
     default:
     {
-        sprintf(msg, "[ERROR] Unknown tray command: %s", subcommand);
+        sprintf(msg, "Unknown tray command: %s", subcommand);
         Console.error(msg);
         Console.error(F("Valid options: load,request | unload,request | load,ready | unload,ready | placed | gripped | removed | released | status | help"));
         return false;
@@ -2775,7 +2778,7 @@ bool cmd_test(char *args, CommandCaller *caller)
 
     default: // Unknown command
     {
-        sprintf(msg, "[ERROR], Unknown test type: %s", subcommand);
+        sprintf(msg, "Unknown test type: %s", subcommand);
         Console.error(msg);
         Console.error(F("Valid options: home, position, tray, help"));
         return false;
@@ -2841,7 +2844,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
             if (isHomed)
             {
                 double positionMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
-                sprintf(msg, "[INFO] Current position: %.2f mm", positionMm);
+                sprintf(msg, "Current position: %.2f mm", positionMm);
                 Console.serialInfo(msg);
             }
         }
@@ -2948,7 +2951,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         sprintf(msg, "MPG handwheel control enabled - current position: %.2f mm", posMm);
         Console.serialInfo(msg);
 
-        sprintf(msg, "[INFO] Using multiplier x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
+        sprintf(msg, "Using multiplier x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
         Console.serialInfo(msg);
 
         Console.serialInfo(F("Issue 'encoder,disable' when finished with manual control"));
@@ -2998,10 +3001,10 @@ bool cmd_encoder(char *args, CommandCaller *caller)
                 return false;
             }
 
-            sprintf(msg, "[INFO] Current multiplier value: %d", currentMultiplier);
+            sprintf(msg, "Current multiplier value: %d", currentMultiplier);
             Console.serialInfo(msg);
             double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-            sprintf(msg, "[INFO] One full rotation moves ~%.2f mm", mmPerRotation);
+            sprintf(msg, "One full rotation moves ~%.2f mm", mmPerRotation);
             Console.serialInfo(msg);
             return true;
         }
@@ -3011,11 +3014,11 @@ bool cmd_encoder(char *args, CommandCaller *caller)
             sprintf(msg, "[ACK], ENCODER_MULT_%d", currentMultiplier);
             Console.println(msg);
 
-            sprintf(msg, "[INFO] Current multiplier: x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
+            sprintf(msg, "Current multiplier: x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
             Console.serialInfo(msg);
 
             double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-            sprintf(msg, "[INFO] One full rotation moves ~%.2f mm", mmPerRotation);
+            sprintf(msg, "One full rotation moves ~%.2f mm", mmPerRotation);
             Console.serialInfo(msg);
 
             return true;
@@ -3075,7 +3078,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
 
     default: // Unknown command
     {
-        sprintf(msg, "[ERROR], Unknown encoder command: %s", subcommand);
+        sprintf(msg, "Unknown encoder command: %s", subcommand);
         Console.error(msg);
         Console.error(F("Valid options are 'enable', 'disable', 'multiplier', or 'help'"));
         return false;

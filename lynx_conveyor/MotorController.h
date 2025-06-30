@@ -36,7 +36,7 @@
 #define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV) // ~14.81 pulses per mm (800 / 53.98)
 
 // Motion profile parameters (in RPM units)
-#define LOADED_SHUTTLE_VELOCITY_RPM 300 // Velocity when moving with a tray (RPM)
+#define LOADED_SHUTTLE_VELOCITY_RPM 325 // Velocity when moving with a tray (RPM)
 #define MAX_ACCEL_RPM_PER_SEC 2500      // Maximum acceleration in RPM/s
 #define EMPTY_SHUTTLE_VELOCITY_RPM 800  // Velocity when moving without a tray (RPM)
 
@@ -64,9 +64,9 @@
 
 // Position definitions (in mm from home)
 #define POSITION_HOME_MM 0.0        // Home position
-#define POSITION_1_MM 24.63         // Position 1 (Tray loading position and tray 1 position)
-#define POSITION_2_MM 466.18        // Position 2 (Tray 2 position)
-#define POSITION_3_MM 908.69        // Position 3 (Tray 3 position)
+#define POSITION_1_MM 36.57         // Position 1 (Tray loading position and tray 1 position)
+#define POSITION_2_MM 477.79        // Position 2 (Tray 2 position)
+#define POSITION_3_MM 919.75        // Position 3 (Tray 3 position)
 #define POSITION_4_MM MAX_TRAVEL_MM // Position 4 (max = 1050 mm)
 
 // Position definitions in pulses (calculated from mm)
