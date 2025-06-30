@@ -39,13 +39,16 @@
     - Torque Limit: 50%
     - HLFB Output: ASG-POSITION WITH MEASURED TORQUE
     - Homing: Enabled
-      * Homing Trigger: Upon Every Enable
-      * Homing Torque Limit: 40%
       * Homing Mode: Normal
-      * Homing Style: User Seeks Home
-      * Precision Homing: Must be calibrated per installation
-      * Homing RPM: 50 RPM
-      * Acceleration/Deceleration: 1500 RPM/s
+      * Homing Style: User seeks home; ClearPath ASG signals when homing is complete
+      * Homing Occurs: Upon every Enable
+      * Homing Direction: CCW (Counter-clockwise)
+      * Homing Torque Limit: 40%
+      * Speed (RPM): 40.00
+      * Accel/Decel (RPM/s): 5,000
+      * Precision Homing: Use Precision Homing (enabled)
+      * Physical Home Clearance: 200 cnts
+      * Home Offset Move Distance: 0 cnts
     
     MOTOR SETUP PROCEDURE:
     1. Configure all settings above using Teknic ClearPath-MSP software
@@ -56,9 +59,11 @@
        * Set auto-tune RPM to 350 RPM (matches operational velocity with tray)
        * Run auto-tune sequence to optimize motor performance
     4. Verify homing operation and position accuracy after installation
+    5. Calibrate precision homing if home reference moves or mechanics change
     
     NOTE: Motor must be configured and auto-tuned before use. Auto-tuning with 
-    actual load is critical for optimal performance and accuracy.
+    actual load is critical for optimal performance and accuracy. Precision homing
+    provides excellent repeatability when properly calibrated.
  
  3. FEEDBACK & CONTROL:
     - CL-ENCDR-DFIN Encoder Input Adapter (for MPG handwheel manual control)
@@ -90,26 +95,54 @@
  - All commands include detailed help documentation and usage examples
  
  USAGE:
+
+OPERATIONAL MODES:
+The system operates in two primary modes:
+
+A. AUTOMATED MODE (Default):
+   - System executes pre-programmed tray handling sequences
+   - Automatic tray detection, transport, and positioning
+   - Pneumatic shuttle automatically grabs/releases trays during transport
+   - Position locks engage/disengage automatically based on sequence
+   - Full safety monitoring and fault detection active
+
+B. MANUAL MODE:
+   - Direct command control for setup, testing, and maintenance
+   - Manual positioning via MPG handwheel encoder
+   - Individual control of all pneumatic systems
+   - Step-by-step operation for troubleshooting
+
+BASIC SETUP AND INITIALIZATION:
  1. Configure ClearPath motor using Teknic ClearPath-MSP software (see MOTION SYSTEM requirements)
  2. Connect all hardware components per system documentation
  3. Power up system and connect via Serial or Ethernet
- 4. Initialize motor system: "motor init"
- 5. Home the system: "motor home" 
- 6. Position control: "move 1" (positions 1-3) or "move <mm>"
- 7. Tray operations: "tray load", "tray unload" 
- 8. Tray locking: "lock1", "lock2", "lock3" for individual position locks
- 9. Shuttle control: Lock shuttle to grab trays, unlock to release
- 10. Manual control: Enable handwheel with "encoder enable"
- 11. System monitoring: "system status", "motor status", pressure monitoring
- 12. Help system: "help" for command list, "help <command>" for detailed usage
- 13. Error diagnosis: Check circular buffer log when issues occur
+ 4. Initialize motor system: "motor,init"
+ 5. Home the system: "motor,home" 
+ 6. Verify all sensors and pneumatics: "system,status"
 
- SAFETY NOTES:
- - Always ensure E-stop circuit is properly connected and functional
- - Verify adequate air pressure (21.75+ PSI) before pneumatic operations
- - System includes comprehensive safety monitoring and automatic fault detection
- - Circular buffer maintains operation history for troubleshooting errors
- - Use "system reset" to clear fault conditions after resolving issues
+MANUAL OPERATION COMMANDS:
+ 7. Position control: "move,1" (positions 1-3) or "move,<mm>" for precise positioning
+ 8. Individual tray locking: "lock,1", "lock,2", "lock,3" for position locks
+ 9. Shuttle control: "lock,shuttle" to grab trays, "unlock,shuttle" to release
+ 10. Manual positioning: "encoder,enable" for handwheel control, "encoder,disable" to return to automated
+ 11. Pressure monitoring: "system,pressure" to check pneumatic system
+
+AUTOMATED OPERATION COMMANDS:
+ 12. Automated sequences: "tray,load" (full loading sequence), "tray,unload" (full unloading sequence)
+ 13. System monitoring: "system,status", "motor,status" for real-time status
+ 14. Test sequences: "test,<sequence>" for automated system validation
+
+DIAGNOSTICS AND TROUBLESHOOTING:
+ 15. Help system: "help" for command list, "help,<command>" for specific usage
+ 16. Error diagnosis: "system,history" to check operation log when issues occur
+ 17. System reset: "system,reset" to clear fault conditions
+ 18. Network management: "network,status" for Ethernet connection info
+
+TYPICAL WORKFLOW:
+- Startup: Initialize → Home → Verify status
+- Loading: Position to station → Lock shuttle → Move to pickup → Grab tray → Transport → Release
+- Unloading: Reverse of loading sequence with safety verification at each step
+- Maintenance: Enable manual mode → Use individual commands → Return to automated mode
 */
 
 #include "Arduino.h"
