@@ -31,6 +31,7 @@ const CommandInfo COMMAND_TABLE[] = {
     {"network", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
     {"stop", CMD_EMERGENCY, 0},
     {"system", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"teach", CMD_MODIFYING, 0},  // ADD THIS LINE
     {"test", CMD_TEST, CMD_FLAG_ASYNC},
     {"tray", CMD_MODIFYING, CMD_FLAG_ASYNC},
     {"unlock", CMD_MODIFYING, 0}};
@@ -367,6 +368,34 @@ CommandType getCommandType(const char *originalCommand)
             }
 
             // system reset is modifying
+            return CMD_MODIFYING;
+        }
+
+        // Special handling for teach commands
+        if (strcmp(firstWord, "teach") == 0)
+        {
+            // Make a local copy that we can modify
+            char command[64];
+            strncpy(command, originalCommand, 63);
+            command[63] = '\0';
+
+            // Convert commas to spaces
+            for (int i = 0; command[i]; i++)
+            {
+                if (command[i] == ',')
+                {
+                    command[i] = ' ';
+                }
+            }
+
+            // Read-only teach commands
+            if (strncmp(command + 6, "status", 6) == 0 ||
+                strncmp(command + 6, "help", 4) == 0)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // All other teach commands are modifying
             return CMD_MODIFYING;
         }
 

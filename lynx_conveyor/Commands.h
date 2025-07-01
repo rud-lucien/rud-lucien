@@ -15,13 +15,14 @@
 #include "EncoderController.h"
 #include "EthernetController.h"
 #include "LogHistory.h"
+#include "PositionConfig.h" // Include PositionConfig for position management
 
 //=============================================================================
 // COMMAND CONSTANTS
 //=============================================================================
 
 // Command tree size
-#define COMMAND_SIZE 15
+#define COMMAND_SIZE 16
 
 // Structure for subcommand lookup
 struct SubcommandInfo
@@ -83,5 +84,11 @@ bool cmd_network(char *args, CommandCaller *caller);      // Network configurati
 // Functions for controlling the MPG handwheel
 //-----------------------------------------------------------------------------
 bool cmd_encoder(char *args, CommandCaller *caller);
+
+//-----------------------------------------------------------------------------
+// Position Configuration Commands 
+// Functions for managing position configurations
+//-----------------------------------------------------------------------------
+bool cmd_teach(char *args, CommandCaller *caller);
 
 #endif // COMMANDS_H

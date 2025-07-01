@@ -1,5 +1,6 @@
 #include "MotorController.h"
 #include "Utils.h"
+#include "PositionConfig.h"
 
 // ----------------- Global Variables -----------------
 bool motorInitialized = false;
@@ -231,17 +232,29 @@ bool moveToPosition(PositionTarget position)
         targetPositionMm = POSITION_HOME_MM;
         targetPulses = POSITION_HOME_PULSES;
         break;
+    // case POSITION_1:
+    //     targetPositionMm = POSITION_1_MM;
+    //     targetPulses = POSITION_1_PULSES;
+    //     break;
+    // case POSITION_2:
+    //     targetPositionMm = POSITION_2_MM;
+    //     targetPulses = POSITION_2_PULSES;
+    //     break;
+    // case POSITION_3:
+    //     targetPositionMm = POSITION_3_MM;
+    //     targetPulses = POSITION_3_PULSES;
+    //     break;
     case POSITION_1:
-        targetPositionMm = POSITION_1_MM;
-        targetPulses = POSITION_1_PULSES;
+        targetPositionMm = getPosition1Mm(); // Instead of POSITION_1_MM
+        targetPulses = mmToPulses(targetPositionMm);
         break;
     case POSITION_2:
-        targetPositionMm = POSITION_2_MM;
-        targetPulses = POSITION_2_PULSES;
+        targetPositionMm = getPosition2Mm(); // Instead of POSITION_2_MM
+        targetPulses = mmToPulses(targetPositionMm);
         break;
     case POSITION_3:
-        targetPositionMm = POSITION_3_MM;
-        targetPulses = POSITION_3_PULSES;
+        targetPositionMm = getPosition3Mm(); // Instead of POSITION_3_MM
+        targetPulses = mmToPulses(targetPositionMm);
         break;
     case POSITION_4:
         targetPositionMm = POSITION_4_MM;

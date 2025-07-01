@@ -459,8 +459,54 @@ void printSystemState(const SystemState &state)
     sprintf(msg, "  HLFB Status: %s", hlfbStatusStr);
     Console.println(msg);
 
-    // Cylinder sensors (raw readings)
-    Console.println(F("\n  Cylinder Sensors:"));
+    // Enhanced Valve States with Position Verification
+    Console.println(F("\n  Valve States (with position verification):"));
+    
+    // Array of valve/sensor pairs for easy iteration
+    const char *valveNames[4] = {"Tray 1", "Tray 2", "Tray 3", "Shuttle"};
+    DoubleSolenoidValve *valves[4] = {
+        getTray1Valve(), getTray2Valve(), getTray3Valve(), getShuttleValve()
+    };
+    CylinderSensor *sensors[4] = {
+        getTray1Sensor(), getTray2Sensor(), getTray3Sensor(), getShuttleSensor()
+    };
+    bool sensorStates[4] = {
+        state.tray1CylinderActivated, state.tray2CylinderActivated, 
+        state.tray3CylinderActivated, state.shuttleCylinderActivated
+    };
+    
+    for (int i = 0; i < 4; i++)
+    {
+        if (valves[i] && sensors[i])
+        {
+            bool isLocked = (valves[i]->position == VALVE_POSITION_LOCK);
+            bool sensorState = sensorStates[i];
+            bool positionVerified = (sensorState == !isLocked); // Sensor active = unlocked
+            
+            const char *valveStatus = isLocked ? "LOCKED" : "UNLOCKED";
+            const char *verificationStatus = positionVerified ? "" : " [MISMATCH!]";
+            
+            sprintf(msg, "    %s: %s%s", valveNames[i], valveStatus, verificationStatus);
+            Console.println(msg);
+            
+            // If there's a mismatch, provide additional detail
+            if (!positionVerified)
+            {
+                sprintf(msg, "      WARNING: Valve set to %s but sensor reads %s", 
+                        valveStatus, 
+                        sensorState ? "ACTIVATED (unlocked)" : "NOT ACTIVATED (locked)");
+                Console.println(msg);
+            }
+        }
+        else
+        {
+            sprintf(msg, "    %s: VALVE/SENSOR ACCESS ERROR", valveNames[i]);
+            Console.println(msg);
+        }
+    }
+
+    // Cylinder sensors (raw readings) - Keep this for reference
+    Console.println(F("\n  Cylinder Sensors (raw readings):"));
     sprintf(msg, "    Tray 1: %s", state.tray1CylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
     Console.println(msg);
 
@@ -473,8 +519,8 @@ void printSystemState(const SystemState &state)
     sprintf(msg, "    Shuttle: %s", state.shuttleCylinderActivated ? "ACTIVATED (UNLOCKED)" : "NOT ACTIVATED (LOCKED)");
     Console.println(msg);
 
-    // Lock states (derived from sensor readings)
-    Console.println(F("\n  Lock States:"));
+    // Lock states (derived from sensor readings) - Keep this but note it's sensor-based
+    Console.println(F("\n  Lock States (sensor-derived):"));
     sprintf(msg, "    Tray 1: %s", state.tray1Locked ? "LOCKED" : "UNLOCKED");
     Console.println(msg);
 
@@ -517,7 +563,7 @@ void printSystemState(const SystemState &state)
             (pressure < MIN_SAFE_PRESSURE) ? "(INSUFFICIENT)" : "(OK)");
     Console.println(msg);
 
-    // Summary of critical safety conditions
+    // Enhanced Safety Summary - now includes valve/sensor mismatches
     Console.println(F("\n  Safety Summary:"));
 
     // Check if any tray is locked while motor is moving
@@ -531,6 +577,26 @@ void printSystemState(const SystemState &state)
                               (state.tray2Locked && !state.tray2Present) ||
                               (state.tray3Locked && !state.tray3Present);
     sprintf(msg, "    Tray/Lock Mismatch: %s", missingTraysLocked ? "YES - LOCK WITHOUT TRAY" : "NO");
+    Console.println(msg);
+
+    // NEW: Check for valve/sensor mismatches
+    bool valveSensorMismatch = false;
+    for (int i = 0; i < 4; i++)
+    {
+        if (valves[i] && sensors[i])
+        {
+            bool isLocked = (valves[i]->position == VALVE_POSITION_LOCK);
+            bool sensorState = sensorStates[i];
+            bool positionVerified = (sensorState == !isLocked);
+            
+            if (!positionVerified)
+            {
+                valveSensorMismatch = true;
+                break;
+            }
+        }
+    }
+    sprintf(msg, "    Valve/Sensor Alignment: %s", valveSensorMismatch ? "MISMATCH DETECTED [!]" : "VERIFIED");
     Console.println(msg);
 
     // Encoder status

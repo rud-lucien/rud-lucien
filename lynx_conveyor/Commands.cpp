@@ -1959,8 +1959,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
             "  The system command provides access to core system functions,\n"
             "  status information, and diagnostic capabilities. Use these\n"
             "  commands to monitor and manage the overall system state.\n"
-            "\n"
-            "COMMAND REFERENCE:\n"
+            "\nCOMMAND REFERENCE:\n"
             "  system,state - Display comprehensive system state\n"
             "    > Shows all sensor readings, valve positions, and motor status\n"
             "    > Provides complete snapshot of current hardware state\n"
@@ -3003,6 +3002,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
 
             sprintf(msg, "Current multiplier value: %d", currentMultiplier);
             Console.serialInfo(msg);
+            Console.serialInfo(msg);
             double mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
             sprintf(msg, "One full rotation moves ~%.2f mm", mmPerRotation);
             Console.serialInfo(msg);
@@ -3301,6 +3301,172 @@ bool cmd_network(char *args, CommandCaller *caller)
     return false; // Should never reach here
 }
 
+// Define the teach subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo TEACH_COMMANDS[] = {
+    {"1", 1},
+    {"2", 2},
+    {"3", 3},
+    {"help", 5},    // Updated code number
+    {"reset", 4},   // Updated code number
+    {"status", 6}}; // Updated code number
+
+static const size_t TEACH_COMMAND_COUNT = sizeof(TEACH_COMMANDS) / sizeof(SubcommandInfo);
+
+// Teach command handler
+bool cmd_teach(char *args, CommandCaller *caller)
+{
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+
+    // Check for empty argument
+    if (strlen(trimmed) == 0)
+    {
+        Console.error(F("Missing parameter. Usage: teach,<1|2|3|reset|status|help>"));
+        return false;
+    }
+
+    // Parse the argument - we'll use commas as separators
+    char *subcommand = strtok(trimmed, ",");
+    if (subcommand == NULL)
+    {
+        Console.error(F("Invalid format. Usage: teach,<1|2|3|reset|status|help>"));
+        return false;
+    }
+
+    // Trim leading spaces from subcommand
+    subcommand = trimLeadingSpaces(subcommand);
+
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(subcommand, TEACH_COMMANDS, TEACH_COMMAND_COUNT);
+
+    char msg[100];
+
+    // Use switch-case for cleaner flow control
+    switch (cmdCode)
+    {
+    case 1: // "1"
+        return teachPosition1();
+
+    case 2: // "2"
+        return teachPosition2();
+
+    case 3: // "3"
+        return teachPosition3();
+
+    case 4: // "reset"
+        return teachResetPositions();
+
+    case 5: // "help"
+        Console.acknowledge(F("TEACH_HELP"));
+        Console.println(F(
+            "\n===== TEACH POSITION SYSTEM HELP =====\n"
+            "\nOVERVIEW:\n"
+            "  The teach system allows you to dynamically set position values\n"
+            "  without reflashing code. Positions are auto-saved to SD card and\n"
+            "  persist across power cycles and firmware updates.\n"
+            "\n"
+            "COMMAND REFERENCE:\n"
+            "  teach,1 - Teach position 1 (loading position)\n"
+            "    > Motor must be at desired position before teaching\n"
+            "    > Captures current motor position and uses it immediately\n"
+            "    > Position is automatically saved to SD card\n"
+            "    > Position takes effect right away for all movements\n"
+            "\n"
+            "  teach,2 - Teach position 2 (middle position)\n"
+            "    > Motor must be at desired position before teaching\n"
+            "    > Captures current motor position and uses it immediately\n"
+            "    > Position is automatically saved to SD card\n"
+            "    > Position takes effect right away for all movements\n"
+            "\n"
+            "  teach,3 - Teach position 3 (unloading position)\n"
+            "    > Motor must be at desired position before teaching\n"
+            "    > Captures current motor position and uses it immediately\n"
+            "    > Position is automatically saved to SD card\n"
+            "    > Position takes effect right away for all movements\n"
+            "\n"
+            "  teach,reset - Reset all positions to factory defaults\n"
+            "    > Clears all taught positions from memory\n"
+            "    > Returns to hardcoded position values\n"
+            "    > Does not affect saved positions on SD card\n"
+            "\n"
+            "  teach,status - Display current position configuration\n"
+            "    > Shows which positions are taught vs. default\n"
+            "    > Displays SD card status and config file presence\n"
+            "    > Use to verify current active positions\n"
+            "\n"
+            "POSITIONING METHODS:\n"
+            "  You can position the motor using any of these methods before teaching:\n"
+            "\n"
+            "  HANDWHEEL METHOD (most precise, recommended if available):\n"
+            "    1. encoder,enable - Enable handwheel control\n"
+            "    2. Rotate handwheel to desired position\n"
+            "    3. teach,X - Capture position\n"
+            "\n"
+            "  MOVE COMMAND METHOD (direct positioning):\n"
+            "    1. move,mm,XXX - Move to specific millimeter coordinate\n"
+            "    2. teach,X - Capture position at that coordinate\n"
+            "\n"
+            "  JOG COMMAND METHOD (incremental positioning):\n"
+            "    1. jog,inc,X - Set desired increment size\n"
+            "    2. jog,+ or jog,- - Move in small increments\n"
+            "    3. Repeat until at desired position\n"
+            "    4. teach,X - Capture final position\n"
+            "\n"
+            "TYPICAL WORKFLOW:\n"
+            "  1. motor,init and motor,home - Initialize system and establish reference\n"
+            "  2. Choose positioning method based on available equipment:\n"
+            "     a) WITH HANDWHEEL: encoder,enable → position → teach,X\n"
+            "     b) WITHOUT HANDWHEEL: move,mm,XXX → teach,X\n"
+            "     c) FINE TUNING: jog commands → teach,X\n"
+            "  3. Test movement: move,1 - Verify position is correct\n"
+            "  4. Repeat for other positions as needed\n"
+            "\n"
+            "POSITION HIERARCHY:\n"
+            "  • Taught positions (highest priority) - Active immediately\n"
+            "  • SD card positions (medium priority) - Loaded at startup\n"
+            "  • Factory defaults (lowest priority) - Fallback values\n"
+            "\n"
+            "SD CARD INTEGRATION:\n"
+            "  • Taught positions are automatically saved and survive firmware updates\n"
+            "  • Config file: positions.txt on SD card root\n"
+            "  • Positions loaded automatically at startup\n"
+            "  • Manual editing of config file is possible\n"
+            "\n"
+            "SAFETY NOTES:\n"
+            "  • Motor must be initialized AND homed before teaching positions\n"
+            "  • Homing establishes the reference point for all measurements\n"
+            "  • Teaching without homing would result in invalid position data\n"
+            "  • Verify positions are within travel limits (0-1050mm)\n"
+            "  • Test taught positions after teaching\n"
+            "  • Keep record of working positions as backup\n"
+            "TROUBLESHOOTING:\n"
+            "  • If teach fails: Check motor is initialized and homed\n"
+            "  • If save fails: Check SD card is inserted and formatted\n"
+            "  • If positions seem wrong: Use teach,status to verify\n"
+            "  • If confused: Use teach,reset to return to known defaults\n"
+            "  • No handwheel available: Use move,mm,X or jog commands instead\n"
+            "-------------------------------------------"));
+        return true;
+
+    case 6: // "status"
+        teachShowStatus();
+        return true;
+
+    default: // Unknown command
+        sprintf(msg, "Unknown teach subcommand: %s", subcommand);
+        Console.error(msg);
+        Console.serialInfo(F("Valid options are '1', '2', '3', 'reset', 'status', or 'help'"));
+        return false;
+    }
+
+    return false; // Should never reach here
+}
+
 Commander commander;
 
 Commander::systemCommand_t API_tree[] = {
@@ -3409,6 +3575,16 @@ Commander::systemCommand_t API_tree[] = {
                              "  network,closeall - Close all client connections\r\n"
                              "  network,help     - Display detailed network management instructions",
                   cmd_network),
+
+    // Teach position command
+    systemCommand("teach", "Teach position commands:\r\n"
+                           "  teach,1   - Teach position 1 (loading position)\r\n"
+                           "  teach,2   - Teach position 2 (middle position)\r\n"
+                           "  teach,3   - Teach position 3 (unloading position)\r\n"
+                           "  teach,reset - Reset all positions to factory defaults\r\n"
+                           "  teach,status - Display current taught positions and SD card status\r\n"
+                           "  teach,help   - Display detailed usage instructions",
+                  cmd_teach),
 };
 
 const size_t API_tree_size = sizeof(API_tree) / sizeof(Commander::systemCommand_t);
