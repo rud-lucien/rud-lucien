@@ -1,393 +1,381 @@
 /*
- Name:		lynx_linear_actuator.ino
+ Name:		lynx_conveyor.ino
  Created:	4/14/2025 12:00:17 PM
  Author:	rlucien
+
+ LYNX CONVEYOR CONTROLLER
+ ========================
+
+ SYSTEM PURPOSE:
+ This program controls an automated linear rail conveyor system designed for precise tray handling
+ and positioning. The system manages tray loading, transport between stations, unloading operations,
+ and comprehensive safety monitoring with pneumatic shuttle and locking control.
+
+ CORE FUNCTIONALITY:
+ - Precise linear motion control with 3 tray loading positions plus home position
+ - Dynamic position teaching system with SD card persistence for field adjustment
+ - Pneumatic shuttle system that can lock/unlock to grab and release trays during transport
+ - Individual pneumatic tray locks at each position (lock1, lock2, lock3) to secure trays
+ - Tray detection sensors throughout the system to track tray locations
+ - Pressure monitoring to ensure pneumatic systems have adequate pressure for operation
+ - Manual positioning control via MPG handwheel encoder interface
+ - Comprehensive logging with circular buffer for error diagnosis and system history
+ - Serial and Ethernet command interfaces with extensive help documentation
+ - Automated test sequences for system validation and troubleshooting
+
+ REQUIRED HARDWARE COMPONENTS:
+
+ 1. CONTROLLER & I/O:
+    - ClearCore Industrial I/O and Motion Controller (main controller)
+    - CCIO-8 Digital I/O Expansion (8-point expansion for additional sensors/outputs)
+    - CABLE-RIBBON6 (6 inch ribbon cable for CCIO connection)
+
+ 2. MOTION SYSTEM:
+    - NEMA 23 ClearPath-SDSK Model CPM-SDSK-2321S-RLS (servo motor with integrated drive)
+    - Linear rail system with precision positioning
+
+    REQUIRED MOTOR CONFIGURATION (using Teknic ClearPath-MSP software):
+    - Input Resolution: 800 pulses per revolution
+    - Input Format: Step and Direction
+    - Torque Limit: 50%
+    - HLFB Output: ASG-POSITION WITH MEASURED TORQUE
+    - Homing: Enabled
+      * Homing Mode: Normal
+      * Homing Style: User seeks home; ClearPath ASG signals when homing is complete
+      * Homing Occurs: Upon every Enable
+      * Homing Direction: CCW (Counter-clockwise)
+      * Homing Torque Limit: 40%
+      * Speed (RPM): 40.00
+      * Accel/Decel (RPM/s): 5,000
+      * Precision Homing: Use Precision Homing (enabled)
+      * Physical Home Clearance: 200 cnts
+      * Home Offset Move Distance: 0 cnts
+
+    MOTOR SETUP PROCEDURE:
+    1. Configure all settings above using Teknic ClearPath-MSP software
+    2. Load configuration to motor (download settings to motor memory)
+    3. Perform auto-tuning with realistic load conditions:
+       * Lock a tray to the shuttle to simulate actual operating load
+       * Set auto-tune torque limit to 50%
+       * Set auto-tune RPM to 325 RPM (matches operational velocity with tray)
+       * Run auto-tune sequence to optimize motor performance
+    4. Verify homing operation and position accuracy after installation
+    5. Calibrate precision homing if home reference moves or mechanics change
+
+    NOTE: Motor must be configured and auto-tuned before use. Auto-tuning with
+    actual load is critical for optimal performance and accuracy. Precision homing
+    provides excellent repeatability when properly calibrated.
+
+ 3. FEEDBACK & CONTROL:
+    - CL-ENCDR-DFIN Encoder Input Adapter (for MPG handwheel manual control)
+    - MPG handwheel encoder (manual positioning interface)
+    - Tray detection sensors positioned throughout the conveyor system
+
+ 4. PNEUMATIC SYSTEM:
+    - Pneumatic shuttle mechanism with lock/unlock capability for tray grabbing
+    - Individual pneumatic tray locks at each of the 3 loading positions
+    - Pressure sensor for pneumatic system monitoring (minimum 21.75 PSI)
+    - Solenoid valves for shuttle and tray lock control
+    - Compressed air supply system
+
+ 5. POWER SYSTEM:
+    - IPC-5 DC Power Supply (350/500W, 75VDC output for motor power)
+    - POWER4-STRIP DC Bus Distribution Strip (power distribution)
+    - 24VDC supply for logic and pneumatics
+
+ 6. SAFETY SYSTEMS:
+    - Emergency stop (E-stop) circuit with normally closed contacts
+    - Pressure monitoring system (minimum 21.75 PSI threshold)
+    - Tray detection sensors for position tracking and safety validation
+    - Comprehensive error detection with historical logging
+
+ COMMUNICATION INTERFACES:
+ - Serial (USB): Direct command interface and diagnostics (115200 baud)
+ - Ethernet: Remote command interface and monitoring
+ - Extensive help system: Type "help" for available commands, "help <command>" for specific usage
+ - All commands include detailed help documentation and usage examples
+
+ USAGE:
+
+OPERATIONAL MODES:
+The system operates in two primary modes:
+
+A. AUTOMATED MODE (Default):
+   - System executes pre-programmed tray handling sequences
+   - Automatic tray detection, transport, and positioning
+   - Pneumatic shuttle automatically grabs/releases trays during transport
+   - Position locks engage/disengage automatically based on sequence
+   - Full safety monitoring and fault detection active
+
+B. MANUAL MODE:
+   - Direct command control for setup, testing, and maintenance
+   - Manual positioning via MPG handwheel encoder
+   - Individual control of all pneumatic systems
+   - Step-by-step operation for troubleshooting
+
+BASIC SETUP AND INITIALIZATION:
+ 1. Configure ClearPath motor using Teknic ClearPath-MSP software (see MOTION SYSTEM requirements)
+ 2. Connect all hardware components per system documentation
+ 3. Power up system and connect via Serial or Ethernet
+ 4. Initialize motor system: "motor,init"
+ 5. Home the system: "motor,home"
+ 6. Verify all sensors and pneumatics: "system,status"
+
+POSITION TEACHING AND CONFIGURATION:
+ 7. Position motor to desired location using your preferred method:
+    - HANDWHEEL (recommended): "encoder,enable" for precise manual positioning
+    - MOVE COMMANDS: "move,<mm>" to position directly by millimeter coordinate
+    - JOG COMMANDS: Use incremental positioning commands for fine adjustment
+ 8. Teach positions: "teach,1", "teach,2", "teach,3" (auto-saves to SD card)
+ 9. Verify taught positions: "teach,status" shows current configuration
+ 10. Test movements: "move,1", "move,2", "move,3" to verify accuracy
+ 11. Reset if needed: "teach,reset" returns to factory defaults
+
+MANUAL OPERATION COMMANDS:
+ 13. Position control: "move,1" (positions 1-3) or "move,<mm>" for precise positioning
+ 14. Individual tray locking: "lock,1", "lock,2", "lock,3" for position locks
+ 15. Shuttle control: "lock,shuttle" to grab trays, "unlock,shuttle" to release
+ 16. Manual positioning: "encoder,enable" for handwheel control, "encoder,disable" to return to automated
+
+AUTOMATED OPERATION COMMANDS:
+ 17. Automated sequences: "tray,load" (full loading sequence), "tray,unload" (full unloading sequence)
+ 18. System monitoring: "system,status", "motor,status" for real-time status
+ 19. Test sequences: "test,<sequence>" for automated system validation
+
+DIAGNOSTICS AND TROUBLESHOOTING:
+ 20. Help system: "help" for command list, "help,<command>" for specific usage
+ 21. Error diagnosis: "system,history" to check operation log when issues occur
+ 22. System reset: "system,reset" to clear fault conditions
+ 23. Network management: "network,status" for Ethernet connection info
+ 24. Position diagnostics: "teach,status" to verify position configuration
+
+POSITION TEACHING SYSTEM:
+The system supports dynamic position teaching for field adjustment without code changes:
+
+- FACTORY DEFAULTS: Hardcoded positions used when no taught positions exist
+  * Position 1: 36.57 mm (loading position)
+  * Position 2: 477.79 mm (middle position)
+  * Position 3: 919.75 mm (unloading position)
+
+- TAUGHT POSITIONS: User-defined positions that override factory defaults
+  * Captured from current motor position using "teach,1/2/3" commands
+  * Automatically saved to SD card (positions.txt) for persistence
+  * Loaded automatically at startup if SD card is present
+  * Survive firmware updates and power cycles
+
+- POSITION HIERARCHY: System uses positions in this priority order:
+  1. Taught positions (highest priority) - if available
+  2. SD card positions (medium priority) - loaded at startup
+  3. Factory defaults (lowest priority) - fallback values
+
+- TEACHING WORKFLOW:
+  1. "motor,init" and "motor,home" - Initialize and reference system
+  2. Position motor to desired location using ONE of these methods:
+     a) HANDWHEEL METHOD (most precise): "encoder,enable" then use handwheel
+     b) MOVE COMMANDS: "move,<mm>" for direct positioning to millimeter coordinates
+     c) JOG COMMANDS: Use incremental jog commands for fine adjustment
+  3. "teach,1" (or 2,3) - Capture current position and auto-save
+  4. "move,1" - Test the newly taught position
+  5. Repeat for other positions as needed
+
+- CONFIGURATION COMMANDS:
+  * "teach,status" - Show current active positions and SD card status
+  * "teach,reset" - Clear taught positions and return to factory defaults
+  * "teach,help" - Display comprehensive teaching system documentation
+
+TYPICAL WORKFLOWS:
+
+INITIAL SYSTEM SETUP:
+- Power up → Connect (Serial/Ethernet) → motor,init → motor,home → system,status
+
+POSITION TEACHING (choose one positioning method):
+- Method A (with handwheel): motor,home → encoder,enable → position manually → teach,X → move,X (test)
+- Method B (direct positioning): motor,home → move,mm,XXX → teach,X → move,X (test)
+- Method C (incremental): motor,home → jog,inc,X → jog,+/- → teach,X → move,X (test)
+
+DAILY OPERATION:
+- Startup → Load taught positions from SD card → Verify system,status → Begin operations
+
+MAINTENANCE/TROUBLESHOOTING:
+- Enable manual mode → Use individual commands → Test components → Return to automated mode
+
+AUTOMATED SEQUENCES:
+- tray,load (complete loading sequence)
+- tray,unload (complete unloading sequence)
+- test,<sequence> (validation sequences)
+
+NOTE: Taught positions provide the flexibility to adjust the system for different
+tray sizes, mechanical tolerances, or field conditions without requiring code
+modifications or reflashing firmware.
 */
 
 #include "Arduino.h"
 #include "ClearCore.h"
+#include "ValveController.h"
+#include "MotorController.h"
+#include "Logging.h"
+#include "Tests.h"
+#include "CommandController.h"
+#include "Commands.h"
+#include "Utils.h"
+#include "EncoderController.h"
+#include "OutputManager.h"
+#include "EthernetController.h"
+#include "PositionConfig.h"
 
-// Specify which ClearCore serial COM port is connected to the "COM IN" port
-// of the CCIO-8 board. COM-1 may also be used.
+// Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
 
-uint8_t ccioBoardCount; // Store the number of connected CCIO-8 boards here.
-uint8_t ccioPinCount;   // Store the number of connected CCIO-8 pins here.
+uint8_t ccioBoardCount; // Store the number of connected CCIO-8 boards here
+uint8_t ccioPinCount;   // Store the number of connected CCIO-8 pins here
 
-// These will be used to format the text that is printed to the serial port.
-#define MAX_MSG_LEN 80
-char msg[MAX_MSG_LEN + 1];
-
-// Set this flag to true to use the CCIO-8 connectors as digital inputs.
-// Set it to false to use the CCIO-8 connectors as digital outputs.
-const bool inputMode = false;
-
-// Definition for IO1 and IO2 pins (ClearCore connectors)
-// These constants are needed to map ClearCore connectors to pins for Arduino API
-#define TRAY_1_LOCK_PIN 0     // IO-0 connector
-#define TRAY_1_UNLOCK_PIN 1   // IO-1 connector
-#define TRAY_2_LOCK_PIN 2     // IO-2 connector
-#define TRAY_2_UNLOCK_PIN 3   // IO-3 connector
-#define TRAY_3_LOCK_PIN 4     // IO-4 connector
-#define TRAY_3_UNLOCK_PIN 5   // IO-5 connector
-#define SHUTTLE_LOCK_PIN 64   // IO-6 connector
-#define SHUTTLE_UNLOCK_PIN 65 // IO-7 connector
-
-// 1. Define constants and enums first
-enum ValvePosition {
-    VALVE_POSITION_UNLOCK,
-    VALVE_POSITION_LOCK
-};
-
-// 2. Define struct types
-struct DoubleSolenoidValve {
-    int unlockPin;
-    int lockPin;
-    ValvePosition position;
-};
-
-// 3. Declare valve variables
-DoubleSolenoidValve tray1Valve;
-DoubleSolenoidValve tray2Valve;
-DoubleSolenoidValve tray3Valve;
-DoubleSolenoidValve shuttleValve;
-
-// 4. Set up arrays that reference the valves
-DoubleSolenoidValve* allValves[] = {&tray1Valve, &tray2Valve, &tray3Valve, &shuttleValve};
-const int valveCount = 4;
-const char* valveNames[] = {"Tray 1", "Tray 2", "Tray 3", "Shuttle"};
-
-// Define sensor pins
-#define TRAY_1_SENSOR_PIN DI6    // Connect Tray 1 sensor to DI-6
-#define TRAY_2_SENSOR_PIN DI7    // Connect Tray 2 sensor to DI-7
-#define TRAY_3_SENSOR_PIN DI8    // Connect Tray 3 sensor to DI-8
-#define SHUTTLE_SENSOR_PIN A9   // Connect Shuttle sensor to DI-9
-
-// Sensor state structure
-struct CylinderSensor {
-    int pin;
-    bool lastState;
-};
-
-// Declare sensor variables
-CylinderSensor tray1Sensor;
-CylinderSensor tray2Sensor;
-CylinderSensor tray3Sensor;
-CylinderSensor shuttleSensor;
-
-// Array of all sensors
-CylinderSensor* allSensors[] = {&tray1Sensor, &tray2Sensor, &tray3Sensor, &shuttleSensor};
-const int sensorCount = 4;
-
-// Minimum recommended pulse duration in milliseconds
-const unsigned long PULSE_DURATION = 100;
-
-// Pure function for pulsing pins
-void pulsePin(int pin, unsigned long duration) {
-    digitalWrite(pin, HIGH);
-    delay(duration);
-    digitalWrite(pin, LOW);
-}
-
-// Pin configuration function
-void configurePinAsOutput(int pin) {
-    pinMode(pin, OUTPUT);
-    digitalWrite(pin, LOW);
-}
-
-// Configure pins for a valve
-void configureValvePins(const DoubleSolenoidValve &valve) {
-    configurePinAsOutput(valve.unlockPin);
-    configurePinAsOutput(valve.lockPin);
-}
-
-// Get the appropriate pin based on target position
-int getActivationPin(const DoubleSolenoidValve &valve, ValvePosition target) {
-    return (target == VALVE_POSITION_UNLOCK) ? valve.unlockPin : valve.lockPin;
-}
-
-
-void valveInit(DoubleSolenoidValve &valve) {
-    // Configure pins
-    configureValvePins(valve);
-    
-    // Force physical position to unlocked
-    pulsePin(valve.unlockPin, PULSE_DURATION);
-    
-    // Set software state
-    valve.position = VALVE_POSITION_UNLOCK;
-}
-
-
-void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target) {
-    // Don't do anything if already in the requested position
-    if (valve.position == target) {
-        return;
-    }
-    
-    // Get the appropriate pin and pulse it
-    int pinToActivate = getActivationPin(valve, target);
-    pulsePin(pinToActivate, PULSE_DURATION);
-    
-    // Update the position state
-    valve.position = target;
-}
-
-
-void valveDeactivate(DoubleSolenoidValve &valve) {
-    digitalWrite(valve.unlockPin, LOW);
-    digitalWrite(valve.lockPin, LOW);
-    // Note: This doesn't change the physical valve position,
-    // it just ensures no coil is energized
-}
-
-// Higher-order function for valve operations
-void withValve(DoubleSolenoidValve &valve, void (*operation)(DoubleSolenoidValve&)) {
-    operation(valve);
-}
-
-// Operations that can be passed to withValve
-void unlockValve(DoubleSolenoidValve &valve) {
-    valveSetPosition(valve, VALVE_POSITION_UNLOCK);
-}
-
-void lockValve(DoubleSolenoidValve &valve) {
-    valveSetPosition(valve, VALVE_POSITION_LOCK);
-}
-
-void deactivateValve(DoubleSolenoidValve &valve) {
-    valveDeactivate(valve);
-}
-
-// Print valve status
-void printValveStatus(const DoubleSolenoidValve &valve, const char* valveName) {
-    Serial.print(valveName);
-    Serial.print(": ");
-    Serial.println(valve.position == VALVE_POSITION_UNLOCK ? "Unlocked" : "Locked");
-}
-
-// Function to apply an operation to multiple valves
-void withAllValves(void (*operation)(DoubleSolenoidValve&)) {
-    for (int i = 0; i < valveCount; i++) {
-        // Skip shuttle valve if no CCIO board
-        if (i == 3 && ccioBoardCount == 0) continue;
-        withValve(*allValves[i], operation);
-    }
-}
-
-// Function to print status of all valves
-void printAllValveStatus() {
-    Serial.println("Current valve positions:");
-    for (int i = 0; i < valveCount; i++) {
-        // Skip shuttle valve if no CCIO board
-        if (i == 3 && ccioBoardCount == 0) continue;
-        printValveStatus(*allValves[i], valveNames[i]);
-    }
-}
-
-// Initialize sensor
-void sensorInit(CylinderSensor &sensor, int pin) {
-    sensor.pin = pin;
-    pinMode(pin, INPUT);
-    sensor.lastState = digitalRead(pin);
-}
-
-// Read sensor state
-bool sensorRead(CylinderSensor &sensor) {
-    bool currentState = digitalRead(sensor.pin);
-    sensor.lastState = currentState;
-    return currentState;
-}
-
-// Print sensor status
-void printSensorStatus(const CylinderSensor &sensor, const char* sensorName) {
-    Serial.print(sensorName);
-    Serial.print(" Sensor: ");
-    Serial.println(sensorRead(const_cast<CylinderSensor&>(sensor)) ? "Not activated" : "Activated");
-}
-
-// Function to print status of all sensors
-void printAllSensorStatus() {
-    Serial.println("Current sensor readings:");
-    for (int i = 0; i < sensorCount; i++) {
-        printSensorStatus(*allSensors[i], valveNames[i]);  // Reuse valve names for sensors
-    }
-}
-
-
-// the setup function runs once when you press reset or power the board
+// The setup function
 void setup()
 {
-    Serial.begin(115200); // Use Arduino's Serial instead of ConnectorUsb
+    Serial.begin(115200);
+    delay(1000);
 
-    // Set up the CCIO-8 COM port.
+    Console.serialInfo(F("Lynx Conveyor Controller starting up..."));
+
+    Console.serialInfo(F("Initializing Ethernet interface..."));
+    initEthernetController(false); // true = use DHCP
+
+    // Initialize the output manager (must be before any Console calls)
+    initOutputManager();
+
+    // Initialize position config
+    initPositionConfig();
+
+    // First set up the CCIO board
+    Console.serialInfo(F("Initializing CCIO-8 expansion boards..."));
     CcioPort.Mode(Connector::CCIO);
     CcioPort.PortOpen();
 
-    // Initialize the CCIO-8 board.
+    // Get count of CCIO-8 boards
     ccioBoardCount = CcioMgr.CcioCount();
-    ccioPinCount = ccioBoardCount * CCIO_PINS_PER_BOARD;
+    char msg[50];
+    sprintf(msg, "[INFO] Discovered CCIO boards: %d", ccioBoardCount);
+    Console.serialInfo(msg);
 
-    // Wait for USB serial to connect (needed for native USB port only)
-    while (!Serial)
-    {
-        ; // wait for serial port to connect
-    }
+    // Now initialize sensor systems
+    Console.serialInfo(F("Initializing sensor systems..."));
+    initSensorSystem();
 
-    Serial.println("Initializing valves...");
+    // Initialize valve system with CCIO board status
+    Console.serialInfo(F("Initializing valve controller..."));
+    initValveSystem(ccioBoardCount > 0);
 
-    // Print the number of discovered CCIO-8 boards to the serial port.
-    snprintf(msg, MAX_MSG_LEN, "Discovered %d CCIO-8 board", ccioBoardCount);
-    Serial.print(msg);
-    if (ccioBoardCount != 1)
-    {
-        Serial.print("s");
-    }
-    Serial.println("...");
+    // Initialize encoder with default direction (modify if needed)
+    Console.serialInfo(F("Initializing MPG handwheel interface..."));
+    initEncoderControl(true, false);
 
-    // Initialize main board valves
-    tray1Valve.unlockPin = TRAY_1_UNLOCK_PIN;
-    tray1Valve.lockPin = TRAY_1_LOCK_PIN;
-    tray2Valve.unlockPin = TRAY_2_UNLOCK_PIN;
-    tray2Valve.lockPin = TRAY_2_LOCK_PIN;
-    tray3Valve.unlockPin = TRAY_3_UNLOCK_PIN;
-    tray3Valve.lockPin = TRAY_3_LOCK_PIN;
+    // Rest of your setup code...
+    Console.serialInfo(F("Motor controller ready for initialization."));
+    Console.serialInfo(F("Use 'motor init' command to initialize the motor."));
 
-    // Initialize the tray valves
-    valveInit(tray1Valve);
-    valveInit(tray2Valve);
-    valveInit(tray3Valve);
+    // Initialize system state variables including target position tracking
+    Console.serialInfo(F("Initializing system state variables..."));
+    initSystemStateVariables();
 
-    // Configure CCIO pins - This is the critical part!
-    // Follow exactly like the example does
-    if (ccioBoardCount > 0)
-    {
-        Serial.println("Configuring CCIO pins...");
-        // Explicitly set each CCIO pin we need as an output, one by one
-        pinMode(SHUTTLE_LOCK_PIN, OUTPUT);
-        pinMode(SHUTTLE_UNLOCK_PIN, OUTPUT);
+    commander.attachTree(API_tree);
+    commander.init();
+    initTestFlags();
 
-        // Initialize shuttle valve only after configuring its pins
-        shuttleValve.unlockPin = SHUTTLE_UNLOCK_PIN;
-        shuttleValve.lockPin = SHUTTLE_LOCK_PIN;
-        valveInit(shuttleValve);
-    }
-    else
-    {
-        Serial.println("WARNING: No CCIO-8 boards detected! Shuttle valve will not function.");
-    }
-
-    // Initialize sensors
-    Serial.println("Initializing cylinder position sensors...");
-
-    // // Configure A9 as digital input
-    // pinMode(A9, INPUT);
-    
-    tray1Sensor.pin = TRAY_1_SENSOR_PIN;
-    tray2Sensor.pin = TRAY_2_SENSOR_PIN;
-    tray3Sensor.pin = TRAY_3_SENSOR_PIN;
-    shuttleSensor.pin = SHUTTLE_SENSOR_PIN;
-    
-    // Initialize all sensors
-    sensorInit(tray1Sensor, TRAY_1_SENSOR_PIN);
-    sensorInit(tray2Sensor, TRAY_2_SENSOR_PIN);
-    sensorInit(tray3Sensor, TRAY_3_SENSOR_PIN);
-    sensorInit(shuttleSensor, SHUTTLE_SENSOR_PIN);
-    
-    Serial.println("Cylinder sensors initialized");
-
-    Serial.println("5/2-way valve controller initialized");
-    Serial.println("Type 'help' for available commands");
+    Console.serialInfo(F("System ready."));
+    Console.serialInfo(F("Type 'help' for available commands"));
 }
 
-// the loop function runs over and over again until power down or reset
+// The main loop
 void loop()
 {
-    // Check if there's data available to read from Serial
-    if (Serial.available() > 0)
+    unsigned long currentTime = millis();
+
+    // Check for E-stop condition (highest priority)
+    handleEStop();
+
+    // Check for test abort requested
+    if (testAbortRequested && testInProgress)
     {
-        // Read the incoming command
-        String command = Serial.readStringUntil('\n');
-        command.trim(); // Remove any whitespace
+        Console.serialInfo(F("Test abort detected in main loop"));
+        handleTestAbort();
+        Console.acknowledge(F("Test aborted successfully"));
+    }
 
-        // Convert to lowercase for case-insensitive comparison
-        command.toLowerCase();
+    // Always capture current system state - it's the foundation of safety
+    SystemState currentState = captureSystemState();
 
-        // Process the command
-        if (command == "tray 1 l" || command == "t1l")
+    // Update tray tracking from physical sensors each cycle
+    updateTrayTrackingFromSensors(currentState);
+
+    // Handle incoming serial commands using Commander API
+    handleSerialCommands();
+
+    // Process Ethernet connections and commands
+    // This will handle both incoming connections and command processing
+    processEthernetConnections();
+    handleEthernetCommands();
+
+    // Process fault clearing if in progress
+    processFaultClearing();
+
+    // Always check move progress - not just when MOVING
+    // This ensures we catch the transition from moving to stopped
+    checkMoveProgress();
+
+    // Then update motor state
+    updateMotorState();
+
+    // Check homing progress if in progress
+    if (motorState == MOTOR_STATE_HOMING)
+    {
+        checkHomingProgress();
+    }
+
+    // Log system state periodically if logging is enabled
+    if (logging.logInterval > 0 && waitTimeReached(currentTime, logging.previousLogTime, logging.logInterval))
+    {
+        logging.previousLogTime = currentTime;
+        logSystemState();
+    }
+
+    // Periodic safety validation using already captured state
+    SafetyValidationResult safety = validateSafety(currentState);
+
+    // Check for safety violations that require immediate action
+    if (operationInProgress &&
+        (!safety.operationWithinTimeout || !safety.operationSequenceValid))
+    {
+        char errorMsg[200];
+        sprintf(errorMsg, "SAFETY VIOLATION: %s", safety.operationSequenceMessage.c_str());
+        Console.error(errorMsg);
+
+        // Emergency stop or other recovery action
+        // Use the failureReason from safety validation
+        abortOperation(safety.failureReason);
+    }
+
+    // Process tray operations if any are in progress
+    processTrayOperations();
+
+    // Store current state as previous for next cycle
+    previousState = currentState;
+
+    // Process encoder input if enabled
+    if (encoderControlActive)
+    {
+        processEncoderInput();
+    }
+
+    // Pressure check using waitTimeReached helper for safe rollover handling
+    static const unsigned long PRESSURE_CHECK_INTERVAL = 10000; // 10 seconds
+    static unsigned long lastPressureCheckTime = 0;
+
+    if (waitTimeReached(currentTime, lastPressureCheckTime, PRESSURE_CHECK_INTERVAL))
+    {
+        if (!isPressureSufficient())
         {
-            Serial.println("Command received: Locking tray 1");
-            withValve(tray1Valve, lockValve);
+            Console.serialWarning(F("System pressure below minimum threshold (21.75 PSI)"));
         }
-        else if (command == "tray 1 ul" || command == "t1ul")
-        {
-            Serial.println("Command received: Unlocking tray 1");
-            withValve(tray1Valve, unlockValve);
-        }
-        else if (command == "tray 2 l" || command == "t2l")
-        {
-            Serial.println("Command received: Locking tray 2");
-            withValve(tray2Valve, lockValve);
-        }
-        else if (command == "tray 2 ul" || command == "t2ul")
-        {
-            Serial.println("Command received: Unlocking tray 2");
-            withValve(tray2Valve, unlockValve);
-        }
-        else if (command == "tray 3 l" || command == "t3l")
-        {
-            Serial.println("Command received: Locking tray 3");
-            withValve(tray3Valve, lockValve);
-        }
-        else if (command == "tray 3 ul" || command == "t3ul")
-        {
-            Serial.println("Command received: Unlocking tray 3");
-            withValve(tray3Valve, unlockValve);
-        }
-        else if (command == "shuttle l" || command == "sl")
-        {
-            Serial.println("Command received: Locking shuttle");
-            withValve(shuttleValve, lockValve);
-        }
-        else if (command == "shuttle ul" || command == "sul")
-        {
-            Serial.println("Command received: Unlocking shuttle");
-            withValve(shuttleValve, unlockValve);
-        }
-        else if (command == "status" || command == "s")
-        {
-            // Report the current status
-            printAllValveStatus();
-        }
-        else if (command == "sensors" || command == "ss")
-        {
-            // Report the current sensor status
-            printAllSensorStatus();
-        }
-        else if (command == "help" || command == "h")
-        {
-            // Display available commands
-            Serial.println("Available commands:");
-            Serial.println("Tray commands:");
-            Serial.println("  tray 1 l or t1l - Lock tray 1");
-            Serial.println("  tray 1 ul or t1ul - Unlock tray 1");
-            Serial.println("  tray 2 l or t2l - Lock tray 2");
-            Serial.println("  tray 2 ul or t2ul - Unlock tray 2");
-            Serial.println("  tray 3 l or t3l - Lock tray 3");
-            Serial.println("  tray 3 ul or t3ul - Unlock tray 3");
-            Serial.println("Shuttle commands:");
-            Serial.println("  shuttle l or sl - Lock shuttle");
-            Serial.println("  shuttle ul or sul - Unlock shuttle");
-            Serial.println("General commands:");
-            Serial.println("  status or s - Display current valve positions");
-            Serial.println("  help or h - Show this help message");
-            Serial.println("Sensor commands:");
-            Serial.println("  sensors or ss - Display all sensor readings");
-        }
-        else
-        {
-            Serial.println("Unknown command. Type 'help' for available commands.");
-        }
+        lastPressureCheckTime = currentTime;
     }
 }
-
