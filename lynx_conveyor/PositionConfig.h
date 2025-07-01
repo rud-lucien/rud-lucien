@@ -16,7 +16,7 @@ extern double runtimePosition3Mm;
 extern bool useRuntimePositions;
 
 // SD Card configuration
-#define CONFIG_FILE_NAME "positions.txt"
+#define CONFIG_FILE_NAME "POS.TXT"
 
 //=============================================================================
 // FUNCTION DECLARATIONS

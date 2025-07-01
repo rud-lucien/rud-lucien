@@ -11,6 +11,7 @@ double runtimePosition1Mm = -1.0;
 double runtimePosition2Mm = -1.0;
 double runtimePosition3Mm = -1.0;
 bool useRuntimePositions = false;
+bool sdCardInitialized = false; 
 
 //=============================================================================
 // SYSTEM INITIALIZATION
@@ -19,8 +20,9 @@ bool useRuntimePositions = false;
 bool initPositionConfig() {
     Console.serialInfo(F("Initializing position configuration system..."));
     
-    // Initialize SD card
-    if (!SD.begin()) {
+    // Initialize SD card - save result to global flag
+    sdCardInitialized = SD.begin();
+    if (!sdCardInitialized) {
         Console.serialWarning(F("SD card initialization failed - using default positions"));
         return false;
     }
@@ -240,11 +242,31 @@ bool savePositionsToSD() {
         return false;
     }
     
+    // Show what file we're working with
+    Console.serialInfo(F("Config filename: "));
+    Console.serialInfo(CONFIG_FILE_NAME);
+    Console.serialInfo(F("Opening config file for writing..."));
+    
+    // Attempt to create/open the file
     File configFile = SD.open(CONFIG_FILE_NAME, FILE_WRITE);
     if (!configFile) {
         Console.serialError(F("Failed to open config file for writing"));
+        
+        // Diagnostic test with a simple file
+        Console.serialInfo(F("Trying test file write..."));
+        File testFile = SD.open("test.txt", FILE_WRITE);
+        if (!testFile) {
+            Console.serialError(F("SD card test file also failed - card may be write-protected"));
+        } else {
+            testFile.println("Test write");
+            testFile.close();
+            Console.serialInfo(F("Test file created successfully - issue is specific to config file"));
+        }
+        
         return false;
     }
+    
+    Console.serialInfo(F("Config file opened successfully, writing data..."));
     
     // Write header
     configFile.println("# Lynx Conveyor Position Configuration");
@@ -269,8 +291,20 @@ bool savePositionsToSD() {
     configFile.print("SAVED_TIME=");
     configFile.println(millis());
     
+    Console.serialInfo(F("Flushing and closing file..."));
+    
+    // Explicitly flush and close the file
+    configFile.flush();
     configFile.close();
-    return true;
+    
+    // Verify the file was created
+    if (SD.exists(CONFIG_FILE_NAME)) {
+        Console.serialInfo(F("Position config file saved successfully"));
+        return true;
+    } else {
+        Console.serialError(F("Config file not found after writing - SD card may have issues"));
+        return false;
+    }
 }
 
 bool loadPositionsFromSD() {
@@ -329,6 +363,6 @@ bool loadPositionsFromSD() {
 }
 
 bool isSDCardAvailable() {
-    // Simple check - try to open the SD card
-    return SD.begin();
+    // Use the flag instead of calling SD.begin() again
+    return sdCardInitialized;
 }

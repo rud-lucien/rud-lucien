@@ -183,14 +183,28 @@ bool moveToAbsolutePosition(int32_t position)
 {
     char msg[200];
 
-    // Check if position is within valid range (accounting for MOTION_DIRECTION)
-    if ((MOTION_DIRECTION * position < 0) ||
-        (MOTION_DIRECTION * position > MAX_TRAVEL_PULSES))
+    // Check if position is within valid range based on MOTION_DIRECTION
+    if (MOTION_DIRECTION > 0)
     {
-        sprintf(msg, "Requested position %ld pulses is outside valid range (0 to %ld pulses)",
-                position, MOTION_DIRECTION * MAX_TRAVEL_PULSES);
-        Console.serialError(msg);
-        return false;
+        // For positive direction, valid range is 0 to MAX_TRAVEL_PULSES
+        if (position < 0 || position > MAX_TRAVEL_PULSES)
+        {
+            sprintf(msg, "Requested position %ld pulses is outside valid range (0 to %ld pulses)",
+                    position, MAX_TRAVEL_PULSES);
+            Console.serialError(msg);
+            return false;
+        }
+    }
+    else
+    {
+        // For negative direction, valid range is -MAX_TRAVEL_PULSES to 0
+        if (position > 0 || position < -MAX_TRAVEL_PULSES)
+        {
+            sprintf(msg, "Requested position %ld pulses is outside valid range (%ld to 0 pulses)",
+                    position, -MAX_TRAVEL_PULSES);
+            Console.serialError(msg);
+            return false;
+        }
     }
 
     // Check if motor has alerts
@@ -201,7 +215,7 @@ bool moveToAbsolutePosition(int32_t position)
         return false;
     }
 
-    sprintf(msg, "Moving to absolute position: %ld", normalizeEncoderValue(position));
+    sprintf(msg, "Moving to absolute position: %ld", position);
     Console.serialInfo(msg);
 
     // Command the absolute move
@@ -215,6 +229,7 @@ bool moveToAbsolutePosition(int32_t position)
 
 bool moveToPosition(PositionTarget position)
 {
+    char debugMsg[200];
     // Set current target for logging
     hasCurrentTarget = true;
     currentTargetType = position;
@@ -231,34 +246,43 @@ bool moveToPosition(PositionTarget position)
     case POSITION_HOME:
         targetPositionMm = POSITION_HOME_MM;
         targetPulses = POSITION_HOME_PULSES;
+
+        sprintf(debugMsg, "POSITION_HOME_MM=%.2f, mmToPulses()=%ld, normalized=%ld, MOTION_DIRECTION=%d",
+                targetPositionMm, targetPulses, normalizeEncoderValue(targetPulses), MOTION_DIRECTION);
+        Console.serialDiagnostic(debugMsg);
         break;
-    // case POSITION_1:
-    //     targetPositionMm = POSITION_1_MM;
-    //     targetPulses = POSITION_1_PULSES;
-    //     break;
-    // case POSITION_2:
-    //     targetPositionMm = POSITION_2_MM;
-    //     targetPulses = POSITION_2_PULSES;
-    //     break;
-    // case POSITION_3:
-    //     targetPositionMm = POSITION_3_MM;
-    //     targetPulses = POSITION_3_PULSES;
-    //     break;
+
     case POSITION_1:
         targetPositionMm = getPosition1Mm(); // Instead of POSITION_1_MM
         targetPulses = mmToPulses(targetPositionMm);
+
+        sprintf(debugMsg, "getPosition1Mm()=%.2f, mmToPulses()=%ld, normalized=%ld, MOTION_DIRECTION=%d",
+                targetPositionMm, targetPulses, normalizeEncoderValue(targetPulses), MOTION_DIRECTION);
+        Console.serialDiagnostic(debugMsg);
         break;
     case POSITION_2:
         targetPositionMm = getPosition2Mm(); // Instead of POSITION_2_MM
         targetPulses = mmToPulses(targetPositionMm);
+
+        sprintf(debugMsg, "getPosition2Mm()=%.2f, mmToPulses()=%ld, normalized=%ld, MOTION_DIRECTION=%d",
+                targetPositionMm, targetPulses, normalizeEncoderValue(targetPulses), MOTION_DIRECTION);
+        Console.serialDiagnostic(debugMsg);
         break;
     case POSITION_3:
         targetPositionMm = getPosition3Mm(); // Instead of POSITION_3_MM
         targetPulses = mmToPulses(targetPositionMm);
+
+        sprintf(debugMsg, "getPosition3Mm()=%.2f, mmToPulses()=%ld, normalized=%ld, MOTION_DIRECTION=%d",
+                targetPositionMm, targetPulses, normalizeEncoderValue(targetPulses), MOTION_DIRECTION);
+        Console.serialDiagnostic(debugMsg);
         break;
     case POSITION_4:
         targetPositionMm = POSITION_4_MM;
         targetPulses = POSITION_4_PULSES;
+
+        sprintf(debugMsg, "POSITION_4_MM=%.2f, mmToPulses()=%ld, normalized=%ld, MOTION_DIRECTION=%d",
+                targetPositionMm, targetPulses, normalizeEncoderValue(targetPulses), MOTION_DIRECTION);
+        Console.serialDiagnostic(debugMsg);
         break;
     default:
         hasCurrentTarget = false;
@@ -336,7 +360,7 @@ bool moveToPosition(PositionTarget position)
     MOTOR_CONNECTOR.VelMax(currentVelMax);
 
     // Perform the move
-    bool moveResult = moveToAbsolutePosition(normalizeEncoderValue(targetPulses));
+    bool moveResult = moveToAbsolutePosition(targetPulses);
 
     if (!moveResult)
     {
