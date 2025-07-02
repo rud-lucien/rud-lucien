@@ -64,9 +64,9 @@
 
 // Position definitions (in mm from home)
 #define POSITION_HOME_MM 0.0        // Home position
-#define POSITION_1_MM 36.57         // Position 1 (Tray loading position and tray 1 position)
-#define POSITION_2_MM 477.79        // Position 2 (Tray 2 position)
-#define POSITION_3_MM 919.75        // Position 3 (Tray 3 position)
+#define POSITION_1_MM 12.15         // Position 1 (Tray loading position and tray 1 position)
+#define POSITION_2_MM 453.70        // Position 2 (Tray 2 position)
+#define POSITION_3_MM 895.46        // Position 3 (Tray 3 position)
 #define POSITION_4_MM MAX_TRAVEL_MM // Position 4 (max = 1050 mm)
 
 // Position definitions in pulses (calculated from mm)
