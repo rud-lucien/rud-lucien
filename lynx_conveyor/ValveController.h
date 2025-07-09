@@ -1,7 +1,7 @@
 #ifndef VALVE_CONTROLLER_H
 #define VALVE_CONTROLLER_H
 
-#include "Arduino.h"
+#include <Arduino.h>
 #include "ClearCore.h"
 
 //=============================================================================

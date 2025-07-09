@@ -1,6 +1,28 @@
 #include "OutputManager.h"
 #include <Ethernet.h>
 #include "LogHistory.h"
+#include "CommandController.h"
+
+// ANSI Color Codes for Serial Terminal
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_WHITE   "\x1b[37m"
+#define ANSI_COLOR_ORANGE  "\x1b[38;5;208m"  // 256-color orange
+#define ANSI_COLOR_GRAY    "\x1b[90m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
+// Bold variants
+#define ANSI_BOLD_RED      "\x1b[1;31m"
+#define ANSI_BOLD_GREEN    "\x1b[1;32m"
+#define ANSI_BOLD_YELLOW   "\x1b[1;33m"
+#define ANSI_BOLD_ORANGE   "\x1b[1;38;5;208m"
+#define ANSI_BOLD_MAGENTA  "\x1b[1;35m"
+#define ANSI_BOLD_WHITE    "\x1b[1;37m"
+#define ANSI_BOLD_CYAN     "\x1b[1;36m"
 
 // Constants
 #define LOG_MESSAGE_BUFFER_SIZE 120
@@ -154,18 +176,18 @@ void MultiPrint::flush()
 // Add to OutputManager.cpp
 void MultiPrint::acknowledge(const char *msg)
 {
-    print(F("[ACK], "));
+    print(ANSI_BOLD_GREEN "[ACK]" ANSI_COLOR_RESET ", ");
     println(msg);
 
-    // Add to history buffer
+    // Add to history buffer (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[ACK] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::INFO);
 }
 
 void MultiPrint::acknowledge(const __FlashStringHelper *msg)
 {
-    print(F("[ACK], "));
+    print(ANSI_BOLD_GREEN "[ACK]" ANSI_COLOR_RESET ", ");
     println(msg);
 
     // Convert to regular string for history
@@ -175,24 +197,24 @@ void MultiPrint::acknowledge(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[ACK] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::INFO);
 }
 
 // Helper methods implementation for formatted messages
 void MultiPrint::info(const char *msg)
 {
-    print(F("[INFO] "));
+    print(ANSI_BOLD_WHITE "[INFO]" ANSI_COLOR_RESET " ");
     println(msg);
 
-    // Add to history buffer
+    // Add to history buffer with INFO severity (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[INFO] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::INFO);
 }
 
 void MultiPrint::info(const __FlashStringHelper *msg)
 {
-    print(F("[INFO] "));
+    print(ANSI_BOLD_WHITE "[INFO]" ANSI_COLOR_RESET " ");
     println(msg);
 
     // Convert to regular string for history
@@ -202,26 +224,26 @@ void MultiPrint::info(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[INFO] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::INFO);
 }
 
 // New operational info methods that always get logged to history
 void MultiPrint::opInfo(const char *msg)
 {
     // Regular output
-    this->print(F("[INFO] "));
+    this->print(ANSI_BOLD_WHITE "[INFO]" ANSI_COLOR_RESET " ");
     this->println(msg);
 
-    // Also add to history
+    // Also add to history (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[INFO] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::INFO);
 }
 
 void MultiPrint::opInfo(const __FlashStringHelper *msg)
 {
     // Regular output
-    this->print(F("[INFO] "));
+    this->print(ANSI_BOLD_WHITE "[INFO]" ANSI_COLOR_RESET " ");
     this->println(msg);
 
     // Convert to regular string for history
@@ -231,24 +253,24 @@ void MultiPrint::opInfo(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[INFO] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::INFO);
 }
 
 // Updated with history logging
 void MultiPrint::error(const char *msg)
 {
-    print(F("[ERROR], "));
+    print(ANSI_BOLD_RED "[ERROR]" ANSI_COLOR_RESET ", ");
     println(msg);
 
-    // Always log errors to history
+    // Always log errors to history with ERROR severity (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[ERROR] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::ERROR);
 }
 
 void MultiPrint::error(const __FlashStringHelper *msg)
 {
-    print(F("[ERROR], "));
+    print(ANSI_BOLD_RED "[ERROR]" ANSI_COLOR_RESET ", ");
     println(msg);
 
     // Convert to regular string for history
@@ -258,24 +280,24 @@ void MultiPrint::error(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[ERROR] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::ERROR);
 }
 
 // Updated with history logging
 void MultiPrint::diagnostic(const char *msg)
 {
-    print(F("[DIAGNOSTIC] "));
+    print(ANSI_BOLD_YELLOW "[DIAGNOSTIC]" ANSI_COLOR_RESET " ");
     println(msg);
 
-    // Log diagnostics to history
+    // Log diagnostics to history with DIAGNOSTIC severity (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[DIAGNOSTIC] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::DIAGNOSTIC);
 }
 
 void MultiPrint::diagnostic(const __FlashStringHelper *msg)
 {
-    print(F("[DIAGNOSTIC] "));
+    print(ANSI_BOLD_YELLOW "[DIAGNOSTIC]" ANSI_COLOR_RESET " ");
     println(msg);
 
     // Convert to regular string for history
@@ -285,13 +307,13 @@ void MultiPrint::diagnostic(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[DIAGNOSTIC] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::DIAGNOSTIC);
 }
 
 // Updated with command filtering for history
 void MultiPrint::serialCommand(const char *msg)
 {
-    print(F("[SERIAL COMMAND] "));
+    print(ANSI_BOLD_CYAN "[SERIAL COMMAND]" ANSI_COLOR_RESET " ");
     println(msg);
 
     // Only log commands that pass the filter
@@ -303,7 +325,7 @@ void MultiPrint::serialCommand(const char *msg)
 
         char buffer[LOG_MESSAGE_BUFFER_SIZE];
         snprintf(buffer, sizeof(buffer), "[SERIAL COMMAND] %s", msg);
-        opLogHistory.addEntry(buffer);
+        opLogHistory.addEntry(buffer, LogEntry::COMMAND);
     }
     else
     {
@@ -314,7 +336,7 @@ void MultiPrint::serialCommand(const char *msg)
 
 void MultiPrint::serialCommand(const __FlashStringHelper *msg)
 {
-    print(F("[SERIAL COMMAND] "));
+    print(ANSI_BOLD_CYAN "[SERIAL COMMAND]" ANSI_COLOR_RESET " ");
     println(msg);
 
     // Convert to regular string for filtering
@@ -327,13 +349,13 @@ void MultiPrint::serialCommand(const __FlashStringHelper *msg)
     {
         char logBuffer[LOG_MESSAGE_BUFFER_SIZE];
         snprintf(logBuffer, sizeof(logBuffer), "[SERIAL COMMAND] %s", buffer); // FIXED: Use correct label
-        opLogHistory.addEntry(logBuffer);
+        opLogHistory.addEntry(logBuffer, LogEntry::COMMAND);
     }
 }
 
 void MultiPrint::ethernetCommand(const char *msg)
 {
-    print(F("[NETWORK COMMAND] "));
+    print(ANSI_BOLD_CYAN "[NETWORK COMMAND]" ANSI_COLOR_RESET " ");
     println(msg);
 
     // Only log commands that pass the filter
@@ -341,13 +363,13 @@ void MultiPrint::ethernetCommand(const char *msg)
     { // Use msg directly
         char logBuffer[LOG_MESSAGE_BUFFER_SIZE];
         snprintf(logBuffer, sizeof(logBuffer), "[NETWORK COMMAND] %s", msg); // Use msg and fix label
-        opLogHistory.addEntry(logBuffer);
+        opLogHistory.addEntry(logBuffer, LogEntry::COMMAND);
     }
 }
 
 void MultiPrint::ethernetCommand(const __FlashStringHelper *msg)
 {
-    print(F("[NETWORK COMMAND] "));
+    print(ANSI_BOLD_CYAN "[NETWORK COMMAND]" ANSI_COLOR_RESET " ");
     println(msg);
 
     // Convert to regular string for filtering
@@ -360,25 +382,25 @@ void MultiPrint::ethernetCommand(const __FlashStringHelper *msg)
     {
         char logBuffer[LOG_MESSAGE_BUFFER_SIZE];
         snprintf(logBuffer, sizeof(logBuffer), "[NETWORK COMMAND] %s", buffer);
-        opLogHistory.addEntry(logBuffer);
+        opLogHistory.addEntry(logBuffer, LogEntry::INFO);
     }
 }
 
 // Updated with history logging
 void MultiPrint::warning(const char *msg)
 {
-    print(F("[WARNING] "));
+    print(ANSI_BOLD_ORANGE "[WARNING]" ANSI_COLOR_RESET " ");
     println(msg);
 
-    // Log warnings to history
+    // Log warnings to history (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[WARNING] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::WARNING);
 }
 
 void MultiPrint::warning(const __FlashStringHelper *msg)
 {
-    print(F("[WARNING] "));
+    print(ANSI_BOLD_ORANGE "[WARNING]" ANSI_COLOR_RESET " ");
     println(msg);
 
     // Convert to regular string for history
@@ -388,24 +410,24 @@ void MultiPrint::warning(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[WARNING] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::WARNING);
 }
 
 // Updated with history logging
 void MultiPrint::safety(const char *msg)
 {
-    print(F("[SAFETY] "));
+    print(ANSI_BOLD_MAGENTA "[SAFETY]" ANSI_COLOR_RESET " ");
     println(msg);
 
-    // Log safety messages to history
+    // Log safety messages to history (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[SAFETY] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::CRITICAL);
 }
 
 void MultiPrint::safety(const __FlashStringHelper *msg)
 {
-    print(F("[SAFETY] "));
+    print(ANSI_BOLD_MAGENTA "[SAFETY]" ANSI_COLOR_RESET " ");
     println(msg);
 
     // Convert to regular string for history
@@ -415,24 +437,24 @@ void MultiPrint::safety(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[SAFETY] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::CRITICAL);
 }
 
 // The serial-only methods don't need to be modified since they don't use the buffer
 void MultiPrint::serialInfo(const char *msg)
 {
-    Serial.print(F("[INFO] "));
+    Serial.print(ANSI_BOLD_WHITE "[INFO]" ANSI_COLOR_RESET " ");
     Serial.println(msg);
 
-    // Add to history buffer
+    // Add to history buffer (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[INFO] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::INFO);
 }
 
 void MultiPrint::serialInfo(const __FlashStringHelper *msg)
 {
-    Serial.print(F("[INFO] "));
+    Serial.print(ANSI_BOLD_WHITE "[INFO]" ANSI_COLOR_RESET " ");
     Serial.println(msg);
 
     // Convert to regular string for history
@@ -442,23 +464,23 @@ void MultiPrint::serialInfo(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[INFO] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::INFO);
 }
 
 void MultiPrint::serialError(const char *msg)
 {
-    Serial.print(F("[ERROR], "));
+    Serial.print(ANSI_BOLD_RED "[ERROR]" ANSI_COLOR_RESET ", ");
     Serial.println(msg);
 
-    // Add to history buffer
+    // Add to history buffer (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[ERROR] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::ERROR);
 }
 
 void MultiPrint::serialError(const __FlashStringHelper *msg)
 {
-    Serial.print(F("[ERROR], "));
+    Serial.print(ANSI_BOLD_RED "[ERROR]" ANSI_COLOR_RESET ", ");
     Serial.println(msg);
 
     // Convert to regular string for history
@@ -468,23 +490,23 @@ void MultiPrint::serialError(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[ERROR] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::ERROR);
 }
 
 void MultiPrint::serialDiagnostic(const char *msg)
 {
-    Serial.print(F("[DIAGNOSTIC] "));
+    Serial.print(ANSI_BOLD_YELLOW "[DIAGNOSTIC]" ANSI_COLOR_RESET " ");
     Serial.println(msg);
 
-    // Add to history buffer
+    // Add to history buffer (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[DIAGNOSTIC] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::INFO);
 }
 
 void MultiPrint::serialDiagnostic(const __FlashStringHelper *msg)
 {
-    Serial.print(F("[DIAGNOSTIC] "));
+    Serial.print(ANSI_BOLD_YELLOW "[DIAGNOSTIC]" ANSI_COLOR_RESET " ");
     Serial.println(msg);
 
     // Convert to regular string for history
@@ -494,23 +516,23 @@ void MultiPrint::serialDiagnostic(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[DIAGNOSTIC] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::INFO);
 }
 
 void MultiPrint::serialWarning(const char *msg)
 {
-    Serial.print(F("[WARNING] "));
+    Serial.print(ANSI_BOLD_ORANGE "[WARNING]" ANSI_COLOR_RESET " ");
     Serial.println(msg);
 
-    // Add to history buffer
+    // Add to history buffer (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[WARNING] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::WARNING);
 }
 
 void MultiPrint::serialWarning(const __FlashStringHelper *msg)
 {
-    Serial.print(F("[WARNING] "));
+    Serial.print(ANSI_BOLD_ORANGE "[WARNING]" ANSI_COLOR_RESET " ");
     Serial.println(msg);
 
     // Convert to regular string for history
@@ -520,23 +542,23 @@ void MultiPrint::serialWarning(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[WARNING] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::WARNING);
 }
 
 void MultiPrint::serialSafety(const char *msg)
 {
-    Serial.print(F("[SAFETY] "));
+    Serial.print(ANSI_BOLD_MAGENTA "[SAFETY]" ANSI_COLOR_RESET " ");
     Serial.println(msg);
 
-    // Add to history buffer
+    // Add to history buffer (without color codes)
     char buffer[LOG_MESSAGE_BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "[SAFETY] %s", msg);
-    opLogHistory.addEntry(buffer);
+    opLogHistory.addEntry(buffer, LogEntry::CRITICAL);
 }
 
 void MultiPrint::serialSafety(const __FlashStringHelper *msg)
 {
-    Serial.print(F("[SAFETY] "));
+    Serial.print(ANSI_BOLD_MAGENTA "[SAFETY]" ANSI_COLOR_RESET " ");
     Serial.println(msg);
 
     // Convert to regular string for history
@@ -546,5 +568,8 @@ void MultiPrint::serialSafety(const __FlashStringHelper *msg)
 
     char logBuffer[80];
     snprintf(logBuffer, sizeof(logBuffer), "[SAFETY] %s", buffer);
-    opLogHistory.addEntry(logBuffer);
+    opLogHistory.addEntry(logBuffer, LogEntry::CRITICAL);
 }
+
+// Note: isCommandExcludedFromHistory() is defined in CommandController.cpp
+

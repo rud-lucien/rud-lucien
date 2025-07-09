@@ -320,30 +320,44 @@ bool loadPositionsFromSD() {
     
     Console.serialInfo(F("Loading positions from SD card..."));
     
-    // Read file line by line
-    String line;
+    // Read file line by line using fixed buffer
+    char line[128];
     bool foundPositions = false;
     
     while (configFile.available()) {
-        line = configFile.readStringUntil('\n');
-        line.trim();
+        // Read line into fixed buffer
+        int i = 0;
+        while (configFile.available() && i < sizeof(line) - 1) {
+            char c = configFile.read();
+            if (c == '\n' || c == '\r') break;
+            line[i++] = c;
+        }
+        line[i] = '\0';
+        
+        // Trim leading/trailing spaces
+        char* trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
+        int len = strlen(trimmed);
+        while (len > 0 && (trimmed[len-1] == ' ' || trimmed[len-1] == '\t' || trimmed[len-1] == '\r')) {
+            trimmed[--len] = '\0';
+        }
         
         // Skip comments and empty lines
-        if (line.startsWith("#") || line.length() == 0) {
+        if (trimmed[0] == '#' || strlen(trimmed) == 0) {
             continue;
         }
         
         // Parse position lines
-        if (line.startsWith("POSITION_1_MM=")) {
-            runtimePosition1Mm = line.substring(14).toFloat();
+        if (strncmp(trimmed, "POSITION_1_MM=", 14) == 0) {
+            runtimePosition1Mm = atof(trimmed + 14);
             foundPositions = true;
         }
-        else if (line.startsWith("POSITION_2_MM=")) {
-            runtimePosition2Mm = line.substring(14).toFloat();
+        else if (strncmp(trimmed, "POSITION_2_MM=", 14) == 0) {
+            runtimePosition2Mm = atof(trimmed + 14);
             foundPositions = true;
         }
-        else if (line.startsWith("POSITION_3_MM=")) {
-            runtimePosition3Mm = line.substring(14).toFloat();
+        else if (strncmp(trimmed, "POSITION_3_MM=", 14) == 0) {
+            runtimePosition3Mm = atof(trimmed + 14);
             foundPositions = true;
         }
     }

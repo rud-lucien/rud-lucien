@@ -4,12 +4,11 @@
 //=============================================================================
 // INCLUDES
 //=============================================================================
-#include "Arduino.h"
+#include <Arduino.h>
 #include "ClearCore.h"
 #include "ValveController.h"
 #include "MotorController.h"
 #include "Logging.h"
-#include "Tests.h"
 #include "Commands.h"
 #include "EncoderController.h"
 #include "OutputManager.h"
@@ -134,54 +133,54 @@ struct SafetyValidationResult
 {
     // Motor movement safety flags
     bool safeToMove;
-    String moveUnsafeReason;
+    char moveUnsafeReason[64];
 
     // Tray locking safety flags
     bool safeToLockTray1;
     bool safeToLockTray2;
     bool safeToLockTray3;
-    String tray1LockUnsafeReason;
-    String tray2LockUnsafeReason;
-    String tray3LockUnsafeReason;
+    char tray1LockUnsafeReason[64];
+    char tray2LockUnsafeReason[64];
+    char tray3LockUnsafeReason[64];
 
     // Shuttle actuation safety flags
     bool safeToLockShuttle;
     bool safeToUnlockShuttle;
-    String shuttleLockUnsafeReason;
-    String shuttleUnlockUnsafeReason;
+    char shuttleLockUnsafeReason[64];
+    char shuttleUnlockUnsafeReason[64];
 
     bool pneumaticPressureSufficient;
-    String pressureUnsafeReason;
+    char pressureUnsafeReason[64];
 
     // Tray loading safety flags
     bool safeToLoadTrayToPos1;
     bool safeToLoadTrayToPos2;
     bool safeToLoadTrayToPos3;
-    String loadTrayPos1UnsafeReason;
-    String loadTrayPos2UnsafeReason;
-    String loadTrayPos3UnsafeReason;
+    char loadTrayPos1UnsafeReason[64];
+    char loadTrayPos2UnsafeReason[64];
+    char loadTrayPos3UnsafeReason[64];
 
     // Tray unloading safety flags
     bool safeToUnloadTrayFromPos1;
     bool safeToUnloadTrayFromPos2;
     bool safeToUnloadTrayFromPos3;
-    String unloadTrayPos1UnsafeReason;
-    String unloadTrayPos2UnsafeReason;
-    String unloadTrayPos3UnsafeReason;
+    char unloadTrayPos1UnsafeReason[64];
+    char unloadTrayPos2UnsafeReason[64];
+    char unloadTrayPos3UnsafeReason[64];
     bool safeToUnlockGrippedTray;
-    String grippedTrayUnlockUnsafeReason;
+    char grippedTrayUnlockUnsafeReason[64];
 
     // System state validation
     bool commandStateValid;
     bool trayPositionValid;
     bool targetPositionValid;
-    String stateValidationMessage;
+    char stateValidationMessage[128];
 
     // Operational sequence validation
     bool safeToAcceptNewCommand;
     bool operationWithinTimeout;
     bool operationSequenceValid;
-    String operationSequenceMessage;
+    char operationSequenceMessage[128];
 
     // Abort reason - directly indicates what type of abort should be triggered
     AbortReason failureReason;
@@ -189,8 +188,8 @@ struct SafetyValidationResult
     // Lock/unlock operation status
     bool lockOperationSuccessful;   // Set to false if a lock operation recently failed
     bool unlockOperationSuccessful; // Set to false if an unlock operation recently failed
-    String lockFailureDetails;      // Details about which lock operation failed
-    String unlockFailureDetails;    // Details about which unlock operation failed
+    char lockFailureDetails[128];      // Details about which lock operation failed
+    char unlockFailureDetails[128];    // Details about which unlock operation failed
 };
 
 //=============================================================================
@@ -225,8 +224,8 @@ extern unsigned long valveActuationStartTime;
 // Lock/unlock operation status tracking
 extern bool lastLockOperationFailed;
 extern bool lastUnlockOperationFailed;
-extern String lastLockFailureDetails;
-extern String lastUnlockFailureDetails;
+extern char lastLockFailureDetails[128];
+extern char lastUnlockFailureDetails[128];
 extern unsigned long lockFailureTimestamp;
 extern unsigned long unlockFailureTimestamp;
 

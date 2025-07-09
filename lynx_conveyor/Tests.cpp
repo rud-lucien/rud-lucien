@@ -30,8 +30,16 @@ bool checkSerialForAbortCommand()
 {
     if (Serial.available() && Serial.peek() == 'a')
     {
-        String cmd = Serial.readStringUntil('\n');
-        if (cmd.indexOf("abort") >= 0)
+        char cmd[32];
+        int i = 0;
+        while (Serial.available() && i < sizeof(cmd) - 1) {
+            char c = Serial.read();
+            if (c == '\n' || c == '\r') break;
+            cmd[i++] = c;
+        }
+        cmd[i] = '\0';
+        
+        if (strstr(cmd, "abort") != nullptr)
         {
             requestTestAbort("serial input");
             return true;

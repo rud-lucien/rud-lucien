@@ -1,7 +1,7 @@
 #ifndef MOTOR_CONTROLLER_H
 #define MOTOR_CONTROLLER_H
 
-#include "Arduino.h"
+#include <Arduino.h>
 #include "ClearCore.h"
 #include "OutputManager.h"
 
@@ -52,7 +52,7 @@
 #define HOME_APPROACH_VELOCITY_RPM 50  // Initial approach velocity in RPM (faster)
 #define HOME_APPROACH_TIME_MS 2000     // Time to move at the initial approach velocity
 #define HOME_OFFSET_DISTANCE_MM 5.0    // Distance to move away from hard stop in mm
-#define HOME_HLFB_CHECK_INTERVAL_MS 20 // Time to wait between HLFB state checks
+
 
 //=============================================================================
 // TRAVEL AND POSITION DEFINITIONS

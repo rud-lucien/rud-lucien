@@ -121,7 +121,7 @@ void processEthernetConnections()
                          clients[i].remoteIP()[2], clients[i].remoteIP()[3],
                          clients[i].remotePort());
                 Console.serialInfo(msg);
-                opLogHistory.addEntry(msg);
+                opLogHistory.addEntry(msg, LogEntry::INFO);
                 clients[i].stop();
             }
         }
@@ -154,7 +154,7 @@ void processEthernetConnections()
                              clients[i].remoteIP()[2], clients[i].remoteIP()[3],
                              clients[i].remotePort());
                     Console.serialDiagnostic(msg);
-                    opLogHistory.addEntry(msg);
+                    opLogHistory.addEntry(msg, LogEntry::WARNING);
                     clients[i].stop();
                 }
             }
@@ -179,7 +179,7 @@ void processEthernetConnections()
                         newClient.remoteIP()[2], newClient.remoteIP()[3],
                         newClient.remotePort());
                 Console.serialInfo(msg);
-                opLogHistory.addEntry(msg);
+                opLogHistory.addEntry(msg, LogEntry::INFO);
 
                 // Replace client in this slot
                 clients[i] = newClient;
@@ -197,7 +197,7 @@ void processEthernetConnections()
         if (!clientAdded)
         {
             Console.serialWarning(F("[NETWORK] Rejected client - no free slots"));
-            opLogHistory.addEntry("[NETWORK] Rejected client - no free slots");
+            opLogHistory.addEntry("[NETWORK] Rejected client - no free slots", LogEntry::WARNING);
             newClient.println(F("ERROR: Too many connections"));
             newClient.stop();
         }
@@ -211,7 +211,7 @@ void processEthernetConnections()
             char msg[200];
             snprintf(msg, sizeof(msg), "[NETWORK] Client disconnected: %d", i);
             Console.serialDiagnostic(msg);
-            opLogHistory.addEntry(msg);
+            opLogHistory.addEntry(msg, LogEntry::INFO);
             clients[i].stop();
         }
     }
@@ -249,7 +249,7 @@ void testConnections()
                              clients[i].remoteIP()[2], clients[i].remoteIP()[3],
                              clients[i].remotePort());
                     Console.serialDiagnostic(msg);
-                    opLogHistory.addEntry(msg);
+                    opLogHistory.addEntry(msg, LogEntry::WARNING);
                     clients[i].stop();
                 }
             }
@@ -318,7 +318,7 @@ bool closeClientConnection(int index)
         snprintf(msg, sizeof(msg), "[NETWORK] Manually closed connection from %d.%d.%d.%d:%d",
                  ip[0], ip[1], ip[2], ip[3], port);
         Console.serialInfo(msg);
-        opLogHistory.addEntry(msg);
+        opLogHistory.addEntry(msg, LogEntry::INFO);
         return true;
     }
     return false;
@@ -338,6 +338,6 @@ bool closeAllConnections()
     char msg[200];
     snprintf(msg, sizeof(msg), "[NETWORK] Closed %d connections", count);
     Console.serialInfo(msg);
-    opLogHistory.addEntry(msg);
+    opLogHistory.addEntry(msg, LogEntry::INFO);
     return count > 0;
 }

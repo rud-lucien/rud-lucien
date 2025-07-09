@@ -21,7 +21,6 @@
  - Manual positioning control via MPG handwheel encoder interface
  - Comprehensive logging with circular buffer for error diagnosis and system history
  - Serial and Ethernet command interfaces with extensive help documentation
- - Automated test sequences for system validation and troubleshooting
 
  REQUIRED HARDWARE COMPONENTS:
 
@@ -68,7 +67,7 @@
 
  3. FEEDBACK & CONTROL:
     - CL-ENCDR-DFIN Encoder Input Adapter (for MPG handwheel manual control)
-    - MPG handwheel encoder (manual positioning interface)
+    - MPG handwheel encoder (manual positioning interface with immediate response)
     - Tray detection sensors positioned throughout the conveyor system
 
  4. PNEUMATIC SYSTEM:
@@ -108,7 +107,7 @@ A. AUTOMATED MODE (Default):
    - Full safety monitoring and fault detection active
 
 B. MANUAL MODE:
-   - Direct command control for setup, testing, and maintenance
+   - Direct command control for setup and maintenance
    - Manual positioning via MPG handwheel encoder
    - Individual control of all pneumatic systems
    - Step-by-step operation for troubleshooting
@@ -140,14 +139,17 @@ MANUAL OPERATION COMMANDS:
 AUTOMATED OPERATION COMMANDS:
  17. Automated sequences: "tray,load" (full loading sequence), "tray,unload" (full unloading sequence)
  18. System monitoring: "system,status", "motor,status" for real-time status
- 19. Test sequences: "test,<sequence>" for automated system validation
 
 DIAGNOSTICS AND TROUBLESHOOTING:
- 20. Help system: "help" for command list, "help,<command>" for specific usage
- 21. Error diagnosis: "system,history" to check operation log when issues occur
- 22. System reset: "system,reset" to clear fault conditions
- 23. Network management: "network,status" for Ethernet connection info
- 24. Position diagnostics: "teach,status" to verify position configuration
+ 19. Help system: "help" for command list, "help,<command>" for specific usage
+ 20. Error diagnosis: Use log commands for operation history and troubleshooting:
+    - "log,history" - View complete operation log with timestamps
+    - "log,errors" - View only error entries for quick diagnosis
+    - "log,last,N" - View last N log entries (e.g., "log,last,10")
+    - "log,stats" - View log statistics and system health overview
+ 21. System reset: "system,reset" to clear fault conditions
+ 22. Network management: "network,status" for Ethernet connection info
+ 23. Position diagnostics: "teach,status" to verify position configuration
 
 POSITION TEACHING SYSTEM:
 The system supports dynamic position teaching for field adjustment without code changes:
@@ -197,24 +199,22 @@ DAILY OPERATION:
 - Startup → Load taught positions from SD card → Verify system,status → Begin operations
 
 MAINTENANCE/TROUBLESHOOTING:
-- Enable manual mode → Use individual commands → Test components → Return to automated mode
+- Enable manual mode → Use individual commands → Return to automated mode
 
 AUTOMATED SEQUENCES:
 - tray,load (complete loading sequence)
 - tray,unload (complete unloading sequence)
-- test,<sequence> (validation sequences)
 
 NOTE: Taught positions provide the flexibility to adjust the system for different
 tray sizes, mechanical tolerances, or field conditions without requiring code
 modifications or reflashing firmware.
 */
 
-#include "Arduino.h"
+#include <Arduino.h>
 #include "ClearCore.h"
 #include "ValveController.h"
 #include "MotorController.h"
 #include "Logging.h"
-#include "Tests.h"
 #include "CommandController.h"
 #include "Commands.h"
 #include "Utils.h"
@@ -279,7 +279,6 @@ void setup()
 
     commander.attachTree(API_tree);
     commander.init();
-    initTestFlags();
 
     Console.serialInfo(F("System ready."));
     Console.serialInfo(F("Type 'help' for available commands"));
@@ -292,14 +291,6 @@ void loop()
 
     // Check for E-stop condition (highest priority)
     handleEStop();
-
-    // Check for test abort requested
-    if (testAbortRequested && testInProgress)
-    {
-        Console.serialInfo(F("Test abort detected in main loop"));
-        handleTestAbort();
-        Console.acknowledge(F("Test aborted successfully"));
-    }
 
     // Always capture current system state - it's the foundation of safety
     SystemState currentState = captureSystemState();
@@ -346,7 +337,7 @@ void loop()
         (!safety.operationWithinTimeout || !safety.operationSequenceValid))
     {
         char errorMsg[200];
-        sprintf(errorMsg, "SAFETY VIOLATION: %s", safety.operationSequenceMessage.c_str());
+        sprintf(errorMsg, "SAFETY VIOLATION: %s", safety.operationSequenceMessage);
         Console.error(errorMsg);
 
         // Emergency stop or other recovery action
@@ -360,11 +351,8 @@ void loop()
     // Store current state as previous for next cycle
     previousState = currentState;
 
-    // Process encoder input if enabled
-    if (encoderControlActive)
-    {
-        processEncoderInput();
-    }
+    // Process encoder input if enabled (Teknic approach - always process when active)
+    processEncoderInput();
 
     // Pressure check using waitTimeReached helper for safe rollover handling
     static const unsigned long PRESSURE_CHECK_INTERVAL = 10000; // 10 seconds

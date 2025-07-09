@@ -18,8 +18,7 @@ enum CommandType
 {
     CMD_EMERGENCY, // Always allowed (stop, abort, estop)
     CMD_READ_ONLY, // Always allowed (status, get position, etc.)
-    CMD_MODIFYING, // Rejected during operations (move, config, etc.)
-    CMD_TEST       // Special handling for test commands
+    CMD_MODIFYING  // Rejected during operations (move, config, etc.)
 };
 
 // Command lookup table structure
@@ -44,8 +43,6 @@ extern const size_t API_tree_size;
 
 // Operation state tracking
 extern bool operationInProgress;
-extern bool testInProgress;
-extern volatile bool testAbortRequested;
 
 // Client tracking for async operations
 extern Stream *persistentClient;
@@ -53,8 +50,6 @@ extern Stream *persistentClient;
 //=============================================================================
 // FUNCTION DECLARATIONS
 //=============================================================================
-// Initialization
-void initTestFlags();
 
 // Command Processing
 bool processCommand(const char *rawCommand, Stream *output, const char *sourceTag = nullptr);
@@ -73,7 +68,6 @@ void clearPersistentClient();
 const char *getOperationTypeName(int type);
 char *trimLeadingSpaces(char *str);
 void sendCommandRejection(const char *command, const char *reason);
-void requestTestAbort(const char *source);
 const CommandInfo *findCommand(const char *cmdName);
 bool isCommandExcludedFromHistory(const char *command);
 

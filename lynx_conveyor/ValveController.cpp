@@ -406,28 +406,24 @@ bool safeValveOperation(DoubleSolenoidValve &valve, CylinderSensor &sensor,
         {
             // Call the function to record a lock failure
             lastLockOperationFailed = true;
-            lastLockFailureDetails = F("Failed to lock ");
-            lastLockFailureDetails += valveType;
-            lastLockFailureDetails += F(" at position ");
-            lastLockFailureDetails += String(valvePosition);
-            lastLockFailureDetails += F(" - sensor didn't confirm");
+            snprintf_P(lastLockFailureDetails, sizeof(lastLockFailureDetails),
+                      PSTR("Failed to lock %s at position %d - sensor didn't confirm"),
+                      valveType, valvePosition);
             lockFailureTimestamp = millis(); // Record the timestamp
         }
         else
         {
             // Call the function to record an unlock failure
             lastUnlockOperationFailed = true;
-            lastUnlockFailureDetails = F("Failed to unlock ");
-            lastUnlockFailureDetails += valveType;
-            lastUnlockFailureDetails += F(" at position ");
-            lastUnlockFailureDetails += String(valvePosition);
-            lastUnlockFailureDetails += F(" - sensor didn't confirm");
+            snprintf_P(lastUnlockFailureDetails, sizeof(lastUnlockFailureDetails),
+                      PSTR("Failed to unlock %s at position %d - sensor didn't confirm"),
+                      valveType, valvePosition);
             unlockFailureTimestamp = millis(); // Record the timestamp
         }
 
         char msg[200];
         sprintf(msg, "Valve operation failed: %s",
-                targetPosition == VALVE_POSITION_LOCK ? lastLockFailureDetails.c_str() : lastUnlockFailureDetails.c_str());
+                targetPosition == VALVE_POSITION_LOCK ? lastLockFailureDetails : lastUnlockFailureDetails);
         Console.serialError(msg);
     }
 

@@ -2,286 +2,363 @@
 #include "Utils.h"
 #include "OutputManager.h"
 
-// Initialize control variables
+//=============================================================================
+// GLOBAL VARIABLES
+//=============================================================================
 bool encoderControlActive = false;
 int32_t lastEncoderPosition = 0;
 unsigned long lastEncoderUpdateTime = 0;
-float currentMultiplier = MULTIPLIER_X1; // Default to x1 multiplier
-bool quadratureError = false;
+float currentMultiplier = MULTIPLIER_X1;       // Default to fine control (0.1mm per count)
+int currentVelocityRpm = ENCODER_DEFAULT_VELOCITY_RPM;
+bool quadratureErrorDetected = false;
+float mpgBasePositionMm = 0.0;                 // Base position when MPG was enabled
+int32_t mpgBaseEncoderCount = 0;               // Base encoder count when MPG was enabled
 
-// Helper function to get the multiplier name
+//=============================================================================
+// HELPER FUNCTIONS
+//=============================================================================
+
 const char *getMultiplierName(float multiplier)
 {
-    // Use almost-equal comparison for float values
-    if (fabs(multiplier - MULTIPLIER_X1) < 0.001f)
-        return "1";
-    if (fabs(multiplier - MULTIPLIER_X10) < 0.001f)
-        return "10";
-    if (fabs(multiplier - MULTIPLIER_X100) < 0.001f)
-        return "100";
-
-    // Still return something helpful in case of unexpected values
-    static char buffer[10];
-    sprintf(buffer, "%.1f", multiplier);
+    if (fabs(multiplier - MULTIPLIER_X1) < 0.01f) return "x1 (0.1mm/count)";
+    if (fabs(multiplier - MULTIPLIER_X10) < 0.01f) return "x10 (1.0mm/count)";
+    if (fabs(multiplier - MULTIPLIER_X100) < 0.01f) return "x100 (10mm/count)";
+    
+    static char buffer[30];
+    sprintf(buffer, "x%.1f (%.1fmm/count)", multiplier * 10, multiplier);
     return buffer;
 }
 
-// Initialize the encoder interface
+//=============================================================================
+// INITIALIZATION
+//=============================================================================
+
 void initEncoderControl(bool swapDirection, bool indexInverted)
 {
     // Enable the encoder input feature
     EncoderIn.Enable(true);
-
+    
     // Zero the position to start
     EncoderIn.Position(0);
-
+    
     // Set the encoder direction
     EncoderIn.SwapDirection(swapDirection);
-
+    
     // Set the sense of index detection
     EncoderIn.IndexInverted(indexInverted);
-
+    
     // Reset tracking variables
     lastEncoderPosition = 0;
     lastEncoderUpdateTime = millis();
-    currentMultiplier = MULTIPLIER_X1; // Make sure default is set
-
-    Console.serialInfo(F("Manual Pulse Generator (MPG) Handwheel interface initialized"));
+    encoderControlActive = false;
+    quadratureErrorDetected = false;
+    
+    Console.serialInfo(F("Manual Pulse Generator (MPG) initialized"));
+    Console.serialInfo(F("Use 'encoder,enable' to start manual control"));
 }
 
-// Process encoder movement
-void processEncoderInput()
-{
-    if (!encoderControlActive || motorState == MOTOR_STATE_FAULTED)
-    {
-        return; // Only process when encoder control is active and motor is not faulted
-    }
+//=============================================================================
+// CONTROL FUNCTIONS (Following Teknic Approach)
+//=============================================================================
 
-    // Extra safety check - ignore encoder input during automatic operations
-    if (motorState == MOTOR_STATE_HOMING || motorState == MOTOR_STATE_MOVING || operationInProgress)
+void enableEncoderControl()
+{
+    // Check if motor is ready for encoder control
+    if (!motorInitialized)
     {
-        // Just reset the encoder position to avoid accumulating inputs
-        EncoderIn.Position(0);
-        lastEncoderPosition = 0;
+        Console.serialError(F("Motor must be initialized before enabling MPG control"));
         return;
     }
-
-    static int32_t accumulatedDelta = 0; // Accumulate encoder movement over time
-    static unsigned long lastMoveTime = 0;
-
-    unsigned long currentTime = millis();
-
-    // Read current encoder position first
-    int32_t currentEncoderPosition = EncoderIn.Position();
-    int32_t encoderDelta = currentEncoderPosition - lastEncoderPosition;
-
-    // If encoder has moved
-    if (encoderDelta != 0)
+    
+    if (!isHomed)
     {
+        Console.serialError(F("Motor must be homed before enabling MPG control"));
+        Console.serialInfo(F("Use 'motor,home' to establish reference position"));
+        return;
+    }
+    
+    // Check that motor is not in a problematic state
+    if (motorState == MOTOR_STATE_FAULTED)
+    {
+        Console.serialError(F("Motor is faulted - clear faults before enabling MPG"));
+        return;
+    }
+    
+    if (operationInProgress)
+    {
+        Console.serialError(F("Cannot enable MPG during automated operation"));
+        return;
+    }
+    
+    // Clear any errors but preserve encoder position for continuity
+    if (EncoderIn.QuadratureError())
+    {
+        EncoderIn.Enable(false);
+        delay(10);
+        EncoderIn.Enable(true);
+    }
+    
+    // Get current encoder position for tracking
+    lastEncoderPosition = EncoderIn.Position();
+    
+    // Capture base position and encoder count for direct position control
+    mpgBasePositionMm = currentPositionMm;
+    mpgBaseEncoderCount = lastEncoderPosition;
+    
+    // Enable encoder control
+    encoderControlActive = true;
+    
+    // Reset tracking variables
+    lastEncoderUpdateTime = millis();
+    quadratureErrorDetected = false;
+    
+    char msg[150];
+    sprintf(msg, "MPG control enabled - Current position: %.2fmm", currentPositionMm);
+    Console.serialInfo(msg);
+    
+    sprintf(msg, "Multiplier: %s, Velocity: %dRPM", 
+            getMultiplierName(currentMultiplier), currentVelocityRpm);
+    Console.serialInfo(msg);
+    
+    Console.serialInfo(F("Turn handwheel to move motor. Use 'encoder,disable' to stop"));
+}
 
-        // Check for quadrature errors after movement detected (less prone to false positives)
-        if (EncoderIn.QuadratureError())
-        {
-            Console.serialError(F("Quadrature error detected in encoder! Disabling control."));
-
-            // The proper way to clear errors is to disable/enable
-            EncoderIn.Enable(false);
-            EncoderIn.Enable(true);
-
-            // If error persists, disable encoder control
-            if (EncoderIn.QuadratureError())
-            {
-                encoderControlActive = false;
-                Console.serialInfo(F("MPG Handwheel control disabled due to persistent error"));
-                return;
-            }
-        }
-
-        // Update accumulated delta
-        accumulatedDelta += encoderDelta;
-
-        // Calculate time since last update - CHANGED: using timeDiff() for rollover safety
-        unsigned long timeDelta = timeDiff(currentTime, lastEncoderUpdateTime);
-        if (timeDelta < ENCODER_DEBOUNCE_MS)
-        {
-            // Update position but wait to process movement (debounce)
-            lastEncoderPosition = currentEncoderPosition;
-            return;
-        }
-
-        // Wait until we have a significant movement or enough time has passed
-        bool shouldMove = false;
-
-        // Either we have accumulated enough movement or waited long enough since last move
-        // Increase this value for smoother, less frequent moves
-        // CHANGED: using timeoutElapsed() for rollover safety
-        if (abs(accumulatedDelta) >= 10 || (timeoutElapsed(currentTime, lastMoveTime, 150) && accumulatedDelta != 0))
-        {
-            shouldMove = true;
-        }
-
-        if (shouldMove && motorState != MOTOR_STATE_MOVING)
-        {
-            // Only move if we're not already moving
-            // Make velocity proportional to encoder speed
-            int32_t encoderVel = EncoderIn.Velocity();
-            // Scale velocity between min and max based on encoder speed
-            int32_t scaledVelocity = map(abs(encoderVel), 0, 500, ENCODER_MIN_VELOCITY, ENCODER_MAX_VELOCITY);
-
-            // Ensure velocity stays within bounds
-            if (scaledVelocity < ENCODER_MIN_VELOCITY)
-            {
-                scaledVelocity = ENCODER_MIN_VELOCITY;
-            }
-            else if (scaledVelocity > ENCODER_MAX_VELOCITY)
-            {
-                scaledVelocity = ENCODER_MAX_VELOCITY;
-            }
-
-            // Calculate steps to move based on accumulated delta and current multiplier
-            float stepsToMoveFloat = accumulatedDelta * currentMultiplier;
-            int32_t stepsToMove = (int32_t)stepsToMoveFloat;
-
-            // Make sure we move at least a meaningful amount
-            if (stepsToMove == 0 && accumulatedDelta != 0)
-            {
-                stepsToMove = (accumulatedDelta > 0) ? 1 : -1;
-            }
-
-            // Calculate target position in mm
-            float targetPositionMm = currentPositionMm + (pulsesToMm(stepsToMove));
-
-            // Check against limits
-            if (targetPositionMm < 0 || targetPositionMm > MAX_TRAVEL_MM)
-            {
-                char msg[200];
-                sprintf(msg, "Encoder movement rejected: target position %.2f mm is outside allowed range (0 to %.2f mm)",
-                        targetPositionMm, MAX_TRAVEL_MM);
-                Console.serialWarning(msg);
-            }
-            else
-            {
-                // Update target tracking in motor controller
-                updateMotorTarget(targetPositionMm);
-
-                // When displaying the move message, show the directional step count for user readability
-                // We want positive numbers when moving away from home (increasing position)
-                int32_t displaySteps;
-                if (targetPositionMm > currentPositionMm)
-                {
-                    // Moving away from home (increasing position) - show positive
-                    displaySteps = abs(stepsToMove);
-                }
-                else
-                {
-                    // Moving towards home (decreasing position) - show negative
-                    displaySteps = -abs(stepsToMove);
-                }
-
-                // Update the move message to use displaySteps
-                char msg[200];
-                sprintf(msg, "MPG Move: %ld steps (x%s, %ldk pps) → %.2f mm",
-                        displaySteps, getMultiplierName(currentMultiplier),
-                        scaledVelocity / 1000, targetPositionMm);
-                Console.serialDiagnostic(msg);
-
-                // Set velocity for this move
-                MOTOR_CONNECTOR.VelMax(scaledVelocity);
-
-                // Move the motor relative to current position
-                MOTOR_CONNECTOR.Move(stepsToMove);
-
-                // Update motor state
-                motorState = MOTOR_STATE_MOVING;
-
-                // Reset accumulated delta after movement
-                accumulatedDelta = 0;
-                lastMoveTime = currentTime;
-            }
-        }
-
-        // Update tracking variables
-        lastEncoderPosition = currentEncoderPosition;
-        lastEncoderUpdateTime = currentTime;
+void disableEncoderControl()
+{
+    if (encoderControlActive)
+    {
+        encoderControlActive = false;
+        Console.serialInfo(F("MPG control disabled"));
     }
 }
 
-// Enable or disable encoder control
-void enableEncoderControl(bool enable)
+bool isEncoderControlActive()
 {
-    // Only allow enabling if motor is both initialized and homed
-    if (enable)
+    return encoderControlActive;
+}
+
+//=============================================================================
+// ENCODER PROCESSING (Teknic Direct Approach)
+//=============================================================================
+
+void processEncoderInput()
+{
+    // Only process if encoder control is active
+    if (!encoderControlActive)
     {
-        if (!motorInitialized)
+        return;
+    }
+    
+    // Check if motor is still ready
+    if (motorState == MOTOR_STATE_FAULTED || operationInProgress)
+    {
+        Console.serialWarning(F("Motor state changed - disabling MPG control"));
+        disableEncoderControl();
+        return;
+    }
+    
+    // Check for quadrature errors first
+    if (EncoderIn.QuadratureError())
+    {
+        if (!quadratureErrorDetected)
         {
-            Console.serialError(F("Motor must be initialized before enabling MPG control"));
-            return;
+            Console.serialError(F("Quadrature error detected! Disabling MPG control"));
+            quadratureErrorDetected = true;
+            disableEncoderControl();
         }
-        if (!isHomed)
+        return;
+    }
+    
+    // Read current encoder position
+    int32_t currentEncoderPosition = EncoderIn.Position();
+    
+    // Calculate total encoder movement since MPG was enabled
+    int32_t totalEncoderDelta = currentEncoderPosition - mpgBaseEncoderCount;
+    
+    // Calculate target position directly (like real milling machines)
+    float totalMovementMm = totalEncoderDelta * currentMultiplier;
+    float targetPositionMm = mpgBasePositionMm + totalMovementMm;
+    
+    // Check travel limits BEFORE attempting move
+    if (targetPositionMm < 0.0)
+    {
+        // Clamp to minimum and update base to prevent further negative movement
+        targetPositionMm = 0.0;
+        mpgBasePositionMm = 0.0;
+        mpgBaseEncoderCount = currentEncoderPosition;
+        
+        static unsigned long lastNegativeWarning = 0;
+        unsigned long currentTime = millis();
+        if (currentTime - lastNegativeWarning > 1000)
         {
-            Console.serialError(F("Motor must be homed before enabling MPG control"));
-            Console.serialInfo(F("Use the 'home' command to establish a reference position"));
-            return;
+            Console.serialWarning(F("At negative travel limit"));
+            lastNegativeWarning = currentTime;
         }
+    }
+    else if (targetPositionMm > MAX_TRAVEL_MM)
+    {
+        // Clamp to maximum and update base to prevent further positive movement
+        targetPositionMm = MAX_TRAVEL_MM;
+        mpgBasePositionMm = MAX_TRAVEL_MM;
+        mpgBaseEncoderCount = currentEncoderPosition;
+        
+        static unsigned long lastPositiveWarning = 0;
+        unsigned long currentTime = millis();
+        if (currentTime - lastPositiveWarning > 1000)
+        {
+            char msg[100];
+            sprintf(msg, "At positive travel limit (%.1fmm)", MAX_TRAVEL_MM);
+            Console.serialWarning(msg);
+            lastPositiveWarning = currentTime;
+        }
+    }
+    
+    // Only update motor target if position has changed significantly
+    int32_t encoderDelta = currentEncoderPosition - lastEncoderPosition;
+    if (abs(encoderDelta) > 0)
+    {
+        // For MPG control, use faster velocity for more responsive feel
+        int32_t velocityPps = (currentVelocityRpm * PULSES_PER_MM * 25.4) / (60 * 8);
+        
+        // Boost velocity for MPG responsiveness (faster than normal moves)
+        velocityPps = velocityPps * 1.5; // 50% faster for immediate response
+        
+        // Ensure velocity stays within reasonable bounds
+        if (velocityPps < 500) velocityPps = 500;   // Higher minimum for responsiveness
+        if (velocityPps > 12000) velocityPps = 12000; // Higher maximum for speed
+        
+        // Set velocity for smooth movement
+        MOTOR_CONNECTOR.VelMax(velocityPps);
+        
+        // Use absolute positioning for immediate response (like real MPG systems)
+        int32_t targetPulses = mmToPulses(targetPositionMm);
+        MOTOR_CONNECTOR.Move(targetPulses, MotorDriver::MOVE_TARGET_ABSOLUTE);
+        
+        // Update motor state and target tracking
+        updateMotorTarget(targetPositionMm);
+        
+        // Log the movement with reduced verbosity (every 50ms instead of 100ms)
+        unsigned long currentTime = millis();
+        if (currentTime - lastEncoderUpdateTime > 50) // More frequent logging for debugging
+        {
+            char msg[150];
+            sprintf(msg, "MPG: %ld counts → %.2fmm target (%s)", 
+                    totalEncoderDelta, targetPositionMm, getMultiplierName(currentMultiplier));
+            Console.serialDiagnostic(msg);
+            lastEncoderUpdateTime = currentTime;
+        }
+        
+        // Update tracking
+        lastEncoderPosition = currentEncoderPosition;
+    }
+}
 
-        // The proper way to reset the encoder and clear errors
-        // is to disable and re-enable it
-        EncoderIn.Enable(false);
-        EncoderIn.Enable(true);
-        EncoderIn.Position(0);
+//=============================================================================
+// CONFIGURATION FUNCTIONS
+//=============================================================================
 
-        // Motor is ready, enable encoder control
-        encoderControlActive = true;
-
-        // Reset encoder position when enabling
-        lastEncoderPosition = 0;
-        lastEncoderUpdateTime = millis();
-
-        char msg[200];
-        sprintf(msg, "MPG handwheel control enabled - current position: %.2f mm", currentPositionMm);
-        Console.serialInfo(msg);
-
-        sprintf(msg, "Using multiplier x%s (%.1f)", getMultiplierName(currentMultiplier), currentMultiplier);
-        Console.serialInfo(msg);
-
-        Console.serialInfo(F("Issue 'encoder,disable' when finished with manual control"));
+void setEncoderMultiplier(float multiplier)
+{
+    // Validate multiplier against predefined values
+    if (fabs(multiplier - MULTIPLIER_X1) < 0.01f)
+    {
+        currentMultiplier = MULTIPLIER_X1;
+    }
+    else if (fabs(multiplier - MULTIPLIER_X10) < 0.01f)
+    {
+        currentMultiplier = MULTIPLIER_X10;
+    }
+    else if (fabs(multiplier - MULTIPLIER_X100) < 0.01f)
+    {
+        currentMultiplier = MULTIPLIER_X100;
     }
     else
     {
-        encoderControlActive = false;
-        Console.serialInfo(F("MPG Handwheel control disabled"));
+        Console.serialError(F("Invalid multiplier. Use 0.1, 1.0, or 10.0"));
+        return;
+    }
+    
+    char msg[100];
+    sprintf(msg, "MPG multiplier set to %s", getMultiplierName(currentMultiplier));
+    Console.serialInfo(msg);
+    
+    sprintf(msg, "One encoder count = %.1fmm movement", currentMultiplier);
+    Console.serialInfo(msg);
+}
+
+void setEncoderVelocity(int velocityRpm)
+{
+    if (velocityRpm < ENCODER_MIN_VELOCITY_RPM || velocityRpm > ENCODER_MAX_VELOCITY_RPM)
+    {
+        char msg[100];
+        sprintf(msg, "Velocity must be between %d and %d RPM", 
+                ENCODER_MIN_VELOCITY_RPM, ENCODER_MAX_VELOCITY_RPM);
+        Console.serialError(msg);
+        return;
+    }
+    
+    currentVelocityRpm = velocityRpm;
+    
+    char msg[100];
+    sprintf(msg, "MPG velocity set to %d RPM", currentVelocityRpm);
+    Console.serialInfo(msg);
+}
+
+//=============================================================================
+// STATUS AND DIAGNOSTICS
+//=============================================================================
+
+void printEncoderStatus()
+{
+    char msg[200];
+    
+    if (!encoderControlActive)
+    {
+        Console.serialInfo(F("MPG Status: DISABLED"));
+    }
+    else
+    {
+        Console.serialInfo(F("MPG Status: ENABLED"));
+        sprintf(msg, "Current position: %.2fmm", currentPositionMm);
+        Console.serialInfo(msg);
+    }
+    
+    sprintf(msg, "Multiplier: %s", getMultiplierName(currentMultiplier));
+    Console.serialInfo(msg);
+    
+    sprintf(msg, "Velocity: %d RPM", currentVelocityRpm);
+    Console.serialInfo(msg);
+    
+    sprintf(msg, "Encoder position: %ld counts", EncoderIn.Position());
+    Console.serialInfo(msg);
+    
+    sprintf(msg, "Encoder velocity: %ld counts/sec", EncoderIn.Velocity());
+    Console.serialInfo(msg);
+    
+    if (hasQuadratureError())
+    {
+        Console.serialWarning(F("Quadrature error detected!"));
     }
 }
 
-// Set the multiplier (x1, x10, x100)
-void setEncoderMultiplier(int multiplier)
+bool hasQuadratureError()
 {
-    char msg[200];
+    return EncoderIn.QuadratureError() || quadratureErrorDetected;
+}
 
-    switch (multiplier)
-    {
-    case 1:
-        currentMultiplier = MULTIPLIER_X1;
-        sprintf(msg, "MPG multiplier set to x1 (fine control): %.1f", currentMultiplier);
-        Console.serialInfo(msg);
-        break;
-    case 10:
-        currentMultiplier = MULTIPLIER_X10;
-        sprintf(msg, "MPG multiplier set to x10 (medium control): %.1f", currentMultiplier);
-        Console.serialInfo(msg);
-        break;
-    case 100:
-        currentMultiplier = MULTIPLIER_X100;
-        sprintf(msg, "MPG multiplier set to x100 (coarse control): %.1f", currentMultiplier);
-        Console.serialInfo(msg);
-        break;
-    default:
-        Console.serialError(F("Invalid multiplier. Use 1, 10, or 100"));
-        return;
-    }
-
-    // Useful diagnostic information
-    float mmPerRotation = 100 * currentMultiplier / PULSES_PER_MM;
-    sprintf(msg, "One full rotation moves ~%.2f mm", mmPerRotation);
-    Console.serialInfo(msg);
+void clearQuadratureError()
+{
+    // Clear hardware quadrature error by disabling/enabling (Teknic approach)
+    EncoderIn.Enable(false);
+    delay(10);
+    EncoderIn.Enable(true);
+    EncoderIn.Position(0);
+    
+    // Clear our error flag and reset base position tracking
+    quadratureErrorDetected = false;
+    lastEncoderPosition = 0;
+    mpgBaseEncoderCount = 0;
+    mpgBasePositionMm = currentPositionMm; // Reset to current motor position
+    
+    Console.serialInfo(F("Quadrature error cleared"));
 }

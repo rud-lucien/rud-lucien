@@ -1,7 +1,6 @@
 #ifndef POSITION_CONFIG_H
 #define POSITION_CONFIG_H
 
-#include "Arduino.h"
 #include "MotorController.h"
 #include "OutputManager.h"
 

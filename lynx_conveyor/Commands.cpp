@@ -552,10 +552,14 @@ bool cmd_unlock(char *args, CommandCaller *caller)
 
 // Define the log subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
 static const SubcommandInfo LOG_COMMANDS[] = {
+    {"errors", 5},
     {"help", 4},
+    {"history", 6},
+    {"last", 7},
     {"now", 3},
     {"off", 2},
-    {"on", 1}};
+    {"on", 1},
+    {"stats", 8}};
 
 static const size_t LOG_COMMAND_COUNT = sizeof(LOG_COMMANDS) / sizeof(SubcommandInfo);
 
@@ -573,7 +577,7 @@ bool cmd_log(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        Console.error(F("Missing parameter. Usage: log,<on[,interval]|off|now|help>"));
+        Console.error(F("Missing parameter. Usage: log,<on[,interval]|off|now|history|errors|last[,count]|stats|help>"));
         return false;
     }
 
@@ -581,7 +585,7 @@ bool cmd_log(char *args, CommandCaller *caller)
     char *subcommand = strtok(trimmed, " ");
     if (subcommand == NULL)
     {
-        Console.error(F("Invalid format. Usage: log,<on[,interval]|off|now|help>"));
+        Console.error(F("Invalid format. Usage: log,<on[,interval]|off|now|history|errors|last[,count]|stats|help>"));
         return false;
     }
 
@@ -689,6 +693,22 @@ bool cmd_log(char *args, CommandCaller *caller)
             "  log,now - Log system state immediately\n"
             "    > Records a single log entry regardless of periodic settings\n"
             "    > Useful for capturing state at specific moments\n"
+            "\n"
+            "  log,history - Show complete operation log history\n"
+            "    > Displays all logged operations with timestamps\n"
+            "    > Shows severity levels and overflow statistics\n"
+            "\n"
+            "  log,errors - Show only errors and warnings\n"
+            "    > Filters to show critical issues for quick debugging\n"
+            "    > Essential for overnight failure troubleshooting\n"
+            "\n"
+            "  log,last[,count] - Show last N log entries\n"
+            "    > count = Number of recent entries (default: 10, max: 100)\n"
+            "    > Example: log,last,20 - Show last 20 operations\n"
+            "\n"
+            "  log,stats - Show log buffer statistics\n"
+            "    > Buffer usage, overflow count, memory utilization\n"
+            "    > Helps identify if critical early data was lost\n"
             "\nLOG CONTENT:\n"
             "  • Valves - Lock status of all trays and shuttle with sensor verification\n"
             "    > [!] indicator shows sensor/command mismatch\n"
@@ -723,9 +743,61 @@ bool cmd_log(char *args, CommandCaller *caller)
         return true;
     }
 
+    case 5: // "errors"
+    {
+        Console.acknowledge(F("LOG_ERRORS"));
+        Console.serialInfo(F("Showing only errors and warnings from operation log"));
+        opLogHistory.printErrors();
+        return true;
+    }
+
+    case 6: // "history"
+    {
+        Console.acknowledge(F("LOG_HISTORY"));
+        Console.serialInfo(F("Showing complete operation log history"));
+        opLogHistory.printHistory();
+        return true;
+    }
+
+    case 7: // "last"
+    {
+        // Get the number parameter
+        char *countStr = strtok(NULL, " ");
+        uint8_t count = 10; // Default to last 10 entries
+
+        if (countStr != NULL)
+        {
+            countStr = trimLeadingSpaces(countStr);
+            unsigned long parsedCount = strtoul(countStr, NULL, 10);
+            if (parsedCount > 0 && parsedCount <= 100)
+            {
+                count = (uint8_t)parsedCount;
+            }
+            else
+            {
+                Console.serialWarning(F("Invalid count. Using default of 10 entries."));
+            }
+        }
+
+        Console.acknowledge(F("LOG_LAST"));
+        char msg[50];
+        sprintf(msg, "Showing last %d operation log entries", count);
+        Console.serialInfo(msg);
+        opLogHistory.printLastN(count);
+        return true;
+    }
+
+    case 8: // "stats"
+    {
+        Console.acknowledge(F("LOG_STATS"));
+        Console.serialInfo(F("Showing operation log statistics"));
+        opLogHistory.printStats();
+        return true;
+    }
+
     default: // Unknown command
     {
-        Console.error(F("Invalid log subcommand. Use 'on', 'off', 'now', or 'help'."));
+        Console.error(F("Invalid log subcommand. Use 'on', 'off', 'now', 'errors', 'history', 'last', 'stats', or 'help'."));
         return false;
     }
     }
@@ -1813,8 +1885,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
 
 // Define the system subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
 static const SubcommandInfo SYSTEM_COMMANDS[] = {
-    {"help", 6},
-    {"history", 5},
+    {"help", 5},
     {"reset", 4},
     {"safety", 2},
     {"state", 1},
@@ -1837,7 +1908,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
     // If no subcommand provided, display usage
     if (subcommand == NULL || strlen(subcommand) == 0)
     {
-        Console.error(F("Missing subcommand. Valid options: state, safety, trays, history, reset"));
+        Console.error(F("Missing subcommand. Valid options: state, safety, trays, reset"));
         return false;
     }
 
@@ -1943,14 +2014,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
         return true;
     }
 
-    case 5: // "history"
-    {
-        Console.acknowledge(F("SYSTEM_HISTORY"));
-        opLogHistory.printHistory();
-        return true;
-    }
-
-    case 6: // "help"
+    case 5: // "help"
     {
         Console.acknowledge(F("SYSTEM_HELP"));
         Console.println(F(
@@ -1982,20 +2046,15 @@ bool cmd_system_state(char *args, CommandCaller *caller)
             "    > Use when system is in an inconsistent state\n"
             "    > Emergency recovery function for error conditions\n"
             "\n"
-            "  system,history - Display operation log history\n"
-            "    > Shows recent operational messages in chronological order\n"
-            "    > Useful for troubleshooting failures\n"
-            "    > Captures the last 20 operational events\n"
-            "\n"
             "TROUBLESHOOTING:\n"
             "  • For hardware issues: Check 'system,state' for sensor/valve status\n"
             "  • For operation failures: Check 'system,safety' for constraints\n"
             "  • For tray inconsistencies: Use 'system,trays' to verify positions\n"
             "  • When stuck in error state: Try 'system,reset' to recover\n"
             "  • After E-Stop activation: Use 'motor,clear' followed by 'system,reset'\n"
-            "  • For debugging overnight failures: Use 'system,history' to see operational logs\n"
-            "  • Review history to understand sequence of events leading to failures\n"
-            "  • History logs are preserved until power cycle or buffer fills (20 entries)\n"
+            "  • For debugging overnight failures: Use 'log,history' or 'log,errors' to see operational logs\n"
+            "  • Review log history to understand sequence of events leading to failures\n"
+            "  • Use 'log,stats' to check if early diagnostic data was lost due to buffer overflow\n"
             "  • Log critical commands/operations before leaving system unattended\n"
             "-------------------------------------------"));
 
@@ -2006,7 +2065,7 @@ bool cmd_system_state(char *args, CommandCaller *caller)
     {
         sprintf(msg, "Unknown system command: %s", subcommand);
         Console.error(msg);
-        Console.error(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,reset', 'system,history', or 'system,help'"));
+        Console.error(F("Valid options are 'system,state', 'system,safety', 'system,trays', 'system,reset', or 'system,help'"));
         return false;
     }
     }
@@ -2105,27 +2164,27 @@ bool cmd_tray(char *args, CommandCaller *caller)
 
         // Comprehensive safety validation with prioritized messages
         bool safeToExecute = true;
-        String errorReason = "";
+        const char* errorReason = "";
 
         // Check emergency conditions first (highest priority)
         if (state.eStopActive)
         {
             safeToExecute = false;
-            errorReason = F("E-STOP_ACTIVE");
+            errorReason = "E-STOP_ACTIVE";
         }
         // Check motor fault conditions
         else if (state.motorState == MOTOR_STATE_FAULTED &&
                  (cmdCode == 1 || cmdCode == 4 || cmdCode == 9 || cmdCode == 10))
         {
             safeToExecute = false;
-            errorReason = F("MOTOR_FAULTED");
+            errorReason = "MOTOR_FAULTED";
         }
         // Check pneumatic pressure for valve operations
         else if (!safety.pneumaticPressureSufficient &&
                  (cmdCode == 2 || cmdCode == 3 || cmdCode == 5 || cmdCode == 6))
         {
             safeToExecute = false;
-            errorReason = F("INSUFFICIENT_PRESSURE");
+            errorReason = "INSUFFICIENT_PRESSURE";
         }
         // Check for lock/unlock operation failures
         else if ((!safety.lockOperationSuccessful || !safety.unlockOperationSuccessful) &&
@@ -2133,34 +2192,34 @@ bool cmd_tray(char *args, CommandCaller *caller)
                   cmdCode == 5 || cmdCode == 6 || cmdCode == 9 || cmdCode == 10))
         {
             safeToExecute = false;
-            errorReason = F("VALVE_OPERATION_FAILURE");
+            errorReason = "VALVE_OPERATION_FAILURE";
 
             // Provide specific details about which operation failed
             if (!safety.lockOperationSuccessful)
             {
-                Console.serialInfo(safety.lockFailureDetails.c_str());
+                Console.serialInfo(safety.lockFailureDetails);
             }
             if (!safety.unlockOperationSuccessful)
             {
-                Console.serialInfo(safety.unlockFailureDetails.c_str());
+                Console.serialInfo(safety.unlockFailureDetails);
             }
         }
         // Check operation sequence validity
         else if (!safety.operationSequenceValid)
         {
             safeToExecute = false;
-            errorReason = F("SEQUENCE_ERROR");
+            errorReason = "SEQUENCE_ERROR";
         }
         // Check position tracking (your original checks)
         else if (!safety.targetPositionValid || !safety.trayPositionValid)
         {
             safeToExecute = false;
-            errorReason = F("POSITION_TRACKING_ERROR");
+            errorReason = "POSITION_TRACKING_ERROR";
         }
 
         if (!safeToExecute)
         {
-            sprintf(msg, "%s", errorReason.c_str());
+            sprintf(msg, "%s", errorReason);
             Console.error(msg);
             Console.serialInfo(F("Cannot execute tray commands while system is in an unsafe state"));
             Console.serialInfo(F("Use 'system,reset' to clear the alert and try again"));
@@ -2181,7 +2240,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         if (!safety.safeToMove)
         {
             Console.error(F("MOTOR_NOT_READY"));
-            Console.serialInfo(safety.moveUnsafeReason.c_str());
+            Console.serialInfo(safety.moveUnsafeReason);
             Console.serialInfo(F("Motor must be initialized and homed before loading/unloading operations"));
             return false;
         }
@@ -2208,7 +2267,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         if (!safety.safeToLoadTrayToPos1)
         {
             Console.error(F("UNSAFE_TO_LOAD"));
-            Console.serialInfo(safety.loadTrayPos1UnsafeReason.c_str());
+            Console.serialInfo(safety.loadTrayPos1UnsafeReason);
             return false;
         }
 
@@ -2357,7 +2416,7 @@ bool cmd_tray(char *args, CommandCaller *caller)
         if (!safety.safeToUnlockGrippedTray)
         {
             Console.error(F("UNSAFE_TO_UNLOCK"));
-            Console.serialInfo(safety.grippedTrayUnlockUnsafeReason.c_str());
+            Console.serialInfo(safety.grippedTrayUnlockUnsafeReason);
             return false;
         }
 
@@ -2597,196 +2656,6 @@ bool cmd_tray(char *args, CommandCaller *caller)
     return false; // Should never reach here
 }
 
-// Define the test subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
-static const SubcommandInfo TEST_COMMANDS[] = {
-    {"help", 4},
-    {"home", 1},
-    {"position", 2},
-    {"tray", 3}};
-
-static const size_t TEST_COMMAND_COUNT = sizeof(TEST_COMMANDS) / sizeof(SubcommandInfo);
-
-bool cmd_test(char *args, CommandCaller *caller)
-{
-    // Create a local copy of arguments
-    char localArgs[COMMAND_SIZE];
-    strncpy(localArgs, args, COMMAND_SIZE);
-    localArgs[COMMAND_SIZE - 1] = '\0';
-
-    // Skip leading spaces
-    char *trimmed = trimLeadingSpaces(localArgs);
-
-    char msg[100];
-
-    // Check for empty argument - show brief help to both outputs
-    if (strlen(trimmed) == 0)
-    {
-        Console.println(F("[ACK], TEST_COMMANDS"));
-        Console.serialInfo(F("Available: home | position | tray | help"));
-
-        // More detailed options to Serial only
-        Console.serialInfo(F("  home     - Test homing repeatability"));
-        Console.serialInfo(F("  position - Test position cycling (for tray loading)"));
-        Console.serialInfo(F("  tray     - Test complete tray handling operations"));
-        Console.serialInfo(F("  help     - Display detailed test information"));
-        Console.serialInfo(F("Usage: test,<test_name>"));
-        return true;
-    }
-
-    // Parse the first argument - we'll use spaces as separators (commas converted to spaces)
-    char *subcommand = strtok(trimmed, " ");
-    if (subcommand == NULL)
-    {
-        Console.error(F("Invalid format. Usage: test,<home|position|tray|help>"));
-        return false;
-    }
-
-    // Trim leading spaces from test type
-    subcommand = trimLeadingSpaces(subcommand);
-
-    // Check motor initialization first (except for help command)
-    if (strcmp(subcommand, "help") != 0 && motorState == MOTOR_STATE_NOT_READY)
-    {
-        Console.error(F("Motor not initialized. Run 'motor,init' first."));
-        return false;
-    }
-
-    // Check E-Stop condition (except for help command)
-    if (strcmp(subcommand, "help") != 0 && isEStopActive())
-    {
-        Console.error(F("Cannot run tests while E-Stop is active."));
-        return false;
-    }
-
-    // Use binary search to find the command code
-    int cmdCode = findSubcommandCode(subcommand, TEST_COMMANDS, TEST_COMMAND_COUNT);
-
-    // Use switch-case for cleaner flow control
-    switch (cmdCode)
-    {
-    case 1: // "home"
-    {
-        Console.acknowledge(F("TEST_HOME_STARTED"));
-        Console.serialInfo(F("Starting homing repeatability test..."));
-        if (testHomingRepeatability())
-        {
-            Console.acknowledge(F("TEST_HOME_COMPLETED"));
-            return true;
-        }
-        else
-        {
-            Console.error(F("Homing test failed or was aborted"));
-            return false;
-        }
-    }
-
-    case 2: // "position"
-    {
-        Console.acknowledge(F("TEST_POSITION_STARTED"));
-        Console.serialInfo(F("Starting position cycling test..."));
-
-        if (testPositionCycling())
-        {
-            Console.acknowledge(F("TEST_POSITION_COMPLETED"));
-            return true;
-        }
-        else
-        {
-            Console.error(F("Position test failed or was aborted"));
-            return false;
-        }
-    }
-
-    case 3: // "tray"
-    {
-        Console.acknowledge(F("TEST_TRAY_STARTED"));
-        Console.serialInfo(F("Starting tray handling test..."));
-
-        // Add pneumatic pressure validation before starting the test
-        if (!isPressureSufficient())
-        {
-            Console.error(F("Pneumatic pressure insufficient"));
-            Console.serialInfo(F("Cannot run tray test - ensure air supply is connected"));
-            Console.serialInfo(F("Use 'tray,status' to check PRESSURE status"));
-            return false;
-        }
-
-        if (testTrayHandling())
-        {
-            Console.acknowledge(F("TEST_TRAY_COMPLETED"));
-            return true;
-        }
-        else
-        {
-            Console.error(F("Tray test failed or was aborted"));
-            return false;
-        }
-    }
-
-    case 4: // "help"
-    {
-        Console.acknowledge(F("TEST_HELP"));
-        Console.println(F(
-            "\n===== TEST SYSTEM HELP =====\n"
-            "\nOVERVIEW:\n"
-            "  The test system provides automated sequences for validating\n"
-            "  system functionality and repeatability. Tests are designed\n"
-            "  to verify proper operation of critical system components.\n"
-            "\n"
-            "AVAILABLE TESTS:\n"
-            "  test,home - Homing repeatability test\n"
-            "    > Performs multiple homing operations to test precision\n"
-            "    > Moves between home position and test position\n"
-            "    > Useful for verifying encoder and limit switch reliability\n"
-            "    > Test runs for approximately 20 cycles\n"
-            "\n"
-            "  test,position - Position cycling test\n"
-            "    > Cycles through positions used in tray loading\n"
-            "    > Tests movements between positions 1, 2, and 3\n"
-            "    > Verifies motor accuracy and repeatability\n"
-            "    > Test runs for approximately 10 cycles\n"
-            "\n"
-            "  test,tray - Comprehensive tray handling test\n"
-            "    > Tests complete tray movement operations\n"
-            "    > Includes valve operations for locking/unlocking\n"
-            "    > Verifies sensors, positioning, and control sequences\n"
-            "    > Most thorough test of the entire system\n"
-            "\n"
-            "RUNNING TESTS:\n"
-            "  • Motor must be initialized (motor,init) before testing\n"
-            "  • Home position must be established for position tests\n"
-            "  • E-Stop must be inactive\n"
-            "  • Tests can be aborted by typing 'abort' during execution\n"
-            "  • Status messages display progress throughout the test\n"
-            "\n"
-            "TRAY TEST REQUIREMENTS:\n"
-            "  • A tray must be present at position 1 to start\n"
-            "  • Positions 2 and 3 must be clear initially\n"
-            "  • Air system must be functioning properly\n"
-            "  • All valves and sensors must be operational\n"
-            "\n"
-            "TROUBLESHOOTING:\n"
-            "  • If a test fails, check the specific error message\n"
-            "  • For position errors: verify motor operation with 'move' commands\n"
-            "  • For valve errors: check air pressure and connections\n"
-            "  • For sensor errors: verify sensor readings with 'system,state'\n"
-            "-------------------------------------------"));
-
-        return true;
-    }
-
-    default: // Unknown command
-    {
-        sprintf(msg, "Unknown test type: %s", subcommand);
-        Console.error(msg);
-        Console.error(F("Valid options: home, position, tray, help"));
-        return false;
-    }
-    }
-
-    return false; // Should never reach here
-}
-
 // Define the encoder subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
 static const SubcommandInfo ENCODER_COMMANDS[] = {
     {"disable", 2},
@@ -2937,33 +2806,17 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         }
 
         // Enable encoder control
-        encoderControlActive = true;
-
-        // Reset encoder position
-        EncoderIn.Position(0);
-        lastEncoderPosition = 0;
-        lastEncoderUpdateTime = millis();
+        enableEncoderControl();
 
         Console.acknowledge(F("ENCODER_ENABLED"));
-
-        double posMm = pulsesToMm(MOTOR_CONNECTOR.PositionRefCommanded());
-        sprintf(msg, "MPG handwheel control enabled - current position: %.2f mm", posMm);
-        Console.serialInfo(msg);
-
-        sprintf(msg, "Using multiplier x%s (%d)", getMultiplierName(currentMultiplier), currentMultiplier);
-        Console.serialInfo(msg);
-
-        Console.serialInfo(F("Issue 'encoder,disable' when finished with manual control"));
-
         return true;
     }
 
     case 2: // "disable"
     {
         // Disable encoder control
-        encoderControlActive = false;
+        disableEncoderControl();
         Console.acknowledge(F("ENCODER_DISABLED"));
-        Console.serialInfo(F("MPG handwheel control disabled"));
         return true;
     }
 
@@ -2981,17 +2834,17 @@ bool cmd_encoder(char *args, CommandCaller *caller)
             switch (multiplier)
             {
             case 1:
-                setEncoderMultiplier(1);
+                setEncoderMultiplier(MULTIPLIER_X1);
                 Console.acknowledge(F("ENCODER_MULT_1"));
                 Console.serialInfo(F("Multiplier set to x1 (fine adjustment)"));
                 break;
             case 10:
-                setEncoderMultiplier(10);
+                setEncoderMultiplier(MULTIPLIER_X10);
                 Console.acknowledge(F("ENCODER_MULT_10"));
                 Console.serialInfo(F("Multiplier set to x10 (medium adjustment)"));
                 break;
             case 100:
-                setEncoderMultiplier(100);
+                setEncoderMultiplier(MULTIPLIER_X100);
                 Console.acknowledge(F("ENCODER_MULT_100"));
                 Console.serialInfo(F("Multiplier set to x100 (coarse adjustment)"));
                 break;
@@ -3090,7 +2943,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
 
 bool cmd_abort(char *args, CommandCaller *caller)
 {
-    requestTestAbort("abort command");
+    Console.acknowledge(F("Abort command received"));
     return true;
 }
 
@@ -3489,10 +3342,14 @@ Commander::systemCommand_t API_tree[] = {
                   cmd_unlock),
 
     // Logging command
-    systemCommand("log", "Logging controls:\r\n"
+    systemCommand("log", "Logging controls and history:\r\n"
                          "  log,on[,interval] - Enable periodic logging (interval in ms)\r\n"
                          "  log,off           - Disable periodic logging\r\n"
                          "  log,now           - Log system state immediately\r\n"
+                         "  log,history       - Show complete operation log history\r\n"
+                         "  log,errors        - Show only errors and warnings for quick debugging\r\n"
+                         "  log,last[,count]  - Show last N log entries (default: 10)\r\n"
+                         "  log,stats         - Show log buffer statistics and overflow info\r\n"
                          "  log,help          - Display detailed logging information",
                   cmd_log),
 
@@ -3502,8 +3359,8 @@ Commander::systemCommand_t API_tree[] = {
                             "  system,safety   - Display comprehensive safety validation status\r\n"
                             "  system,trays    - Display tray tracking and statistics\r\n"
                             "  system,reset    - Reset system state after failure to retry operation\r\n"
-                            "  system,history  - Display operation log history for troubleshooting\r\n"
-                            "  system,help     - Display detailed instructions for system commands",
+                            "  system,help     - Display detailed instructions for system commands\r\n"
+                            "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
                   cmd_system_state),
 
     // Motor control commands
@@ -3548,14 +3405,6 @@ Commander::systemCommand_t API_tree[] = {
                           "  tray,status    - Get tray system status (machine-readable)\r\n"
                           "  tray,help      - Display detailed usage instructions",
                   cmd_tray),
-
-    // Test command
-    systemCommand("test", "Run tests on the system:\r\n"
-                          "  test,home     - Run homing repeatability test\r\n"
-                          "  test,position - Run position cycling test for tray loading\r\n"
-                          "  test,tray     - Run tray handling test (request, place, release)\r\n"
-                          "  test,help     - Display detailed test information and requirements",
-                  cmd_test),
 
     // Encoder control commands
     systemCommand("encoder", "Encoder handwheel control:\r\n"

@@ -1,24 +1,34 @@
 #ifndef LOG_HISTORY_H
 #define LOG_HISTORY_H
 
-#include "Arduino.h"
-#include "OutputManager.h"
-#include "CommandController.h"
+#include <Arduino.h>
+// REMOVED: #include "OutputManager.h"  // Fix circular dependency
 
 //=============================================================================
 // CONSTANTS
 //=============================================================================
-// Log history size - how many entries to keep
-#define LOG_HISTORY_SIZE 100
+// Reduced log history size for better memory management
+#define LOG_HISTORY_SIZE 100  
+#define LOG_MESSAGE_SIZE 100  
 
 //=============================================================================
 // TYPE DEFINITIONS
 //=============================================================================
-// Log entry structure - simplified
+// Log entry structure - enhanced with severity
 struct LogEntry
 {
-    char message[100];       // Complete message with tag already included
+    char message[LOG_MESSAGE_SIZE];       // Complete message with tag already included
     unsigned long timestamp; // When the message was logged
+    
+    // Add severity for quick filtering during debugging
+    enum Severity {
+        INFO = 0,
+        DIAGNOSTIC = 1,
+        WARNING = 2,
+        ERROR = 3,
+        CRITICAL = 4,
+        COMMAND = 5     // For serial/network commands (cyan)
+    } severity;
 };
 
 //=============================================================================
@@ -29,18 +39,29 @@ class LogHistory
 {
 private:
     LogEntry entries[LOG_HISTORY_SIZE];
-    uint8_t head;
-    uint8_t count;
+    volatile uint8_t head;      // volatile for thread safety
+    volatile uint8_t count;
+    uint16_t overflowCount;     // Track lost entries
+    
+    // Helper function for colored output
+    void printColoredEntry(const LogEntry& entry);
 
 public:
     LogHistory();
 
-    // Add a message to the history
-    void addEntry(const char *msg);
-
-    // Print the log history
+    // Enhanced addEntry with severity and safety
+    void addEntry(const char *msg, LogEntry::Severity severity = LogEntry::INFO);
+    
+    // Multiple display options for debugging
     void printHistory();
-
+    void printErrors();         // Show only errors/critical
+    void printLastN(uint8_t n); // Show last N entries
+    void printSince(unsigned long sinceTime);
+    
+    // Diagnostic info
+    void printStats();
+    uint16_t getOverflowCount() const { return overflowCount; }
+    
     // Clear all entries
     void clear();
 };

@@ -48,8 +48,8 @@ SystemState previousState;
 // Add these near your other global variables
 bool lastLockOperationFailed = false;
 bool lastUnlockOperationFailed = false;
-String lastLockFailureDetails = "";
-String lastUnlockFailureDetails = "";
+char lastLockFailureDetails[128] = "";
+char lastUnlockFailureDetails[128] = "";
 unsigned long lockFailureTimestamp = 0;
 unsigned long unlockFailureTimestamp = 0;
 
@@ -657,7 +657,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!isPressureSufficient())
     {
         result.pneumaticPressureSufficient = false;
-        result.pressureUnsafeReason = F("Pneumatic pressure below minimum threshold");
+        strcpy_P(result.pressureUnsafeReason, PSTR("Pneumatic pressure below minimum threshold"));
 
         // Set abort reason during operations requiring pneumatics
         // This will cause active operations to abort if pressure is lost
@@ -679,17 +679,17 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (isAtPosition(state.currentPositionMm, POSITION_1_MM) && state.tray1Locked)
     {
         result.safeToMove = false;
-        result.moveUnsafeReason = F("Cannot move - Tray at position 1 is locked");
+        strcpy_P(result.moveUnsafeReason, PSTR("Cannot move - Tray at position 1 is locked"));
     }
     else if (isAtPosition(state.currentPositionMm, POSITION_2_MM) && state.tray2Locked)
     {
         result.safeToMove = false;
-        result.moveUnsafeReason = F("Cannot move - Tray at position 2 is locked");
+        strcpy_P(result.moveUnsafeReason, PSTR("Cannot move - Tray at position 2 is locked"));
     }
     else if (isAtPosition(state.currentPositionMm, POSITION_3_MM) && state.tray3Locked)
     {
         result.safeToMove = false;
-        result.moveUnsafeReason = F("Cannot move - Tray at position 3 is locked");
+        strcpy_P(result.moveUnsafeReason, PSTR("Cannot move - Tray at position 3 is locked"));
     }
 
     // System State Requirements
@@ -697,7 +697,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!state.isHomed)
     {
         result.safeToMove = false;
-        result.moveUnsafeReason = F("Motor not homed");
+        strcpy_P(result.moveUnsafeReason, PSTR("Motor not homed"));
         // This is a prerequisite safety check, not an abort condition
     }
 
@@ -706,7 +706,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (state.eStopActive)
     {
         result.safeToMove = false;
-        result.moveUnsafeReason = F("E-stop active");
+        strcpy_P(result.moveUnsafeReason, PSTR("E-stop active"));
         result.failureReason = ABORT_REASON_ESTOP; // E-stop is an immediate abort condition
     }
 
@@ -715,7 +715,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!state.ccioBoardPresent)
     {
         result.safeToMove = false;
-        result.moveUnsafeReason = F("CCIO board not detected");
+        strcpy_P(result.moveUnsafeReason, PSTR("CCIO board not detected"));
         // No abort reason - this is a hardware presence check
     }
 
@@ -724,7 +724,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (state.motorState == MOTOR_STATE_FAULTED)
     {
         result.safeToMove = false;
-        result.moveUnsafeReason = F("Motor in fault state");
+        strcpy_P(result.moveUnsafeReason, PSTR("Motor in fault state"));
         // No abort reason - motor already in fault state
     }
 
@@ -739,21 +739,21 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!state.tray1Present)
     {
         result.safeToLockTray1 = false;
-        result.tray1LockUnsafeReason = F("No tray detected");
+        strcpy_P(result.tray1LockUnsafeReason, PSTR("No tray detected"));
         // No abort reason - this is a prerequisite check
     }
 
     if (!state.tray2Present)
     {
         result.safeToLockTray2 = false;
-        result.tray2LockUnsafeReason = F("No tray detected");
+        strcpy_P(result.tray2LockUnsafeReason, PSTR("No tray detected"));
         // No abort reason - this is a prerequisite check
     }
 
     if (!state.tray3Present)
     {
         result.safeToLockTray3 = false;
-        result.tray3LockUnsafeReason = F("No tray detected");
+        strcpy_P(result.tray3LockUnsafeReason, PSTR("No tray detected"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -764,9 +764,9 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.safeToLockTray1 = false;
         result.safeToLockTray2 = false;
         result.safeToLockTray3 = false;
-        result.tray1LockUnsafeReason = F("Motor is moving");
-        result.tray2LockUnsafeReason = F("Motor is moving");
-        result.tray3LockUnsafeReason = F("Motor is moving");
+        strcpy_P(result.tray1LockUnsafeReason, PSTR("Motor is moving"));
+        strcpy_P(result.tray2LockUnsafeReason, PSTR("Motor is moving"));
+        strcpy_P(result.tray3LockUnsafeReason, PSTR("Motor is moving"));
 
         // Sequence validation: Detect unexpected movement during lock/unlock steps
         // For tray loading, steps 0-7 involve lock/unlock ops, while 8+ are for movement
@@ -778,40 +778,40 @@ SafetyValidationResult validateSafety(const SystemState &state)
             // This means movement started during a lock/unlock operation - sequence violation
             result.operationSequenceValid = false;
 
-            // Provide detailed error message with operation-specific context
-            result.operationSequenceMessage = F("Motor unexpectedly started moving during ");
-
+            // Build detailed error message with operation-specific context
+            const char* stepDescription = "";
+            
             // Add specific step information for clearer diagnostics
             if (currentOperation.type == OPERATION_LOADING)
             {
                 switch (currentOperationStep)
                 {
                 case 0:
-                    result.operationSequenceMessage += F("initial tray load preparation");
+                    stepDescription = "initial tray load preparation";
                     break;
                 case 1:
-                    result.operationSequenceMessage += F("tray detection verification");
+                    stepDescription = "tray detection verification";
                     break;
                 case 2:
-                    result.operationSequenceMessage += F("shuttle locking");
+                    stepDescription = "shuttle locking";
                     break;
                 case 3:
-                    result.operationSequenceMessage += F("shuttle lock verification");
+                    stepDescription = "shuttle lock verification";
                     break;
                 case 4:
-                    result.operationSequenceMessage += F("shuttle unlocking");
+                    stepDescription = "shuttle unlocking";
                     break;
                 case 5:
-                    result.operationSequenceMessage += F("tray locking");
+                    stepDescription = "tray locking";
                     break;
                 case 6:
-                    result.operationSequenceMessage += F("tray lock verification");
+                    stepDescription = "tray lock verification";
                     break;
                 case 7:
-                    result.operationSequenceMessage += F("pre-movement preparation");
+                    stepDescription = "pre-movement preparation";
                     break;
                 default:
-                    result.operationSequenceMessage += F("lock operation");
+                    stepDescription = "lock operation";
                     break;
                 }
             }
@@ -820,26 +820,29 @@ SafetyValidationResult validateSafety(const SystemState &state)
                 switch (currentOperationStep)
                 {
                 case 0:
-                    result.operationSequenceMessage += F("tray unload preparation");
+                    stepDescription = "tray unload preparation";
                     break;
                 case 1:
-                    result.operationSequenceMessage += F("sensor verification");
+                    stepDescription = "sensor verification";
                     break;
                 case 2:
-                    result.operationSequenceMessage += F("movement to source position");
+                    stepDescription = "movement to source position";
                     break;
                 case 3:
-                    result.operationSequenceMessage += F("movement monitoring");
+                    stepDescription = "movement monitoring";
                     break;
                 case 4:
-                    result.operationSequenceMessage += F("shuttle locking");
+                    stepDescription = "shuttle locking";
+                    break;
+                default:
+                    stepDescription = "lock operation";
                     break;
                 }
             }
 
-            result.operationSequenceMessage += F(" (step ");
-            result.operationSequenceMessage += String(currentOperationStep);
-            result.operationSequenceMessage += F(")");
+            snprintf(result.operationSequenceMessage, sizeof(result.operationSequenceMessage),
+                     "Motor unexpectedly started moving during %s (step %d)", 
+                     stepDescription, currentOperationStep);
 
             result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
         }
@@ -852,9 +855,9 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.safeToLockTray1 = false;
         result.safeToLockTray2 = false;
         result.safeToLockTray3 = false;
-        result.tray1LockUnsafeReason = F("Shuttle is locked");
-        result.tray2LockUnsafeReason = F("Shuttle is locked");
-        result.tray3LockUnsafeReason = F("Shuttle is locked");
+        strcpy_P(result.tray1LockUnsafeReason, PSTR("Shuttle is locked"));
+        strcpy_P(result.tray2LockUnsafeReason, PSTR("Shuttle is locked"));
+        strcpy_P(result.tray3LockUnsafeReason, PSTR("Shuttle is locked"));
 
         // Sequence validation: Detect unexpected shuttle locking
         // We expect the shuttle to lock during specific operation steps only
@@ -866,25 +869,21 @@ SafetyValidationResult validateSafety(const SystemState &state)
             // This means shuttle was locked unexpectedly outside the expected step
             result.operationSequenceValid = false;
 
-            // Provide detailed error message with operation context
-            result.operationSequenceMessage = F("Shuttle unexpectedly locked during ");
-
-            // Add operation-specific context for clearer diagnostics
+            // Build detailed error message with operation context
             if (currentOperation.type == OPERATION_LOADING)
             {
-                result.operationSequenceMessage += F("tray loading operation at step ");
-                result.operationSequenceMessage += String(currentOperationStep);
-                result.operationSequenceMessage += F(" (expected at steps 2-3)");
+                snprintf(result.operationSequenceMessage, sizeof(result.operationSequenceMessage),
+                         "Shuttle unexpectedly locked during tray loading operation at step %d (expected at steps 2-3)",
+                         currentOperationStep);
             }
             else if (currentOperation.type == OPERATION_UNLOADING)
             {
-                result.operationSequenceMessage += F("tray unloading operation at step ");
-                result.operationSequenceMessage += String(currentOperationStep);
-
                 // Provide specific guidance about when shuttle should be locked during unloading
                 if (currentOperationStep < 3)
                 {
-                    result.operationSequenceMessage += F(" (expected at steps 4-5)");
+                    snprintf(result.operationSequenceMessage, sizeof(result.operationSequenceMessage),
+                             "Shuttle unexpectedly locked during tray unloading operation at step %d (expected at steps 4-5)",
+                             currentOperationStep);
                 }
                 else if (currentOperationStep == 4 || currentOperationStep == 5)
                 {
@@ -894,12 +893,14 @@ SafetyValidationResult validateSafety(const SystemState &state)
                 }
                 else
                 {
-                    result.operationSequenceMessage += F(" (unexpected at this step)");
+                    snprintf(result.operationSequenceMessage, sizeof(result.operationSequenceMessage),
+                             "Shuttle unexpectedly locked during tray unloading operation at step %d (unexpected at this step)",
+                             currentOperationStep);
                 }
             }
             else
             {
-                result.operationSequenceMessage += F("operation at unexpected step");
+                strcpy(result.operationSequenceMessage, "Shuttle unexpectedly locked during operation at unexpected step");
             }
 
             result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
@@ -917,21 +918,21 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (state.tray1Present)
     {
         result.safeToLoadTrayToPos1 = false;
-        result.loadTrayPos1UnsafeReason = F("Position already occupied");
+        strcpy_P(result.loadTrayPos1UnsafeReason, PSTR("Position already occupied"));
         // No abort reason - this is a prerequisite check
     }
 
     if (state.tray2Present)
     {
         result.safeToLoadTrayToPos2 = false;
-        result.loadTrayPos2UnsafeReason = F("Position already occupied");
+        strcpy_P(result.loadTrayPos2UnsafeReason, PSTR("Position already occupied"));
         // No abort reason - this is a prerequisite check
     }
 
     if (state.tray3Present)
     {
         result.safeToLoadTrayToPos3 = false;
-        result.loadTrayPos3UnsafeReason = F("Position already occupied");
+        strcpy_P(result.loadTrayPos3UnsafeReason, PSTR("Position already occupied"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -942,9 +943,9 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.safeToLoadTrayToPos1 = false;
         result.safeToLoadTrayToPos2 = false;
         result.safeToLoadTrayToPos3 = false;
-        result.loadTrayPos1UnsafeReason = F("All positions occupied");
-        result.loadTrayPos2UnsafeReason = F("All positions occupied");
-        result.loadTrayPos3UnsafeReason = F("All positions occupied");
+        strcpy_P(result.loadTrayPos1UnsafeReason, PSTR("All positions occupied"));
+        strcpy_P(result.loadTrayPos2UnsafeReason, PSTR("All positions occupied"));
+        strcpy_P(result.loadTrayPos3UnsafeReason, PSTR("All positions occupied"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -959,21 +960,21 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!state.tray1Present)
     {
         result.safeToUnloadTrayFromPos1 = false;
-        result.unloadTrayPos1UnsafeReason = F("No tray detected");
+        strcpy_P(result.unloadTrayPos1UnsafeReason, PSTR("No tray detected"));
         // No abort reason - this is a prerequisite check
     }
 
     if (!state.tray2Present)
     {
         result.safeToUnloadTrayFromPos2 = false;
-        result.unloadTrayPos2UnsafeReason = F("No tray detected");
+        strcpy_P(result.unloadTrayPos2UnsafeReason, PSTR("No tray detected"));
         // No abort reason - this is a prerequisite check
     }
 
     if (!state.tray3Present)
     {
         result.safeToUnloadTrayFromPos3 = false;
-        result.unloadTrayPos3UnsafeReason = F("No tray detected");
+        strcpy_P(result.unloadTrayPos3UnsafeReason, PSTR("No tray detected"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -985,8 +986,8 @@ SafetyValidationResult validateSafety(const SystemState &state)
     {
         result.safeToUnloadTrayFromPos2 = false;
         result.safeToUnloadTrayFromPos3 = false;
-        result.unloadTrayPos2UnsafeReason = F("Tray 1 must be unloaded first");
-        result.unloadTrayPos3UnsafeReason = F("Tray 1 must be unloaded first");
+        strcpy_P(result.unloadTrayPos2UnsafeReason, PSTR("Tray 1 must be unloaded first"));
+        strcpy_P(result.unloadTrayPos3UnsafeReason, PSTR("Tray 1 must be unloaded first"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -994,7 +995,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (state.tray2Present && !state.tray1Present)
     {
         result.safeToUnloadTrayFromPos3 = false;
-        result.unloadTrayPos3UnsafeReason = F("Tray 2 must be unloaded first");
+        strcpy_P(result.unloadTrayPos3UnsafeReason, PSTR("Tray 2 must be unloaded first"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -1008,7 +1009,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!state.tray1Present)
     {
         result.safeToUnlockGrippedTray = false;
-        result.grippedTrayUnlockUnsafeReason = F("No tray at position 1");
+        strcpy_P(result.grippedTrayUnlockUnsafeReason, PSTR("No tray at position 1"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -1016,7 +1017,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!state.tray1Locked)
     {
         result.safeToUnlockGrippedTray = false;
-        result.grippedTrayUnlockUnsafeReason = F("Tray not locked");
+        strcpy_P(result.grippedTrayUnlockUnsafeReason, PSTR("Tray not locked"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -1024,7 +1025,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (state.shuttleLocked)
     {
         result.safeToUnlockGrippedTray = false;
-        result.grippedTrayUnlockUnsafeReason = F("Shuttle must be retracted");
+        strcpy_P(result.grippedTrayUnlockUnsafeReason, PSTR("Shuttle must be retracted"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -1032,7 +1033,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (operationInProgress)
     {
         result.safeToUnlockGrippedTray = false;
-        result.grippedTrayUnlockUnsafeReason = F("Operation in progress");
+        strcpy_P(result.grippedTrayUnlockUnsafeReason, PSTR("Operation in progress"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -1040,7 +1041,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (state.motorState == MOTOR_STATE_MOVING)
     {
         result.safeToUnlockGrippedTray = false;
-        result.grippedTrayUnlockUnsafeReason = F("Motor is moving");
+        strcpy_P(result.grippedTrayUnlockUnsafeReason, PSTR("Motor is moving"));
         // No abort reason - this is a prerequisite check
     }
 
@@ -1048,7 +1049,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (state.eStopActive)
     {
         result.safeToUnlockGrippedTray = false;
-        result.grippedTrayUnlockUnsafeReason = F("E-stop active");
+        strcpy_P(result.grippedTrayUnlockUnsafeReason, PSTR("E-stop active"));
         // This is consistent with other E-stop handling
     }
 
@@ -1056,7 +1057,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!result.pneumaticPressureSufficient)
     {
         result.safeToUnlockGrippedTray = false;
-        result.grippedTrayUnlockUnsafeReason = F("Insufficient pneumatic pressure");
+        strcpy_P(result.grippedTrayUnlockUnsafeReason, PSTR("Insufficient pneumatic pressure"));
         // This uses the existing pneumatic pressure validation
     }
 
@@ -1070,26 +1071,30 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (lastLockOperationFailed)
     {
         result.lockOperationSuccessful = false;
-        result.lockFailureDetails = lastLockFailureDetails;
+        strcpy(result.lockFailureDetails, lastLockFailureDetails);
 
         // If we're in an operation, mark the sequence as invalid
         if (operationInProgress)
         {
             result.operationSequenceValid = false;
-            result.operationSequenceMessage = F("Lock operation failed: ");
-            result.operationSequenceMessage += lastLockFailureDetails;
+            strcpy_P(result.operationSequenceMessage, PSTR("Lock operation failed: "));
+            strcat(result.operationSequenceMessage, lastLockFailureDetails);
             result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
 
             // Add operation context for better diagnostics
             if (currentOperation.type == OPERATION_LOADING)
             {
-                result.operationSequenceMessage += F(" during loading operation step ");
-                result.operationSequenceMessage += String(currentOperationStep);
+                strcat_P(result.operationSequenceMessage, PSTR(" during loading operation step "));
+                char stepStr[10];
+                itoa(currentOperationStep, stepStr, 10);
+                strcat(result.operationSequenceMessage, stepStr);
             }
             else if (currentOperation.type == OPERATION_UNLOADING)
             {
-                result.operationSequenceMessage += F(" during unloading operation step ");
-                result.operationSequenceMessage += String(currentOperationStep);
+                strcat_P(result.operationSequenceMessage, PSTR(" during unloading operation step "));
+                char stepStr[10];
+                itoa(currentOperationStep, stepStr, 10);
+                strcat(result.operationSequenceMessage, stepStr);
             }
         }
     }
@@ -1098,26 +1103,30 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (lastUnlockOperationFailed)
     {
         result.unlockOperationSuccessful = false;
-        result.unlockFailureDetails = lastUnlockFailureDetails;
+        strcpy(result.unlockFailureDetails, lastUnlockFailureDetails);
 
         // If we're in an operation, mark the sequence as invalid
         if (operationInProgress)
         {
             result.operationSequenceValid = false;
-            result.operationSequenceMessage = F("Unlock operation failed: ");
-            result.operationSequenceMessage += lastUnlockFailureDetails;
+            strcpy_P(result.operationSequenceMessage, PSTR("Unlock operation failed: "));
+            strcat(result.operationSequenceMessage, lastUnlockFailureDetails);
             result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
 
             // Add operation context for better diagnostics
             if (currentOperation.type == OPERATION_LOADING)
             {
-                result.operationSequenceMessage += F(" during loading operation step ");
-                result.operationSequenceMessage += String(currentOperationStep);
+                strcat_P(result.operationSequenceMessage, PSTR(" during loading operation step "));
+                char stepStr[10];
+                itoa(currentOperationStep, stepStr, 10);
+                strcat(result.operationSequenceMessage, stepStr);
             }
             else if (currentOperation.type == OPERATION_UNLOADING)
             {
-                result.operationSequenceMessage += F(" during unloading operation step ");
-                result.operationSequenceMessage += String(currentOperationStep);
+                strcat_P(result.operationSequenceMessage, PSTR(" during unloading operation step "));
+                char stepStr[10];
+                itoa(currentOperationStep, stepStr, 10);
+                strcat(result.operationSequenceMessage, stepStr);
             }
         }
     }
@@ -1137,26 +1146,23 @@ SafetyValidationResult validateSafety(const SystemState &state)
             result.commandStateValid = false;
 
             // Create detailed error message with position values
-            result.stateValidationMessage = F("Position mismatch: current position ");
-            result.stateValidationMessage += String(state.currentPositionMm);
-            result.stateValidationMessage += F(" mm vs. commanded ");
-            result.stateValidationMessage += String(commandedPositionMm);
-            result.stateValidationMessage += F(" mm (diff: ");
-            result.stateValidationMessage += String(abs(state.currentPositionMm - commandedPositionMm));
-            result.stateValidationMessage += F(" mm)");
+            snprintf_P(result.stateValidationMessage, sizeof(result.stateValidationMessage),
+                      PSTR("Position mismatch: current position %d mm vs. commanded %d mm (diff: %d mm)"),
+                      state.currentPositionMm, commandedPositionMm, 
+                      abs(state.currentPositionMm - commandedPositionMm));
 
             // Add motor state context for better diagnostics
             if (state.motorState == MOTOR_STATE_MOVING)
             {
-                result.stateValidationMessage += F(" - Motor still moving");
+                strcat_P(result.stateValidationMessage, PSTR(" - Motor still moving"));
             }
             else if (state.motorState == MOTOR_STATE_FAULTED)
             {
-                result.stateValidationMessage += F(" - Motor in FAULT state");
+                strcat_P(result.stateValidationMessage, PSTR(" - Motor in FAULT state"));
             }
             else
             {
-                result.stateValidationMessage += F(" - Motor stopped before reaching target");
+                strcat_P(result.stateValidationMessage, PSTR(" - Motor stopped before reaching target"));
             }
 
             // Set abort reason during operations - motor timeout or blockage
@@ -1166,23 +1172,25 @@ SafetyValidationResult validateSafety(const SystemState &state)
                 result.operationSequenceValid = false;
 
                 // Add operation context for more detailed error reporting
-                result.stateValidationMessage += F(" during ");
+                strcat_P(result.stateValidationMessage, PSTR(" during "));
                 if (currentOperation.type == OPERATION_LOADING)
                 {
-                    result.stateValidationMessage += F("loading operation");
+                    strcat_P(result.stateValidationMessage, PSTR("loading operation"));
                 }
                 else if (currentOperation.type == OPERATION_UNLOADING)
                 {
-                    result.stateValidationMessage += F("unloading operation");
+                    strcat_P(result.stateValidationMessage, PSTR("unloading operation"));
                 }
                 else
                 {
-                    result.stateValidationMessage += F("operation");
+                    strcat_P(result.stateValidationMessage, PSTR("operation"));
                 }
-                result.stateValidationMessage += F(" step ");
-                result.stateValidationMessage += String(currentOperationStep);
+                strcat_P(result.stateValidationMessage, PSTR(" step "));
+                char stepStr[10];
+                itoa(currentOperationStep, stepStr, 10);
+                strcat(result.stateValidationMessage, stepStr);
 
-                result.operationSequenceMessage = result.stateValidationMessage;
+                strcpy(result.operationSequenceMessage, result.stateValidationMessage);
             }
         }
     }
@@ -1215,15 +1223,15 @@ SafetyValidationResult validateSafety(const SystemState &state)
             result.trayPositionValid = false;
 
             // Detailed error message with position information
-            result.stateValidationMessage = F("ERROR: Expected tray at position 1 is missing (Motor at ");
-            result.stateValidationMessage += String(state.currentPositionMm);
-            result.stateValidationMessage += F(" mm)");
+            snprintf_P(result.stateValidationMessage, sizeof(result.stateValidationMessage),
+                      PSTR("ERROR: Expected tray at position 1 is missing (Motor at %d mm)"),
+                      state.currentPositionMm);
 
             // Add operation context and set failure reason
             if (operationInProgress)
             {
                 // Copy message to operation sequence for consistency
-                result.operationSequenceMessage = result.stateValidationMessage;
+                strcpy(result.operationSequenceMessage, result.stateValidationMessage);
                 result.operationSequenceValid = false;
                 result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
             }
@@ -1235,7 +1243,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (!operationInProgress)
     {
         result.trayPositionValid = true;
-        result.stateValidationMessage = F("System idle - position validation not required");
+        strcpy_P(result.stateValidationMessage, PSTR("System idle - position validation not required"));
     }
 
     // Target Position Validation
@@ -1249,22 +1257,22 @@ SafetyValidationResult validateSafety(const SystemState &state)
         if (currentTargetPositionMm < 0 || currentTargetPositionMm > MAX_TRAVEL_MM)
         {
             result.targetPositionValid = false;
-            result.stateValidationMessage = F("Target position out of range");
-            result.operationSequenceMessage = result.stateValidationMessage;
+            strcpy_P(result.stateValidationMessage, PSTR("Target position out of range"));
+            strcpy(result.operationSequenceMessage, result.stateValidationMessage);
         }
     }
     else if (operationInProgress && !skipTargetValidation)
     {
         // Missing target is only a problem during active operations
         result.targetPositionValid = false;
-        result.stateValidationMessage = F("No target position set during active operation");
-        result.operationSequenceMessage = result.stateValidationMessage;
+        strcpy_P(result.stateValidationMessage, PSTR("No target position set during active operation"));
+        strcpy(result.operationSequenceMessage, result.stateValidationMessage);
     }
     else if (!hasCurrentTarget)
     {
         // No target position when system is idle is perfectly fine
         result.targetPositionValid = true;
-        result.stateValidationMessage = F("System idle - no target needed");
+        strcpy_P(result.stateValidationMessage, PSTR("System idle - no target needed"));
     }
 
     //=============================================================================
@@ -1280,8 +1288,8 @@ SafetyValidationResult validateSafety(const SystemState &state)
         if (newCommandReceived)
         {
             result.safeToAcceptNewCommand = false;
-            result.operationSequenceMessage = F("Operation in progress, cannot accept new command");
-            result.operationSequenceMessage += F(" (use 'system,reset' after failure)");
+            strcpy_P(result.operationSequenceMessage, PSTR("Operation in progress, cannot accept new command"));
+            strcat_P(result.operationSequenceMessage, PSTR(" (use 'system,reset' after failure)"));
         }
     }
 
@@ -1290,7 +1298,7 @@ SafetyValidationResult validateSafety(const SystemState &state)
     if (operationInProgress && timeoutElapsed(millis(), operationStartTime, operationTimeoutMs))
     {
         result.operationWithinTimeout = false;
-        result.operationSequenceMessage = F("Operation exceeded timeout");
+        strcpy_P(result.operationSequenceMessage, PSTR("Operation exceeded timeout"));
         result.failureReason = ABORT_REASON_OPERATION_TIMEOUT;
     }
 
@@ -1301,28 +1309,32 @@ SafetyValidationResult validateSafety(const SystemState &state)
         result.operationSequenceValid = false;
 
         // Create detailed error message with operation context
-        result.operationSequenceMessage = F("Operation sequence mismatch: ");
+        strcpy_P(result.operationSequenceMessage, PSTR("Operation sequence mismatch: "));
 
         // Add operation-specific type information
         switch (currentOperation.type)
         {
         case OPERATION_LOADING:
-            result.operationSequenceMessage += F("Tray loading operation");
+            strcat_P(result.operationSequenceMessage, PSTR("Tray loading operation"));
             break;
         case OPERATION_UNLOADING:
-            result.operationSequenceMessage += F("Tray unloading operation");
+            strcat_P(result.operationSequenceMessage, PSTR("Tray unloading operation"));
             break;
         default:
-            result.operationSequenceMessage += F("Current operation");
+            strcat_P(result.operationSequenceMessage, PSTR("Current operation"));
             break;
         }
 
         // Add step information for debugging
-        result.operationSequenceMessage += F(" at step ");
-        result.operationSequenceMessage += String(currentOperationStep);
-        result.operationSequenceMessage += F(" (expected: ");
-        result.operationSequenceMessage += String(expectedOperationStep);
-        result.operationSequenceMessage += F(")");
+        strcat_P(result.operationSequenceMessage, PSTR(" at step "));
+        char stepStr[10];
+        itoa(currentOperationStep, stepStr, 10);
+        strcat(result.operationSequenceMessage, stepStr);
+        strcat_P(result.operationSequenceMessage, PSTR(" (expected: "));
+        char expectedStr[10];
+        itoa(expectedOperationStep, expectedStr, 10);
+        strcat(result.operationSequenceMessage, expectedStr);
+        strcat_P(result.operationSequenceMessage, PSTR(")"));
 
         result.failureReason = ABORT_REASON_SENSOR_MISMATCH;
     }
@@ -1344,7 +1356,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "  Motor Movement: UNSAFE - %s", result.moveUnsafeReason.c_str());
+        sprintf(msg, "  Motor Movement: UNSAFE - %s", result.moveUnsafeReason);
         Console.println(msg);
     }
 
@@ -1356,7 +1368,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "  Pneumatic System: UNSAFE - %s", result.pressureUnsafeReason.c_str());
+        sprintf(msg, "  Pneumatic System: UNSAFE - %s", result.pressureUnsafeReason);
         Console.println(msg);
         sprintf(msg, "    Current pressure: %.1f PSI, Minimum required: %.1f", getPressurePsi(), MIN_SAFE_PRESSURE);
         Console.println(msg);
@@ -1385,7 +1397,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Tray 1: UNSAFE TO LOCK - %s", result.tray1LockUnsafeReason.c_str());
+        sprintf(msg, "    Tray 1: UNSAFE TO LOCK - %s", result.tray1LockUnsafeReason);
         Console.println(msg);
     }
 
@@ -1396,7 +1408,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Tray 2: UNSAFE TO LOCK - %s", result.tray2LockUnsafeReason.c_str());
+        sprintf(msg, "    Tray 2: UNSAFE TO LOCK - %s", result.tray2LockUnsafeReason);
         Console.println(msg);
     }
 
@@ -1407,7 +1419,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Tray 3: UNSAFE TO LOCK - %s", result.tray3LockUnsafeReason.c_str());
+        sprintf(msg, "    Tray 3: UNSAFE TO LOCK - %s", result.tray3LockUnsafeReason);
         Console.println(msg);
     }
 
@@ -1428,7 +1440,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Lock: UNSAFE - %s", result.shuttleLockUnsafeReason.c_str());
+        sprintf(msg, "    Lock: UNSAFE - %s", result.shuttleLockUnsafeReason);
         Console.println(msg);
     }
 
@@ -1446,7 +1458,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Unlock: UNSAFE - %s", result.shuttleUnlockUnsafeReason.c_str());
+        sprintf(msg, "    Unlock: UNSAFE - %s", result.shuttleUnlockUnsafeReason);
         Console.println(msg);
     }
 
@@ -1459,7 +1471,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Lock Operations: FAILED - %s", result.lockFailureDetails.c_str());
+        sprintf(msg, "    Lock Operations: FAILED - %s", result.lockFailureDetails);
         Console.println(msg);
 
         if (lockFailureTimestamp > 0)
@@ -1476,7 +1488,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Unlock Operations: FAILED - %s", result.unlockFailureDetails.c_str());
+        sprintf(msg, "    Unlock Operations: FAILED - %s", result.unlockFailureDetails);
         Console.println(msg);
 
         if (unlockFailureTimestamp > 0)
@@ -1502,7 +1514,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Command/Actual State: INVALID - %s", result.stateValidationMessage.c_str());
+        sprintf(msg, "    Command/Actual State: INVALID - %s", result.stateValidationMessage);
         Console.println(msg);
     }
 
@@ -1513,7 +1525,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Tray Positions: INVALID - %s", result.stateValidationMessage.c_str());
+        sprintf(msg, "    Tray Positions: INVALID - %s", result.stateValidationMessage);
         Console.println(msg);
     }
 
@@ -1532,7 +1544,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Target Position: INVALID - %s", result.stateValidationMessage.c_str());
+        sprintf(msg, "    Target Position: INVALID - %s", result.stateValidationMessage);
         Console.println(msg);
     }
 
@@ -1566,7 +1578,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Accept New Commands: UNSAFE - %s", result.operationSequenceMessage.c_str());
+        sprintf(msg, "    Accept New Commands: UNSAFE - %s", result.operationSequenceMessage);
         Console.println(msg);
     }
 
@@ -1586,7 +1598,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Operation Timing: TIMEOUT - %s", result.operationSequenceMessage.c_str());
+        sprintf(msg, "    Operation Timing: TIMEOUT - %s", result.operationSequenceMessage);
         Console.println(msg);
     }
 
@@ -1613,10 +1625,10 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Operation Sequence: INVALID - %s", result.operationSequenceMessage.c_str());
+        sprintf(msg, "    Operation Sequence: INVALID - %s", result.operationSequenceMessage);
         Console.println(msg);
 
-        if (result.operationSequenceMessage.indexOf(F("sequence mismatch")) >= 0)
+        if (strstr_P(result.operationSequenceMessage, PSTR("sequence mismatch")) != NULL)
         {
             Console.println(F("            Use 'system,reset' to reset the system"));
         }
@@ -1642,7 +1654,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Position 1: UNSAFE TO LOAD - %s", result.loadTrayPos1UnsafeReason.c_str());
+        sprintf(msg, "    Position 1: UNSAFE TO LOAD - %s", result.loadTrayPos1UnsafeReason);
         Console.println(msg);
     }
 
@@ -1652,7 +1664,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Position 2: UNSAFE TO LOAD - %s", result.loadTrayPos2UnsafeReason.c_str());
+        sprintf(msg, "    Position 2: UNSAFE TO LOAD - %s", result.loadTrayPos2UnsafeReason);
         Console.println(msg);
     }
 
@@ -1662,7 +1674,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Position 3: UNSAFE TO LOAD - %s", result.loadTrayPos3UnsafeReason.c_str());
+        sprintf(msg, "    Position 3: UNSAFE TO LOAD - %s", result.loadTrayPos3UnsafeReason);
         Console.println(msg);
     }
 
@@ -1675,7 +1687,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Position 1: UNSAFE TO UNLOAD - %s", result.unloadTrayPos1UnsafeReason.c_str());
+        sprintf(msg, "    Position 1: UNSAFE TO UNLOAD - %s", result.unloadTrayPos1UnsafeReason);
         Console.println(msg);
     }
 
@@ -1685,7 +1697,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Position 2: UNSAFE TO UNLOAD - %s", result.unloadTrayPos2UnsafeReason.c_str());
+        sprintf(msg, "    Position 2: UNSAFE TO UNLOAD - %s", result.unloadTrayPos2UnsafeReason);
         Console.println(msg);
     }
 
@@ -1695,7 +1707,7 @@ void printSafetyStatus(const SafetyValidationResult &result)
     }
     else
     {
-        sprintf(msg, "    Position 3: UNSAFE TO UNLOAD - %s", result.unloadTrayPos3UnsafeReason.c_str());
+        sprintf(msg, "    Position 3: UNSAFE TO UNLOAD - %s", result.unloadTrayPos3UnsafeReason);
         Console.println(msg);
     }
 
@@ -1733,25 +1745,25 @@ void printSafetyStatus(const SafetyValidationResult &result)
         if (!result.operationSequenceValid)
         {
             Console.println(F("    Reason: Operation sequence error detected"));
-            sprintf(msg, "            %s", result.operationSequenceMessage.c_str());
+            sprintf(msg, "            %s", result.operationSequenceMessage);
             Console.println(msg);
         }
         else if (!result.trayPositionValid)
         {
             Console.println(F("    Reason: Tray position error detected"));
-            sprintf(msg, "            %s", result.stateValidationMessage.c_str());
+            sprintf(msg, "            %s", result.stateValidationMessage);
             Console.println(msg);
         }
         else if (!result.targetPositionValid && operationInProgress)
         {
             Console.println(F("    Reason: Target position error detected"));
-            sprintf(msg, "            %s", result.stateValidationMessage.c_str());
+            sprintf(msg, "            %s", result.stateValidationMessage);
             Console.println(msg);
         }
         else if (!result.commandStateValid)
         {
             Console.println(F("    Reason: Motor position error detected"));
-            sprintf(msg, "            %s", result.stateValidationMessage.c_str());
+            sprintf(msg, "            %s", result.stateValidationMessage);
             Console.println(msg);
         }
 
@@ -3400,8 +3412,8 @@ void initSystemStateVariables()
     // Initialize lock/unlock failure tracking
     lastLockOperationFailed = false;
     lastUnlockOperationFailed = false;
-    lastLockFailureDetails = "";
-    lastUnlockFailureDetails = "";
+    lastLockFailureDetails[0] = '\0';
+    lastUnlockFailureDetails[0] = '\0';
     lockFailureTimestamp = 0;
     unlockFailureTimestamp = 0;
 
@@ -3534,6 +3546,6 @@ void resetLockUnlockFailures()
 {
     lastLockOperationFailed = false;
     lastUnlockOperationFailed = false;
-    lastLockFailureDetails = "";
-    lastUnlockFailureDetails = "";
+    lastLockFailureDetails[0] = '\0';
+    lastUnlockFailureDetails[0] = '\0';
 }

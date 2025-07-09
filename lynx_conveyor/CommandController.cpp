@@ -12,8 +12,6 @@ extern OperationStatus currentOperation; // This is referenced in sendCommandRej
 //-------------------------------------------------------------------------
 // Global Variables
 //-------------------------------------------------------------------------
-bool testInProgress = false;
-volatile bool testAbortRequested = false;
 
 // Command lookup table - MUST BE ALPHABETICALLY SORTED for binary search
 const CommandInfo COMMAND_TABLE[] = {
@@ -25,14 +23,13 @@ const CommandInfo COMMAND_TABLE[] = {
     {"help", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
     {"jog", CMD_MODIFYING, CMD_FLAG_ASYNC},
     {"lock", CMD_MODIFYING, 0},
-    {"log", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"log", CMD_READ_ONLY, 0},
     {"motor", CMD_MODIFYING, CMD_FLAG_ASYNC},
     {"move", CMD_MODIFYING, CMD_FLAG_ASYNC},
     {"network", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
     {"stop", CMD_EMERGENCY, 0},
     {"system", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"teach", CMD_MODIFYING, 0},  // ADD THIS LINE
-    {"test", CMD_TEST, CMD_FLAG_ASYNC},
+    {"teach", CMD_MODIFYING, 0},  
     {"tray", CMD_MODIFYING, CMD_FLAG_ASYNC},
     {"unlock", CMD_MODIFYING, 0}};
 
@@ -72,15 +69,9 @@ Stream *persistentClient = nullptr;
 // Core Command Processing Functions
 //-------------------------------------------------------------------------
 
-// Initialization
-void initTestFlags()
-{
-    // Initialize command controller state
-    testInProgress = false;
-    testAbortRequested = false;
-}
-
-// Command Handling Functions
+//-------------------------------------------------------------------------
+// Core Command Processing Functions
+//-------------------------------------------------------------------------
 void handleSerialCommands()
 {
     static char commandBuffer[64]; // Buffer for incoming commands
@@ -201,8 +192,7 @@ bool processCommand(const char *rawCommand, Stream *output, const char *sourceTa
 
     if (cmdInfo && strcmp(cmdInfo->name, "abort") == 0)
     {
-        requestTestAbort("command interface");
-        Console.acknowledge(F("Test abort requested"));
+        Console.acknowledge(F("Abort command received"));
         return true;
     }
 
@@ -231,11 +221,11 @@ bool processCommand(const char *rawCommand, Stream *output, const char *sourceTa
         {
             if (sourceTag && sourceTag[0])
             {
-                opLogHistory.addEntry(sourceTag);
+                opLogHistory.addEntry(sourceTag, LogEntry::INFO);
             }
             else
             {
-                opLogHistory.addEntry(originalCommand);
+                opLogHistory.addEntry(originalCommand, LogEntry::INFO);
             }
         }
 
@@ -449,32 +439,10 @@ bool canExecuteCommand(const char *command)
         return true;
     }
 
-    // For test commands, check if any operation or another test is in progress
-    if (cmdType == CMD_TEST)
-    {
-        if (operationInProgress)
-        {
-            sendCommandRejection(command, "Operation in progress");
-            return false;
-        }
-        if (testInProgress)
-        {
-            sendCommandRejection(command, "Another test is already running");
-            return false;
-        }
-        return true;
-    }
-
-    // For other modifying commands, check if an operation or test is in progress
+    // For other modifying commands, check if an operation is in progress
     if (operationInProgress)
     {
         sendCommandRejection(command, "Operation in progress");
-        return false;
-    }
-
-    if (testInProgress)
-    {
-        sendCommandRejection(command, "Test in progress");
         return false;
     }
 
@@ -494,6 +462,23 @@ bool isCommandExcludedFromHistory(const char *command)
         i++;
     }
     firstWord[i] = '\0';
+
+    // Special handling for log commands - allow administrative log viewing commands
+    // but exclude any potential frequent status queries
+    if (strcmp(firstWord, "log") == 0)
+    {
+        // Allow the new administrative log commands to be logged
+        if (strstr(command, "log,history") != nullptr ||
+            strstr(command, "log,errors") != nullptr ||
+            strstr(command, "log,last") != nullptr ||
+            strstr(command, "log,stats") != nullptr)
+        {
+            return false; // Include these in history
+        }
+        // Could exclude other frequent log queries here if needed
+        // For now, include all log commands in history
+        return false;
+    }
 
     // Look up the command in our dispatch table
     const CommandInfo *cmdInfo = findCommand(firstWord);
@@ -521,13 +506,6 @@ void sendCommandRejection(const char *command, const char *reason)
         snprintf(msg, sizeof(msg),
                  "[BUSY], Cannot execute '%s' - %s operation in progress. Use 'abort' to cancel.",
                  command, getOperationTypeName(currentOperation.type));
-    }
-    else if (testInProgress)
-    {
-        // This is also a BUSY condition
-        snprintf(msg, sizeof(msg),
-                 "[BUSY], Cannot execute '%s' - Test in progress. Use 'abort' to cancel.",
-                 command);
     }
     else
     {
