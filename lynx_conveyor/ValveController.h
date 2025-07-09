@@ -33,9 +33,9 @@ struct CylinderSensor
 // Pressure Sensor Structure
 struct PressureSensor
 {
-    uint8_t analogPin; // Analog input pin
-    float minPressure; // Minimum pressure in PSI
-    float maxPressure; // Maximum pressure in PSI
+    uint8_t analogPin;  // Analog input pin
+    uint16_t minPressure; // Minimum pressure in PSI * 100 (fixed-point)
+    uint16_t maxPressure; // Maximum pressure in PSI * 100 (fixed-point)
 };
 
 //=============================================================================
@@ -104,8 +104,8 @@ extern const int trayDetectSensorCount;
 extern bool hasCCIO;
 
 extern PressureSensor airPressureSensor;
-extern const float MIN_SAFE_PRESSURE; // Minimum pressure in PSI for safe valve operation
-extern const float MAX_PRESSURE;      // Maximum pressure range of the sensor in PSI
+extern const uint16_t MIN_SAFE_PRESSURE; // Minimum pressure in PSI * 100 for safe valve operation
+extern const uint16_t MAX_PRESSURE;      // Maximum pressure range in PSI * 100
 
 //=============================================================================
 // FUNCTION DECLARATIONS
@@ -198,9 +198,9 @@ CylinderSensor *getTray3DetectionSensor();
 // Initialize and read pressure sensor
 //-----------------------------------------------------------------------------
 void initPressureSensor();
-float readPressureVoltage(const PressureSensor &sensor);
-float readPressure(const PressureSensor &sensor);
-float getPressurePsi();
+uint16_t readPressureRaw(const PressureSensor &sensor);      // Raw ADC value (0-4095)
+uint16_t readPressure(const PressureSensor &sensor);         // Pressure in PSI * 100
+uint16_t getPressurePsi();                                   // Current pressure in PSI * 100
 bool isPressureSufficient(); // Returns true if pressure is above MIN_SAFE_PRESSURE
 void printPressureStatus();  // Prints the current pressure reading
 

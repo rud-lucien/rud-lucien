@@ -69,14 +69,14 @@ void logSystemState()
         break;
     }
 
-    float pressure = getPressurePsi();
-    sprintf(section, " | System: Motor=%s, Homed=%s, E-Stop=%s, HLFB=%s, Clients=%d, Pressure=%.1f PSI%s",
+    uint16_t pressure = getPressurePsi();
+    sprintf(section, " | System: Motor=%s, Homed=%s, E-Stop=%s, HLFB=%s, Clients=%d, Pressure=%d.%02d PSI%s",
             motorStateStr,
             isHomed ? "YES" : "NO",
             isEStopActive() ? "TRIGGERED" : "RELEASED",
             (MOTOR_CONNECTOR.HlfbState() == MotorDriver::HLFB_ASSERTED) ? "ASSERTED" : "NOT_ASSERTED",
             getConnectedClientCount(),
-            pressure,
+            pressure / 100, pressure % 100,
             (pressure < MIN_SAFE_PRESSURE) ? " (LOW)" : "");
     strcat(msg, section);
 
@@ -139,6 +139,159 @@ void logSystemState()
     }
     strcat(msg, section);
 
-    // Output the complete message
-    Serial.println(msg);
+    // Output the complete message with color enhancement
+    printColoredSystemState(msg);
+}
+
+// Function to print colored system state output
+void printColoredSystemState(const char* msg)
+{
+    // Start with bold white [LOG] tag
+    Console.print("\x1b[1;37m[LOG]\x1b[0m ");
+    
+    const char* ptr = msg + 6; // Skip the "[LOG] " part
+    
+    while (*ptr) {
+        // Section headers - Bold cyan
+        if (strncmp(ptr, "Valves:", 7) == 0) {
+            Console.print("\x1b[1;36mValves:\x1b[0m");
+            ptr += 7;
+        }
+        else if (strncmp(ptr, "Sensors:", 8) == 0) {
+            Console.print("\x1b[1;36mSensors:\x1b[0m");
+            ptr += 8;
+        }
+        else if (strncmp(ptr, "System:", 7) == 0) {
+            Console.print("\x1b[1;36mSystem:\x1b[0m");
+            ptr += 7;
+        }
+        else if (strncmp(ptr, "Position:", 9) == 0) {
+            Console.print("\x1b[1;36mPosition:\x1b[0m");
+            ptr += 9;
+        }
+        else if (strncmp(ptr, "Velocity:", 9) == 0) {
+            Console.print("\x1b[1;36mVelocity:\x1b[0m");
+            ptr += 9;
+        }
+        else if (strncmp(ptr, "Jog:", 4) == 0) {
+            Console.print("\x1b[1;36mJog:\x1b[0m");
+            ptr += 4;
+        }
+        else if (strncmp(ptr, "MPG:", 4) == 0) {
+            Console.print("\x1b[1;36mMPG:\x1b[0m");
+            ptr += 4;
+        }
+        // Critical safety indicator - BRIGHT RED
+        else if (strncmp(ptr, "[!]", 3) == 0) {
+            Console.print("\x1b[1;31m[!]\x1b[0m"); // Bold red for position mismatch warning
+            ptr += 3;
+        }
+        // Valve states
+        else if (strncmp(ptr, "LOCKED?", 7) == 0) {
+            Console.print("\x1b[1;31mLOCKED?\x1b[0m"); // Bold red for uncertain locked state
+            ptr += 7;
+        }
+        else if (strncmp(ptr, "UNLOCKED?", 9) == 0) {
+            Console.print("\x1b[1;31mUNLOCKED?\x1b[0m"); // Bold red for uncertain unlocked state
+            ptr += 9;
+        }
+        else if (strncmp(ptr, "LOCKED", 6) == 0) {
+            Console.print("\x1b[32mLOCKED\x1b[0m"); // Green for confirmed locked
+            ptr += 6;
+        }
+        else if (strncmp(ptr, "UNLOCKED", 8) == 0) {
+            Console.print("\x1b[33mUNLOCKED\x1b[0m"); // Yellow for confirmed unlocked
+            ptr += 8;
+        }
+        // Sensor states
+        else if (strncmp(ptr, "PRESENT", 7) == 0) {
+            Console.print("\x1b[32mPRESENT\x1b[0m"); // Green for tray present
+            ptr += 7;
+        }
+        else if (strncmp(ptr, "EMPTY", 5) == 0) {
+            Console.print("EMPTY"); // White (normal text) - readable
+            ptr += 5;
+        }
+        // Motor states
+        else if (strncmp(ptr, "IDLE", 4) == 0) {
+            Console.print("\x1b[32mIDLE\x1b[0m"); // Green for ready state
+            ptr += 4;
+        }
+        else if (strncmp(ptr, "MOVING", 6) == 0) {
+            Console.print("\x1b[33mMOVING\x1b[0m"); // Yellow for active
+            ptr += 6;
+        }
+        else if (strncmp(ptr, "HOMING", 6) == 0) {
+            Console.print("\x1b[33mHOMING\x1b[0m"); // Yellow for active
+            ptr += 6;
+        }
+        else if (strncmp(ptr, "FAULTED", 7) == 0) {
+            Console.print("\x1b[1;31mFAULTED\x1b[0m"); // Bold red for fault
+            ptr += 7;
+        }
+        else if (strncmp(ptr, "NOT_READY", 9) == 0) {
+            Console.print("\x1b[1;31mNOT_READY\x1b[0m"); // Bold red for not ready
+            ptr += 9;
+        }
+        else if (strncmp(ptr, "UNKNOWN", 7) == 0) {
+            Console.print("\x1b[1;31mUNKNOWN\x1b[0m"); // Bold red for unknown state
+            ptr += 7;
+        }
+        // Homing status
+        else if (strncmp(ptr, "YES", 3) == 0 && (ptr[3] == ',' || ptr[3] == ' ' || ptr[3] == '\0')) {
+            Console.print("\x1b[32mYES\x1b[0m"); // Green for homed
+            ptr += 3;
+        }
+        else if (strncmp(ptr, "NO", 2) == 0 && (ptr[2] == ',' || ptr[2] == ' ' || ptr[2] == '\0')) {
+            Console.print("\x1b[33mNO\x1b[0m"); // Yellow for not homed
+            ptr += 2;
+        }
+        // Safety states
+        else if (strncmp(ptr, "TRIGGERED", 9) == 0) {
+            Console.print("\x1b[1;31mTRIGGERED\x1b[0m"); // Bold red for E-stop
+            ptr += 9;
+        }
+        else if (strncmp(ptr, "RELEASED", 8) == 0) {
+            Console.print("\x1b[32mRELEASED\x1b[0m"); // Green for normal
+            ptr += 8;
+        }
+        // HLFB states
+        else if (strncmp(ptr, "ASSERTED", 8) == 0) {
+            Console.print("\x1b[32mASSERTED\x1b[0m"); // Green for motor happy
+            ptr += 8;
+        }
+        else if (strncmp(ptr, "NOT_ASSERTED", 12) == 0) {
+            Console.print("\x1b[33mNOT_ASSERTED\x1b[0m"); // Yellow for motor busy
+            ptr += 12;
+        }
+        // Pressure warning
+        else if (strncmp(ptr, " (LOW)", 6) == 0) {
+            Console.print("\x1b[1;31m (LOW)\x1b[0m"); // Bold red for low pressure
+            ptr += 6;
+        }
+        // MPG states  
+        else if (strncmp(ptr, "ON ", 3) == 0) {
+            Console.print("\x1b[32mON\x1b[0m "); // Green for MPG active
+            ptr += 3;
+        }
+        else if (strncmp(ptr, "OFF", 3) == 0 && (ptr[3] == ' ' || ptr[3] == '\0')) {
+            Console.print("OFF"); // White (normal text) instead of gray
+            ptr += 3;
+        }
+        // Target states
+        else if (strncmp(ptr, "None", 4) == 0) {
+            Console.print("\x1b[90mNone\x1b[0m"); // Gray for no target/last target
+            ptr += 4;
+        }
+        // Separators - subtle gray
+        else if (*ptr == '|') {
+            Console.print("\x1b[90m|\x1b[0m"); // Keep separators gray for structure
+            ptr++;
+        }
+        else {
+            Console.write(*ptr); // Print regular characters as normal white text
+            ptr++;
+        }
+    }
+    Console.println();
 }

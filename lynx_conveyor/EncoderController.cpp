@@ -8,11 +8,12 @@
 bool encoderControlActive = false;
 int32_t lastEncoderPosition = 0;
 unsigned long lastEncoderUpdateTime = 0;
-float currentMultiplier = MULTIPLIER_X1;       // Default to fine control (0.1mm per count)
+int16_t currentMultiplierInt = MULTIPLIER_X1_INT;   // Integer multiplier for fast math (default fine control)
+float currentMultiplier = MULTIPLIER_X1;           // Float multiplier for compatibility
 int currentVelocityRpm = ENCODER_DEFAULT_VELOCITY_RPM;
 bool quadratureErrorDetected = false;
-float mpgBasePositionMm = 0.0;                 // Base position when MPG was enabled
-int32_t mpgBaseEncoderCount = 0;               // Base encoder count when MPG was enabled
+int32_t mpgBasePositionDeciMm = 0;                  // Base position in 0.1mm units for fast math
+int32_t mpgBaseEncoderCount = 0;                    // Base encoder count when MPG was enabled
 
 //=============================================================================
 // HELPER FUNCTIONS
@@ -20,13 +21,18 @@ int32_t mpgBaseEncoderCount = 0;               // Base encoder count when MPG wa
 
 const char *getMultiplierName(float multiplier)
 {
-    if (fabs(multiplier - MULTIPLIER_X1) < 0.01f) return "x1 (0.1mm/count)";
-    if (fabs(multiplier - MULTIPLIER_X10) < 0.01f) return "x10 (1.0mm/count)";
-    if (fabs(multiplier - MULTIPLIER_X100) < 0.01f) return "x100 (10mm/count)";
+    // Use integer comparison for faster execution - no floating point needed
+    int multiplierInt = (int)(multiplier * 10 + 0.5f); // Round to nearest 0.1
     
-    static char buffer[30];
-    sprintf(buffer, "x%.1f (%.1fmm/count)", multiplier * 10, multiplier);
-    return buffer;
+    switch (multiplierInt) {
+        case 1:  return "x1 (0.1mm/count)";
+        case 10: return "x10 (1.0mm/count)";
+        case 100: return "x100 (10mm/count)";
+        default:
+            static char buffer[30];
+            sprintf(buffer, "x%.1f (%.1fmm/count)", multiplier * 10, multiplier);
+            return buffer;
+    }
 }
 
 //=============================================================================
@@ -102,7 +108,7 @@ void enableEncoderControl()
     lastEncoderPosition = EncoderIn.Position();
     
     // Capture base position and encoder count for direct position control
-    mpgBasePositionMm = currentPositionMm;
+    mpgBasePositionDeciMm = (int32_t)(currentPositionMm * 10); // Convert to 0.1mm units for fast math
     mpgBaseEncoderCount = lastEncoderPosition;
     
     // Enable encoder control
@@ -175,16 +181,18 @@ void processEncoderInput()
     // Calculate total encoder movement since MPG was enabled
     int32_t totalEncoderDelta = currentEncoderPosition - mpgBaseEncoderCount;
     
-    // Calculate target position directly (like real milling machines)
-    float totalMovementMm = totalEncoderDelta * currentMultiplier;
-    float targetPositionMm = mpgBasePositionMm + totalMovementMm;
+    // Calculate target position using fast integer math (no floating-point operations)
+    int32_t totalMovementDeciMm = totalEncoderDelta * currentMultiplierInt;
+    int32_t targetPositionDeciMm = mpgBasePositionDeciMm + totalMovementDeciMm;
     
-    // Check travel limits BEFORE attempting move
-    if (targetPositionMm < 0.0)
+    // Check travel limits using integer math (much faster than float comparisons)
+    int32_t maxTravelDeciMm = (int32_t)(MAX_TRAVEL_MM * 10); // Convert limit to 0.1mm units
+    
+    if (targetPositionDeciMm < 0)
     {
         // Clamp to minimum and update base to prevent further negative movement
-        targetPositionMm = 0.0;
-        mpgBasePositionMm = 0.0;
+        targetPositionDeciMm = 0;
+        mpgBasePositionDeciMm = 0;
         mpgBaseEncoderCount = currentEncoderPosition;
         
         static unsigned long lastNegativeWarning = 0;
@@ -195,11 +203,11 @@ void processEncoderInput()
             lastNegativeWarning = currentTime;
         }
     }
-    else if (targetPositionMm > MAX_TRAVEL_MM)
+    else if (targetPositionDeciMm > maxTravelDeciMm)
     {
         // Clamp to maximum and update base to prevent further positive movement
-        targetPositionMm = MAX_TRAVEL_MM;
-        mpgBasePositionMm = MAX_TRAVEL_MM;
+        targetPositionDeciMm = maxTravelDeciMm;
+        mpgBasePositionDeciMm = maxTravelDeciMm;
         mpgBaseEncoderCount = currentEncoderPosition;
         
         static unsigned long lastPositiveWarning = 0;
@@ -212,6 +220,9 @@ void processEncoderInput()
             lastPositiveWarning = currentTime;
         }
     }
+    
+    // Convert to float only when interfacing with motor system
+    float targetPositionMm = targetPositionDeciMm / 10.0f;
     
     // Only update motor target if position has changed significantly
     int32_t encoderDelta = currentEncoderPosition - lastEncoderPosition;
@@ -241,9 +252,18 @@ void processEncoderInput()
         unsigned long currentTime = millis();
         if (currentTime - lastEncoderUpdateTime > 50) // More frequent logging for debugging
         {
-            char msg[150];
-            sprintf(msg, "MPG: %ld counts → %.2fmm target (%s)", 
-                    totalEncoderDelta, targetPositionMm, getMultiplierName(currentMultiplier));
+            // Wait for motor to stop moving before reading position for accuracy
+            int timeout = 0;
+            while (MOTOR_CONNECTOR.StatusReg().bit.StepsActive && timeout < 25) {
+                delay(1);
+                timeout++;
+            }
+            
+            // Show actual motor position instead of calculated target for teaching accuracy
+            double actualMotorPosition = getMotorPositionMm();
+            char msg[200];
+            sprintf(msg, "MPG: %ld counts → %.2fmm actual (target: %.2fmm) (%s)", 
+                    totalEncoderDelta, actualMotorPosition, targetPositionMm, getMultiplierName(currentMultiplier));
             Console.serialDiagnostic(msg);
             lastEncoderUpdateTime = currentTime;
         }
@@ -259,17 +279,22 @@ void processEncoderInput()
 
 void setEncoderMultiplier(float multiplier)
 {
-    // Validate multiplier against predefined values
-    if (fabs(multiplier - MULTIPLIER_X1) < 0.01f)
+    // Use integer comparison for fast validation - no floating point needed
+    int multiplierInt = (int)(multiplier * 10 + 0.5f); // Round to nearest 0.1
+    
+    if (multiplierInt == 1) // 0.1mm
     {
+        currentMultiplierInt = MULTIPLIER_X1_INT;
         currentMultiplier = MULTIPLIER_X1;
     }
-    else if (fabs(multiplier - MULTIPLIER_X10) < 0.01f)
+    else if (multiplierInt == 10) // 1.0mm
     {
+        currentMultiplierInt = MULTIPLIER_X10_INT;
         currentMultiplier = MULTIPLIER_X10;
     }
-    else if (fabs(multiplier - MULTIPLIER_X100) < 0.01f)
+    else if (multiplierInt == 100) // 10.0mm
     {
+        currentMultiplierInt = MULTIPLIER_X100_INT;
         currentMultiplier = MULTIPLIER_X100;
     }
     else
@@ -319,7 +344,9 @@ void printEncoderStatus()
     else
     {
         Console.serialInfo(F("MPG Status: ENABLED"));
-        sprintf(msg, "Current position: %.2fmm", currentPositionMm);
+        // Show actual motor position for teaching accuracy
+        double actualMotorPosition = getMotorPositionMm();
+        sprintf(msg, "Actual motor position: %.2fmm", actualMotorPosition);
         Console.serialInfo(msg);
     }
     
@@ -358,7 +385,7 @@ void clearQuadratureError()
     quadratureErrorDetected = false;
     lastEncoderPosition = 0;
     mpgBaseEncoderCount = 0;
-    mpgBasePositionMm = currentPositionMm; // Reset to current motor position
+    mpgBasePositionDeciMm = (int32_t)(currentPositionMm * 10); // Reset to current motor position in 0.1mm units
     
     Console.serialInfo(F("Quadrature error cleared"));
 }

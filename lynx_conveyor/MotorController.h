@@ -35,6 +35,12 @@
 
 #define PULSES_PER_MM (PULSES_PER_REV / MM_PER_REV) // ~14.81 pulses per mm (800 / 53.98)
 
+// Integer math optimization constants (Phase 1)
+// These constants enable high-performance integer math while maintaining
+// 0.01mm precision for all position and distance calculations
+#define MM_SCALE_FACTOR 100                                      // Scale factor for integer math (0.01mm units)
+#define MAX_TRAVEL_CM_MM (int32_t)(MAX_TRAVEL_MM * MM_SCALE_FACTOR) // Max travel in 0.01mm units
+
 // Motion profile parameters (in RPM units)
 #define LOADED_SHUTTLE_VELOCITY_RPM 325 // Velocity when moving with a tray (RPM)
 #define MAX_ACCEL_RPM_PER_SEC 2500      // Maximum acceleration in RPM/s
@@ -64,9 +70,9 @@
 
 // Position definitions (in mm from home)
 #define POSITION_HOME_MM 0.0        // Home position
-#define POSITION_1_MM 12.15         // Position 1 (Tray loading position and tray 1 position)
-#define POSITION_2_MM 453.70        // Position 2 (Tray 2 position)
-#define POSITION_3_MM 895.46        // Position 3 (Tray 3 position)
+#define POSITION_1_MM 11.94         // Position 1 (Tray loading position and tray 1 position)
+#define POSITION_2_MM 453.10        // Position 2 (Tray 2 position)
+#define POSITION_3_MM 895.68        // Position 3 (Tray 3 position)
 #define POSITION_4_MM MAX_TRAVEL_MM // Position 4 (max = 1050 mm)
 
 // Position definitions in pulses (calculated from mm)
@@ -142,6 +148,13 @@ struct DecelerationConfig
 #define VERY_SHORT_MOVE_THRESHOLD_MM 10.0 // Moves less than 10mm are very short
 #define SHORT_MOVE_THRESHOLD_MM 30.0      // Moves less than 30mm are short
 #define MEDIUM_MOVE_THRESHOLD_MM 100.0    // Moves less than 100mm are medium
+
+// Integer math versions of distance thresholds (0.01mm units)
+// These enable fast integer comparisons instead of floating-point operations
+// in high-frequency velocity selection and motion control functions
+#define VERY_SHORT_MOVE_THRESHOLD_CM_MM (int32_t)(VERY_SHORT_MOVE_THRESHOLD_MM * MM_SCALE_FACTOR)
+#define SHORT_MOVE_THRESHOLD_CM_MM (int32_t)(SHORT_MOVE_THRESHOLD_MM * MM_SCALE_FACTOR)
+#define MEDIUM_MOVE_THRESHOLD_CM_MM (int32_t)(MEDIUM_MOVE_THRESHOLD_MM * MM_SCALE_FACTOR)
 
 // Velocity scaling for different move distances
 #define VERY_SHORT_MOVE_VELOCITY_RPM 50 // CHANGED: 50 RPM for very short moves (was 25)
@@ -225,6 +238,14 @@ int32_t rpmPerSecToPpsPerSec(double rpmPerSec);
 int32_t mmToPulses(double mm);
 double pulsesToMm(int32_t pulses);
 int32_t normalizeEncoderValue(int32_t rawValue);
+
+// Integer math optimized unit conversions (Phase 1)
+// These functions provide high-performance alternatives to floating-point
+// operations while maintaining precision for embedded/real-time operation
+int32_t mmToPulses_i(int32_t mm_cm); // Convert 0.01mm units to pulses
+int32_t pulsesToMm_i(int32_t pulses); // Convert pulses to 0.01mm units
+int32_t distanceAbs_i(int32_t pos1_cm, int32_t pos2_cm); // Absolute distance in 0.01mm units
+int getVelocityForDistance_i(int32_t distance_cm, bool shuttleEmpty); // Optimized velocity selection
 
 //-----------------------------------------------------------------------------
 // Homing Operations

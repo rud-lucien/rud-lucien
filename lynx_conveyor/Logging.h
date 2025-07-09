@@ -34,4 +34,7 @@ extern const unsigned long DEFAULT_LOG_INTERVAL;
 // Log the current state of the entire system
 void logSystemState();
 
+// Print system state with color enhancement
+void printColoredSystemState(const char* msg);
+
 #endif // LOGGING_H

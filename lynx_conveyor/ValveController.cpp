@@ -36,8 +36,8 @@ const int cylinderSensorCount = 4;
 bool hasCCIO = false;
 
 PressureSensor airPressureSensor;
-const float MIN_SAFE_PRESSURE = 21.75f; // Minimum pressure in PSI for valve operation (1.5 bar)
-const float MAX_PRESSURE = 87.0f;       // Maximum pressure range (87 PSI)
+const uint16_t MIN_SAFE_PRESSURE = 2175; // 21.75 PSI * 100, Minimum pressure in PSI for valve operation (1.5 bar)
+const uint16_t MAX_PRESSURE = 8700;       // Maximum pressure range (87 PSI * 100)
 
 // ----------------- Initialization functions -----------------
 
@@ -59,7 +59,7 @@ void initSensorSystem()
 
     // Initialize the pressure sensor
     airPressureSensor.analogPin = PRESSURE_SENSOR_PIN;
-    airPressureSensor.minPressure = 0.0f;
+    airPressureSensor.minPressure = 0;
     airPressureSensor.maxPressure = MAX_PRESSURE;
 
     Console.serialInfo(F("Sensor system initialized"));
@@ -69,7 +69,7 @@ void initPressureSensor()
 {
     // Initialize the pressure sensor
     airPressureSensor.analogPin = PRESSURE_SENSOR_PIN;
-    airPressureSensor.minPressure = 0.0f;
+    airPressureSensor.minPressure = 0;
     airPressureSensor.maxPressure = MAX_PRESSURE;
 
     // Set the resolution of the ADC for better precision
@@ -78,9 +78,10 @@ void initPressureSensor()
     Console.serialInfo(F("Pressure sensor initialized on pin A11"));
 
     // Read and report the initial pressure
-    float initialPressure = readPressure(airPressureSensor);
+    uint16_t initialPressure = readPressure(airPressureSensor);
     char msg[200];
-    sprintf(msg, "Initial system pressure: %.2f PSI", initialPressure);
+    sprintf(msg, "Initial system pressure: %d.%02d PSI", 
+            initialPressure / 100, initialPressure % 100);
     Console.serialInfo(msg);
 
     // Check if pressure is sufficient for valve operation
@@ -90,35 +91,43 @@ void initPressureSensor()
     }
 }
 
-// Implement the pressure reading functions:
-float readPressureVoltage(const PressureSensor &sensor)
+// Implement the pressure reading functions using integer math:
+uint16_t readPressureRaw(const PressureSensor &sensor)
 {
-    int analogValue = analogRead(sensor.analogPin);
-    return (analogValue / 4095.0) * 10.0; // For 12-bit resolution (4095)
+    return analogRead(sensor.analogPin);
 }
 
-float readPressure(const PressureSensor &sensor)
+uint16_t readPressure(const PressureSensor &sensor)
 {
-    float voltage = readPressureVoltage(sensor);
-    return (voltage / 10.0) * sensor.maxPressure;
+    uint16_t adcValue = readPressureRaw(sensor);
+    
+    // Convert ADC to pressure using integer math
+    // Formula: pressure = (adcValue * maxPressure) / 4095
+    // Using 32-bit intermediate to prevent overflow
+    uint32_t pressureTemp = ((uint32_t)adcValue * sensor.maxPressure) / 4095;
+    
+    return (uint16_t)pressureTemp;
 }
 
-float getPressurePsi()
+uint16_t getPressurePsi()
 {
     return readPressure(airPressureSensor);
 }
 
 bool isPressureSufficient()
 {
-    float currentPressure = readPressure(airPressureSensor);
+    uint16_t currentPressure = readPressure(airPressureSensor);
     return currentPressure >= MIN_SAFE_PRESSURE;
 }
 
 void printPressureStatus()
 {
     char msg[200];
-    float currentPressure = readPressure(airPressureSensor);
-    sprintf(msg, "Air Pressure: %.2f PSI", currentPressure);
+    uint16_t currentPressure = readPressure(airPressureSensor);
+    
+    // Format as XX.XX PSI using integer math
+    sprintf(msg, "Air Pressure: %d.%02d PSI", 
+            currentPressure / 100, currentPressure % 100);
     Console.serialInfo(msg);
 
     if (currentPressure < MIN_SAFE_PRESSURE)
@@ -216,8 +225,12 @@ void valveSetPosition(DoubleSolenoidValve &valve, ValvePosition target)
     if (!isPressureSufficient())
     {
         char msg[200];
-        sprintf(msg, "Cannot actuate valve - System pressure too low. Current: %.2f PSI, Minimum required: %.2f PSI",
-                readPressure(airPressureSensor), MIN_SAFE_PRESSURE);
+        uint16_t currentPressure = readPressure(airPressureSensor);
+        uint16_t minPressure = MIN_SAFE_PRESSURE;
+        
+        sprintf(msg, "Cannot actuate valve - System pressure too low. Current: %d.%02d PSI, Minimum required: %d.%02d PSI",
+                currentPressure / 100, currentPressure % 100,
+                minPressure / 100, minPressure % 100);
         Console.serialError(msg);
         return;
     }
@@ -317,8 +330,9 @@ void printAllValveStatus()
 
     // First print pressure status
     char msg[200];
-    float currentPressure = readPressure(airPressureSensor);
-    sprintf(msg, " System Pressure: %.2f PSI %s", currentPressure,
+    uint16_t currentPressure = readPressure(airPressureSensor);
+    sprintf(msg, " System Pressure: %d.%02d PSI %s", 
+            currentPressure / 100, currentPressure % 100,
             currentPressure < MIN_SAFE_PRESSURE ? "(INSUFFICIENT)" : "(OK)");
     Console.serialDiagnostic(msg);
 

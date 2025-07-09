@@ -2,6 +2,30 @@
 #include "Utils.h"
 #include "PositionConfig.h"
 
+//=============================================================================
+// PHASE 1 INTEGER MATH OPTIMIZATIONS
+//=============================================================================
+// This file has been optimized to use integer math for high-frequency operations
+// while maintaining full API compatibility. Key optimizations:
+//
+// 1. Unit Conversions: mmToPulses() and pulsesToMm() now use integer math internally
+//    with 0.01mm precision (MM_SCALE_FACTOR = 100)
+//
+// 2. Distance Calculations: All move functions use integer math for distance
+//    calculations to eliminate floating-point operations in critical paths
+//
+// 3. Position Limit Checking: Range validation uses integer comparisons
+//
+// 4. Velocity Selection: Distance-based velocity scaling uses integer thresholds
+//    and centralized getVelocityForDistance_i() function
+//
+// 5. Deceleration Logic: Distance-to-target calculations use integer math
+//    in checkMoveProgress() to reduce floating-point load during motion
+//
+// All user-facing APIs remain unchanged - functions still accept/return doubles
+// for backward compatibility and ease of use.
+//=============================================================================
+
 // ----------------- Global Variables -----------------
 bool motorInitialized = false;
 int32_t currentVelMax = 0;
@@ -75,23 +99,86 @@ int32_t rpmPerSecToPpsPerSec(double rpmPerSec)
     return (int32_t)((rpmPerSec * PULSES_PER_REV) / 60.0);
 }
 
-// Convert mm to pulses with direction control
+// Convert mm to pulses with direction control (optimized with integer math)
 int32_t mmToPulses(double mm)
 {
-    return (int32_t)(mm * PULSES_PER_MM * MOTION_DIRECTION);
+    // Convert to 0.01mm units and use integer math for precision
+    int32_t mm_cm = (int32_t)(mm * MM_SCALE_FACTOR + 0.5); // Round to nearest 0.01mm
+    return mmToPulses_i(mm_cm);
 }
 
-// Convert pulses to mm
+// Convert pulses to mm (optimized with integer math)
 double pulsesToMm(int32_t pulses)
 {
-    // When converting from pulses to mm for display, include the MOTION_DIRECTION factor
-    return (double)pulses / PULSES_PER_MM * MOTION_DIRECTION;
+    // Use integer math then convert back to double for API compatibility
+    int32_t mm_cm = pulsesToMm_i(pulses);
+    return (double)mm_cm / MM_SCALE_FACTOR;
 }
 // Normalize encoder values for display
 int32_t normalizeEncoderValue(int32_t rawValue)
 {
     // Apply the same direction multiplier as used in movement calculations
     return rawValue * MOTION_DIRECTION;
+}
+
+// ----------------- Integer Math Optimized Unit Conversions (Phase 1) -----------------
+
+// Convert 0.01mm units to pulses using integer math
+int32_t mmToPulses_i(int32_t mm_cm)
+{
+    // mm_cm is in 0.01mm units (e.g., 1215 for 12.15mm)
+    // Convert: mm_cm -> mm -> pulses
+    // Formula: pulses = (mm_cm / 100) * PULSES_PER_MM
+    // Integer math: pulses = (mm_cm * (PULSES_PER_MM * 1000)) / 100000
+    // Example: 1215 * 14810 / 100000 = 179 pulses (for 12.15mm)
+    int32_t pulsesPerMm1000 = (int32_t)(PULSES_PER_MM * 1000 + 0.5); // ~14810
+    return (mm_cm * pulsesPerMm1000 / 100000) * MOTION_DIRECTION;
+}
+
+// Convert pulses to 0.01mm units using integer math  
+int32_t pulsesToMm_i(int32_t pulses)
+{
+    // Convert pulses to 0.01mm units with direction control
+    // Formula: mm_cm = (pulses / PULSES_PER_MM) * 100
+    // Integer math: mm_cm = (pulses * 100000) / (PULSES_PER_MM * 1000)
+    // Example: 179 * 100000 / 14810 = 1208 (≈12.08mm in 0.01mm units)
+    int32_t pulsesPerMm1000 = (int32_t)(PULSES_PER_MM * 1000 + 0.5); // ~14810
+    return (pulses * MOTION_DIRECTION * 100000 / pulsesPerMm1000);
+}
+
+// Calculate absolute distance between two positions in 0.01mm units
+int32_t distanceAbs_i(int32_t pos1_cm, int32_t pos2_cm)
+{
+    // Return absolute difference using integer math
+    int32_t diff = pos1_cm - pos2_cm;
+    return (diff < 0) ? -diff : diff;
+}
+
+// Optimized velocity selection based on distance using integer math
+int getVelocityForDistance_i(int32_t distance_cm, bool shuttleEmpty)
+{
+    if (shuttleEmpty)
+    {
+        return EMPTY_SHUTTLE_VELOCITY_RPM;
+    }
+    
+    // Use integer comparison for distance thresholds
+    if (distance_cm < VERY_SHORT_MOVE_THRESHOLD_CM_MM)
+    {
+        return VERY_SHORT_MOVE_VELOCITY_RPM;
+    }
+    else if (distance_cm < SHORT_MOVE_THRESHOLD_CM_MM)
+    {
+        return SHORT_MOVE_VELOCITY_RPM;
+    }
+    else if (distance_cm < MEDIUM_MOVE_THRESHOLD_CM_MM)
+    {
+        return MEDIUM_MOVE_VELOCITY_RPM;
+    }
+    else
+    {
+        return LOADED_SHUTTLE_VELOCITY_RPM;
+    }
 }
 // ----------------- Basic Setup Functions -----------------
 
@@ -302,58 +389,55 @@ bool moveToPosition(PositionTarget position)
             currentPositionMm, targetPositionMm);
     Console.serialDiagnostic(msg);
 
-    // Calculate distance to move with updated position value
-    double distanceToMoveMm = fabs(targetPositionMm - currentPositionMm);
+    // Calculate distance to move with optimized integer math
+    int32_t currentPos_cm = (int32_t)(currentPositionMm * MM_SCALE_FACTOR + 0.5);
+    int32_t targetPos_cm = (int32_t)(targetPositionMm * MM_SCALE_FACTOR + 0.5);
+    int32_t distance_cm = distanceAbs_i(targetPos_cm, currentPos_cm);
+    double distanceToMoveMm = (double)distance_cm / MM_SCALE_FACTOR;
 
     sprintf(msg, "Calculated move distance: %.2fmm", distanceToMoveMm);
     Console.serialDiagnostic(msg);
 
-    // Apply velocity scaling based on move distance
+    // Apply velocity scaling based on move distance using optimized integer math
     // Check if shuttle is retracted (empty) - use higher speed
     SystemState currentState = captureSystemState();
     sprintf(msg, "Shuttle locked state: %s", currentState.shuttleLocked ? "TRUE (not empty)" : "FALSE (empty)");
     Console.serialDiagnostic(msg);
 
+    // Use optimized velocity selection
+    int selectedVelocityRPM = getVelocityForDistance_i(distance_cm, !currentState.shuttleLocked);
+    currentVelMax = rpmToPps(selectedVelocityRPM);
+    
     if (!currentState.shuttleLocked)
     {
-        // Shuttle is empty - use higher speed AND disable deceleration
-        currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+        // Shuttle is empty - disable deceleration
         motorDecelConfig.enableDeceleration = false;
-
-        sprintf(msg, "Empty shuttle detected - Using increased speed: %d RPM with deceleration disabled", EMPTY_SHUTTLE_VELOCITY_RPM);
+        sprintf(msg, "Empty shuttle detected - Using increased speed: %d RPM with deceleration disabled", selectedVelocityRPM);
         Console.serialInfo(msg);
     }
     else
     {
         // Make sure deceleration is enabled for loaded shuttle
         motorDecelConfig.enableDeceleration = true;
-
-        // Apply velocity scaling based on move distance
-        if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+        
+        // Log the selected velocity with appropriate message
+        if (distance_cm < VERY_SHORT_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Very short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, VERY_SHORT_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Very short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
-        else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
+        else if (distance_cm < SHORT_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, SHORT_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
-        else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
+        else if (distance_cm < MEDIUM_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Medium move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, MEDIUM_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Medium move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
         else
         {
-            // For long moves, explicitly set to maximum velocity
-            currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM);
-            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, LOADED_SHUTTLE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
+        Console.serialInfo(msg);
     }
 
     // Apply the velocity limit to the motor
@@ -397,8 +481,9 @@ bool moveToPositionMm(double positionMm)
 {
     char msg[200];
 
-    // Safety check - prevent movement beyond physical limits
-    if (positionMm < 0 || positionMm > MAX_TRAVEL_MM)
+    // Safety check - prevent movement beyond physical limits (optimized with integer math)
+    int32_t positionMm_cm = (int32_t)(positionMm * MM_SCALE_FACTOR + 0.5);
+    if (positionMm_cm < 0 || positionMm_cm > MAX_TRAVEL_CM_MM)
     {
         sprintf(msg, "Requested position %.2f mm is outside valid range (0 to %.2f mm)", positionMm, MAX_TRAVEL_MM);
         Console.serialError(msg);
@@ -412,8 +497,11 @@ bool moveToPositionMm(double positionMm)
     sprintf(msg, "Current position: %.2fmm, Target position: %.2fmm", currentPositionMm, positionMm);
     Console.serialDiagnostic(msg);
 
-    // Calculate distance to move
-    double distanceToMoveMm = fabs(positionMm - currentPositionMm);
+    // Calculate distance to move using optimized integer math
+    int32_t currentPos_cm = (int32_t)(currentPositionMm * MM_SCALE_FACTOR + 0.5);
+    int32_t targetPos_cm = (int32_t)(positionMm * MM_SCALE_FACTOR + 0.5);
+    int32_t distance_cm = distanceAbs_i(targetPos_cm, currentPos_cm);
+    double distanceToMoveMm = (double)distance_cm / MM_SCALE_FACTOR;
 
     sprintf(msg, "Calculated move distance: %.2fmm", distanceToMoveMm);
     Console.serialDiagnostic(msg);
@@ -422,52 +510,46 @@ bool moveToPositionMm(double positionMm)
     int32_t originalVelMax = currentVelMax;
     bool originalDecelEnabled = motorDecelConfig.enableDeceleration;
 
-    // Apply velocity scaling based on move distance
+    // Apply velocity scaling based on move distance using optimized integer math
     // Check if shuttle is retracted (empty) - use higher speed
     SystemState currentState = captureSystemState();
     sprintf(msg, "Shuttle locked state: %s", currentState.shuttleLocked ? "TRUE (not empty)" : "FALSE (empty)");
     Console.serialDiagnostic(msg);
 
+    // Use optimized velocity selection
+    int selectedVelocityRPM = getVelocityForDistance_i(distance_cm, !currentState.shuttleLocked);
+    currentVelMax = rpmToPps(selectedVelocityRPM);
+    
     if (!currentState.shuttleLocked)
     {
-        // Shuttle is empty - use higher speed AND disable deceleration
-        currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+        // Shuttle is empty - disable deceleration
         motorDecelConfig.enableDeceleration = false;
-
-        sprintf(msg, "Empty shuttle detected - Using increased speed: %d RPM with deceleration disabled", EMPTY_SHUTTLE_VELOCITY_RPM);
+        sprintf(msg, "Empty shuttle detected - Using increased speed: %d RPM with deceleration disabled", selectedVelocityRPM);
         Console.serialInfo(msg);
     }
     else
     {
         // Make sure deceleration is enabled for loaded shuttle
         motorDecelConfig.enableDeceleration = true;
-
-        // Apply velocity scaling based on move distance
-        if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+        
+        // Log the selected velocity with appropriate message
+        if (distance_cm < VERY_SHORT_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Very short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, VERY_SHORT_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Very short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
-        else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
+        else if (distance_cm < SHORT_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, SHORT_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
-        else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
+        else if (distance_cm < MEDIUM_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Medium move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, MEDIUM_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Medium move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
         else
         {
-            // For long moves, explicitly set to maximum velocity
-            currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM);
-            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, LOADED_SHUTTLE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
+        Console.serialInfo(msg);
     }
 
     // Apply the new velocity limit to the motor
@@ -518,8 +600,9 @@ bool moveRelative(double relativeMm)
     sprintf(msg, "Current position: %.2fmm, Target position: %.2fmm", currentPositionMm, targetPositionMm);
     Console.serialDiagnostic(msg);
 
-    // Check if the target position would be out of bounds
-    if (targetPositionMm < 0 || targetPositionMm > MAX_TRAVEL_MM)
+    // Check if the target position would be out of bounds (optimized with integer math)
+    int32_t targetPos_cm = (int32_t)(targetPositionMm * MM_SCALE_FACTOR + (targetPositionMm >= 0 ? 0.5 : -0.5));
+    if (targetPos_cm < 0 || targetPos_cm > MAX_TRAVEL_CM_MM)
     {
         sprintf(msg, "Relative move would exceed valid range (0 to %.2f mm)", MAX_TRAVEL_MM);
         Console.serialError(msg);
@@ -529,8 +612,10 @@ bool moveRelative(double relativeMm)
         return false;
     }
 
-    // Calculate distance to move (use absolute value for velocity scaling)
-    double distanceToMoveMm = fabs(relativeMm);
+    // Calculate distance to move using optimized integer math (use absolute value for velocity scaling)
+    int32_t relativeMm_cm = (int32_t)(relativeMm * MM_SCALE_FACTOR + (relativeMm >= 0 ? 0.5 : -0.5));
+    int32_t distance_cm = (relativeMm_cm < 0) ? -relativeMm_cm : relativeMm_cm;
+    double distanceToMoveMm = (double)distance_cm / MM_SCALE_FACTOR;
 
     sprintf(msg, "Calculated move distance: %.2fmm", distanceToMoveMm);
     Console.serialDiagnostic(msg);
@@ -539,52 +624,46 @@ bool moveRelative(double relativeMm)
     int32_t originalVelMax = currentVelMax;
     bool originalDecelEnabled = motorDecelConfig.enableDeceleration;
 
-    // Apply velocity scaling based on move distance
+    // Apply velocity scaling based on move distance using optimized integer math
     // Check if shuttle is retracted (empty) - use higher speed
     SystemState currentState = captureSystemState();
     sprintf(msg, "Shuttle locked state: %s", currentState.shuttleLocked ? "TRUE (not empty)" : "FALSE (empty)");
     Console.serialDiagnostic(msg);
 
+    // Use optimized velocity selection
+    int selectedVelocityRPM = getVelocityForDistance_i(distance_cm, !currentState.shuttleLocked);
+    currentVelMax = rpmToPps(selectedVelocityRPM);
+    
     if (!currentState.shuttleLocked)
     {
-        // Shuttle is empty - use higher speed AND disable deceleration
-        currentVelMax = rpmToPps(EMPTY_SHUTTLE_VELOCITY_RPM);
+        // Shuttle is empty - disable deceleration
         motorDecelConfig.enableDeceleration = false;
-
-        sprintf(msg, "Empty shuttle detected - Using increased speed: %d RPM with deceleration disabled", EMPTY_SHUTTLE_VELOCITY_RPM);
+        sprintf(msg, "Empty shuttle detected - Using increased speed: %d RPM with deceleration disabled", selectedVelocityRPM);
         Console.serialInfo(msg);
     }
     else
     {
         // Make sure deceleration is enabled for loaded shuttle
         motorDecelConfig.enableDeceleration = true;
-
-        // Apply velocity scaling based on move distance
-        if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+        
+        // Log the selected velocity with appropriate message
+        if (distance_cm < VERY_SHORT_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(VERY_SHORT_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Very short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, VERY_SHORT_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Very short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
-        else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
+        else if (distance_cm < SHORT_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(SHORT_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, SHORT_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Short move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
-        else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
+        else if (distance_cm < MEDIUM_MOVE_THRESHOLD_CM_MM)
         {
-            currentVelMax = rpmToPps(MEDIUM_MOVE_VELOCITY_RPM);
-            sprintf(msg, "Medium move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, MEDIUM_MOVE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Medium move detected (%.2fmm) - Using reduced speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
         else
         {
-            // For long moves, explicitly set to maximum velocity
-            currentVelMax = rpmToPps(LOADED_SHUTTLE_VELOCITY_RPM);
-            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, LOADED_SHUTTLE_VELOCITY_RPM);
-            Console.serialInfo(msg);
+            sprintf(msg, "Long move detected (%.2fmm) - Using full speed: %d RPM", distanceToMoveMm, selectedVelocityRPM);
         }
+        Console.serialInfo(msg);
     }
 
     // Apply the new velocity limit to the motor
@@ -722,10 +801,11 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
         return false;
     }
 
-    // Apply distance-based speed caps
+    // Apply distance-based speed caps using optimized integer math
+    int32_t distance_cm = (int32_t)(distanceToMoveMm * MM_SCALE_FACTOR + 0.5);
     int cappedSpeed = speedRpm;
 
-    if (distanceToMoveMm < VERY_SHORT_MOVE_THRESHOLD_MM)
+    if (distance_cm < VERY_SHORT_MOVE_THRESHOLD_CM_MM)
     {
         // Cap speed for very short moves
         cappedSpeed = min(speedRpm, VERY_SHORT_MOVE_VELOCITY_RPM);
@@ -736,7 +816,7 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
             Console.serialInfo(msg);
         }
     }
-    else if (distanceToMoveMm < SHORT_MOVE_THRESHOLD_MM)
+    else if (distance_cm < SHORT_MOVE_THRESHOLD_CM_MM)
     {
         // Cap speed for short moves
         cappedSpeed = min(speedRpm, SHORT_MOVE_VELOCITY_RPM);
@@ -747,7 +827,7 @@ bool setJogSpeed(int speedRpm, double jogDistanceMm)
             Console.serialInfo(msg);
         }
     }
-    else if (distanceToMoveMm < MEDIUM_MOVE_THRESHOLD_MM)
+    else if (distance_cm < MEDIUM_MOVE_THRESHOLD_CM_MM)
     {
         // Cap speed for medium moves
         cappedSpeed = min(speedRpm, MEDIUM_MOVE_VELOCITY_RPM);
@@ -1435,8 +1515,11 @@ void checkMoveProgress()
             // Only apply deceleration if shuttle is NOT empty
             if (!shuttleEmpty)
             {
-                // Calculate absolute distance to target
-                float distanceToTargetMm = fabs(currentTargetPositionMm - currentPositionMm);
+                // Calculate absolute distance to target using optimized integer math
+                int32_t currentPos_cm = (int32_t)(currentPositionMm * MM_SCALE_FACTOR + 0.5);
+                int32_t targetPos_cm = (int32_t)(currentTargetPositionMm * MM_SCALE_FACTOR + 0.5);
+                int32_t distance_cm = distanceAbs_i(targetPos_cm, currentPos_cm);
+                float distanceToTargetMm = (float)distance_cm / MM_SCALE_FACTOR;
 
                 // Calculate appropriate velocity based on distance
                 int32_t newVelocity = calculateDeceleratedVelocity(distanceToTargetMm, currentVelMax);
