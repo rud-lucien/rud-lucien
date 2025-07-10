@@ -280,7 +280,7 @@ void printColoredSystemState(const char* msg)
         }
         // Target states
         else if (strncmp(ptr, "None", 4) == 0) {
-            Console.print("\x1b[90mNone\x1b[0m"); // Gray for no target/last target
+            Console.print("None"); // White (normal text) for better readability
             ptr += 4;
         }
         // Separators - subtle gray

@@ -245,25 +245,18 @@ void processEncoderInput()
         int32_t targetPulses = mmToPulses(targetPositionMm);
         MOTOR_CONNECTOR.Move(targetPulses, MotorDriver::MOVE_TARGET_ABSOLUTE);
         
-        // Update motor state and target tracking
+        // Update motor state and target tracking first to update the cache
         updateMotorTarget(targetPositionMm);
         
         // Log the movement with reduced verbosity (every 50ms instead of 100ms)
         unsigned long currentTime = millis();
         if (currentTime - lastEncoderUpdateTime > 50) // More frequent logging for debugging
         {
-            // Wait for motor to stop moving before reading position for accuracy
-            int timeout = 0;
-            while (MOTOR_CONNECTOR.StatusReg().bit.StepsActive && timeout < 25) {
-                delay(1);
-                timeout++;
-            }
-            
-            // Show actual motor position instead of calculated target for teaching accuracy
-            double actualMotorPosition = getMotorPositionMm();
+            // Read cached position that log,now will show for perfect matching
+            double cachedMotorPosition = currentPositionMm; // Same value log,now uses
             char msg[200];
-            sprintf(msg, "MPG: %ld counts → %.2fmm actual (target: %.2fmm) (%s)", 
-                    totalEncoderDelta, actualMotorPosition, targetPositionMm, getMultiplierName(currentMultiplier));
+            sprintf(msg, "MPG: %+ld counts → Target: %.2fmm (%s)", 
+                    encoderDelta, cachedMotorPosition, getMultiplierName(currentMultiplier));
             Console.serialDiagnostic(msg);
             lastEncoderUpdateTime = currentTime;
         }
