@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "ClearCore.h"
+#include "Utils.h"
 #include "MotorController.h"
 #include "OutputManager.h"
 #include "EncoderController.h"
@@ -23,8 +24,8 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
-    // Initialize the motor system
-    initMotorSystem();
+    // Initialize the motor manager (one-time system configuration)
+    initMotorManager();
 
     // Initialize SD card and load taught positions
     initPositionConfig();
@@ -40,7 +41,7 @@ void setup()
     ccioBoardCount = CcioMgr.CcioCount();
     bool hasCCIOBoard = (ccioBoardCount > 0);
     
-    char msg[50];
+    char msg[SMALL_MSG_SIZE];
     sprintf_P(msg, PSTR("Discovered CCIO boards: %d"), ccioBoardCount);
     Console.serialInfo(msg);
     

@@ -1,4 +1,5 @@
 #include "PositionConfig.h"
+#include "Utils.h"
 #include <SPI.h>
 #include <SD.h>
 
@@ -75,7 +76,7 @@ bool initPositionConfig() {
             }
         }
         
-        char msg[80];
+        char msg[SMALL_MSG_SIZE];
         sprintf_P(msg, FMT_LOADED_POSITIONS, 
                 taughtCount, NUM_TEACHABLE_POSITIONS - taughtCount);
         Console.serialInfo(msg);
@@ -158,7 +159,7 @@ bool teachCurrentPosition(int rail, PositionTarget target) {
     
     // Check if rail is homed
     if (!isHomingComplete(rail)) {
-        char msg[80];
+        char msg[SMALL_MSG_SIZE];
         sprintf_P(msg, FMT_RAIL_NOT_HOMED, rail);
         Console.serialError(msg);
         Console.serialInfo(F("Teaching positions requires a proper reference point"));
@@ -174,7 +175,7 @@ bool teachCurrentPosition(int rail, PositionTarget target) {
     
     // Verify rail matches
     if (posInfo->rail != rail) {
-        char msg[80];
+        char msg[SMALL_MSG_SIZE];
         sprintf_P(msg, FMT_WRONG_RAIL_POSITION, 
                 posInfo->name, posInfo->rail, rail);
         Console.serialError(msg);
@@ -195,7 +196,7 @@ bool teachCurrentPosition(int rail, PositionTarget target) {
     
     // Auto-save to SD card immediately
     if (savePositionsToSD()) {
-        char msg[120];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_POSITION_TAUGHT_ACK, posInfo->name, currentPos);
         Console.acknowledge(msg);
         
@@ -203,7 +204,7 @@ bool teachCurrentPosition(int rail, PositionTarget target) {
                 posInfo->description, currentPos);
         Console.serialInfo(msg);
     } else {
-        char msg[120];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_POSITION_TAUGHT_ACK, posInfo->name, currentPos);
         Console.acknowledge(msg);
         
@@ -257,7 +258,7 @@ bool teachSaveAllPositions() {
             }
         }
         
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_SAVED_COUNT, taughtCount);
         Console.serialInfo(msg);
         return true;
@@ -280,7 +281,7 @@ bool teachResetAllPositions() {
     // Show factory defaults
     Console.serialInfo(F("Factory default positions:"));
     for (int i = 0; i < NUM_TEACHABLE_POSITIONS; i++) {
-        char msg[120];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_FACTORY_DEFAULT, 
                 teachablePositions[i].description, 
                 teachablePositions[i].factoryDefault);
@@ -304,7 +305,7 @@ bool teachResetRail(int rail) {
         }
     }
     
-    char msg[80];
+    char msg[SMALL_MSG_SIZE];
     sprintf_P(msg, FMT_RAIL_RESET_ACK, rail);
     Console.acknowledge(msg);
     
@@ -353,7 +354,7 @@ void teachShowRail(int rail) {
                 *(teachablePositions[i].runtimeVariable) : 
                 teachablePositions[i].factoryDefault;
             
-            char msg[150];
+            char msg[MEDIUM_MSG_SIZE];
             sprintf_P(msg, FMT_POSITION_STATUS, 
                     teachablePositions[i].description,
                     currentValue,
@@ -372,7 +373,7 @@ bool validateTaughtPosition(int rail, double positionMm, PositionTarget target) 
     double maxTravel = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
     
     if (positionMm < 0 || positionMm > maxTravel) {
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_POSITION_OUT_OF_RANGE, 
                 positionMm, maxTravel);
         Console.serialError(msg);

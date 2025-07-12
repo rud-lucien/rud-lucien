@@ -6,6 +6,7 @@
 //=============================================================================
 #include <Arduino.h>
 #include "ClearCore.h"
+#include "Utils.h"
 
 //=============================================================================
 // VALVE CONFIGURATION
@@ -59,7 +60,7 @@ struct PneumaticValve
 extern PneumaticValve cylinderValve;      // Main pneumatic cylinder valve
 extern unsigned long lastValveOperationTime; // Global timestamp for valve operations
 extern bool lastValveOperationFailed;    // Status of last valve operation
-extern char lastValveFailureDetails[100]; // Details of last failure
+extern char lastValveFailureDetails[MEDIUM_MSG_SIZE]; // Details of last failure
 
 //=============================================================================
 // FUNCTION DECLARATIONS

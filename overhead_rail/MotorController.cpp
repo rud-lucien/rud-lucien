@@ -370,20 +370,84 @@ bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocity
     }
 }
 
-void initMotorSystem()
-{
-    Console.serialInfo(F("Initializing motor system..."));
+//=============================================================================
+// E-STOP INITIALIZATION
+//=============================================================================
 
+bool initEStop()
+{
+    Console.serialInfo(F("Initializing E-stop system..."));
+    
     // Set up E-stop input pin with internal pull-up
     pinMode(E_STOP_PIN, INPUT_PULLUP);
+    
     if (isEStopActive())
     {
         Console.serialError(F("E-STOP ACTIVE! Please reset E-stop before continuing."));
-        return;
+        return false;
     }
     else
     {
         Console.serialInfo(F("E-stop inactive, system ready."));
+        return true;
+    }
+}
+
+//=============================================================================
+// RAIL-SPECIFIC MOTOR INITIALIZATION
+//=============================================================================
+
+bool initRailMotor(int railNumber)
+{
+    char msg[SMALL_MSG_SIZE];
+    sprintf_P(msg, PSTR("Initializing Rail %d motor..."), railNumber);
+    Console.serialInfo(msg);
+    
+    MotorDriver* motor;
+    MotorState* motorState;
+    int32_t velocityRpm;
+    const char* railName;
+    
+    // Select rail-specific parameters
+    if (railNumber == 1) {
+        motor = &RAIL1_MOTOR;
+        motorState = &rail1MotorState;
+        velocityRpm = RAIL1_LOADED_CARRIAGE_VELOCITY_RPM;
+        railName = "Rail 1";
+    } else if (railNumber == 2) {
+        motor = &RAIL2_MOTOR;
+        motorState = &rail2MotorState;
+        velocityRpm = RAIL2_LOADED_CARRIAGE_VELOCITY_RPM;
+        railName = "Rail 2";
+    } else {
+        Console.serialError(F("Invalid rail number. Must be 1 or 2."));
+        return false;
+    }
+    
+    // Initialize the motor with rail-specific settings
+    bool ready = initSingleMotor(*motor, railName, velocityRpm, MAX_ACCEL_RPM_PER_SEC);
+    
+    if (ready) {
+        *motorState = MOTOR_STATE_IDLE;
+        sprintf_P(msg, PSTR("Rail %d motor initialized and ready"), railNumber);
+        Console.serialInfo(msg);
+        return true;
+    } else {
+        *motorState = MOTOR_STATE_FAULTED;
+        sprintf_P(msg, PSTR("Rail %d motor initialization failed"), railNumber);
+        Console.serialError(msg);
+        return false;
+    }
+}
+
+bool initMotorManager()
+{
+    Console.serialInfo(F("Initializing motor manager configuration..."));
+
+    // Initialize E-stop system first
+    if (!initEStop()) {
+        Console.serialError(F("E-stop initialization failed - motor system cannot start"));
+        return false;
     }
 
     // Set the input clocking rate
@@ -392,23 +456,8 @@ void initMotorSystem()
     // Configure motor connector for step and direction mode
     MotorMgr.MotorModeSet(MotorManager::MOTOR_ALL, Connector::CPM_MODE_STEP_AND_DIR);
 
-    // Initialize both motors with rail-specific loaded carriage velocity as default
-    bool rail1Ready = initSingleMotor(RAIL1_MOTOR, "Rail 1", RAIL1_LOADED_CARRIAGE_VELOCITY_RPM, MAX_ACCEL_RPM_PER_SEC);
-    bool rail2Ready = initSingleMotor(RAIL2_MOTOR, "Rail 2", RAIL2_LOADED_CARRIAGE_VELOCITY_RPM, MAX_ACCEL_RPM_PER_SEC);
-
-    if (rail1Ready && rail2Ready)
-    {
-        Console.serialInfo(F("Both motors initialized and ready"));
-        motorInitialized = true;
-        rail1MotorState = MOTOR_STATE_IDLE;
-        rail2MotorState = MOTOR_STATE_IDLE;
-    }
-    else
-    {
-        Console.serialError(F("Motor system initialization failed"));
-        rail1MotorState = MOTOR_STATE_FAULTED;
-        rail2MotorState = MOTOR_STATE_FAULTED;
-    }
+    Console.serialInfo(F("Motor manager configuration complete"));
+    return true;
 }
 
 //=============================================================================
@@ -560,7 +609,7 @@ void stopMotion(int rail)
 {
     MotorDriver& motor = getMotorByRail(rail);
     motor.MoveStopAbrupt();
-    char msg[50];
+    char msg[SMALL_MSG_SIZE];
     sprintf_P(msg, FMT_MOTION_STOPPED, getMotorName(rail));
     Console.serialInfo(msg);
 }
@@ -693,7 +742,7 @@ void clearMotorFaults(int rail)
 
     if (!*faultClearInProgress)
     {
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_CLEARING_FAULTS, motorName);
         Console.serialDiagnostic(msg);
 
@@ -733,7 +782,7 @@ void processFaultClearing(int rail)
     case FAULT_CLEAR_DISABLE:
         if (motor.AlertReg().bit.MotorFaulted)
         {
-            char msg[100];
+            char msg[MEDIUM_MSG_SIZE];
             sprintf_P(msg, FMT_MOTOR_FAULTED, motorName);
             Console.serialDiagnostic(msg);
             motor.EnableRequest(false);
@@ -760,7 +809,7 @@ void processFaultClearing(int rail)
 
     case FAULT_CLEAR_ALERTS:
         {
-            char msg[100];
+            char msg[MEDIUM_MSG_SIZE];
             sprintf_P(msg, FMT_CLEARING_ALERTS, motorName);
             Console.serialDiagnostic(msg);
             motor.ClearAlerts();
@@ -813,7 +862,7 @@ bool clearMotorFaultWithStatus(int rail)
     // If fault clearing is already in progress, return false
     if (*faultClearInProgress)
     {
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_FAULT_IN_PROGRESS, motorName);
         Console.serialInfo(msg);
         return false;
@@ -939,7 +988,7 @@ bool moveToPosition(int rail, PositionTarget fromPos, PositionTarget toPos, bool
     
     // Validate positions
     if (!isValidPositionForRail(fromPos, rail) || !isValidPositionForRail(toPos, rail)) {
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_INVALID_POSITION, motorName);
         Console.serialError(msg);
         return false;
@@ -1028,7 +1077,7 @@ bool moveToPosition(int rail, int positionNumber, bool carriageLoaded) {
             case 4: target = RAIL1_HANDOFF_POS; break;
             default: 
                 {
-                    char msg[100];
+                    char msg[MEDIUM_MSG_SIZE];
                     sprintf_P(msg, FMT_INVALID_POSITION_NUM_RAIL1, motorName, positionNumber);
                     Console.serialError(msg);
                     return false;
@@ -1041,14 +1090,14 @@ bool moveToPosition(int rail, int positionNumber, bool carriageLoaded) {
             case 2: target = RAIL2_WC3_PICKUP_DROPOFF_POS; break;
             default: 
                 {
-                    char msg[100];
+                    char msg[MEDIUM_MSG_SIZE];
                     sprintf_P(msg, FMT_INVALID_POSITION_NUM_RAIL2, motorName, positionNumber);
                     Console.serialError(msg);
                     return false;
                 }
         }
     } else {
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_INVALID_RAIL_NUM, rail);
         Console.serialError(msg);
         return false;
@@ -1066,7 +1115,7 @@ bool moveToAbsolutePosition(int rail, int32_t positionPulses) {
     int32_t maxTravel = mmToPulses((rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM, rail);
     
     if (positionPulses < 0 || positionPulses > maxTravel) {
-        char msg[150];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_POSITION_OUT_OF_RANGE, 
                 motorName, positionPulses, maxTravel);
         Console.serialError(msg);
@@ -1075,7 +1124,7 @@ bool moveToAbsolutePosition(int rail, int32_t positionPulses) {
     
     // Check for motor alerts
     if (motor.StatusReg().bit.AlertsPresent) {
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_MOTOR_CANNOT_MOVE, motorName);
         Console.serialError(msg);
         printMotorAlerts(motor, motorName);
@@ -1085,7 +1134,7 @@ bool moveToAbsolutePosition(int rail, int32_t positionPulses) {
     // Command the absolute move
     motor.Move(positionPulses, MotorDriver::MOVE_TARGET_ABSOLUTE);
     
-    char msg[150];
+    char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_MOVE_TO_ABSOLUTE, 
             motorName, positionPulses, pulsesToMm(positionPulses, rail));
     Console.serialInfo(msg);
@@ -1099,7 +1148,7 @@ bool moveToPositionMm(int rail, double positionMm, bool carriageLoaded) {
     
     // Safety check
     if (positionMm < 0 || positionMm > maxTravel) {
-        char msg[150];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_POSITION_MM_OUT_OF_RANGE, 
                 motorName, positionMm, maxTravel);
         Console.serialError(msg);
@@ -1128,7 +1177,7 @@ bool moveToPositionMm(int rail, double positionMm, bool carriageLoaded) {
     motor.VelMax(moveVelocity);
     motor.Move(targetPulses, MotorDriver::MOVE_TARGET_ABSOLUTE);
     
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     sprintf_P(msg, FMT_MOVE_TO_MM, 
             motorName, positionMm, targetPulses, (int)ppsToRpm(moveVelocity),
             carriageLoaded ? "[LOADED]" : "[EMPTY]");
@@ -1149,7 +1198,7 @@ bool moveRelativeManual(int rail, double relativeMm, bool carriageLoaded) {
     
     // Safety check
     if (targetPosMm < 0 || targetPosMm > maxTravel) {
-        char msg[200];
+        char msg[ALERT_MSG_SIZE];
         sprintf_P(msg, FMT_RELATIVE_MOVE_RANGE, motorName, maxTravel);
         Console.serialError(msg);
         sprintf_P(msg, FMT_RELATIVE_MOVE_DETAILS, 
@@ -1177,7 +1226,7 @@ bool moveRelativeManual(int rail, double relativeMm, bool carriageLoaded) {
     motor.VelMax(moveVelocity);
     motor.Move(relativePulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
     
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     sprintf_P(msg, FMT_RELATIVE_MOVE, 
             motorName, relativeMm, relativePulses, (int)ppsToRpm(moveVelocity),
             carriageLoaded ? "[LOADED]" : "[EMPTY]");
@@ -1196,7 +1245,7 @@ bool initiateHomingSequence(int rail)
     const char* motorName = getMotorName(rail);
     MotorHomingState& homingState = getHomingState(rail);
     
-    char msg[100];
+    char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_INITIATE_HOMING, motorName);
     Console.serialInfo(msg);
 
@@ -1261,7 +1310,7 @@ void checkHomingProgress(int rail)
         return;
 
     unsigned long currentTime = millis();
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
 
     // Add a delay before starting actual hardstop detection
     static const unsigned long homingStartDelay = 500;
@@ -1463,7 +1512,7 @@ void completeHomingSequence(int rail)
         rail2MotorState = MOTOR_STATE_IDLE;
     }
 
-    char msg[150];
+    char msg[MEDIUM_MSG_SIZE];
     unsigned long homingDurationMs = timeDiff(millis(), homingState.homingStartTime);
     sprintf_P(msg, FMT_HOMING_COMPLETED, motorName);
     Console.serialInfo(msg);
@@ -1490,7 +1539,7 @@ void resetHomingState(int rail)
     // Capture the current position AFTER resetting variables
     homingState.startPulses = motor.PositionRefCommanded();
 
-    char msg[100];
+    char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_HOMING_STATE_RESET, getMotorName(rail));
     Console.serialDiagnostic(msg);
 }
@@ -1503,7 +1552,7 @@ void abortHoming(int rail)
     
     if (homingState.homingInProgress)
     {
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_ABORTING_HOMING, motorName);
         Console.serialInfo(msg);
         
@@ -1844,7 +1893,7 @@ bool jogMotor(int rail, bool direction, double customIncrement, bool carriageLoa
 {
     MotorDriver& motor = getMotorByRail(rail);
     const char* motorName = getMotorName(rail);
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
 
     // Check if motor is ready
     if (!isMotorReady(rail))
@@ -1924,7 +1973,7 @@ bool jogMotor(int rail, bool direction, double customIncrement, bool carriageLoa
 bool setJogIncrement(int rail, double increment)
 {
     const char* motorName = getMotorName(rail);
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
 
     // Validate increment is reasonable for the specific rail using header constants
     double maxIncrement = (rail == 1) ? RAIL1_MAX_JOG_INCREMENT_MM : RAIL2_MAX_JOG_INCREMENT_MM;
@@ -1950,7 +1999,7 @@ bool setJogIncrement(int rail, double increment)
 bool setJogSpeed(int rail, int speedRpm, double jogDistanceMm)
 {
     const char* motorName = getMotorName(rail);
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
 
     // Get the jog distance - either from parameter or use current increment
     double distanceToMoveMm = (jogDistanceMm > 0) ? jogDistanceMm : getJogIncrementRef(rail);

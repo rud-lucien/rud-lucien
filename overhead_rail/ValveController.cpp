@@ -35,7 +35,7 @@ const char FMT_LAST_RESULT_FAILED[] PROGMEM = "Last Result: FAILED - %s";
 PneumaticValve cylinderValve;              // Main pneumatic cylinder valve
 unsigned long lastValveOperationTime = 0; // Global timestamp for valve operations
 bool lastValveOperationFailed = false;    // Status of last valve operation
-char lastValveFailureDetails[100] = "";   // Details of last failure
+char lastValveFailureDetails[MEDIUM_MSG_SIZE] = "";   // Details of last failure
 
 //=============================================================================
 // INITIALIZATION
@@ -100,7 +100,7 @@ void setValvePosition(ValvePosition position)
     cylinderValve.lastOperationTime = millis();
     lastValveOperationTime = millis();
     
-    char msg[100];
+    char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_VALVE_SET, getValvePositionName(position));
     Console.serialDiagnostic(msg);
 }
@@ -121,7 +121,7 @@ bool isValveAtPosition(ValvePosition position)
 
 ValveOperationResult safeSetValvePosition(ValvePosition targetPosition, unsigned long timeoutMs)
 {
-    char msg[150];
+    char msg[MEDIUM_MSG_SIZE];
     
     // Check if system is ready
     if (!hasCCIO)
@@ -248,7 +248,7 @@ ValveOperationResult retractCylinder(unsigned long timeoutMs)
 
 void printValveStatus()
 {
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     
     if (!hasCCIO)
     {
@@ -319,7 +319,7 @@ void printValveStatus()
 
 void printValveDetailedStatus()
 {
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     
     Console.serialInfo(F("=== DETAILED VALVE STATUS ==="));
     

@@ -119,7 +119,7 @@ bool moveRail1CarriageToWC1(bool carriageLoaded) {
     
     // Execute the movement
     if (moveToPositionFromCurrent(1, targetPos, carriageLoaded)) {
-        Console.acknowledge(carriageLoaded ? F("OK_MOVE_WC1_WITH") : F("OK_MOVE_WC1_NO"));
+        Console.acknowledge(carriageLoaded ? F("WC1_REACHED_WITH_LABWARE") : F("WC1_REACHED"));
         Console.serialInfo(F("Carriage successfully moved to WC1 position"));
         return true;
     } else {
@@ -140,7 +140,7 @@ bool moveRail1CarriageToWC2(bool carriageLoaded) {
     
     // Execute the movement
     if (moveToPositionFromCurrent(1, targetPos, carriageLoaded)) {
-        Console.acknowledge(carriageLoaded ? F("OK_MOVE_WC2_WITH") : F("OK_MOVE_WC2_NO"));
+        Console.acknowledge(carriageLoaded ? F("WC2_REACHED_WITH_LABWARE") : F("WC2_REACHED"));
         Console.serialInfo(F("Carriage successfully moved to WC2 position"));
         return true;
     } else {
@@ -161,7 +161,7 @@ bool moveRail1CarriageToStaging(bool carriageLoaded) {
     
     // Execute the movement
     if (moveToPositionFromCurrent(1, targetPos, carriageLoaded)) {
-        Console.acknowledge(carriageLoaded ? F("OK_MOVE_STAGING_WITH") : F("OK_MOVE_STAGING_NO"));
+        Console.acknowledge(carriageLoaded ? F("STAGING_REACHED_WITH_LABWARE") : F("STAGING_REACHED"));
         Console.serialInfo(F("Carriage successfully moved to staging position"));
         return true;
     } else {
@@ -182,7 +182,7 @@ bool moveRail1CarriageToHandoff(bool carriageLoaded) {
     
     // Execute the movement
     if (moveToPositionFromCurrent(1, targetPos, carriageLoaded)) {
-        Console.acknowledge(carriageLoaded ? F("OK_MOVE_HANDOFF_WITH") : F("OK_MOVE_HANDOFF_NO"));
+        Console.acknowledge(carriageLoaded ? F("HANDOFF_REACHED_WITH_LABWARE") : F("HANDOFF_REACHED"));
         Console.serialInfo(F("Carriage successfully moved to handoff position"));
         return true;
     } else {
@@ -212,7 +212,7 @@ bool moveRail2CarriageToWC3(bool carriageLoaded) {
     
     // Execute the movement
     if (moveToPositionFromCurrent(2, targetPos, carriageLoaded)) {
-        Console.acknowledge(carriageLoaded ? F("OK_MOVE_WC3_WITH") : F("OK_MOVE_WC3_NO"));
+        Console.acknowledge(carriageLoaded ? F("WC3_REACHED_WITH_LABWARE") : F("WC3_REACHED"));
         Console.serialInfo(F("Carriage successfully moved to WC3 position"));
         return true;
     } else {
@@ -236,12 +236,233 @@ bool moveRail2CarriageToHandoff(bool carriageLoaded) {
     
     // Execute the movement
     if (moveToPositionFromCurrent(2, targetPos, carriageLoaded)) {
-        Console.acknowledge(carriageLoaded ? F("OK_MOVE_HANDOFF_WITH") : F("OK_MOVE_HANDOFF_NO"));
+        Console.acknowledge(carriageLoaded ? F("HANDOFF_REACHED_WITH_LABWARE") : F("HANDOFF_REACHED"));
         Console.serialInfo(F("Carriage successfully moved to handoff position"));
         return true;
     } else {
         Console.error(F("MOVEMENT_FAILED"));
         Console.serialInfo(F("Failed to move carriage to handoff - check motor status"));
+        return false;
+    }
+}
+
+//=============================================================================
+// COMMON RAIL COMMAND HELPER FUNCTIONS
+//=============================================================================
+// These functions encapsulate the common commands shared between rail1 and rail2
+// to eliminate code duplication while preserving rail-specific safety logic
+
+bool executeRailInit(int railNumber) {
+    Console.serialInfo(railNumber == 1 ? F("Initializing Rail 1 motor...") : F("Initializing Rail 2 motor..."));
+
+    // Rail 2 specific diagnostic
+    if (railNumber == 2) {
+        Console.serialInfo(F("[DIAGNOSTIC] Checking Rail 2 motor state before initialization"));
+    }
+
+    // Initialize only the specific rail motor
+    bool railReady = initRailMotor(railNumber);
+
+    if (railReady) {
+        Console.acknowledge(F("MOTOR_INITIALIZED"));
+        Console.serialInfo(railNumber == 1 ? F("Rail 1 motor initialized successfully") : F("Rail 2 motor initialized successfully"));
+        return true;
+    } else {
+        Console.error(F("INIT_FAILED"));
+        Console.serialInfo(railNumber == 1 ? F("Rail 1 motor initialization failed.") : F("Rail 2 motor initialization failed."));
+        Console.serialInfo(F("Check connections and power."));
+        return false;
+    }
+}
+
+bool executeRailClearFault(int railNumber) {
+    Console.serialInfo(railNumber == 1 ? F("Attempting to clear Rail 1 motor fault...") : F("Attempting to clear Rail 2 motor fault..."));
+
+    if (clearMotorFaultWithStatus(railNumber)) {
+        Console.acknowledge(F("FAULT_CLEARED"));
+        Console.serialInfo(railNumber == 1 ? F("Rail 1 motor fault cleared successfully") : F("Rail 2 motor fault cleared successfully"));
+        return true;
+    } else {
+        Console.error(F("CLEAR_FAULT_FAILED"));
+        Console.serialInfo(railNumber == 1 ? F("Failed to clear Rail 1 motor fault") : F("Failed to clear Rail 2 motor fault"));
+        Console.serialInfo(F("Motor may still be in fault state."));
+        Console.serialInfo(F("Try power cycling the system if fault persists."));
+        return false;
+    }
+}
+
+bool executeRailAbort(int railNumber) {
+    // Check if motor is initialized before attempting to abort
+    if (!isMotorReady(railNumber)) {
+        Console.error(F("MOTOR_NOT_READY"));
+        Console.serialInfo(railNumber == 1 ? F("Rail 1 motor is not initialized. Nothing to abort.") : F("Rail 2 motor is not initialized. Nothing to abort."));
+        return false;
+    }
+
+    Console.serialInfo(railNumber == 1 ? F("Aborting current Rail 1 operation...") : F("Aborting current Rail 2 operation..."));
+
+    // Only meaningful to abort if we're moving or homing
+    if (isMotorMoving(railNumber) || isHomingInProgress(railNumber)) {
+        if (isHomingInProgress(railNumber)) {
+            abortHoming(railNumber);
+        } else {
+            stopMotion(railNumber);
+        }
+
+        Console.acknowledge(F("OPERATION_ABORTED"));
+        Console.serialInfo(railNumber == 1 ? F("Rail 1 operation aborted successfully") : F("Rail 2 operation aborted successfully"));
+        return true;
+    } else {
+        Console.error(F("NO_ACTIVE_OPERATION"));
+        Console.serialInfo(F("No active operation to abort"));
+        return false;
+    }
+}
+
+bool executeRailStop(int railNumber) {
+    // Check if motor is initialized
+    if (!isMotorReady(railNumber)) {
+        Console.error(F("MOTOR_NOT_READY"));
+        Console.serialInfo(railNumber == 1 ? F("Rail 1 motor is not initialized. Cannot perform stop.") : F("Rail 2 motor is not initialized. Cannot perform stop."));
+        return false;
+    }
+
+    Console.serialInfo(railNumber == 1 ? F("EMERGENCY STOP initiated for Rail 1!") : F("EMERGENCY STOP initiated for Rail 2!"));
+
+    // Execute emergency stop
+    stopMotion(railNumber);
+
+    Console.acknowledge(F("EMERGENCY_STOP_EXECUTED"));
+    Console.serialInfo(railNumber == 1 ? F("Rail 1 motor movement halted. Position may no longer be accurate.") : F("Rail 2 motor movement halted. Position may no longer be accurate."));
+    Console.serialInfo(F("Re-homing recommended after emergency stop."));
+
+    return true;
+}
+
+bool executeRailHome(int railNumber) {
+    if (!checkRailMovementReadiness(railNumber)) return false;
+    
+    // Rail 2 specific safety: Use helper function for cylinder safety (homing always involves collision zone)
+    if (railNumber == 2) {
+        if (!ensureCylinderRetractedForSafeMovement(true)) return false;
+    }
+    
+    Console.serialInfo(railNumber == 1 ? F("Initiating Rail 1 homing sequence...") : F("Initiating Rail 2 homing sequence..."));
+    if (initiateHomingSequence(railNumber)) {
+        Console.acknowledge(F("HOMING_STARTED"));
+        Console.serialInfo(F("Homing sequence initiated successfully"));
+        return true;
+    } else {
+        Console.error(F("HOMING_START_FAILED"));
+        Console.serialInfo(F("Failed to start homing sequence - check motor status"));
+        return false;
+    }
+}
+
+bool executeRailMoveToPosition(int railNumber, double positionMm, bool carriageLoaded) {
+    // Use helper functions for common validation
+    if (!checkRailMovementReadiness(railNumber)) return false;
+    
+    // Rail 2 specific collision zone safety logic
+    if (railNumber == 2) {
+        // CRITICAL SAFETY: Check if any part of the movement path requires cylinder retraction to prevent Rail 1 collision
+        // Collision zone is between RAIL2_COLLISION_ZONE_START and RAIL2_COLLISION_ZONE_END
+        // We must check current position, target position, and the entire movement path
+        double currentPos = getMotorPositionMm(2);
+        bool movementInCollisionZone = false;
+        
+        // Check if current position is in collision zone
+        if (currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) {
+            movementInCollisionZone = true;
+        }
+        
+        // Check if target position is in collision zone
+        if (positionMm >= RAIL2_COLLISION_ZONE_START && positionMm <= RAIL2_COLLISION_ZONE_END) {
+            movementInCollisionZone = true;
+        }
+        
+        // Check if movement path crosses collision zone (even if start/end are outside zone)
+        if (currentPos < RAIL2_COLLISION_ZONE_START && positionMm >= RAIL2_COLLISION_ZONE_START) {
+            movementInCollisionZone = true; // Entering collision zone
+        }
+        if (currentPos > RAIL2_COLLISION_ZONE_END && positionMm <= RAIL2_COLLISION_ZONE_END) {
+            movementInCollisionZone = true; // Entering collision zone from far side
+        }
+        if ((currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) && 
+            (positionMm < RAIL2_COLLISION_ZONE_START || positionMm > RAIL2_COLLISION_ZONE_END)) {
+            movementInCollisionZone = true; // Exiting collision zone
+        }
+        
+        // Use helper function for cylinder safety
+        if (!ensureCylinderRetractedForSafeMovement(movementInCollisionZone)) return false;
+    }
+    
+    Console.serialInfo(carriageLoaded ? 
+        F("Moving carriage with labware to absolute position...") :
+        F("Moving empty carriage to absolute position..."));
+    
+    // Execute the movement
+    if (moveToPositionMm(railNumber, positionMm, carriageLoaded)) {
+        Console.acknowledge(F("POSITION_REACHED"));
+        Console.serialInfo(F("Carriage successfully moved to target position"));
+        return true;
+    } else {
+        Console.error(F("MOVEMENT_FAILED"));
+        Console.serialInfo(F("Failed to move carriage to target position - check motor status"));
+        return false;
+    }
+}
+
+bool executeRailMoveRelative(int railNumber, double distanceMm, bool carriageLoaded) {
+    // Use helper functions for common validation
+    if (!checkRailMovementReadiness(railNumber)) return false;
+    
+    // Rail 2 specific collision zone safety logic
+    if (railNumber == 2) {
+        // CRITICAL SAFETY: Check if any part of the movement path requires cylinder retraction to prevent Rail 1 collision
+        // Calculate target position and check if movement involves collision zone (500-700mm)
+        double currentPos = getMotorPositionMm(2);
+        double calculatedTargetPos = currentPos + distanceMm;
+        bool movementInCollisionZone = false;
+        
+        // Check if current position is in collision zone
+        if (currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) {
+            movementInCollisionZone = true;
+        }
+        
+        // Check if target position is in collision zone
+        if (calculatedTargetPos >= RAIL2_COLLISION_ZONE_START && calculatedTargetPos <= RAIL2_COLLISION_ZONE_END) {
+            movementInCollisionZone = true;
+        }
+        
+        // Check if movement path crosses collision zone boundary
+        if (currentPos < RAIL2_COLLISION_ZONE_START && calculatedTargetPos >= RAIL2_COLLISION_ZONE_START) {
+            movementInCollisionZone = true; // Entering collision zone
+        }
+        if (currentPos > RAIL2_COLLISION_ZONE_END && calculatedTargetPos <= RAIL2_COLLISION_ZONE_END) {
+            movementInCollisionZone = true; // Entering collision zone from far side
+        }
+        if ((currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) && 
+            (calculatedTargetPos < RAIL2_COLLISION_ZONE_START || calculatedTargetPos > RAIL2_COLLISION_ZONE_END)) {
+            movementInCollisionZone = true; // Exiting collision zone
+        }
+        
+        // Use helper function for cylinder safety
+        if (!ensureCylinderRetractedForSafeMovement(movementInCollisionZone)) return false;
+    }
+    
+    Console.serialInfo(carriageLoaded ? 
+        F("Moving carriage with labware relative distance...") :
+        F("Moving empty carriage relative distance..."));
+    
+    // Execute the movement
+    if (moveRelativeManual(railNumber, distanceMm, carriageLoaded)) {
+        Console.acknowledge(F("MOVE_COMPLETED"));
+        Console.serialInfo(F("Carriage successfully moved relative distance"));
+        return true;
+    } else {
+        Console.error(F("MOVEMENT_FAILED"));
+        Console.serialInfo(F("Failed to move carriage relative distance - check motor status"));
         return false;
     }
 }

@@ -1,4 +1,5 @@
 #include "CommandController.h"
+#include "Utils.h"
 #include <Ethernet.h>
 
 //=============================================================================
@@ -100,12 +101,12 @@ void handleSerialCommands()
 
             if (commandIndex > 0) // Only process non-empty commands
             {
-                char logMsg[128];
+                char logMsg[MEDIUM_MSG_SIZE];
                 sprintf_P(logMsg, FMT_SERIAL_COMMAND, serialCommandBuffer);
                 Console.serialInfo(logMsg);
 
                 // Tag for operation log
-                char taggedCommand[96];
+                char taggedCommand[SMALL_MSG_SIZE];
                 sprintf_P(taggedCommand, FMT_SERIAL_COMMAND, serialCommandBuffer);
 
                 // Pass tag to processCommand
@@ -154,18 +155,18 @@ void handleEthernetCommands()
 
                     if (j > 0)
                     {
-                        char commandWithSource[128];
+                        char commandWithSource[MEDIUM_MSG_SIZE];
                         sprintf_P(commandWithSource, FMT_COMMAND_WITH_SOURCE,
                                  ethernetCommandBuffer,
                                  clients[i].remoteIP()[0], clients[i].remoteIP()[1],
                                  clients[i].remoteIP()[2], clients[i].remoteIP()[3]);
 
-                        char logMsg[200];
+                        char logMsg[ALERT_MSG_SIZE];
                         sprintf_P(logMsg, FMT_NETWORK_COMMAND, commandWithSource);
                         Console.serialInfo(logMsg);
 
                         // Tag for operation log
-                        char taggedCommand[160];
+                        char taggedCommand[MEDIUM_MSG_SIZE];
                         sprintf_P(taggedCommand, FMT_NETWORK_COMMAND, commandWithSource);
 
                         processCommand(ethernetCommandBuffer, &clients[i], taggedCommand);
@@ -439,7 +440,7 @@ void clearPersistentClient()
 
 void sendCommandRejection(const char *command, const char *reason)
 {
-    char msg[128];
+    char msg[MEDIUM_MSG_SIZE];
 
     if (operationInProgress)
     {

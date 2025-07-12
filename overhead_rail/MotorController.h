@@ -240,7 +240,9 @@ bool isEStopActive();
 void handleEStop();
 void printMotorAlerts(MotorDriver &motor, const char* motorName);
 bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocityRpm, int32_t accelRpmPerSec);
-void initMotorSystem();
+bool initEStop();
+bool initRailMotor(int railNumber);
+bool initMotorManager();
 
 // Unit Conversion Utilities
 int32_t rpmToPps(double rpm);

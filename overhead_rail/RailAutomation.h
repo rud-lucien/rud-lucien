@@ -53,6 +53,18 @@ bool parseAndValidateLabwareParameter(char* param, bool& carriageLoaded);
 bool ensureCylinderRetractedForSafeMovement(bool movementInCollisionZone);
 
 //-----------------------------------------------------------------------------
+// Common Rail Command Helper Functions
+// Encapsulated functions for common commands shared between rail1 and rail2
+//-----------------------------------------------------------------------------
+bool executeRailInit(int railNumber);
+bool executeRailClearFault(int railNumber);
+bool executeRailAbort(int railNumber);
+bool executeRailStop(int railNumber);
+bool executeRailHome(int railNumber);
+bool executeRailMoveToPosition(int railNumber, double positionMm, bool carriageLoaded);
+bool executeRailMoveRelative(int railNumber, double distanceMm, bool carriageLoaded);
+
+//-----------------------------------------------------------------------------
 // Rail 1 Specific Automated Movement Functions
 // Helper functions for Rail 1 predefined position movements
 //-----------------------------------------------------------------------------

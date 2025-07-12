@@ -1,4 +1,5 @@
 #include "EthernetController.h"
+#include "Utils.h"
 
 //=============================================================================
 // PROGMEM FORMAT STRINGS
@@ -44,7 +45,7 @@ void initEthernetController(bool useDhcp)
     Console.serialInfo(F("Starting Ethernet initialization..."));
 
     // Print link status for debugging
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     if (Ethernet.linkStatus() == LinkOFF)
     {
         Console.serialWarning(F("Ethernet physical link status: DISCONNECTED - cable may not be connected"));
@@ -142,7 +143,7 @@ void processEthernetConnections()
             // Check if client has been inactive too long
             if (timeoutElapsed(currentTime, clientLastActivityTime[i], CLIENT_TIMEOUT_MS))
             {
-                char msg[200];
+                char msg[ALERT_MSG_SIZE];
                 sprintf_P(msg, FMT_CLOSING_INACTIVE_CLIENT,
                          clients[i].remoteIP()[0], clients[i].remoteIP()[1],
                          clients[i].remoteIP()[2], clients[i].remoteIP()[3],
@@ -174,7 +175,7 @@ void processEthernetConnections()
                 // Try to write a single byte to test connection
                 if (!clients[i].print(""))
                 {
-                    char msg[200];
+                    char msg[ALERT_MSG_SIZE];
                     sprintf_P(msg, FMT_STALE_CONNECTION,
                              clients[i].remoteIP()[0], clients[i].remoteIP()[1],
                              clients[i].remoteIP()[2], clients[i].remoteIP()[3],
@@ -198,7 +199,7 @@ void processEthernetConnections()
             if (!clients[i] || !clients[i].connected())
             {
                 // Found a free slot
-                char msg[200];
+                char msg[ALERT_MSG_SIZE];
                 sprintf_P(msg, FMT_NEW_CLIENT_CONNECTED,
                         newClient.remoteIP()[0], newClient.remoteIP()[1],
                         newClient.remoteIP()[2], newClient.remoteIP()[3],
@@ -231,7 +232,7 @@ void processEthernetConnections()
     {
         if (clients[i] && !clients[i].connected())
         {
-            char msg[200];
+            char msg[ALERT_MSG_SIZE];
             sprintf_P(msg, FMT_CLIENT_DISCONNECTED, i);
             Console.serialDiagnostic(msg);
             clients[i].stop();
@@ -265,7 +266,7 @@ void testConnections()
                 // If this fails, the connection is stale
                 if (!clients[i].print(" "))
                 {
-                    char msg[200];
+                    char msg[ALERT_MSG_SIZE];
                     sprintf_P(msg, FMT_STALE_CONNECTION,
                              clients[i].remoteIP()[0], clients[i].remoteIP()[1],
                              clients[i].remoteIP()[2], clients[i].remoteIP()[3],
@@ -295,7 +296,7 @@ bool closeClientConnection(int index)
         int port = clients[index].remotePort();
         clients[index].stop();
 
-        char msg[200];
+        char msg[ALERT_MSG_SIZE];
         sprintf_P(msg, FMT_CLOSED_CONNECTION,
                  ip[0], ip[1], ip[2], ip[3], port);
         Console.serialInfo(msg);
@@ -315,7 +316,7 @@ bool closeAllConnections()
             count++;
         }
     }
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     sprintf_P(msg, FMT_CLOSED_CONNECTIONS, count);
     Console.serialInfo(msg);
     return count > 0;
@@ -367,7 +368,7 @@ int getConnectedClientCount()
 
 void printEthernetStatus()
 {
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     
     Console.serialInfo(F("=== ETHERNET STATUS ==="));
     

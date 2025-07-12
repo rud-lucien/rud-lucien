@@ -71,20 +71,6 @@ Commander::systemCommand_t API_tree[] = {
     systemCommand("h", "Display help information for all commands", cmd_print_help),
     systemCommand("H", "Display help information for all commands", cmd_print_help),
 
-    // Unified lock/unlock commands
-    // systemCommand("lock", "Lock a tray or shuttle:\r\n"
-    //                       "  lock,1..3    - Lock specific tray position\r\n"
-    //                       "  lock,shuttle - Lock the shuttle\r\n"
-    //                       "  lock,help    - Display detailed lock instructions",
-    //               cmd_lock),
-
-    // systemCommand("unlock", "Unlock a tray, shuttle, or all valves:\r\n"
-    //                         "  unlock,1..3    - Unlock specific tray position\r\n"
-    //                         "  unlock,shuttle - Unlock the shuttle\r\n"
-    //                         "  unlock,all     - Unlock all valves\r\n"
-    //                         "  unlock,help    - Display detailed unlock instructions",
-    //               cmd_unlock),
-
     // Logging command
     systemCommand("log", "Logging controls and history:\r\n"
                          "  log on [interval] - Enable periodic logging (interval in ms, default 250)\r\n"
@@ -107,26 +93,6 @@ Commander::systemCommand_t API_tree[] = {
     //                         "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
     //               cmd_system_state),
 
-    // Motor control commands
-    // systemCommand("motor", "Motor control:\r\n"
-    //                        "  motor,init   - Initialize motor system and prepare for operation\r\n"
-    //                        "  motor,status - Display detailed motor status and configuration\r\n"
-    //                        "  motor,clear  - Clear motor fault condition to restore operation\r\n"
-    //                        "  motor,home   - Home the motor (find zero position)\r\n"
-    //                        "  motor,abort  - Abort current operation gracefully\r\n"
-    //                        "  motor,stop   - Emergency stop motor movement immediately\r\n"
-    //                        "  motor,help   - Display comprehensive motor control instructions",
-    //               cmd_motor),
-
-    // Move command
-    // systemCommand("move", "Move motor to position:\r\n"
-    //                       "  move,home      - Move to home (zero) position\r\n"
-    //                       "  move,1..4      - Move to predefined positions 1 through 4\r\n"
-    //                       "  move,counts,X  - Move to absolute position X in encoder counts (0-64333)\r\n"
-    //                       "  move,mm,X      - Move to absolute position X in millimeters (0-1050.0)\r\n"
-    //                       "  move,rel,X     - Move X millimeters relative to current position (+ forward, - backward)\r\n"
-    //                       "  move,help      - Display detailed command usage and troubleshooting",
-    //               cmd_move),
 
     // Jog command
     // systemCommand("jog", "Jog motor:\r\n"
@@ -471,46 +437,10 @@ bool cmd_rail2(char *args, CommandCaller *caller)
     switch (cmdCode) {
     
     case 0: // "abort" - Abort current operation gracefully
-        // Check if motor is initialized before attempting to abort
-        if (!isMotorReady(2)) {
-            Console.error(F("MOTOR_NOT_READY"));
-            Console.serialInfo(F("Rail 2 motor is not initialized. Nothing to abort."));
-            return false;
-        }
-
-        Console.serialInfo(F("Aborting current Rail 2 operation..."));
-
-        // Only meaningful to abort if we're moving or homing
-        if (isMotorMoving(2) || isHomingInProgress(2)) {
-            if (isHomingInProgress(2)) {
-                abortHoming(2);
-            } else {
-                stopMotion(2);
-            }
-
-            Console.acknowledge(F("OK_ABORT"));
-            Console.serialInfo(F("Rail 2 operation aborted successfully"));
-            return true;
-        } else {
-            Console.error(F("NO_ACTIVE_OPERATION"));
-            Console.serialInfo(F("No active operation to abort"));
-            return false;
-        }
+        return executeRailAbort(2);
         
     case 1: // "clear-fault" - Clear motor fault condition
-        Console.serialInfo(F("Attempting to clear Rail 2 motor fault..."));
-
-        if (clearMotorFaultWithStatus(2)) {
-            Console.acknowledge(F("OK_CLEAR_FAULT"));
-            Console.serialInfo(F("Rail 2 motor fault cleared successfully"));
-            return true;
-        } else {
-            Console.error(F("CLEAR_FAULT_FAILED"));
-            Console.serialInfo(F("Failed to clear Rail 2 motor fault"));
-            Console.serialInfo(F("Motor may still be in fault state."));
-            Console.serialInfo(F("Try power cycling the system if fault persists."));
-            return false;
-        }
+        return executeRailClearFault(2);
         
     case 2: // "extend" - Extend pneumatic drive
         if (!isPressureSufficient()) {
@@ -582,23 +512,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         return true;
         
     case 5: // "init" - Initialize Rail 2 motor system
-        Console.serialInfo(F("Initializing Rail 2 motor..."));
-
-        // Diagnostic: Print state before initialization
-        Console.serialInfo(F("[DIAGNOSTIC] Checking Rail 2 motor state before initialization"));
-
-        initMotorSystem();
-
-        if (isMotorReady(2)) {
-            Console.acknowledge(F("OK_INIT"));
-            Console.serialInfo(F("Rail 2 motor initialized successfully"));
-            return true;
-        } else {
-            Console.error(F("INIT_FAILED"));
-            Console.serialInfo(F("Rail 2 motor initialization failed."));
-            Console.serialInfo(F("Check connections and power."));
-            return false;
-        }
+        return executeRailInit(2);
         
     case 10: // "retract" - Retract pneumatic drive
         if (!isPressureSufficient()) {
@@ -622,21 +536,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         }
         
     case 4: // "home" - Home carriage
-        if (!checkRailMovementReadiness(2)) return false;
-        
-        // Use helper function for cylinder safety (homing always involves collision zone)
-        if (!ensureCylinderRetractedForSafeMovement(true)) return false;
-        
-        Console.serialInfo(F("Initiating Rail 2 homing sequence..."));
-        if (initiateHomingSequence(2)) {
-            Console.acknowledge(F("OK_HOME"));
-            Console.serialInfo(F("Homing sequence initiated successfully"));
-            return true;
-        } else {
-            Console.error(F("HOMING_START_FAILED"));
-            Console.serialInfo(F("Failed to start homing sequence - check motor status"));
-            return false;
-        }
+        return executeRailHome(2);
         
     case 7: // "move-mm-to" - Move to absolute millimeter position
         if (param1 == NULL || param2 == NULL) {
@@ -649,53 +549,9 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         
         // Use helper functions for common validation
         if (!parseAndValidateLabwareParameter(param2, carriageLoaded)) return false;
-        if (!checkRailMovementReadiness(2)) return false;
         
-        // CRITICAL SAFETY: Check if any part of the movement path requires cylinder retraction to prevent Rail 1 collision
-        // Collision zone is between RAIL2_COLLISION_ZONE_START and RAIL2_COLLISION_ZONE_END
-        // We must check current position, target position, and the entire movement path
-        currentPos = getMotorPositionMm(2);
-        movementInCollisionZone = false;
-        
-        // Check if current position is in collision zone
-        if (currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) {
-            movementInCollisionZone = true;
-        }
-        
-        // Check if target position is in collision zone
-        if (targetPosition >= RAIL2_COLLISION_ZONE_START && targetPosition <= RAIL2_COLLISION_ZONE_END) {
-            movementInCollisionZone = true;
-        }
-        
-        // Check if movement path crosses collision zone (even if start/end are outside zone)
-        if (currentPos < RAIL2_COLLISION_ZONE_START && targetPosition >= RAIL2_COLLISION_ZONE_START) {
-            movementInCollisionZone = true; // Entering collision zone
-        }
-        if (currentPos > RAIL2_COLLISION_ZONE_END && targetPosition <= RAIL2_COLLISION_ZONE_END) {
-            movementInCollisionZone = true; // Entering collision zone from far side
-        }
-        if ((currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) && 
-            (targetPosition < RAIL2_COLLISION_ZONE_START || targetPosition > RAIL2_COLLISION_ZONE_END)) {
-            movementInCollisionZone = true; // Exiting collision zone
-        }
-        
-        // Use helper function for cylinder safety
-        if (!ensureCylinderRetractedForSafeMovement(movementInCollisionZone)) return false;
-        
-        Console.serialInfo(carriageLoaded ? 
-            F("Moving carriage with labware to absolute position...") :
-            F("Moving empty carriage to absolute position..."));
-        
-        // Execute the movement
-        if (moveToPositionMm(2, targetPosition, carriageLoaded)) {
-            Console.acknowledge(F("OK_MOVE_MM_TO"));
-            Console.serialInfo(F("Carriage successfully moved to target position"));
-            return true;
-        } else {
-            Console.error(F("MOVEMENT_FAILED"));
-            Console.serialInfo(F("Failed to move carriage to target position - check motor status"));
-            return false;
-        }
+        // Execute the movement using helper function
+        return executeRailMoveToPosition(2, targetPosition, carriageLoaded);
         
     case 8: // "move-rel" - Move relative distance
         if (param1 == NULL || param2 == NULL) {
@@ -708,53 +564,9 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         
         // Use helper functions for common validation
         if (!parseAndValidateLabwareParameter(param2, carriageLoaded)) return false;
-        if (!checkRailMovementReadiness(2)) return false;
         
-        // CRITICAL SAFETY: Check if any part of the movement path requires cylinder retraction to prevent Rail 1 collision
-        // Calculate target position and check if movement involves collision zone (500-700mm)
-        currentPos = getMotorPositionMm(2);
-        calculatedTargetPos = currentPos + targetPosition;
-        movementInCollisionZone = false;
-        
-        // Check if current position is in collision zone
-        if (currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) {
-            movementInCollisionZone = true;
-        }
-        
-        // Check if target position is in collision zone
-        if (calculatedTargetPos >= RAIL2_COLLISION_ZONE_START && calculatedTargetPos <= RAIL2_COLLISION_ZONE_END) {
-            movementInCollisionZone = true;
-        }
-        
-        // Check if movement path crosses collision zone boundary
-        if (currentPos < RAIL2_COLLISION_ZONE_START && calculatedTargetPos >= RAIL2_COLLISION_ZONE_START) {
-            movementInCollisionZone = true; // Entering collision zone
-        }
-        if (currentPos > RAIL2_COLLISION_ZONE_END && calculatedTargetPos <= RAIL2_COLLISION_ZONE_END) {
-            movementInCollisionZone = true; // Entering collision zone from far side
-        }
-        if ((currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) && 
-            (calculatedTargetPos < RAIL2_COLLISION_ZONE_START || calculatedTargetPos > RAIL2_COLLISION_ZONE_END)) {
-            movementInCollisionZone = true; // Exiting collision zone
-        }
-        
-        // Use helper function for cylinder safety
-        if (!ensureCylinderRetractedForSafeMovement(movementInCollisionZone)) return false;
-        
-        Console.serialInfo(carriageLoaded ? 
-            F("Moving carriage with labware relative distance...") :
-            F("Moving empty carriage relative distance..."));
-        
-        // Execute the movement
-        if (moveRelativeManual(2, targetPosition, carriageLoaded)) {
-            Console.acknowledge(F("OK_MOVE_REL"));
-            Console.serialInfo(F("Carriage successfully moved relative distance"));
-            return true;
-        } else {
-            Console.error(F("MOVEMENT_FAILED"));
-            Console.serialInfo(F("Failed to move carriage relative distance - check motor status"));
-            return false;
-        }
+        // Execute the movement using helper function
+        return executeRailMoveRelative(2, targetPosition, carriageLoaded);
         
     case 9: // "move-wc3" - Move carriage to WC3
         // Parse and validate labware parameter
@@ -885,23 +697,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         return true;
         
     case 12: // "stop" - Emergency stop motor movement
-        // Check if motor is initialized
-        if (!isMotorReady(2)) {
-            Console.error(F("MOTOR_NOT_READY"));
-            Console.serialInfo(F("Rail 2 motor is not initialized. Cannot perform stop."));
-            return false;
-        }
-
-        Console.serialInfo(F("EMERGENCY STOP initiated for Rail 2!"));
-
-        // Execute emergency stop
-        stopMotion(2);
-
-        Console.acknowledge(F("OK_EMERGENCY_STOP"));
-        Console.serialInfo(F("Rail 2 motor movement halted. Position may no longer be accurate."));
-        Console.serialInfo(F("Re-homing recommended after emergency stop."));
-
-        return true;
+        return executeRailStop(2);
         
     default: // Unknown command
         Console.error(F("Unknown action. Available: init, clear-fault, abort, stop, extend, retract, home, move-wc3, move-handoff, move-mm-to, move-rel, status, and help"));
@@ -981,46 +777,10 @@ bool cmd_rail1(char *args, CommandCaller *caller)
     switch (cmdCode) {
     
     case 0: // "abort" - Abort current operation gracefully
-        // Check if motor is initialized before attempting to abort
-        if (!isMotorReady(1)) {
-            Console.error(F("MOTOR_NOT_READY"));
-            Console.serialInfo(F("Rail 1 motor is not initialized. Nothing to abort."));
-            return false;
-        }
-
-        Console.serialInfo(F("Aborting current Rail 1 operation..."));
-
-        // Only meaningful to abort if we're moving or homing
-        if (isMotorMoving(1) || isHomingInProgress(1)) {
-            if (isHomingInProgress(1)) {
-                abortHoming(1);
-            } else {
-                stopMotion(1);
-            }
-
-            Console.acknowledge(F("OK_ABORT"));
-            Console.serialInfo(F("Rail 1 operation aborted successfully"));
-            return true;
-        } else {
-            Console.error(F("NO_ACTIVE_OPERATION"));
-            Console.serialInfo(F("No active operation to abort"));
-            return false;
-        }
+        return executeRailAbort(1);
         
     case 1: // "clear-fault" - Clear motor fault condition
-        Console.serialInfo(F("Attempting to clear Rail 1 motor fault..."));
-
-        if (clearMotorFaultWithStatus(1)) {
-            Console.acknowledge(F("OK_CLEAR_FAULT"));
-            Console.serialInfo(F("Rail 1 motor fault cleared successfully"));
-            return true;
-        } else {
-            Console.error(F("CLEAR_FAULT_FAILED"));
-            Console.serialInfo(F("Failed to clear Rail 1 motor fault"));
-            Console.serialInfo(F("Motor may still be in fault state."));
-            Console.serialInfo(F("Try power cycling the system if fault persists."));
-            return false;
-        }
+        return executeRailClearFault(1);
         
     case 2: // "help" - Display help information
         Console.acknowledge(F("RAIL1_HELP"));
@@ -1083,34 +843,10 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         return true;
         
     case 4: // "init" - Initialize Rail 1 motor system
-        Console.serialInfo(F("Initializing Rail 1 motor..."));
-
-        initMotorSystem();
-
-        if (isMotorReady(1)) {
-            Console.acknowledge(F("OK_INIT"));
-            Console.serialInfo(F("Rail 1 motor initialized successfully"));
-            return true;
-        } else {
-            Console.error(F("INIT_FAILED"));
-            Console.serialInfo(F("Rail 1 motor initialization failed."));
-            Console.serialInfo(F("Check connections and power."));
-            return false;
-        }
+        return executeRailInit(1);
         
     case 3: // "home" - Home carriage
-        if (!checkRailMovementReadiness(1)) return false;
-        
-        Console.serialInfo(F("Initiating Rail 1 homing sequence..."));
-        if (initiateHomingSequence(1)) {
-            Console.acknowledge(F("OK_HOME"));
-            Console.serialInfo(F("Homing sequence initiated successfully"));
-            return true;
-        } else {
-            Console.error(F("HOMING_START_FAILED"));
-            Console.serialInfo(F("Failed to start homing sequence - check motor status"));
-            return false;
-        }
+        return executeRailHome(1);
         
     case 6: // "move-mm-to" - Move to absolute millimeter position
         if (param1 == NULL || param2 == NULL) {
@@ -1123,22 +859,9 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         
         // Use helper functions for common validation
         if (!parseAndValidateLabwareParameter(param2, carriageLoaded)) return false;
-        if (!checkRailMovementReadiness(1)) return false;
         
-        Console.serialInfo(carriageLoaded ? 
-            F("Moving carriage with labware to absolute position...") :
-            F("Moving empty carriage to absolute position..."));
-        
-        // Execute the movement
-        if (moveToPositionMm(1, targetPosition, carriageLoaded)) {
-            Console.acknowledge(F("OK_MOVE_MM_TO"));
-            Console.serialInfo(F("Carriage successfully moved to target position"));
-            return true;
-        } else {
-            Console.error(F("MOVEMENT_FAILED"));
-            Console.serialInfo(F("Failed to move carriage to target position - check motor status"));
-            return false;
-        }
+        // Execute the movement using helper function
+        return executeRailMoveToPosition(1, targetPosition, carriageLoaded);
         
     case 7: // "move-rel" - Move relative distance
         if (param1 == NULL || param2 == NULL) {
@@ -1151,22 +874,9 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         
         // Use helper functions for common validation
         if (!parseAndValidateLabwareParameter(param2, carriageLoaded)) return false;
-        if (!checkRailMovementReadiness(1)) return false;
         
-        Console.serialInfo(carriageLoaded ? 
-            F("Moving carriage with labware relative distance...") :
-            F("Moving empty carriage relative distance..."));
-        
-        // Execute the movement
-        if (moveRelativeManual(1, targetPosition, carriageLoaded)) {
-            Console.acknowledge(F("OK_MOVE_REL"));
-            Console.serialInfo(F("Carriage successfully moved relative distance"));
-            return true;
-        } else {
-            Console.error(F("MOVEMENT_FAILED"));
-            Console.serialInfo(F("Failed to move carriage relative distance - check motor status"));
-            return false;
-        }
+        // Execute the movement using helper function
+        return executeRailMoveRelative(1, targetPosition, carriageLoaded);
         
     case 9: // "move-wc1" - Move carriage to WC1
         // Parse and validate labware parameter
@@ -1256,23 +966,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         return true;
         
     case 12: // "stop" - Emergency stop motor movement
-        // Check if motor is initialized
-        if (!isMotorReady(1)) {
-            Console.error(F("MOTOR_NOT_READY"));
-            Console.serialInfo(F("Rail 1 motor is not initialized. Cannot perform stop."));
-            return false;
-        }
-
-        Console.serialInfo(F("EMERGENCY STOP initiated for Rail 1!"));
-
-        // Execute emergency stop
-        stopMotion(1);
-
-        Console.acknowledge(F("OK_EMERGENCY_STOP"));
-        Console.serialInfo(F("Rail 1 motor movement halted. Position may no longer be accurate."));
-        Console.serialInfo(F("Re-homing recommended after emergency stop."));
-
-        return true;
+        return executeRailStop(1);
         
     default: // Unknown command
         Console.error(F("Unknown action. Available: init, clear-fault, abort, stop, home, move-wc1, move-wc2, move-staging, move-handoff, move-mm-to, move-rel, status, and help"));

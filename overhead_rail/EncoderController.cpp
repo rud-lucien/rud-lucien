@@ -164,7 +164,7 @@ void enableEncoderControl(int rail)
     lastEncoderUpdateTime = millis();
     quadratureErrorDetected = false;
     
-    char msg[150];
+    char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_MPG_ENABLED, 
             rail, scaledToMm(mpgBasePositionScaled));
     Console.serialInfo(msg);
@@ -279,7 +279,7 @@ void processEncoderInput()
         unsigned long currentTime = millis();
         if (waitTimeReached(currentTime, lastPositiveWarning, 1000))
         {
-            char msg[100];
+            char msg[MEDIUM_MSG_SIZE];
             sprintf_P(msg, FMT_AT_POSITIVE_LIMIT, scaledToMm(maxTravelScaled));
             Console.serialWarning(msg);
             lastPositiveWarning = currentTime;
@@ -312,7 +312,7 @@ void processEncoderInput()
     unsigned long currentTime = millis();
     if (waitTimeReached(currentTime, lastEncoderUpdateTime, 50)) // More frequent logging for debugging
     {
-        char msg[150];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_MPG_RAIL_MOVEMENT, 
                 activeEncoderRail, totalEncoderDelta, targetPositionMm, getMultiplierName(currentMultiplierScaled));
         Console.serialDiagnostic(msg);
@@ -348,7 +348,7 @@ void setEncoderMultiplier(float multiplier)
         return;
     }
     
-    char msg[100];
+    char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_MPG_MULTIPLIER_SET, getMultiplierName(currentMultiplierScaled));
     Console.serialInfo(msg);
     
@@ -360,7 +360,7 @@ void setEncoderVelocity(int velocityRpm)
 {
     if (velocityRpm < ENCODER_MIN_VELOCITY_RPM || velocityRpm > ENCODER_MAX_VELOCITY_RPM)
     {
-        char msg[100];
+        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_VELOCITY_RANGE, 
                 ENCODER_MIN_VELOCITY_RPM, ENCODER_MAX_VELOCITY_RPM);
         Console.serialError(msg);
@@ -369,7 +369,7 @@ void setEncoderVelocity(int velocityRpm)
     
     currentVelocityRpm = velocityRpm;
     
-    char msg[100];
+    char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_MPG_VELOCITY_SET, currentVelocityRpm);
     Console.serialInfo(msg);
 }
@@ -380,7 +380,7 @@ void setEncoderVelocity(int velocityRpm)
 
 void printEncoderStatus()
 {
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     
     if (!encoderControlActive)
     {

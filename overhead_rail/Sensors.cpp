@@ -136,7 +136,7 @@ void initDigitalSensor(DigitalSensor& sensor, int pin, bool isCcioPin, const cha
     updateDigitalSensor(sensor);
     sensor.lastState = sensor.currentState;  // Prevent initial false state change
 
-    char msg[100];
+    char msg[MEDIUM_MSG_SIZE];
     if (isCcioPin) {
         sprintf_P(msg, FMT_SENSOR_INIT_CCIO, name);
     } else {
@@ -159,7 +159,7 @@ void initPressureSensor()
 
     // Read and report the initial pressure
     float initialPressure = getPressurePsi();
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     sprintf_P(msg, FMT_INITIAL_PRESSURE, initialPressure);
     Console.serialInfo(msg);
 
@@ -386,7 +386,7 @@ void printAllSensorStatus()
 void printCarriagePositions()
 {
     Console.serialInfo(F("--- Carriage Position Sensors ---"));
-    char msg[250];
+    char msg[LARGE_MSG_SIZE];
     
     if (hasCCIO) {
         sprintf_P(msg, FMT_CARRIAGE_STATUS_FULL,
@@ -407,7 +407,7 @@ void printCarriagePositions()
 void printLabwareStatus()
 {
     Console.serialInfo(F("--- Labware Presence Sensors ---"));
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     
     if (hasCCIO) {
         sprintf_P(msg, FMT_LABWARE_STATUS_FULL,
@@ -426,7 +426,7 @@ void printLabwareStatus()
 
 void printPressureStatus()
 {
-    char msg[200];
+    char msg[ALERT_MSG_SIZE];
     float currentPressure = getPressurePsi();
     sprintf_P(msg, FMT_AIR_PRESSURE, currentPressure);
     Console.serialInfo(msg);
@@ -439,7 +439,7 @@ void printPressureStatus()
 void printCylinderStatus()
 {
     Console.serialInfo(F("--- Cylinder Position ---"));
-    char msg[150];
+    char msg[MEDIUM_MSG_SIZE];
     
     if (!hasCCIO) {
         Console.serialInfo(F("Cylinder: N/A (No CCIO board detected)"));

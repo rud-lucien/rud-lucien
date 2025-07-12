@@ -1,4 +1,5 @@
 #include "Logging.h"
+#include "Utils.h"
 
 //=============================================================================
 // PROGMEM STRING CONSTANTS FOR MEMORY EFFICIENCY
@@ -122,7 +123,7 @@ void printSensorSection()
 
 void printSystemSection()
 {
-    char systemInfo[200];
+    char systemInfo[ALERT_MSG_SIZE];
     uint16_t pressurePsi = getPressurePsi();
     sprintf_P(systemInfo, FMT_SYSTEM_SECTION,
         isEStopActive() ? PSTR("TRIGGERED") : PSTR("RELEASED"),
@@ -136,7 +137,7 @@ void printSystemSection()
 
 void printMotorSection(int railNumber)
 {
-    char motorInfo[150];
+    char motorInfo[MEDIUM_MSG_SIZE];
     const char* motorStateStr;
     MotorState state = updateMotorState(railNumber);
     
@@ -178,7 +179,7 @@ void printMotorSection(int railNumber)
 
 void printPositionSection(int railNumber)
 {
-    char positionInfo[200];
+    char positionInfo[ALERT_MSG_SIZE];
     
     if (!isHomingComplete(railNumber)) {
         sprintf_P(positionInfo, FMT_POSITION_UNHOMED, railNumber);
@@ -199,7 +200,7 @@ void printPositionSection(int railNumber)
 
 void printVelocitySection(int railNumber)
 {
-    char velocityInfo[150];
+    char velocityInfo[MEDIUM_MSG_SIZE];
     char percentStr[20] = "";
     
     // Get velocity directly from motor connector
@@ -225,7 +226,7 @@ void printVelocitySection(int railNumber)
 
 void printMPGSection()
 {
-    char mpgInfo[100];
+    char mpgInfo[MEDIUM_MSG_SIZE];
     
     if (encoderControlActive) {
         const char* multiplierName = getMultiplierName(currentMultiplierScaled);
