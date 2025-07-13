@@ -44,7 +44,8 @@ enum HandoffResult {
     HANDOFF_ERROR_INVALID_PARAMS, // Invalid parameters provided
     HANDOFF_ERROR_SYSTEM_STATE,   // System not ready for handoff
     HANDOFF_ERROR_COLLISION,      // Both carriages have labware - collision risk
-    HANDOFF_ERROR_SOURCE_MISSING  // Source labware disappeared during operation
+    HANDOFF_ERROR_SOURCE_MISSING, // Source labware disappeared during operation
+    HANDOFF_ERROR_POSITION        // Position validation failure
 };
 
 // Internal handoff state (for non-blocking operation)
@@ -91,10 +92,6 @@ bool isHandoffInProgress();
 HandoffState getCurrentHandoffState();
 HandoffResult getLastHandoffResult();
 
-// Utility functions
-void cancelHandoff(); // Emergency cancel
-void resetHandoff();  // Reset to idle state
-
 // Helper functions (internal - defined in .cpp)
 bool validateHandoffParameters(HandoffDirection dir, HandoffDestination dest);
 bool checkHandoffSystemReadiness();
@@ -105,5 +102,10 @@ bool verifyHandoffLabwareTransfer();
 bool isHandoffOperationTimedOut();
 const char* getHandoffResultName(HandoffResult result);
 const char* getHandoffStateName(HandoffState state);
+
+// Enhanced position validation using existing MotorController functions
+bool validateRailReadyForHandoff(int railNumber, double expectedPosition);
+bool validateRail1AtHandoffPosition();
+bool validateRail2AtHandoffPosition();
 
 #endif // HANDOFF_CONTROLLER_H

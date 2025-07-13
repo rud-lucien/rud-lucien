@@ -1,5 +1,7 @@
 #include "HandoffController.h"
 #include "LabwareAutomation.h"
+#include "MotorController.h"  // Add for position validation functions
+#include "PositionConfig.h"   // Add for position constants
 #include "Logging.h"
 #include "Sensors.h"
 #include "ValveController.h"
@@ -59,6 +61,25 @@ HandoffResult startHandoff(HandoffDirection dir, HandoffDestination dest) {
         return handoffState.currentResult;
     }
     
+    // ENHANCED: Pre-flight position validation
+    if (dir == HANDOFF_RAIL1_TO_RAIL2) {
+        Console.serialInfo(F("HANDOFF_PREFLIGHT: Validating Rail 1 ready for handoff"));
+        // Don't require exact handoff position yet, just validate rail is homed and operational
+        if (!isHomingComplete(1)) {
+            Console.error(F("HANDOFF_PREFLIGHT_FAILED: Rail 1 not homed"));
+            handoffState.currentResult = HANDOFF_ERROR_POSITION;
+            return handoffState.currentResult;
+        }
+    }
+    else if (dir == HANDOFF_RAIL2_TO_RAIL1) {
+        Console.serialInfo(F("HANDOFF_PREFLIGHT: Validating Rail 2 ready for handoff"));
+        if (!isHomingComplete(2)) {
+            Console.error(F("HANDOFF_PREFLIGHT_FAILED: Rail 2 not homed"));
+            handoffState.currentResult = HANDOFF_ERROR_POSITION;
+            return handoffState.currentResult;
+        }
+    }
+    
     // Initialize handoff operation
     handoffState.direction = dir;
     handoffState.destination = dest;
@@ -75,6 +96,8 @@ HandoffResult startHandoff(HandoffDirection dir, HandoffDestination dest) {
                           (dest == DEST_STAGING) ? "Staging" : "WC3";
     sprintf_P(msg, FMT_HANDOFF_INIT, dirStr, destStr);
     Console.serialInfo(msg);
+    
+    Console.serialInfo(F("HANDOFF_INITIATED_WITH_VALIDATION: Position validation enabled"));
     
     return HANDOFF_SUCCESS;
 }
@@ -110,11 +133,39 @@ HandoffResult updateHandoff() {
             
         case HANDOFF_MOVING_SOURCE_TO_POS:
             if (moveSourceRailToHandoffPosition()) {
-                char msg[MEDIUM_MSG_SIZE];
-                sprintf_P(msg, FMT_HANDOFF_STATE, "Extending cylinder");
-                Console.serialInfo(msg);
-                handoffState.currentState = HANDOFF_EXTENDING_CYLINDER;
-                handoffState.operationStartTime = millis(); // Reset timer for next phase
+                // ENHANCED: Validate source rail reached handoff position
+                bool positionValid = false;
+                
+                if (handoffState.direction == HANDOFF_RAIL1_TO_RAIL2) {
+                    if (validateRail1AtHandoffPosition()) {
+                        Console.serialInfo(F("HANDOFF_RAIL1_POSITIONED: Rail 1 validated at handoff"));
+                        positionValid = true;
+                    } else {
+                        Console.error(F("HANDOFF_POSITION_ERROR: Rail 1 failed position validation"));
+                        handoffState.currentState = HANDOFF_ERROR;
+                        handoffState.currentResult = HANDOFF_ERROR_POSITION;
+                        return handoffState.currentResult;
+                    }
+                }
+                else if (handoffState.direction == HANDOFF_RAIL2_TO_RAIL1) {
+                    if (validateRail2AtHandoffPosition()) {
+                        Console.serialInfo(F("HANDOFF_RAIL2_POSITIONED: Rail 2 validated at handoff"));
+                        positionValid = true;
+                    } else {
+                        Console.error(F("HANDOFF_POSITION_ERROR: Rail 2 failed position validation"));
+                        handoffState.currentState = HANDOFF_ERROR;
+                        handoffState.currentResult = HANDOFF_ERROR_POSITION;
+                        return handoffState.currentResult;
+                    }
+                }
+                
+                if (positionValid) {
+                    char msg[MEDIUM_MSG_SIZE];
+                    sprintf_P(msg, FMT_HANDOFF_STATE, "Extending cylinder");
+                    Console.serialInfo(msg);
+                    handoffState.currentState = HANDOFF_EXTENDING_CYLINDER;
+                    handoffState.operationStartTime = millis(); // Reset timer for next phase
+                }
             }
             break;
             
@@ -170,12 +221,66 @@ HandoffResult updateHandoff() {
             
         case HANDOFF_MOVING_DEST_TO_TARGET:
             if (moveDestinationRailToTargetPosition()) {
-                Console.acknowledge(F("LABWARE_HANDOFF_COMPLETED"));
-                handoffState.currentState = HANDOFF_COMPLETED;
-                handoffState.currentResult = HANDOFF_SUCCESS;
+                // ENHANCED: Validate destination positioning for both directions
+                bool destinationValid = false;
                 
-                // Update cross-rail transfer counter for successful handoff
-                incrementCrossRailCounter();
+                if (handoffState.direction == HANDOFF_RAIL1_TO_RAIL2) {
+                    // Rail 2 moving to final destination (WC3)
+                    if (validateRailReadyForHandoff(2, RAIL2_WC3_PICKUP_DROPOFF)) {
+                        Console.serialInfo(F("HANDOFF_DEST_POSITIONED: Rail 2 validated at WC3"));
+                        destinationValid = true;
+                    } else {
+                        Console.error(F("HANDOFF_DEST_ERROR: Rail 2 failed WC3 position validation"));
+                        handoffState.currentState = HANDOFF_ERROR;
+                        handoffState.currentResult = HANDOFF_ERROR_POSITION;
+                        return handoffState.currentResult;
+                    }
+                }
+                else if (handoffState.direction == HANDOFF_RAIL2_TO_RAIL1) {
+                    // Rail 1 moving to final destination
+                    if (handoffState.destination == DEST_WC1) {
+                        if (validateRailReadyForHandoff(1, RAIL1_WC1_PICKUP_DROPOFF)) {
+                            Console.serialInfo(F("HANDOFF_DEST_POSITIONED: Rail 1 validated at WC1"));
+                            destinationValid = true;
+                        } else {
+                            Console.error(F("HANDOFF_DEST_ERROR: Rail 1 failed WC1 position validation"));
+                            handoffState.currentState = HANDOFF_ERROR;
+                            handoffState.currentResult = HANDOFF_ERROR_POSITION;
+                            return handoffState.currentResult;
+                        }
+                    }
+                    else if (handoffState.destination == DEST_WC2) {
+                        if (validateRailReadyForHandoff(1, RAIL1_WC2_PICKUP_DROPOFF)) {
+                            Console.serialInfo(F("HANDOFF_DEST_POSITIONED: Rail 1 validated at WC2"));
+                            destinationValid = true;
+                        } else {
+                            Console.error(F("HANDOFF_DEST_ERROR: Rail 1 failed WC2 position validation"));
+                            handoffState.currentState = HANDOFF_ERROR;
+                            handoffState.currentResult = HANDOFF_ERROR_POSITION;
+                            return handoffState.currentResult;
+                        }
+                    }
+                    else if (handoffState.destination == DEST_STAGING) {
+                        if (validateRailReadyForHandoff(1, RAIL1_STAGING_POSITION)) {
+                            Console.serialInfo(F("HANDOFF_DEST_POSITIONED: Rail 1 validated at staging"));
+                            destinationValid = true;
+                        } else {
+                            Console.error(F("HANDOFF_DEST_ERROR: Rail 1 failed staging position validation"));
+                            handoffState.currentState = HANDOFF_ERROR;
+                            handoffState.currentResult = HANDOFF_ERROR_POSITION;
+                            return handoffState.currentResult;
+                        }
+                    }
+                }
+                
+                if (destinationValid) {
+                    // ENHANCED: Increment cross-rail counter with position validation
+                    incrementCrossRailCounter();
+                    
+                    Console.acknowledge(F("HANDOFF_COMPLETED_WITH_VALIDATION: Cross-rail transfer successful"));
+                    handoffState.currentState = HANDOFF_COMPLETED;
+                    handoffState.currentResult = HANDOFF_SUCCESS;
+                }
             }
             break;
             
@@ -185,7 +290,19 @@ HandoffResult updateHandoff() {
             return HANDOFF_SUCCESS;
             
         case HANDOFF_ERROR:
-            // Error state - manual intervention required
+            // Enhanced error reporting with proper string formatting
+            {
+                char errorMsg[100];
+                sprintf_P(errorMsg, PSTR("HANDOFF_FAILED: %s"), getHandoffResultName(handoffState.currentResult));
+                Console.error(errorMsg);
+            }
+            
+            // Attempt safe recovery - retract cylinder if extended
+            if (isCylinderActuallyExtended()) {
+                Console.serialInfo(F("HANDOFF_RECOVERY: Retracting cylinder for safety"));
+                retractCylinder();
+            }
+            
             return handoffState.currentResult;
     }
     
@@ -206,25 +323,46 @@ HandoffResult getLastHandoffResult() {
     return handoffState.currentResult;
 }
 
-void cancelHandoff() {
-    if (handoffState.currentState != HANDOFF_IDLE) {
-        char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_HANDOFF_STATE, "Cancelled - returning to safe state");
-        Console.serialInfo(msg);
-        handoffState.currentState = HANDOFF_IDLE;
-        handoffState.currentResult = HANDOFF_SUCCESS;
-        
-        // Attempt to safely retract cylinder if extended
-        if (isCylinderActuallyExtended()) {
-            retractCylinder();
-        }
+//=============================================================================
+// ENHANCED POSITION VALIDATION FUNCTIONS
+//=============================================================================
+// Leverage existing MotorController position validation capabilities
+
+bool validateRailReadyForHandoff(int railNumber, double expectedPosition) {
+    // Leverage existing MotorController functions
+    if (!isHomingComplete(railNumber)) {
+        char errorMsg[80];
+        sprintf_P(errorMsg, PSTR("POSITION_VALIDATION_FAILED: Rail %d not homed"), railNumber);
+        Console.error(errorMsg);
+        return false;
     }
+    
+    // Get current position and check tolerance manually
+    double currentPos = getMotorPositionMm(railNumber);
+    double tolerance = MOVEMENT_POSITION_TOLERANCE_MM;
+    
+    if (abs(currentPos - expectedPosition) > tolerance) {
+        char errorMsg[120];
+        sprintf_P(errorMsg, PSTR("POSITION_VALIDATION_FAILED: Rail %d at %.1fmm, expected %.1fmm"), 
+                 railNumber, currentPos, expectedPosition);
+        Console.error(errorMsg);
+        return false;
+    }
+    
+    char infoMsg[80];
+    sprintf_P(infoMsg, PSTR("POSITION_VALIDATED: Rail %d ready at %.1fmm"), railNumber, expectedPosition);
+    Console.serialInfo(infoMsg);
+    return true;
 }
 
-void resetHandoff() {
-    handoffState.currentState = HANDOFF_IDLE;
-    handoffState.currentResult = HANDOFF_SUCCESS;
-    handoffState.operationStartTime = 0;
+bool validateRail1AtHandoffPosition() {
+    // Rail 1 handoff position is at 0mm (home position)
+    return validateRailReadyForHandoff(1, 0.0);
+}
+
+bool validateRail2AtHandoffPosition() {
+    // Rail 2 handoff position - use the defined constant
+    return validateRailReadyForHandoff(2, RAIL2_HANDOFF);
 }
 
 //=============================================================================
@@ -480,6 +618,7 @@ const char* getHandoffResultName(HandoffResult result) {
         case HANDOFF_ERROR_SYSTEM_STATE:   return "SYSTEM_NOT_READY";
         case HANDOFF_ERROR_COLLISION:      return "COLLISION_RISK_DETECTED";
         case HANDOFF_ERROR_SOURCE_MISSING: return "SOURCE_LABWARE_MISSING";
+        case HANDOFF_ERROR_POSITION:       return "POSITION_VALIDATION_FAILED";
         default:                           return "UNKNOWN_ERROR";
     }
 }
