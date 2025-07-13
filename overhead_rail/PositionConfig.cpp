@@ -36,24 +36,24 @@ const char FMT_POSITION_OUT_OF_RANGE[] PROGMEM = "Position %.2fmm is outside val
 //=============================================================================
 
 // Runtime position overrides (-1 means use factory default)
-double runtimeRail1HomeMm = -1.0;
 double runtimeRail1StagingMm = -1.0;
 double runtimeRail1WC1PickupMm = -1.0;
 double runtimeRail1WC2PickupMm = -1.0;
-double runtimeRail2HomeMm = -1.0;
+double runtimeRail1HandoffMm = -1.0;
 double runtimeRail2HandoffMm = -1.0;
+double runtimeRail2WC3PickupMm = -1.0;
 
 bool useRuntimePositions = false;
 bool sdCardInitialized = false;
 
 // Teachable position lookup table
 TeachablePosition teachablePositions[] = {
-    {RAIL1_HOME_POS, "RAIL1_HOME", "Rail 1 Home (Handoff)", 1, RAIL1_HOME_POSITION, &runtimeRail1HomeMm},
     {RAIL1_STAGING_POS, "RAIL1_STAGING", "Rail 1 Staging Position", 1, RAIL1_STAGING_POSITION, &runtimeRail1StagingMm},
     {RAIL1_WC1_PICKUP_DROPOFF_POS, "RAIL1_WC1", "Rail 1 Workcell 1 Pickup/Dropoff", 1, RAIL1_WC1_PICKUP_DROPOFF, &runtimeRail1WC1PickupMm},
     {RAIL1_WC2_PICKUP_DROPOFF_POS, "RAIL1_WC2", "Rail 1 Workcell 2 Pickup/Dropoff", 1, RAIL1_WC2_PICKUP_DROPOFF, &runtimeRail1WC2PickupMm},
-    {RAIL2_HOME_POS, "RAIL2_HOME", "Rail 2 Home (WC3)", 2, RAIL2_HOME_POSITION, &runtimeRail2HomeMm},
-    {RAIL2_HANDOFF_POS, "RAIL2_HANDOFF", "Rail 2 Handoff Position", 2, RAIL2_HANDOFF, &runtimeRail2HandoffMm}
+    {RAIL1_HANDOFF_POS, "RAIL1_HANDOFF", "Rail 1 Handoff Position", 1, RAIL1_HANDOFF, &runtimeRail1HandoffMm},
+    {RAIL2_HANDOFF_POS, "RAIL2_HANDOFF", "Rail 2 Handoff Position", 2, RAIL2_HANDOFF, &runtimeRail2HandoffMm},
+    {RAIL2_WC3_PICKUP_DROPOFF_POS, "RAIL2_WC3", "Rail 2 Workcell 3 Pickup/Dropoff", 2, RAIL2_WC3_PICKUP_DROPOFF, &runtimeRail2WC3PickupMm}
 };
 
 const int NUM_TEACHABLE_POSITIONS = sizeof(teachablePositions) / sizeof(TeachablePosition);
@@ -100,13 +100,6 @@ bool initPositionConfig() {
 // POSITION GETTER FUNCTIONS
 //=============================================================================
 
-double getRail1HomeMm() {
-    if (useRuntimePositions && runtimeRail1HomeMm >= 0) {
-        return runtimeRail1HomeMm;
-    }
-    return RAIL1_HOME_POSITION;
-}
-
 double getRail1StagingMm() {
     if (useRuntimePositions && runtimeRail1StagingMm >= 0) {
         return runtimeRail1StagingMm;
@@ -128,11 +121,11 @@ double getRail1WC2PickupMm() {
     return RAIL1_WC2_PICKUP_DROPOFF;
 }
 
-double getRail2HomeMm() {
-    if (useRuntimePositions && runtimeRail2HomeMm >= 0) {
-        return runtimeRail2HomeMm;
+double getRail1HandoffMm() {
+    if (useRuntimePositions && runtimeRail1HandoffMm >= 0) {
+        return runtimeRail1HandoffMm;
     }
-    return RAIL2_HOME_POSITION;
+    return RAIL1_HANDOFF;
 }
 
 double getRail2HandoffMm() {
@@ -140,6 +133,13 @@ double getRail2HandoffMm() {
         return runtimeRail2HandoffMm;
     }
     return RAIL2_HANDOFF;
+}
+
+double getRail2WC3PickupMm() {
+    if (useRuntimePositions && runtimeRail2WC3PickupMm >= 0) {
+        return runtimeRail2WC3PickupMm;
+    }
+    return RAIL2_WC3_PICKUP_DROPOFF;
 }
 
 double getTeachablePositionMm(PositionTarget target) {
@@ -223,10 +223,6 @@ bool teachCurrentPosition(int rail, PositionTarget target) {
 }
 
 // Individual teaching functions for convenience
-bool teachRail1Home() {
-    return teachCurrentPosition(1, RAIL1_HOME_POS);
-}
-
 bool teachRail1Staging() {
     return teachCurrentPosition(1, RAIL1_STAGING_POS);
 }
@@ -239,39 +235,21 @@ bool teachRail1WC2Pickup() {
     return teachCurrentPosition(1, RAIL1_WC2_PICKUP_DROPOFF_POS);
 }
 
-bool teachRail2Home() {
-    return teachCurrentPosition(2, RAIL2_HOME_POS);
+bool teachRail1Handoff() {
+    return teachCurrentPosition(1, RAIL1_HANDOFF_POS);
 }
 
 bool teachRail2Handoff() {
     return teachCurrentPosition(2, RAIL2_HANDOFF_POS);
 }
 
+bool teachRail2WC3Pickup() {
+    return teachCurrentPosition(2, RAIL2_WC3_PICKUP_DROPOFF_POS);
+}
+
 //=============================================================================
 // BULK OPERATIONS
 //=============================================================================
-
-bool teachSaveAllPositions() {
-    if (savePositionsToSD()) {
-        Console.acknowledge(F("ALL_POSITIONS_SAVED"));
-        
-        // Show summary
-        int taughtCount = 0;
-        for (int i = 0; i < NUM_TEACHABLE_POSITIONS; i++) {
-            if (*(teachablePositions[i].runtimeVariable) >= 0) {
-                taughtCount++;
-            }
-        }
-        
-        char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_SAVED_COUNT, taughtCount);
-        Console.serialInfo(msg);
-        return true;
-    } else {
-        Console.serialError(F("Failed to save positions to SD card"));
-        return false;
-    }
-}
 
 bool teachResetAllPositions() {
     // Clear all runtime positions
@@ -390,17 +368,13 @@ bool validateTaughtPosition(int rail, double positionMm, PositionTarget target) 
     // Add position-specific validation if needed
     TeachablePosition* pos = getTeachablePositionInfo(target);
     if (pos) {
-        // For example, ensure home position is near 0
-        if (target == RAIL1_HOME_POS || target == RAIL2_HOME_POS) {
-            if (positionMm > 100) {  // Allow some tolerance for home position
-                Console.serialWarning(F("Home position is far from 0mm - verify this is correct"));
-            }
-        }
-        
         // Ensure handoff positions are compatible between rails
         if (target == RAIL1_HANDOFF_POS && runtimeRail2HandoffMm >= 0) {
             // Could add validation that handoff positions are reasonable relative to each other
         }
+        
+        // Could add other position-specific validations here
+        // For example, ensure staging position is reasonable, etc.
     }
     
     return true;

@@ -8,7 +8,7 @@
 #include "ValveController.h"
 #include "Sensors.h"
 #include "LabwareAutomation.h"
-// #include "Logging.h" // TODO: need to figure out what I want to log
+#include "Logging.h"
 #include "CommandController.h"
 #include "Utils.h"
 #include "EncoderController.h"
@@ -55,20 +55,6 @@ extern Commander commander;
 //-----------------------------------------------------------------------------
 bool cmd_print_help(char *args, CommandCaller *caller);
 
-//-----------------------------------------------------------------------------
-// Motor Control Commands
-// Functions for motor movement and configuration
-//-----------------------------------------------------------------------------
-// bool cmd_motor(char *args, CommandCaller *caller);
-// bool cmd_move(char *args, CommandCaller *caller);
-// bool cmd_jog(char *args, CommandCaller *caller);
-
-//-----------------------------------------------------------------------------
-// Valve Control Commands
-// Functions for operating pneumatic valves
-//-----------------------------------------------------------------------------
-// bool cmd_lock(char *args, CommandCaller *caller);
-// bool cmd_unlock(char *args, CommandCaller *caller);
 
 //-----------------------------------------------------------------------------
 // Status and Logging Commands
@@ -77,6 +63,10 @@ bool cmd_print_help(char *args, CommandCaller *caller);
 bool cmd_log(char *args, CommandCaller *caller);
 bool cmd_labware(char *args, CommandCaller *caller);
 bool cmd_goto(char *args, CommandCaller *caller);
+bool cmd_network(char *args, CommandCaller *caller);
+bool cmd_encoder(char *args, CommandCaller *caller);
+bool cmd_jog(char *args, CommandCaller *caller);
+bool cmd_teach(char *args, CommandCaller *caller);
 
 //-----------------------------------------------------------------------------
 // Rail Control Commands

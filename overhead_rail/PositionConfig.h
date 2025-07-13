@@ -10,14 +10,14 @@
 //=============================================================================
 
 // Runtime position variables for Rail 1 (override #defines when set)
-extern double runtimeRail1HomeMm;
 extern double runtimeRail1StagingMm; 
 extern double runtimeRail1WC1PickupMm;
 extern double runtimeRail1WC2PickupMm;
+extern double runtimeRail1HandoffMm;
 
 // Runtime position variables for Rail 2
-extern double runtimeRail2HomeMm;
 extern double runtimeRail2HandoffMm;
+extern double runtimeRail2WC3PickupMm;
 
 // Control flags
 extern bool useRuntimePositions;
@@ -49,27 +49,26 @@ typedef struct {
 bool initPositionConfig();
 
 // Position getter functions (replaces direct #define usage)
-double getRail1HomeMm();
 double getRail1StagingMm();
 double getRail1WC1PickupMm();
 double getRail1WC2PickupMm();
-double getRail2HomeMm();
+double getRail1HandoffMm();
 double getRail2HandoffMm();
+double getRail2WC3PickupMm();
 
 // Generic position getter (works with PositionTarget enum)
 double getTeachablePositionMm(PositionTarget target);
 
 // Teaching functions by rail and position
 bool teachCurrentPosition(int rail, PositionTarget target);
-bool teachRail1Home();
 bool teachRail1Staging();
 bool teachRail1WC1Pickup();
 bool teachRail1WC2Pickup();
-bool teachRail2Home();
+bool teachRail1Handoff();
 bool teachRail2Handoff();
+bool teachRail2WC3Pickup();
 
 // Bulk operations
-bool teachSaveAllPositions();
 bool teachResetAllPositions();
 bool teachResetRail(int rail);
 void teachShowStatus();

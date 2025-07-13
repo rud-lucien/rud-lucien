@@ -115,45 +115,59 @@ Commander::systemCommand_t API_tree[] = {
     //               cmd_system_state),
 
 
-    // Jog command
-    // systemCommand("jog", "Jog motor:\r\n"
-    //                      "  jog,+         - Jog forward by current increment\r\n"
-    //                      "  jog,-         - Jog backward by current increment\r\n"
-    //                      "  jog,inc,X     - Get or set jog increment (X in mm or 'default')\r\n"
-    //                      "  jog,speed,X   - Get or set jog speed (X in RPM or 'default')\r\n"
-    //                      "  jog,status    - Display current jog settings\r\n"
-    //                      "  jog,help      - Display usage instructions and comparison with handwheel",
-    //               cmd_jog),
+   
 
 
     // Encoder control commands
-    // systemCommand("encoder", "Encoder handwheel control:\r\n"
-    //                          "  encoder,enable  - Enable encoder control\r\n"
-    //                          "  encoder,disable - Disable encoder control\r\n"
-    //                          "  encoder,multiplier,X - Set encoder multiplier (X = 1, 10, or 100)\r\n"
-    //                          "  encoder,help    - Display setup instructions and usage tips",
-    //               cmd_encoder),
+    systemCommand("encoder", "Manual Pulse Generator (MPG) handwheel control:\r\n"
+                             "  encoder enable <rail>    - Enable encoder control for Rail 1 or 2\r\n"
+                             "  encoder disable          - Disable encoder control\r\n"
+                             "  encoder multiplier <X>   - Set encoder multiplier (X = 0.1, 1.0, or 10.0)\r\n"
+                             "  encoder velocity <RPM>   - Set encoder velocity (50-400 RPM)\r\n"
+                             "  encoder status           - Display current encoder status and settings\r\n"
+                             "  encoder help             - Display detailed setup and usage instructions",
+                  cmd_encoder),
+
+    // Jog command
+    systemCommand("jog", "Manual jogging control for dual-rail system:\r\n"
+                         "  jog <rail> + [mm]        - Jog rail forward by increment or custom distance\r\n"
+                         "  jog <rail> - [mm]        - Jog rail backward by increment or custom distance\r\n"
+                         "  jog <rail> increment <mm> - Set default jog increment for rail\r\n"
+                         "  jog <rail> speed <rpm>   - Set jog speed for rail\r\n"
+                         "  jog <rail> status        - Display jog settings for specific rail\r\n"
+                         "  jog status               - Display jog settings for all rails\r\n"
+                         "  jog help                 - Display detailed usage instructions",
+                  cmd_jog),
 
     // Abort command
     // systemCommand("abort", "Abort any running test", cmd_abort),
 
     // Network management command
-    // systemCommand("network", "Network management:\r\n"
-    //                          "  network,status   - Display current network status and connected clients\r\n"
-    //                          "  network,close,X  - Close a specific client connection (X = client number)\r\n"
-    //                          "  network,closeall - Close all client connections\r\n"
-    //                          "  network,help     - Display detailed network management instructions",
-    //               cmd_network),
+    systemCommand("network", "Network management:\r\n"
+                             "  network status     - Display current network status and client info\r\n"
+                             "  network disconnect - Disconnect the current client\r\n"
+                             "  network help       - Display detailed network management instructions",
+                  cmd_network),
 
     // Teach position command
-    // systemCommand("teach", "Teach position commands:\r\n"
-    //                        "  teach,1   - Teach position 1 (loading position)\r\n"
-    //                        "  teach,2   - Teach position 2 (middle position)\r\n"
-    //                        "  teach,3   - Teach position 3 (unloading position)\r\n"
-    //                        "  teach,reset - Reset all positions to factory defaults\r\n"
-    //                        "  teach,status - Display current taught positions and SD card status\r\n"
-    //                        "  teach,help   - Display detailed usage instructions",
-    //               cmd_teach),
+    systemCommand("teach", "Position teaching system with automatic SD card persistence:\r\n"
+                          "  teach <rail> <position>  - Teach current position and auto-save to SD card\r\n"
+                          "  teach <rail> status      - Show taught positions for specific rail\r\n"
+                          "  teach status             - Show all taught positions and system status\r\n"
+                          "  teach <rail> reset       - Reset rail positions to factory defaults\r\n"
+                          "  teach reset              - Reset all positions to factory defaults\r\n"
+                          "  \r\n"
+                          "  Rail 1 positions: staging, wc1, wc2, handoff\r\n"
+                          "  Rail 2 positions: handoff, wc3\r\n"
+                          "  \r\n"
+                          "  Examples:\r\n"
+                          "    teach 1 staging        - Teach Rail 1 staging position\r\n"
+                          "    teach 2 wc3            - Teach Rail 2 WC3 position\r\n"
+                          "    teach 1 status         - Show Rail 1 position status\r\n"
+                          "    teach 1 reset          - Reset Rail 1 to defaults",
+                  cmd_teach),
+
+   
 
     // Rail 1 control command
     systemCommand("rail1", "Rail 1 Control Commands:\r\n"
@@ -363,6 +377,167 @@ bool cmd_log(char *args, CommandCaller *caller)
         Console.error(F("Unknown log command. Available: on, off, now, history, errors, last, stats, help"));
         return false;
     }
+}
+
+// ============================================================
+// Teach Position Command Implementation
+// ============================================================
+
+// Define the teach subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo TEACH_COMMANDS[] = {
+    {"reset", 0},
+    {"status", 1}
+};
+
+static const size_t TEACH_COMMAND_COUNT = sizeof(TEACH_COMMANDS) / sizeof(SubcommandInfo);
+
+// Define Rail 1 position lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo RAIL1_POSITIONS[] = {
+    {"handoff", 3},
+    {"staging", 0},
+    {"wc1", 1},
+    {"wc2", 2}
+};
+
+static const size_t RAIL1_POSITION_COUNT = sizeof(RAIL1_POSITIONS) / sizeof(SubcommandInfo);
+
+// Define Rail 2 position lookup table (MUST BE SORTED ALPHABETICALLY)  
+static const SubcommandInfo RAIL2_POSITIONS[] = {
+    {"handoff", 0},
+    {"wc3", 1}
+};
+
+static const size_t RAIL2_POSITION_COUNT = sizeof(RAIL2_POSITIONS) / sizeof(SubcommandInfo);
+
+bool cmd_teach(char *args, CommandCaller *caller)
+{
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+    
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+    
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        Console.error(F("Missing parameters. Usage: teach <rail|status|reset> [position|status|reset]"));
+        Console.error(F("Examples: teach 1 staging, teach status, teach reset"));
+        return false;
+    }
+    
+    // Parse the arguments - use spaces as separators
+    char *param1 = strtok(trimmed, " ");
+    char *param2 = strtok(nullptr, " ");
+    
+    if (param1 == NULL) {
+        Console.error(F("Invalid format. Usage: teach <rail|status|reset> [position|status|reset]"));
+        return false;
+    }
+    
+    // Trim leading spaces from param1
+    param1 = trimLeadingSpaces(param1);
+    
+    // Convert param1 to lowercase for case-insensitive comparison
+    for (int i = 0; param1[i]; i++) {
+        param1[i] = tolower(param1[i]);
+    }
+    
+    // Handle global commands first
+    if (strcmp(param1, "status") == 0) {
+        // Global status command
+        teachShowStatus();
+        return true;
+    }
+    else if (strcmp(param1, "reset") == 0) {
+        // Global reset command
+        return teachResetAllPositions();
+    }
+    
+    // Check if param1 is a rail number
+    int rail = atoi(param1);
+    if (rail != 1 && rail != 2) {
+        Console.error(F("Invalid rail number or command. Use: 1, 2, status, or reset"));
+        Console.error(F("Examples: teach 1 staging, teach 2 wc3, teach status"));
+        return false;
+    }
+    
+    // We have a valid rail number, check for second parameter
+    if (param2 == NULL) {
+        Console.error(F("Missing position or command. Usage: teach <rail> <position|status|reset>"));
+        if (rail == 1) {
+            Console.error(F("Rail 1 positions: staging, wc1, wc2, handoff"));
+        } else {
+            Console.error(F("Rail 2 positions: handoff, wc3"));
+        }
+        Console.error(F("Commands: status, reset"));
+        return false;
+    }
+    
+    // Trim and convert param2 to lowercase
+    param2 = trimLeadingSpaces(param2);
+    for (int i = 0; param2[i]; i++) {
+        param2[i] = tolower(param2[i]);
+    }
+    
+    // Check for rail-specific commands first
+    int cmdCode = findSubcommandCode(param2, TEACH_COMMANDS, TEACH_COMMAND_COUNT);
+    
+    switch (cmdCode) {
+        case 0: // "reset" - Reset rail positions
+            return teachResetRail(rail);
+            
+        case 1: // "status" - Show rail status
+            Console.acknowledge((String(F("DISPLAYING_RAIL")) + String(rail) + F("_TEACH_STATUS: Position status follows:")).c_str());
+            teachShowRail(rail);
+            return true;
+            
+        default:
+            // Not a command, try to find position
+            break;
+    }
+    
+    // Try to find the position for the specified rail
+    int positionCode = -1;
+    
+    if (rail == 1) {
+        positionCode = findSubcommandCode(param2, RAIL1_POSITIONS, RAIL1_POSITION_COUNT);
+        
+        switch (positionCode) {
+            case 0: // "staging"
+                return teachRail1Staging();
+                
+            case 1: // "wc1"
+                return teachRail1WC1Pickup();
+                
+            case 2: // "wc2"
+                return teachRail1WC2Pickup();
+                
+            case 3: // "handoff"
+                return teachRail1Handoff();
+                
+            default:
+                Console.error(F("Unknown Rail 1 position. Available: staging, wc1, wc2, handoff"));
+                return false;
+        }
+    }
+    else if (rail == 2) {
+        positionCode = findSubcommandCode(param2, RAIL2_POSITIONS, RAIL2_POSITION_COUNT);
+        
+        switch (positionCode) {
+            case 0: // "handoff"
+                return teachRail2Handoff();
+                
+            case 1: // "wc3"
+                return teachRail2WC3Pickup();
+                
+            default:
+                Console.error(F("Unknown Rail 2 position. Available: handoff, wc3"));
+                return false;
+        }
+    }
+    
+    return false; // Should never reach here
 }
 
 // ============================================================
@@ -1282,5 +1457,509 @@ bool cmd_goto(char *args, CommandCaller *caller)
     }
     
     return false; // Should never reach here
+}
+
+//=============================================================================
+// NETWORK MANAGEMENT COMMAND IMPLEMENTATION
+//=============================================================================
+
+// Define the network subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo NETWORK_COMMANDS[] = {
+    {"disconnect", 0},
+    {"help", 1},
+    {"status", 2}
+};
+
+static const size_t NETWORK_COMMAND_COUNT = sizeof(NETWORK_COMMANDS) / sizeof(SubcommandInfo);
+
+bool cmd_network(char *args, CommandCaller *caller)
+{
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+    
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+    
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        Console.error(F("Missing parameter. Usage: network <action>"));
+        return false;
+    }
+    
+    // Parse the argument - use spaces as separators
+    char *action = strtok(trimmed, " ");
+    
+    if (action == NULL) {
+        Console.error(F("Invalid format. Usage: network <action>"));
+        return false;
+    }
+    
+    // Trim leading spaces from action
+    action = trimLeadingSpaces(action);
+    
+    // Convert action to lowercase for case-insensitive comparison
+    for (int i = 0; action[i]; i++) {
+        action[i] = tolower(action[i]);
+    }
+    
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(action, NETWORK_COMMANDS, NETWORK_COMMAND_COUNT);
+    
+    // Use switch-case for cleaner flow control
+    switch (cmdCode) {
+    
+    case 0: // "disconnect" - Disconnect the current client
+        Console.acknowledge(F("NETWORK_DISCONNECT_INITIATED: Closing current client connection"));
+        
+        if (closeAllConnections()) {
+            Console.acknowledge(F("CLIENT_DISCONNECTED: Network connection closed"));
+            return true;
+        } else {
+            Console.error(F("DISCONNECT_FAILED: No active connections to close"));
+            return false;
+        }
+        
+    case 1: // "help" - Display network management help
+        Console.acknowledge(F("DISPLAYING_NETWORK_HELP: Network management guide follows:"));
+        Console.println(F("============================================"));
+        Console.println(F("Network Management Commands"));
+        Console.println(F("============================================"));
+        Console.println(F("CONNECTION STATUS:"));
+        Console.println(F("  network status     - Display current network status and client info"));
+        Console.println(F("                       Shows IP configuration, client details, activity"));
+        Console.println(F(""));
+        Console.println(F("CONNECTION CONTROL:"));
+        Console.println(F("  network disconnect - Disconnect the current client"));
+        Console.println(F("                       Gracefully closes active connection"));
+        Console.println(F(""));
+        Console.println(F("SYSTEM CONFIGURATION:"));
+        Console.println(F("- Single client design: Only one connection allowed at a time"));
+        Console.println(F("- Auto-timeout: Inactive clients disconnected after 3 minutes"));
+        Console.println(F("- Connection testing: Periodic health checks every 2 minutes"));
+        Console.println(F("- Port: 8888 (configurable in EthernetController.h)"));
+        Console.println(F(""));
+        Console.println(F("NETWORK INFORMATION:"));
+        Console.println(F("- Physical link status and cable detection"));
+        Console.println(F("- IP address assignment (DHCP or static fallback)"));
+        Console.println(F("- Client IP address and port information"));
+        Console.println(F("- Last activity timestamps for connection monitoring"));
+        Console.println(F(""));
+        Console.println(F("USAGE SCENARIOS:"));
+        Console.println(F("- Check connectivity: Use 'network status' to verify connection"));
+        Console.println(F("- Force disconnect: Use 'network disconnect' to reset connection"));
+        Console.println(F("- Troubleshooting: Status shows physical link and client activity"));
+        Console.println(F("- System monitoring: Regular status checks for network health"));
+        Console.println(F(""));
+        Console.println(F("SAFETY FEATURES:"));
+        Console.println(F("- Automatic timeout prevents stale connections"));
+        Console.println(F("- Connection health monitoring detects network issues"));
+        Console.println(F("- Graceful disconnect preserves system stability"));
+        Console.println(F("- Single-client design eliminates command conflicts"));
+        Console.println(F("============================================"));
+        return true;
+        
+    case 2: // "status" - Display current network status
+        Console.acknowledge(F("NETWORK_STATUS_REQUESTED: Current network diagnostics follow:"));
+        printEthernetStatus();
+        return true;
+        
+    default: // Unknown command
+        Console.error(F("Unknown network command. Available: status, disconnect, help"));
+        return false;
+    }
+    
+    return false; // Should never reach here
+}
+
+//=============================================================================
+// ENCODER COMMAND IMPLEMENTATION
+//=============================================================================
+
+// Define the encoder subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo ENCODER_COMMANDS[] = {
+    {"disable", 0},
+    {"enable", 1},
+    {"help", 2},
+    {"multiplier", 3},
+    {"status", 4},
+    {"velocity", 5}
+};
+
+static const size_t ENCODER_COMMAND_COUNT = sizeof(ENCODER_COMMANDS) / sizeof(SubcommandInfo);
+
+bool cmd_encoder(char *args, CommandCaller *caller)
+{
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+    
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+    
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        Console.error(F("Missing parameter. Usage: encoder <action>"));
+        return false;
+    }
+    
+    // Parse the argument - use spaces as separators
+    char *action = strtok(trimmed, " ");
+    char *param1 = strtok(nullptr, " ");
+    char *param2 = strtok(nullptr, " ");
+    
+    if (action == NULL) {
+        Console.error(F("Invalid format. Usage: encoder <action>"));
+        return false;
+    }
+    
+    // Trim leading spaces from action
+    action = trimLeadingSpaces(action);
+    
+    // Convert action to lowercase for case-insensitive comparison
+    for (int i = 0; action[i]; i++) {
+        action[i] = tolower(action[i]);
+    }
+    
+    // Declare variables at the beginning
+    int railNumber = 0;
+    float multiplierValue = 0.0;
+    int velocityValue = 0;
+    
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(action, ENCODER_COMMANDS, ENCODER_COMMAND_COUNT);
+    
+    // Use switch-case for cleaner flow control
+    switch (cmdCode) {
+    
+    case 0: // "disable" - Disable encoder control
+        Console.acknowledge(F("ENCODER_DISABLE_INITIATED: Disabling MPG control"));
+        disableEncoderControl();
+        return true;
+        
+    case 1: // "enable" - Enable encoder control for specific rail
+        if (param1 == NULL) {
+            Console.error(F("Missing rail parameter. Usage: encoder enable <rail>"));
+            Console.error(F("Example: encoder enable 1  (for Rail 1)"));
+            Console.error(F("Example: encoder enable 2  (for Rail 2)"));
+            return false;
+        }
+        
+        railNumber = atoi(param1);
+        
+        if (railNumber != 1 && railNumber != 2) {
+            Console.error(F("Invalid rail number. Use 1 or 2"));
+            Console.error(F("Example: encoder enable 1  (for Rail 1)"));
+            Console.error(F("Example: encoder enable 2  (for Rail 2)"));
+            return false;
+        }
+        
+        Console.acknowledge((String(F("ENCODER_ENABLE_INITIATED: Enabling MPG control for Rail ")) + String(railNumber)).c_str());
+        enableEncoderControl(railNumber);
+        return true;
+        
+    case 2: // "help" - Display encoder help
+        Console.acknowledge(F("DISPLAYING_ENCODER_HELP: MPG control guide follows:"));
+        Console.println(F("============================================"));
+        Console.println(F("Manual Pulse Generator (MPG) Commands"));
+        Console.println(F("============================================"));
+        Console.println(F("CONTROL OPERATIONS:"));
+        Console.println(F("  encoder enable <rail>    - Enable MPG control for specific rail"));
+        Console.println(F("                             Rail 1: Controls WC1, WC2, staging, handoff"));
+        Console.println(F("                             Rail 2: Controls WC3, handoff (with collision avoidance)"));
+        Console.println(F("  encoder disable          - Disable MPG control completely"));
+        Console.println(F(""));
+        Console.println(F("CONFIGURATION:"));
+        Console.println(F("  encoder multiplier <X>   - Set movement precision per encoder count"));
+        Console.println(F("                             0.1 = Fine (0.1mm per count)"));
+        Console.println(F("                             1.0 = Medium (1.0mm per count)"));
+        Console.println(F("                             10.0 = Coarse (10.0mm per count)"));
+        Console.println(F("  encoder velocity <RPM>   - Set movement velocity (50-400 RPM)"));
+        Console.println(F(""));
+        Console.println(F("STATUS AND DIAGNOSTICS:"));
+        Console.println(F("  encoder status           - Display current MPG status and settings"));
+        Console.println(F("                             Shows active rail, position, multiplier, velocity"));
+        Console.println(F("                             Includes encoder hardware status"));
+        Console.println(F(""));
+        Console.println(F("SYSTEM ARCHITECTURE:"));
+        Console.println(F("- Single hardware encoder controls one rail at a time"));
+        Console.println(F("- Automatic switching: enabling new rail disables previous"));
+        Console.println(F("- Global settings: multiplier and velocity apply to active rail"));
+        Console.println(F("- Position tracking: absolute positioning for immediate response"));
+        Console.println(F(""));
+        Console.println(F("USAGE EXAMPLES:"));
+        Console.println(F("  encoder enable 1         - Enable MPG for Rail 1"));
+        Console.println(F("  encoder multiplier 1.0   - Set medium precision"));
+        Console.println(F("  encoder velocity 150     - Set velocity to 150 RPM"));
+        Console.println(F("  encoder enable 2         - Switch MPG to Rail 2"));
+        Console.println(F("  encoder status           - Check current settings"));
+        Console.println(F("  encoder disable          - Stop MPG control"));
+        Console.println(F(""));
+        Console.println(F("SAFETY REQUIREMENTS:"));
+        Console.println(F("- Rail must be homed before enabling MPG control"));
+        Console.println(F("- Rail must be ready (not faulted or moving)"));
+        Console.println(F("- MPG automatically disabled if motor faults or moves"));
+        Console.println(F("- Travel limits enforced (cannot exceed rail boundaries)"));
+        Console.println(F("- Quadrature error detection and recovery"));
+        Console.println(F(""));
+        Console.println(F("OPERATIONAL TIPS:"));
+        Console.println(F("- Start with medium multiplier (1.0) for general use"));
+        Console.println(F("- Use fine multiplier (0.1) for precise positioning"));
+        Console.println(F("- Use coarse multiplier (10.0) for rapid movement"));
+        Console.println(F("- Higher velocity = faster response to encoder input"));
+        Console.println(F("- Check 'encoder status' to verify active rail and settings"));
+        Console.println(F("============================================"));
+        return true;
+        
+    case 3: // "multiplier" - Set encoder multiplier
+        if (param1 == NULL) {
+            Console.error(F("Missing multiplier value. Usage: encoder multiplier <value>"));
+            Console.error(F("Valid values: 0.1 (fine), 1.0 (medium), 10.0 (coarse)"));
+            return false;
+        }
+        
+        multiplierValue = atof(param1);
+        
+        Console.acknowledge((String(F("ENCODER_MULTIPLIER_UPDATE: Setting multiplier to ")) + String(multiplierValue)).c_str());
+        setEncoderMultiplier(multiplierValue);
+        return true;
+        
+    case 4: // "status" - Display encoder status
+        Console.acknowledge(F("ENCODER_STATUS_REQUESTED: Current MPG diagnostics follow:"));
+        printEncoderStatus();
+        return true;
+        
+    case 5: // "velocity" - Set encoder velocity
+        if (param1 == NULL) {
+            Console.error(F("Missing velocity value. Usage: encoder velocity <RPM>"));
+            Console.error(F("Valid range: 50-400 RPM"));
+            return false;
+        }
+        
+        velocityValue = atoi(param1);
+        
+               
+        
+        Console.acknowledge((String(F("ENCODER_VELOCITY_UPDATE: Setting velocity to ")) + String(velocityValue) + F(" RPM")).c_str());
+        setEncoderVelocity(velocityValue);
+        return true;
+        
+    default: // Unknown command
+        Console.error(F("Unknown encoder command. Available: enable, disable, multiplier, velocity, status, help"));
+        return false;
+    }
+    
+    return false; // Should never reach here
+}
+
+//=============================================================================
+// JOG COMMAND IMPLEMENTATION
+//=============================================================================
+
+bool cmd_jog(char *args, CommandCaller *caller)
+{
+    // Parse first argument
+    char *param1 = strtok(args, " ");
+    if (param1 == NULL) {
+        Console.error(F("Missing jog command. Usage: jog <rail> <+|-> [distance] | jog <rail> <setting> <value> | jog <rail|all> status | jog help"));
+        return false;
+    }
+    
+    // Handle global commands
+    if (strcmp(param1, "help") == 0) {
+        Console.println(F("============================================"));
+        Console.println(F("             JOG COMMAND HELP"));
+        Console.println(F("============================================"));
+        Console.println(F(""));
+        Console.println(F("DESCRIPTION:"));
+        Console.println(F("Manual jogging control for dual-rail overhead system."));
+        Console.println(F("Provides precision movement with configurable increments and speeds."));
+        Console.println(F(""));
+        Console.println(F("BASIC JOGGING:"));
+        Console.println(F("  jog <rail> +             - Jog rail forward by default increment"));
+        Console.println(F("  jog <rail> -             - Jog rail backward by default increment"));
+        Console.println(F(""));
+        Console.println(F("CUSTOM DISTANCE JOGGING:"));
+        Console.println(F("  jog <rail> + <mm>        - Jog forward by specific distance"));
+        Console.println(F("  jog <rail> - <mm>        - Jog backward by specific distance"));
+        Console.println(F(""));
+        Console.println(F("CONFIGURATION:"));
+        Console.println(F("  jog <rail> increment <mm> - Set default jog increment"));
+        Console.println(F("  jog <rail> speed <rpm>    - Set jog speed"));
+        Console.println(F(""));
+        Console.println(F("STATUS AND INFORMATION:"));
+        Console.println(F("  jog <rail> status        - Show jog settings for specific rail"));
+        Console.println(F("  jog all status           - Show jog settings for all rails"));
+        Console.println(F("  jog status               - Show jog settings for all rails"));
+        Console.println(F(""));
+        Console.println(F("RAIL SPECIFICATION:"));
+        Console.println(F("- Rail 1: Process rail (typically higher speeds)"));
+        Console.println(F("- Rail 2: WC3 rail (typically lower speeds)"));
+        Console.println(F(""));
+        Console.println(F("DEFAULTS:"));
+        Console.println(F("- Rail 1: 1.0mm increment, 200 RPM"));
+        Console.println(F("- Rail 2: 0.5mm increment, 150 RPM"));
+        Console.println(F(""));
+        Console.println(F("SAFETY FEATURES:"));
+        Console.println(F("- Travel limits enforced (cannot exceed rail boundaries)"));
+        Console.println(F("- Motor ready state verification"));
+        Console.println(F("- Movement conflict detection"));
+        Console.println(F("- Intelligent speed capping based on distance"));
+        Console.println(F(""));
+        Console.println(F("USAGE EXAMPLES:"));
+        Console.println(F("  jog 1 +                  - Rail 1 forward by default"));
+        Console.println(F("  jog 2 - 5.0              - Rail 2 backward 5.0mm"));
+        Console.println(F("  jog 1 increment 2.0      - Set Rail 1 increment to 2.0mm"));
+        Console.println(F("  jog 2 speed 100          - Set Rail 2 speed to 100 RPM"));
+        Console.println(F("============================================"));
+        return true;
+    }
+    
+    if (strcmp(param1, "status") == 0 || strcmp(param1, "all") == 0) {
+        Console.println(F("============================================"));
+        Console.println(F("           JOG STATUS - ALL RAILS"));
+        Console.println(F("============================================"));
+        
+        for (int rail = 1; rail <= 2; rail++) {
+            Console.println((String(F("RAIL ")) + String(rail) + F(":")).c_str());
+            Console.println((String(F("  Increment: ")) + String(getJogIncrement(rail), 2) + F(" mm")).c_str());
+            Console.println((String(F("  Speed: ")) + String(getJogSpeed(rail)) + F(" RPM")).c_str());
+            Console.println((String(F("  Ready: ")) + (isMotorReady(rail) ? F("YES") : F("NO"))).c_str());
+            Console.println((String(F("  Moving: ")) + (isMotorMoving(rail) ? F("YES") : F("NO"))).c_str());
+            if (rail == 1) Console.println(F(""));
+        }
+        
+        Console.println(F("============================================"));
+        return true;
+    }
+    
+    // Parse rail number
+    int rail = atoi(param1);
+    if (rail < 1 || rail > 2) {
+        Console.error(F("Invalid rail number. Use 1 or 2"));
+        return false;
+    }
+    
+    // Parse second argument (command/direction)
+    char *param2 = strtok(NULL, " ");
+    if (param2 == NULL) {
+        Console.error(F("Missing command. Usage: jog <rail> <+|-> [value]"));
+        return false;
+    }
+    
+    // Handle rail-specific status
+    if (strcmp(param2, "status") == 0) {
+        Console.println((String(F("============ RAIL ")) + String(rail) + F(" JOG STATUS ============")).c_str());
+        Console.println((String(F("Increment: ")) + String(getJogIncrement(rail), 2) + F(" mm")).c_str());
+        Console.println((String(F("Speed: ")) + String(getJogSpeed(rail)) + F(" RPM")).c_str());
+        Console.println((String(F("Motor Ready: ")) + (isMotorReady(rail) ? F("YES") : F("NO"))).c_str());
+        Console.println((String(F("Motor Moving: ")) + (isMotorMoving(rail) ? F("YES") : F("NO"))).c_str());
+        Console.println(F("============================================"));
+        return true;
+    }
+    
+    // Handle jog settings
+    if (strcmp(param2, "increment") == 0) {
+        char *param3 = strtok(NULL, " ");
+        if (param3 == NULL) {
+            Console.error(F("Missing increment value. Usage: jog <rail> increment <mm>"));
+            return false;
+        }
+        
+        double increment = atof(param3);
+        if (increment <= 0 || increment > 100) {
+            Console.error(F("Invalid increment. Must be between 0.01 and 100.0 mm"));
+            return false;
+        }
+        
+        if (setJogIncrement(rail, increment)) {
+            Console.acknowledge((String(F("JOG_INCREMENT_UPDATE: Rail ")) + String(rail) + 
+                              F(" increment set to ") + String(increment, 2) + F(" mm")).c_str());
+            return true;
+        } else {
+            Console.error(F("Failed to set jog increment"));
+            return false;
+        }
+    }
+    
+    if (strcmp(param2, "speed") == 0) {
+        char *param3 = strtok(NULL, " ");
+        if (param3 == NULL) {
+            Console.error(F("Missing speed value. Usage: jog <rail> speed <rpm>"));
+            return false;
+        }
+        
+        int speed = atoi(param3);
+        if (speed < 10 || speed > 1000) {
+            Console.error(F("Invalid speed. Must be between 10 and 1000 RPM"));
+            return false;
+        }
+        
+        if (setJogSpeed(rail, speed)) {
+            Console.acknowledge((String(F("JOG_SPEED_UPDATE: Rail ")) + String(rail) + 
+                              F(" speed set to ") + String(speed) + F(" RPM")).c_str());
+            return true;
+        } else {
+            Console.error(F("Failed to set jog speed"));
+            return false;
+        }
+    }
+    
+    // Handle jog directions
+    bool isForward = false;
+    bool isValidDirection = false;
+    
+    if (strcmp(param2, "+") == 0) {
+        isForward = true;
+        isValidDirection = true;
+    } else if (strcmp(param2, "-") == 0) {
+        isForward = false;
+        isValidDirection = true;
+    }
+    
+    if (!isValidDirection) {
+        Console.error(F("Invalid direction. Use: + (forward) or - (backward)"));
+        return false;
+    }
+    
+    // Check for custom distance
+    char *param3 = strtok(NULL, " ");
+    double customDistance = 0;
+    bool useCustomDistance = false;
+    
+    if (param3 != NULL) {
+        customDistance = atof(param3);
+        if (customDistance <= 0 || customDistance > 200) {
+            Console.error(F("Invalid distance. Must be between 0.01 and 200.0 mm"));
+            return false;
+        }
+        useCustomDistance = true;
+    }
+    
+    // Perform jog movement
+    String jogMsg = String(F("JOG_EXECUTE: Rail ")) + String(rail) + 
+                   F(" ") + (isForward ? F("forward") : F("backward"));
+    if (useCustomDistance) {
+        jogMsg += String(F(" ")) + String(customDistance, 2) + String(F("mm"));
+    } else {
+        jogMsg += String(F(" (default)"));
+    }
+    Console.acknowledge(jogMsg.c_str());
+    
+    bool success;
+    if (useCustomDistance) {
+        success = jogMotor(rail, isForward, customDistance);
+    } else {
+        success = jogMotor(rail, isForward);
+    }
+    
+    if (!success) {
+        Console.error(F("Jog operation failed. Check motor status and try again"));
+        return false;
+    }
+    
+    return true;
 }
 

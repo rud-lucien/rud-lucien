@@ -53,6 +53,7 @@ const char FMT_JOG_INCREMENT_RANGE[] PROGMEM = "%s: Jog increment must be betwee
 const char FMT_JOG_INCREMENT_SET[] PROGMEM = "%s: Jog increment set to %.2fmm";
 const char FMT_JOG_SPEED_RANGE[] PROGMEM = "%s: Jog speed must be between 10 and %d RPM";
 const char FMT_JOG_SPEED_SET[] PROGMEM = "%s: Jog speed set to %d RPM";
+const char FMT_JOG_SPEED_SET_WITH_DISTANCE[] PROGMEM = "%s: Jog speed set to %d RPM, increment set to %.2fmm";
 const char FMT_MOVE_POSITIONED[] PROGMEM = "%s: %s→%s (%.1fmm) at %d RPM %s";
 const char FMT_MOVE_TO_POSITION[] PROGMEM = "%s: Moving to %s (%.1fmm) at %d RPM %s";
 const char FMT_INVALID_POSITION_NUM_RAIL1[] PROGMEM = "%s: Invalid position number %d (valid: 0-4)";
@@ -1582,7 +1583,7 @@ void checkMoveProgress() {
 // JOGGING SYSTEM FUNCTIONS
 //=============================================================================
 
-bool jogMotor(int rail, bool positiveDirection) {
+bool jogMotor(int rail, bool direction, double customIncrement, bool carriageLoaded) {
     MotorDriver& motor = getMotorByRail(rail);
     const char* motorName = getMotorName(rail);
     char msg[MEDIUM_MSG_SIZE];
@@ -1601,12 +1602,12 @@ bool jogMotor(int rail, bool positiveDirection) {
         return false;
     }
     
-    // Get jog parameters
-    double jogIncrementMm = getJogIncrementRef(rail);
+    // Get jog parameters - use custom increment if provided, otherwise use default
+    double jogIncrementMm = (customIncrement > 0) ? customIncrement : getJogIncrementRef(rail);
     int jogSpeedRpm = getJogSpeedRef(rail);
     
     // Calculate jog distance with direction
-    double jogDistanceMm = positiveDirection ? jogIncrementMm : -jogIncrementMm;
+    double jogDistanceMm = direction ? jogIncrementMm : -jogIncrementMm;
     
     // Check if jog would exceed travel limits
     double currentMm = getMotorPositionMm(rail);
@@ -1647,7 +1648,7 @@ bool jogMotor(int rail, bool positiveDirection) {
     }
     
     sprintf_P(msg, FMT_JOGGING, motorName, 
-             positiveDirection ? "forward" : "backward", 
+             direction ? "forward" : "backward", 
              jogIncrementMm, cappedSpeedRpm, speedNote);
     Console.serialInfo(msg);
     
@@ -1676,7 +1677,7 @@ bool setJogIncrement(int rail, double incrementMm) {
     return true;
 }
 
-bool setJogSpeed(int rail, int speedRpm) {
+bool setJogSpeed(int rail, int speedRpm, double jogDistanceMm) {
     const char* motorName = getMotorName(rail);
     char msg[MEDIUM_MSG_SIZE];
     
@@ -1692,7 +1693,13 @@ bool setJogSpeed(int rail, int speedRpm) {
     // Set the jog speed
     getJogSpeedRef(rail) = speedRpm;
     
-    sprintf_P(msg, FMT_JOG_SPEED_SET, motorName, speedRpm);
+    // If a jog distance is provided, also set that
+    if (jogDistanceMm > 0) {
+        setJogIncrement(rail, jogDistanceMm);
+        sprintf_P(msg, FMT_JOG_SPEED_SET_WITH_DISTANCE, motorName, speedRpm, jogDistanceMm);
+    } else {
+        sprintf_P(msg, FMT_JOG_SPEED_SET, motorName, speedRpm);
+    }
     Console.serialInfo(msg);
     
     return true;
@@ -1791,7 +1798,7 @@ bool checkMovementProgress(int rail) {
     
     // Check for stall detection
     unsigned long currentTime = millis();
-    int32_t currentPosition = motor.PositionRefCommanded();
+       int32_t currentPosition = motor.PositionRefCommanded();
     
     if (timeoutElapsed(currentTime, targetState.lastProgressCheck, MOVEMENT_STALL_TIMEOUT_MS)) {
         int32_t positionChange = abs(currentPosition - targetState.lastPositionCheck);
@@ -2025,3 +2032,14 @@ bool validateAllPredefinedPositions() {
     return allValid;
 }
 
+//=============================================================================
+// JOGGING GETTER FUNCTIONS
+//=============================================================================
+
+double getJogIncrement(int rail) {
+    return getJogIncrementRef(rail);
+}
+
+int getJogSpeed(int rail) {
+    return getJogSpeedRef(rail);
+}
