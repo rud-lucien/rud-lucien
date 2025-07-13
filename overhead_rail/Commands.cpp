@@ -227,13 +227,11 @@ bool cmd_log(char *args, CommandCaller *caller)
         if (param1 != NULL) {
             interval = atol(param1);
             if (interval < 100) {
-                Console.error(F("LOG_INTERVAL_TOO_SMALL"));
-                Console.serialInfo(F("Minimum logging interval is 100ms"));
+                Console.error(F("LOG_INTERVAL_TOO_SMALL: Minimum logging interval is 100ms"));
                 return false;
             }
             if (interval > 60000) {
-                Console.error(F("LOG_INTERVAL_TOO_LARGE"));
-                Console.serialInfo(F("Maximum logging interval is 60000ms (1 minute)"));
+                Console.error(F("LOG_INTERVAL_TOO_LARGE: Maximum logging interval is 60000ms (1 minute)"));
                 return false;
             }
         }
@@ -241,37 +239,31 @@ bool cmd_log(char *args, CommandCaller *caller)
         logging.logInterval = interval;
         logging.previousLogTime = millis(); // Reset timer
         
-        Console.acknowledge(F("OK_LOG_ON"));
-        Console.serialInfo(F("Periodic logging enabled with interval: "));
-        Console.serialInfo(String(interval).c_str());
-        Console.serialInfo(F("ms"));
+        Console.acknowledge((String(F("PERIODIC_LOGGING_ENABLED: Interval set to ")) + String(interval) + F("ms")).c_str());
         return true;
     }
     else if (strcmp(action, "off") == 0) {
         // Disable periodic logging
         logging.logInterval = 0;
         
-        Console.acknowledge(F("OK_LOG_OFF"));
-        Console.serialInfo(F("Periodic logging disabled"));
+        Console.acknowledge(F("PERIODIC_LOGGING_DISABLED: No automatic logging"));
         return true;
     }
     else if (strcmp(action, "now") == 0) {
         // Log system state immediately
-        Console.acknowledge(F("OK_LOG_NOW"));
+        Console.acknowledge(F("SYSTEM_STATE_LOGGED: Current system state captured"));
         logSystemState();
         return true;
     }
     else if (strcmp(action, "history") == 0) {
         // Show complete operation log history
-        Console.acknowledge(F("OK_LOG_HISTORY"));
-        Console.serialInfo(F("Complete operation log history:"));
+        Console.acknowledge(F("DISPLAYING_LOG_HISTORY: Complete operation log follows:"));
         opLogHistory.printHistory();
         return true;
     }
     else if (strcmp(action, "errors") == 0) {
         // Show only errors and warnings
-        Console.acknowledge(F("OK_LOG_ERRORS"));
-        Console.serialInfo(F("Error and warning log entries:"));
+        Console.acknowledge(F("DISPLAYING_ERROR_LOG: Error and warning entries follow:"));
         opLogHistory.printErrors();
         return true;
     }
@@ -289,25 +281,19 @@ bool cmd_log(char *args, CommandCaller *caller)
             }
         }
         
-        Console.acknowledge(F("OK_LOG_LAST"));
-        Console.serialInfo(F("Last "));
-        Console.serialInfo(String(count).c_str());
-        Console.serialInfo(F(" log entries:"));
+        Console.acknowledge((String(F("DISPLAYING_LOG_LAST: Last ")) + String(count) + F(" log entries follow:")).c_str());
         opLogHistory.printLastN(count);
         return true;
     }
     else if (strcmp(action, "stats") == 0) {
         // Show log buffer statistics
-        Console.acknowledge(F("OK_LOG_STATS"));
-        Console.serialInfo(F("Log buffer statistics:"));
+        Console.acknowledge(F("DISPLAYING_LOG_STATS: Buffer statistics and status follow:"));
         opLogHistory.printStats();
         
         // Also show current logging status
         Console.serialInfo(F("Current logging status:"));
         if (logging.logInterval > 0) {
-            Console.serialInfo(F("  Periodic logging: ENABLED ("));
-            Console.serialInfo(String(logging.logInterval).c_str());
-            Console.serialInfo(F("ms interval)"));
+            Console.serialInfo((String(F("  Periodic logging: ENABLED (")) + String(logging.logInterval) + F("ms interval)")).c_str());
         } else {
             Console.serialInfo(F("  Periodic logging: DISABLED"));
         }
@@ -315,7 +301,7 @@ bool cmd_log(char *args, CommandCaller *caller)
     }
     else if (strcmp(action, "help") == 0) {
         // Display detailed help information
-        Console.acknowledge(F("LOG_HELP"));
+        Console.acknowledge(F("DISPLAYING_LOG_HELP: Logging system guide follows:"));
         Console.println(F("============================================"));
         Console.println(F("Logging System Commands"));
         Console.println(F("============================================"));
@@ -429,6 +415,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
     bool validationResult = false;
     bool actuallyRetracted = false;
     bool actuallyExtended = false;
+    String motorStatus; // For status consolidation
     
     // Use binary search to find the command code
     int cmdCode = findSubcommandCode(action, RAIL2_COMMANDS, RAIL2_COMMAND_COUNT);
@@ -444,8 +431,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         
     case 2: // "extend" - Extend pneumatic drive
         if (!isPressureSufficient()) {
-            Console.error(F("INSUFFICIENT_PRESSURE"));
-            Console.serialInfo(F("Air pressure too low for valve operation"));
+            Console.error(F("INSUFFICIENT_PRESSURE: Air pressure too low for valve operation"));
             return false;
         }
         
@@ -453,18 +439,15 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         result = extendCylinder();
         
         if (result == VALVE_OP_SUCCESS) {
-            Console.acknowledge(F("OK_EXTEND"));
-            Console.serialInfo(F("Pneumatic drive extended successfully"));
+            Console.acknowledge(F("CYLINDER_EXTENDED: Pneumatic drive is now extended"));
             return true;
         } else {
-            Console.error(F("EXTEND_FAILED"));
-            Console.serialInfo(F("Failed to extend pneumatic drive:"));
-            Console.serialInfo(getValveOperationResultName(result));
+            Console.error((String(F("EXTEND_FAILED: ")) + getValveOperationResultName(result)).c_str());
             return false;
         }
         
     case 3: // "help" - Display help information
-        Console.acknowledge(F("RAIL2_HELP"));
+        Console.acknowledge(F("DISPLAYING_RAIL2_HELP: Command reference follows:"));
         Console.println(F("============================================"));
         Console.println(F("Rail 2 Control Commands"));
         Console.println(F("============================================"));
@@ -516,8 +499,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         
     case 10: // "retract" - Retract pneumatic drive
         if (!isPressureSufficient()) {
-            Console.error(F("INSUFFICIENT_PRESSURE"));
-            Console.serialInfo(F("Air pressure too low for valve operation"));
+            Console.error(F("INSUFFICIENT_PRESSURE: Air pressure too low for valve operation"));
             return false;
         }
         
@@ -525,13 +507,10 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         result = retractCylinder();
         
         if (result == VALVE_OP_SUCCESS) {
-            Console.acknowledge(F("OK_RETRACT"));
-            Console.serialInfo(F("Pneumatic drive retracted successfully"));
+            Console.acknowledge(F("CYLINDER_RETRACTED: Pneumatic drive is now retracted"));
             return true;
         } else {
-            Console.error(F("RETRACT_FAILED"));
-            Console.serialInfo(F("Failed to retract pneumatic drive:"));
-            Console.serialInfo(getValveOperationResultName(result));
+            Console.error((String(F("RETRACT_FAILED: ")) + getValveOperationResultName(result)).c_str());
             return false;
         }
         
@@ -583,114 +562,92 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         return moveRail2CarriageToHandoff(carriageLoaded);
         
     case 11: // "status" - Show system status
-        Console.acknowledge(F("RAIL2_STATUS"));
+        Console.acknowledge(F("DISPLAYING_RAIL2_STATUS: Comprehensive system diagnostics follow:"));
         Console.serialInfo(F("============================================"));
         Console.serialInfo(F("Rail 2 System Status"));
         Console.serialInfo(F("============================================"));
         
-        // E-Stop status (critical safety information first)
+        // Safety status
         Console.serialInfo(F("SAFETY STATUS:"));
-        Console.serialInfo(isEStopActive() ? F("  E-Stop: ACTIVE (UNSAFE - Cannot operate)") : F("  E-Stop: INACTIVE (Safe to operate)"));
+        if (isEStopActive()) {
+            Console.serialInfo(F("  E-Stop Status: ACTIVE (UNSAFE)"));
+        } else {
+            Console.serialInfo(F("  E-Stop Status: INACTIVE (Safe)"));
+        }
         
         // Motor status
         Console.serialInfo(F("MOTOR STATUS:"));
         Console.serialInfo(isMotorReady(2) ? F("  Motor Ready: YES") : F("  Motor Ready: NO"));
-        Console.serialInfo(isHomingComplete(2) ? F("  Homing Status: COMPLETE") : F("  Homing Status: NOT HOMED"));
+        Console.serialInfo(isHomingComplete(2) ? F("  Motor Homed: YES") : F("  Motor Homed: NO"));
         Console.serialInfo(isMotorMoving(2) ? F("  Motor Moving: YES") : F("  Motor Moving: NO"));
-        Console.serialInfo(isHomingInProgress(2) ? F("  Homing in Progress: YES") : F("  Homing in Progress: NO"));
+        Console.serialInfo(isHomingInProgress(2) ? F("  Motor Homing: YES") : F("  Motor Homing: NO"));
         
-        // Current position and location analysis
-        Console.serialInfo(F("CURRENT LOCATION:"));
+        // Current position
+        Console.serialInfo(F("CURRENT POSITION:"));
         if (!isHomingComplete(2)) {
-            Console.serialInfo(F("  Raw Position: UNKNOWN (Motor not homed)"));
-            Console.serialInfo(F("  Location: UNKNOWN - Motor must be homed first"));
-            Console.serialInfo(F("  Use 'rail2 home' to establish position reference"));
+            Console.serialInfo(F("  Position: UNKNOWN (not homed) - Use 'rail2 home' first"));
         } else {
             currentPos = getMotorPositionMm(2);
-            Console.serialInfo(F("  Raw Position: "));
-            Console.serialInfo(String(currentPos, 2).c_str());
-            Console.serialInfo(F(" mm from home"));
+            Console.serialInfo((String(F("  Position: ")) + String(currentPos, 2) + F("mm")).c_str());
             
-            // Determine and display meaningful location
             if (isCarriageAtWC3()) {
-                Console.serialInfo(F("  Location: AT WORKCELL 3 (Home position)"));
+                Console.serialInfo(F("  Location: AT WC3"));
             } else if (isCarriageAtRail2Handoff()) {
-                Console.serialInfo(F("  Location: AT HANDOFF POSITION (Rail 1-2 transfer)"));
+                Console.serialInfo(F("  Location: AT HANDOFF"));
+            } else if (currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) {
+                Console.serialInfo(F("  Location: IN COLLISION ZONE"));
             } else {
-                // Determine location based on position ranges using defined constants
-                double homeToCollisionMidpoint = (RAIL2_HOME_POSITION + RAIL2_COLLISION_ZONE_START) / 2.0;
-                double handoffNearRange = 50.0; // ±50mm around handoff position
-                
-                if (currentPos < homeToCollisionMidpoint) {
-                    Console.serialInfo(F("  Location: NEAR WORKCELL 3 (close to home)"));
-                } else if (abs(currentPos - RAIL2_HANDOFF) <= handoffNearRange) {
-                    Console.serialInfo(F("  Location: NEAR HANDOFF POSITION (Rail 1-2 transfer area)"));
-                } else if (currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) {
-                    Console.serialInfo(F("  Location: IN COLLISION ZONE (between WC3 and handoff)"));
-                } else if (currentPos > RAIL2_HANDOFF) {
-                    Console.serialInfo(F("  Location: BEYOND HANDOFF (far end of rail)"));
-                } else {
-                    Console.serialInfo(F("  Location: BETWEEN WC3 AND HANDOFF"));
-                }
+                Console.serialInfo(F("  Location: BETWEEN POSITIONS"));
             }
         }
         
-        // Pneumatic system status
+        // Pneumatic system
         Console.serialInfo(F("PNEUMATIC SYSTEM:"));
-        Console.serialInfo(F("  Air Pressure: "));
-        Console.serialInfo(String(getPressurePsi(), 1).c_str());
-        Console.serialInfo(F(" PSI"));
-        Console.serialInfo(isPressureSufficient() ? F("  Pressure Status: SUFFICIENT") : F("  Pressure Status: INSUFFICIENT"));
-        
-        // Valve position and validation
+        Console.serialInfo((String(F("  Air Pressure: ")) + String(getPressurePsi(), 1) + F(" PSI")).c_str());
+        Console.serialInfo(isPressureSufficient() ? F("  Pressure Status: OK") : F("  Pressure Status: LOW"));
         valveState = getValvePosition();
-        Console.serialInfo(F("  Valve Controller State: "));
-        Console.serialInfo(getValvePositionName(valveState));
+        Console.serialInfo((String(F("  Valve Position: ")) + getValvePositionName(valveState)).c_str());
         
-        // Raw sensor readings
+        // Cylinder sensors
+        Console.serialInfo(F("CYLINDER SENSORS:"));
         sensorRetracted = isCylinderRetracted();
         sensorExtended = isCylinderExtended();
         Console.serialInfo(sensorRetracted ? F("  Retracted Sensor: ACTIVE") : F("  Retracted Sensor: INACTIVE"));
         Console.serialInfo(sensorExtended ? F("  Extended Sensor: ACTIVE") : F("  Extended Sensor: INACTIVE"));
-        
-        // Validated position states
-        actuallyRetracted = isCylinderActuallyRetracted();
-        actuallyExtended = isCylinderActuallyExtended();
-        Console.serialInfo(actuallyRetracted ? F("  Actually Retracted: YES") : F("  Actually Retracted: NO"));
-        Console.serialInfo(actuallyExtended ? F("  Actually Extended: YES") : F("  Actually Extended: NO"));
-        
-        // Valve validation result
         validationResult = validateValvePosition();
-        if (validationResult) {
-            Console.serialInfo(F("  Valve Validation: PASS"));
-        } else {
-            Console.serialError(F("  Valve Validation: FAIL - SENSOR/VALVE MISMATCH"));
-            Console.serialInfo(F("    Check sensor wiring and valve operation"));
-        }
+        Console.serialInfo(validationResult ? F("  Sensor Validation: PASS") : F("  Sensor Validation: FAIL"));
         
-        // Position sensors confirmation
-        Console.serialInfo(F("POSITION SENSORS:"));
-        Console.serialInfo(isCarriageAtWC3() ? F("  WC3 Sensor: ACTIVE (carriage detected)") : F("  WC3 Sensor: INACTIVE"));
-        Console.serialInfo(isCarriageAtRail2Handoff() ? F("  Handoff Sensor: ACTIVE (carriage detected)") : F("  Handoff Sensor: INACTIVE"));
+        // Position detection
+        Console.serialInfo(F("POSITION DETECTION:"));
+        Console.serialInfo(isCarriageAtWC3() ? F("  WC3 Detection: YES") : F("  WC3 Detection: NO"));
+        Console.serialInfo(isCarriageAtRail2Handoff() ? F("  Handoff Detection: YES") : F("  Handoff Detection: NO"));
         
         // Labware detection
         Console.serialInfo(F("LABWARE DETECTION:"));
-        Console.serialInfo(isLabwarePresentAtWC3() ? F("  WC3: PRESENT") : F("  WC3: NOT PRESENT"));
-        Console.serialInfo(isLabwarePresentAtHandoff() ? F("  Handoff: PRESENT") : F("  Handoff: NOT PRESENT"));
+        Console.serialInfo(isLabwarePresentAtWC3() ? F("  WC3 Labware Present: YES") : F("  WC3 Labware Present: NO"));
+        Console.serialInfo(isLabwarePresentAtHandoff() ? F("  Handoff Labware Present: YES") : F("  Handoff Labware Present: NO"));
         
-        // Safety zone status
-        Console.serialInfo(F("COLLISION SAFETY:"));
-        if (!isHomingComplete(2)) {
-            Console.serialInfo(F("  Current Zone: UNKNOWN (Motor not homed)"));
-            Console.serialInfo(F("  Safety Status: UNKNOWN - Home motor first to determine position"));
-        } else {
-            if (currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END) {
-                Console.serialInfo(F("  Current Zone: COLLISION ZONE (500-700mm)"));
-                Console.serialInfo(actuallyRetracted ? F("  Safety Status: SAFE (Cylinder retracted)") : F("  Safety Status: UNSAFE (Cylinder not retracted in collision zone)"));
+        // Collision zone analysis
+        Console.serialInfo(F("COLLISION ZONE ANALYSIS:"));
+        if (isHomingComplete(2)) {
+            bool inCollisionZone = (currentPos >= RAIL2_COLLISION_ZONE_START && currentPos <= RAIL2_COLLISION_ZONE_END);
+            actuallyRetracted = isCylinderActuallyRetracted();
+            actuallyExtended = isCylinderActuallyExtended();
+            
+            if (inCollisionZone) {
+                Console.serialInfo(F("  Current Zone: COLLISION"));
+                if (actuallyRetracted) {
+                    Console.serialInfo(F("  Collision Status: SAFE (cylinder retracted)"));
+                } else {
+                    Console.serialInfo(F("  Collision Status: UNSAFE (cylinder extended in collision zone)"));
+                }
             } else {
-                Console.serialInfo(F("  Current Zone: SAFE ZONE"));
-                Console.serialInfo(F("  Safety Status: SAFE (Outside collision zone)"));
+                Console.serialInfo(F("  Current Zone: SAFE"));
+                Console.serialInfo(F("  Collision Status: SAFE"));
             }
+        } else {
+            Console.serialInfo(F("  Current Zone: UNKNOWN (motor not homed)"));
+            Console.serialInfo(F("  Collision Status: UNKNOWN"));
         }
         
         Console.serialInfo(F("============================================"));
@@ -769,6 +726,8 @@ bool cmd_rail1(char *args, CommandCaller *caller)
     double targetPosition = 0.0;
     double calculatedTargetPos = 0.0;
     bool carriageLoaded = false;
+    String motorStatus; // For status consolidation
+    String location; // For location description
     
     // Use binary search to find the command code
     int cmdCode = findSubcommandCode(action, RAIL1_COMMANDS, RAIL1_COMMAND_COUNT);
@@ -783,7 +742,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         return executeRailClearFault(1);
         
     case 2: // "help" - Display help information
-        Console.acknowledge(F("RAIL1_HELP"));
+        Console.acknowledge(F("DISPLAYING_RAIL1_HELP: Command reference follows:"));
         Console.println(F("============================================"));
         Console.println(F("Rail 1 Control Commands"));
         Console.println(F("============================================"));
@@ -907,60 +866,58 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         return moveRail1CarriageToHandoff(carriageLoaded);
         
     case 11: // "status" - Show system status
-        Console.acknowledge(F("RAIL1_STATUS"));
+        Console.acknowledge(F("DISPLAYING_RAIL1_STATUS: System diagnostics follow:"));
         Console.serialInfo(F("============================================"));
         Console.serialInfo(F("Rail 1 System Status"));
         Console.serialInfo(F("============================================"));
         
-        // E-Stop status (critical safety information first)
+        // Safety status
         Console.serialInfo(F("SAFETY STATUS:"));
-        Console.serialInfo(isEStopActive() ? F("  E-Stop: ACTIVE (UNSAFE - Cannot operate)") : F("  E-Stop: INACTIVE (Safe to operate)"));
+        if (isEStopActive()) {
+            Console.serialInfo(F("  E-Stop Status: ACTIVE (UNSAFE)"));
+        } else {
+            Console.serialInfo(F("  E-Stop Status: INACTIVE (Safe)"));
+        }
         
         // Motor status
         Console.serialInfo(F("MOTOR STATUS:"));
         Console.serialInfo(isMotorReady(1) ? F("  Motor Ready: YES") : F("  Motor Ready: NO"));
-        Console.serialInfo(isHomingComplete(1) ? F("  Homing Status: COMPLETE") : F("  Homing Status: NOT HOMED"));
+        Console.serialInfo(isHomingComplete(1) ? F("  Motor Homed: YES") : F("  Motor Homed: NO"));
         Console.serialInfo(isMotorMoving(1) ? F("  Motor Moving: YES") : F("  Motor Moving: NO"));
-        Console.serialInfo(isHomingInProgress(1) ? F("  Homing in Progress: YES") : F("  Homing in Progress: NO"));
+        Console.serialInfo(isHomingInProgress(1) ? F("  Motor Homing: YES") : F("  Motor Homing: NO"));
         
-        // Current position and location analysis
-        Console.serialInfo(F("CURRENT LOCATION:"));
+        // Current position
+        Console.serialInfo(F("CURRENT POSITION:"));
         if (!isHomingComplete(1)) {
-            Console.serialInfo(F("  Raw Position: UNKNOWN (Motor not homed)"));
-            Console.serialInfo(F("  Location: UNKNOWN - Motor must be homed first"));
-            Console.serialInfo(F("  Use 'rail1 home' to establish position reference"));
+            Console.serialInfo(F("  Position: UNKNOWN (not homed) - Use 'rail1 home' first"));
         } else {
             currentPos = getMotorPositionMm(1);
-            Console.serialInfo(F("  Raw Position: "));
-            Console.serialInfo(String(currentPos, 2).c_str());
-            Console.serialInfo(F(" mm from home"));
+            Console.serialInfo((String(F("  Position: ")) + String(currentPos, 2) + F("mm")).c_str());
             
-            // Determine and display meaningful location based on Rail 1 positions
             if (abs(currentPos - RAIL1_HOME_POSITION) < 50.0) {
-                Console.serialInfo(F("  Location: AT HOME/HANDOFF (Rail 1-2 transfer)"));
+                Console.serialInfo(F("  Location: AT HOME/HANDOFF"));
             } else if (abs(currentPos - RAIL1_WC2_PICKUP_DROPOFF) < 50.0) {
-                Console.serialInfo(F("  Location: AT WORKCELL 2 (pickup/dropoff)"));
+                Console.serialInfo(F("  Location: AT WC2"));
             } else if (abs(currentPos - RAIL1_WC1_PICKUP_DROPOFF) < 50.0) {
-                Console.serialInfo(F("  Location: AT WORKCELL 1 (pickup/dropoff)"));
+                Console.serialInfo(F("  Location: AT WC1"));
             } else if (abs(currentPos - RAIL1_STAGING_POSITION) < 50.0) {
-                Console.serialInfo(F("  Location: AT STAGING POSITION (coordination point)"));
+                Console.serialInfo(F("  Location: AT STAGING"));
             } else {
-                // Determine location based on position ranges using defined constants
-                double homeToWc2Midpoint = (RAIL1_HOME_POSITION + RAIL1_WC2_PICKUP_DROPOFF) / 2.0;
-                double wc2ToWc1Midpoint = (RAIL1_WC2_PICKUP_DROPOFF + RAIL1_WC1_PICKUP_DROPOFF) / 2.0;
-                double wc1ToStagingMidpoint = (RAIL1_WC1_PICKUP_DROPOFF + RAIL1_STAGING_POSITION) / 2.0;
-                
-                if (currentPos < homeToWc2Midpoint) {
-                    Console.serialInfo(F("  Location: BETWEEN HOME AND WC2"));
-                } else if (currentPos < wc2ToWc1Midpoint) {
-                    Console.serialInfo(F("  Location: BETWEEN WC2 AND WC1"));
-                } else if (currentPos < wc1ToStagingMidpoint) {
-                    Console.serialInfo(F("  Location: BETWEEN WC1 AND STAGING"));
-                } else {
-                    Console.serialInfo(F("  Location: BEYOND STAGING (far end of rail)"));
-                }
+                Console.serialInfo(F("  Location: BETWEEN POSITIONS"));
             }
         }
+        
+        // Position detection
+        Console.serialInfo(F("POSITION DETECTION:"));
+        Console.serialInfo(isCarriageAtWC1() ? F("  WC1 Detection: YES") : F("  WC1 Detection: NO"));
+        Console.serialInfo(isCarriageAtWC2() ? F("  WC2 Detection: YES") : F("  WC2 Detection: NO"));
+        Console.serialInfo(isCarriageAtRail1Handoff() ? F("  Handoff Detection: YES") : F("  Handoff Detection: NO"));
+        
+        // Labware detection
+        Console.serialInfo(F("LABWARE DETECTION:"));
+        Console.serialInfo(isLabwarePresentAtWC1() ? F("  WC1 Labware Present: YES") : F("  WC1 Labware Present: NO"));
+        Console.serialInfo(isLabwarePresentAtWC2() ? F("  WC2 Labware Present: YES") : F("  WC2 Labware Present: NO"));
+        Console.serialInfo(isLabwarePresentAtHandoff() ? F("  Handoff Labware Present: YES") : F("  Handoff Labware Present: NO"));
         
         Console.serialInfo(F("============================================"));
         return true;

@@ -5,6 +5,17 @@
 #include "Utils.h"
 
 //=============================================================================
+// CONSOLE OUTPUT FORMAT STRINGS
+//=============================================================================
+// Consolidated format strings for cleaner, more concise handoff messaging
+
+// Handoff operation format strings
+const char FMT_HANDOFF_INIT[] PROGMEM = "Handoff: %s → %s";
+const char FMT_HANDOFF_STATE[] PROGMEM = "Handoff: %s";
+const char FMT_HANDOFF_ERROR[] PROGMEM = "Handoff error: %s";
+const char FMT_HANDOFF_COLLISION[] PROGMEM = "Collision risk: %s has labware";
+
+//=============================================================================
 // GLOBAL HANDOFF STATE
 //=============================================================================
 
@@ -26,15 +37,12 @@ HandoffResult startHandoff(HandoffDirection dir, HandoffDestination dest) {
     if (!validateHandoffParameters(dir, dest)) {
         handoffState.currentResult = HANDOFF_ERROR_INVALID_PARAMS;
         Console.error(F("INVALID_HANDOFF_PARAMETERS"));
-        Console.serialInfo(F("Invalid direction-destination combination specified"));
-        Console.serialInfo(F("Rail1→Rail2 only supports WC3 destination, Rail2→Rail1 supports WC1/WC2"));
         return handoffState.currentResult;
     }
     
     // Check if handoff already in progress
     if (handoffState.currentState != HANDOFF_IDLE) {
         Console.error(F("HANDOFF_ALREADY_ACTIVE"));
-        Console.serialInfo(F("Another handoff operation is currently running - stop current operation first"));
         return HANDOFF_ERROR_SYSTEM_STATE;
     }
     
@@ -59,21 +67,13 @@ HandoffResult startHandoff(HandoffDirection dir, HandoffDestination dest) {
     // Set timeout based on destination
     handoffState.currentTimeout = (dest == DEST_WC3) ? HANDOFF_TIMEOUT_WC3_EXT : HANDOFF_TIMEOUT_DEFAULT;
     
-    Console.serialInfo(F("Initiating labware handoff operation..."));
-    
-    // Create direction message
-    char dirMsg[SMALL_MSG_SIZE];
-    sprintf_P(dirMsg, PSTR("Direction: %s"), 
-        (dir == HANDOFF_RAIL1_TO_RAIL2) ? "Rail1→Rail2" : "Rail2→Rail1");
-    Console.serialInfo(dirMsg);
-    
-    // Create destination message  
-    char destMsg[SMALL_MSG_SIZE];
-    sprintf_P(destMsg, PSTR("Destination: %s"), 
-        (dest == DEST_WC1) ? "WC1" : 
-        (dest == DEST_WC2) ? "WC2" : 
-        (dest == DEST_STAGING) ? "Staging" : "WC3");
-    Console.serialInfo(destMsg);
+    char msg[MEDIUM_MSG_SIZE];
+    const char* dirStr = (dir == HANDOFF_RAIL1_TO_RAIL2) ? "Rail1→Rail2" : "Rail2→Rail1";
+    const char* destStr = (dest == DEST_WC1) ? "WC1" : 
+                          (dest == DEST_WC2) ? "WC2" : 
+                          (dest == DEST_STAGING) ? "Staging" : "WC3";
+    sprintf_P(msg, FMT_HANDOFF_INIT, dirStr, destStr);
+    Console.serialInfo(msg);
     
     return HANDOFF_SUCCESS;
 }
@@ -109,7 +109,9 @@ HandoffResult updateHandoff() {
             
         case HANDOFF_MOVING_SOURCE_TO_POS:
             if (moveSourceRailToHandoffPosition()) {
-                Console.serialInfo(F("Source rail positioned - extending cylinder..."));
+                char msg[MEDIUM_MSG_SIZE];
+                sprintf_P(msg, FMT_HANDOFF_STATE, "Extending cylinder");
+                Console.serialInfo(msg);
                 handoffState.currentState = HANDOFF_EXTENDING_CYLINDER;
                 handoffState.operationStartTime = millis(); // Reset timer for next phase
             }
@@ -119,17 +121,16 @@ HandoffResult updateHandoff() {
             {
                 ValveOperationResult result = extendCylinder();
                 if (result == VALVE_OP_SUCCESS && isCylinderActuallyExtended()) {
-                    Console.serialInfo(F("Cylinder extended - waiting for labware transfer..."));
+                    char msg[MEDIUM_MSG_SIZE];
+                    sprintf_P(msg, FMT_HANDOFF_STATE, "Waiting for transfer");
+                    Console.serialInfo(msg);
                     handoffState.currentState = HANDOFF_WAITING_TRANSFER;
                     handoffState.operationStartTime = millis(); // Reset timer for transfer phase
                 } else if (result != VALVE_OP_SUCCESS) {
                     Console.error(F("CYLINDER_EXTENSION_FAILED"));
-                    
-                    char errorMsg[SMALL_MSG_SIZE];
-                    sprintf_P(errorMsg, PSTR("Failed to extend cylinder: %s"), 
-                        getValveOperationResultName(result));
+                    char errorMsg[MEDIUM_MSG_SIZE];
+                    sprintf_P(errorMsg, FMT_HANDOFF_ERROR, getValveOperationResultName(result));
                     Console.serialInfo(errorMsg);
-                    
                     handoffState.currentState = HANDOFF_ERROR;
                     handoffState.currentResult = HANDOFF_ERROR_VALVE;
                 }
@@ -138,7 +139,9 @@ HandoffResult updateHandoff() {
             
         case HANDOFF_WAITING_TRANSFER:
             if (verifyHandoffLabwareTransfer()) {
-                Console.serialInfo(F("Labware transfer confirmed - retracting cylinder..."));
+                char msg[MEDIUM_MSG_SIZE];
+                sprintf_P(msg, FMT_HANDOFF_STATE, "Retracting cylinder");
+                Console.serialInfo(msg);
                 handoffState.currentState = HANDOFF_RETRACTING_CYLINDER;
                 handoffState.operationStartTime = millis(); // Reset timer for retraction
             }
@@ -148,17 +151,16 @@ HandoffResult updateHandoff() {
             {
                 ValveOperationResult result = retractCylinder();
                 if (result == VALVE_OP_SUCCESS && isCylinderActuallyRetracted()) {
-                    Console.serialInfo(F("Cylinder retracted - moving destination rail..."));
+                    char msg[MEDIUM_MSG_SIZE];
+                    sprintf_P(msg, FMT_HANDOFF_STATE, "Moving to destination");
+                    Console.serialInfo(msg);
                     handoffState.currentState = HANDOFF_MOVING_DEST_TO_TARGET;
                     handoffState.operationStartTime = millis(); // Reset timer for final movement
                 } else if (result != VALVE_OP_SUCCESS) {
                     Console.error(F("CYLINDER_RETRACTION_FAILED"));
-                    
-                    char errorMsg[SMALL_MSG_SIZE];
-                    sprintf_P(errorMsg, PSTR("Failed to retract cylinder: %s"), 
-                        getValveOperationResultName(result));
+                    char errorMsg[MEDIUM_MSG_SIZE];
+                    sprintf_P(errorMsg, FMT_HANDOFF_ERROR, getValveOperationResultName(result));
                     Console.serialInfo(errorMsg);
-                    
                     handoffState.currentState = HANDOFF_ERROR;
                     handoffState.currentResult = HANDOFF_ERROR_VALVE;
                 }
@@ -168,7 +170,6 @@ HandoffResult updateHandoff() {
         case HANDOFF_MOVING_DEST_TO_TARGET:
             if (moveDestinationRailToTargetPosition()) {
                 Console.acknowledge(F("LABWARE_HANDOFF_COMPLETED"));
-                Console.serialInfo(F("Handoff operation completed successfully"));
                 handoffState.currentState = HANDOFF_COMPLETED;
                 handoffState.currentResult = HANDOFF_SUCCESS;
             }
@@ -203,13 +204,14 @@ HandoffResult getLastHandoffResult() {
 
 void cancelHandoff() {
     if (handoffState.currentState != HANDOFF_IDLE) {
-        Console.serialInfo(F("Stopping handoff operation and returning to safe state..."));
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, FMT_HANDOFF_STATE, "Cancelled - returning to safe state");
+        Console.serialInfo(msg);
         handoffState.currentState = HANDOFF_IDLE;
         handoffState.currentResult = HANDOFF_SUCCESS;
         
         // Attempt to safely retract cylinder if extended
         if (isCylinderActuallyExtended()) {
-            Console.serialInfo(F("Retracting pneumatic cylinder for safety..."));
             retractCylinder();
         }
     }
@@ -229,15 +231,11 @@ bool validateHandoffParameters(HandoffDirection dir, HandoffDestination dest) {
     // Validate direction-destination combinations
     if (dir == HANDOFF_RAIL1_TO_RAIL2 && dest != DEST_WC3) {
         Console.error(F("Invalid handoff: Rail1→Rail2 only supports WC3 destination"));
-        Console.serialInfo(F("Rail 1 can only deliver labware to WC3 on Rail 2"));
-        Console.serialInfo(F("WC1 and WC2 are only accessible from Rail 2 to Rail 1"));
         return false;
     }
     
     if (dir == HANDOFF_RAIL2_TO_RAIL1 && dest == DEST_WC3) {
         Console.error(F("Invalid handoff: Rail2→Rail1 cannot target WC3"));
-        Console.serialInfo(F("WC3 is located on Rail 2 and cannot be a destination from Rail 2"));
-        Console.serialInfo(F("Valid destinations for Rail2→Rail1: WC1 or WC2"));
         return false;
     }
     
@@ -248,29 +246,23 @@ bool checkHandoffSystemReadiness() {
     // Check E-stop
     if (isEStopActive()) {
         Console.error(F("EMERGENCY_STOP_ENGAGED"));
-        Console.serialInfo(F("Cannot start handoff while emergency stop is active"));
         return false;
     }
     
     // Check both rails ready
     if (!checkRailMovementReadiness(1)) {
         Console.error(F("RAIL1_SYSTEM_NOT_READY"));
-        Console.serialInfo(F("Rail 1 motor system is not ready for movement"));
-        Console.serialInfo(F("Check: Motor enabled, homing completed, no faults, E-stop clear"));
         return false;
     }
     
     if (!checkRailMovementReadiness(2)) {
         Console.error(F("RAIL2_SYSTEM_NOT_READY"));
-        Console.serialInfo(F("Rail 2 motor system is not ready for movement"));
-        Console.serialInfo(F("Check: Motor enabled, homing completed, no faults, E-stop clear"));
         return false;
     }
     
     // Check air pressure
     if (!isPressureSufficient()) {
         Console.error(F("AIR_PRESSURE_TOO_LOW"));
-        Console.serialInfo(F("Insufficient air pressure for handoff operation"));
         return false;
     }
     
@@ -279,78 +271,55 @@ bool checkHandoffSystemReadiness() {
 
 bool checkHandoffCollisionSafety(HandoffDirection dir, HandoffDestination dest) {
     // Check for the dangerous scenario where both carriages have labware
-    // This would result in a collision during handoff operation
-    
     bool rail1HasLabware = isLabwarePresentAtWC1() || isLabwarePresentAtWC2();
     bool rail2HasLabware = isLabwarePresentAtWC3() || isLabwarePresentAtHandoff();
     
     if (rail1HasLabware && rail2HasLabware) {
         Console.error(F("CARRIAGE_COLLISION_RISK"));
-        Console.serialInfo(F("CRITICAL: Both Rail 1 and Rail 2 have labware detected"));
-        Console.serialInfo(F("Cannot perform handoff - collision risk between carriages"));
-        
-        // Provide specific guidance based on direction
-        if (dir == HANDOFF_RAIL1_TO_RAIL2) {
-            Console.serialInfo(F("To proceed: Remove labware from WC3/handoff position first"));
-        } else {
-            Console.serialInfo(F("To proceed: Remove labware from WC1/WC2 positions first"));
-        }
-        
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, FMT_HANDOFF_COLLISION, "both rails");
+        Console.serialInfo(msg);
         return false;
     }
     
-    // Additional check: Verify source carriage actually has labware to transfer
+    // Verify source carriage actually has labware to transfer
     if (dir == HANDOFF_RAIL1_TO_RAIL2 && !rail1HasLabware) {
         Console.error(F("RAIL1_NO_LABWARE_TO_TRANSFER"));
-        Console.serialInfo(F("Rail 1 has no labware to transfer to Rail 2"));
         return false;
     }
     
     if (dir == HANDOFF_RAIL2_TO_RAIL1 && !rail2HasLabware) {
         Console.error(F("RAIL2_NO_LABWARE_TO_TRANSFER"));
-        Console.serialInfo(F("Rail 2 has no labware to transfer to Rail 1"));
         return false;
     }
     
     // Destination-specific collision checks
     if (dir == HANDOFF_RAIL2_TO_RAIL1) {
         bool destinationOccupied = false;
-        const char* destinationName = "";
         
         switch (dest) {
             case DEST_WC1:
                 destinationOccupied = isLabwarePresentAtWC1();
-                destinationName = "WC1";
                 break;
             case DEST_WC2:
                 destinationOccupied = isLabwarePresentAtWC2();
-                destinationName = "WC2";
                 break;
             case DEST_STAGING:
-                // Staging is not a valid destination - only enables handoff operations
                 Console.error(F("Invalid destination: Staging is not a delivery target"));
-                Console.serialInfo(F("Staging position is used for handoff operations, not as a destination"));
-                Console.serialInfo(F("Valid destinations for Rail2→Rail1: WC1 or WC2"));
                 return false;
             default:
                 Console.error(F("Invalid destination for Rail 2 → Rail 1 handoff"));
-                Console.serialInfo(F("Unknown destination specified for Rail 2 to Rail 1 transfer"));
-                Console.serialInfo(F("Valid destinations: WC1 or WC2"));
                 return false;
         }
         
         if (destinationOccupied) {
             Console.error(F("TARGET_POSITION_OCCUPIED"));
-            char errorMsg[SMALL_MSG_SIZE];
-            sprintf_P(errorMsg, PSTR("Cannot deliver to %s - position already occupied"), destinationName);
-            Console.serialInfo(errorMsg);
             return false;
         }
     } else if (dir == HANDOFF_RAIL1_TO_RAIL2) {
         // Rail1 → Rail2 always goes to WC3
         if (isLabwarePresentAtWC3()) {
             Console.error(F("WC3_POSITION_OCCUPIED"));
-            Console.serialInfo(F("Cannot deliver to WC3 - position already occupied"));
             return false;
         }
     }
@@ -384,15 +353,10 @@ bool moveDestinationRailToTargetPosition() {
             case DEST_WC2:
                 return moveRail1CarriageToWC2(hasLabware);
             case DEST_STAGING:
-                // Staging is not a valid destination - this should not happen
                 Console.error(F("Invalid destination: Staging is not a delivery target"));
-                Console.serialInfo(F("System error: Staging position cannot be used as handoff destination"));
-                Console.serialInfo(F("This indicates a software configuration error - check system setup"));
                 return false;
             default:
                 Console.error(F("Invalid destination for Rail 2 → Rail 1 handoff"));
-                Console.serialInfo(F("Destination routing error - unknown target position"));
-                Console.serialInfo(F("Check command parameters and system configuration"));
                 return false;
         }
     }
@@ -402,15 +366,15 @@ bool verifyHandoffLabwareTransfer() {
     // Use sensor timeout for this verification
     if (timeoutElapsed(millis(), handoffState.operationStartTime, HANDOFF_SENSOR_TIMEOUT)) {
         Console.error(F("LABWARE_SENSOR_TIMEOUT"));
-        Console.serialInfo(F("Labware transfer verification timed out"));
         
         // SAFETY: Automatically retract cylinder on sensor timeout to prevent collision
         if (isCylinderActuallyExtended()) {
-            Console.serialInfo(F("SAFETY: Retracting pneumatic cylinder due to sensor timeout..."));
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, FMT_HANDOFF_ERROR, "Auto-retracting cylinder after timeout");
+            Console.serialInfo(msg);
             ValveOperationResult retractResult = retractCylinder();
             if (retractResult != VALVE_OP_SUCCESS) {
                 Console.error(F("CRITICAL_PNEUMATIC_FAILURE"));
-                Console.serialInfo(F("Failed to automatically retract cylinder after timeout - manual intervention required"));
             }
         }
         
@@ -437,8 +401,6 @@ bool verifyHandoffLabwareTransfer() {
         // Failure scenarios with specific diagnostics
         if (!labwareAtHandoff && sourceStillHasLabware) {
             Console.error(F("LABWARE_TRANSFER_MECHANISM_FAILED"));
-            Console.serialInfo(F("Labware still detected at WC1/WC2 but not at handoff position"));
-            Console.serialInfo(F("Transfer mechanism may have failed - check cylinder operation"));
             handoffState.currentState = HANDOFF_ERROR;
             handoffState.currentResult = HANDOFF_ERROR_SENSOR;
             return false;
@@ -446,9 +408,6 @@ bool verifyHandoffLabwareTransfer() {
         
         if (!labwareAtHandoff && !sourceStillHasLabware) {
             Console.error(F("RAIL1_LABWARE_DISAPPEARED"));
-            Console.serialInfo(F("CRITICAL: Labware disappeared from Rail 1 during handoff"));
-            Console.serialInfo(F("Labware was expected at WC1/WC2 but is no longer detected"));
-            Console.serialInfo(F("Check for mechanical issues or sensor malfunctions"));
             handoffState.currentState = HANDOFF_ERROR;
             handoffState.currentResult = HANDOFF_ERROR_SOURCE_MISSING;
             return false;
@@ -456,8 +415,6 @@ bool verifyHandoffLabwareTransfer() {
         
         if (labwareAtHandoff && sourceStillHasLabware) {
             Console.error(F("SENSOR_MALFUNCTION_DETECTED"));
-            Console.serialInfo(F("WARNING: Labware detected at both source (WC1/WC2) and handoff"));
-            Console.serialInfo(F("This suggests sensor malfunction or unexpected labware duplication"));
             handoffState.currentState = HANDOFF_ERROR;
             handoffState.currentResult = HANDOFF_ERROR_SENSOR;
             return false;
@@ -476,8 +433,6 @@ bool verifyHandoffLabwareTransfer() {
         // Failure scenarios with specific diagnostics
         if (!labwareAtHandoff && sourceStillHasLabware) {
             Console.error(F("LABWARE_TRANSFER_MECHANISM_FAILED"));
-            Console.serialInfo(F("Labware still detected at WC3 but not at handoff position"));
-            Console.serialInfo(F("Transfer mechanism may have failed - check cylinder operation"));
             handoffState.currentState = HANDOFF_ERROR;
             handoffState.currentResult = HANDOFF_ERROR_SENSOR;
             return false;
@@ -485,9 +440,6 @@ bool verifyHandoffLabwareTransfer() {
         
         if (!labwareAtHandoff && !sourceStillHasLabware) {
             Console.error(F("RAIL2_LABWARE_DISAPPEARED"));
-            Console.serialInfo(F("CRITICAL: Labware disappeared from Rail 2 during handoff"));
-            Console.serialInfo(F("Labware was expected at WC3 but is no longer detected"));
-            Console.serialInfo(F("Check for mechanical issues or sensor malfunctions"));
             handoffState.currentState = HANDOFF_ERROR;
             handoffState.currentResult = HANDOFF_ERROR_SOURCE_MISSING;
             return false;
@@ -495,8 +447,6 @@ bool verifyHandoffLabwareTransfer() {
         
         if (labwareAtHandoff && sourceStillHasLabware) {
             Console.error(F("SENSOR_MALFUNCTION_DETECTED"));
-            Console.serialInfo(F("WARNING: Labware detected at both source (WC3) and handoff"));
-            Console.serialInfo(F("This suggests sensor malfunction or unexpected labware duplication"));
             handoffState.currentState = HANDOFF_ERROR;
             handoffState.currentResult = HANDOFF_ERROR_SENSOR;
             return false;
@@ -505,7 +455,6 @@ bool verifyHandoffLabwareTransfer() {
     
     // Should never reach here, but safety fallback
     Console.error(F("HANDOFF_VERIFICATION_ERROR"));
-    Console.serialInfo(F("Unexpected state during transfer verification"));
     handoffState.currentState = HANDOFF_ERROR;
     handoffState.currentResult = HANDOFF_ERROR_SENSOR;
     return false;

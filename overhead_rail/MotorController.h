@@ -97,8 +97,14 @@
 //=============================================================================
 // HOMING CONFIGURATION
 //=============================================================================
-// Homing Timeouts and Tolerances
-#define HOME_TIMEOUT_MS 60000              // Homing operation timeout
+// Rail-Specific Homing Timeouts
+#define RAIL1_HOME_TIMEOUT_MS 120000       // Rail 1 homing timeout (2 minutes for 8.2m rail)
+#define RAIL2_HOME_TIMEOUT_MS 30000        // Rail 2 homing timeout (30 seconds for 1m rail)
+
+// Legacy timeout for backward compatibility
+#define HOME_TIMEOUT_MS RAIL1_HOME_TIMEOUT_MS
+
+// Homing Tolerances and Delays
 #define HOME_VERIFICATION_TOLERANCE_PULSES 10
 #define HOME_COMPLETION_DELAY_MS 1000
 
@@ -110,10 +116,63 @@
 #define HOMING_MIN_TIME_AFTER_DISTANCE_MS 500
 
 // Rail-Specific Homing Parameters
-#define RAIL1_HOMING_DIRECTION -1          // Rail 1 homes toward home position
+#define RAIL1_HOMING_DIRECTION -1          // Rail 1 homes toward home position (negative direction)
 #define RAIL1_HOME_OFFSET_DISTANCE_MM 5    // Offset from hardstop
-#define RAIL2_HOMING_DIRECTION -1          // Rail 2 homes toward home position
+#define RAIL2_HOMING_DIRECTION 1           // Rail 2 homes away from home position (positive direction)
 #define RAIL2_HOME_OFFSET_DISTANCE_MM 5    // Offset from hardstop
+
+//=============================================================================
+// SMART HOMING CONSTANTS
+//=============================================================================
+
+// Smart homing speeds and distances
+#define HOME_FAST_APPROACH_VELOCITY_RPM 200    // Fast approach speed for re-homing
+#define HOME_PRECISION_DISTANCE_MM 50          // Distance to switch to precision homing
+#define HOME_MIN_DISTANCE_FOR_SMART_MM 100     // Minimum distance to enable smart homing
+
+// Pulse-based constants for integer math (calculated at compile time)
+#define HOME_PRECISION_DISTANCE_PULSES_RAIL1 (HOME_PRECISION_DISTANCE_MM * RAIL1_PULSES_PER_MM)
+#define HOME_PRECISION_DISTANCE_PULSES_RAIL2 (HOME_PRECISION_DISTANCE_MM * RAIL2_PULSES_PER_MM)
+#define HOME_MIN_DISTANCE_PULSES_RAIL1 (HOME_MIN_DISTANCE_FOR_SMART_MM * RAIL1_PULSES_PER_MM)
+#define HOME_MIN_DISTANCE_PULSES_RAIL2 (HOME_MIN_DISTANCE_FOR_SMART_MM * RAIL2_PULSES_PER_MM)
+
+//=============================================================================
+// MOTOR INITIALIZATION CONSTANTS
+//=============================================================================
+#define MOTOR_INIT_TIMEOUT_MS 2000         // Timeout for motor initialization (2 seconds)
+#define MOTOR_INIT_POLL_DELAY_MS 10        // Polling delay during motor initialization
+
+//=============================================================================
+// JOGGING SPEED AND DISTANCE THRESHOLDS
+//=============================================================================
+// Distance thresholds for automatic jog speed capping (in mm)
+#define JOG_VERY_SHORT_THRESHOLD_MM 1.0    // Very short jog distance threshold
+#define JOG_SHORT_THRESHOLD_MM 5.0         // Short jog distance threshold  
+#define JOG_MEDIUM_THRESHOLD_MM 20.0       // Medium jog distance threshold
+
+// Maximum speeds for different jog distances (in RPM)
+#define JOG_VERY_SHORT_MAX_SPEED_RPM 100   // Speed cap for very short jogs (≤1mm)
+#define JOG_SHORT_MAX_SPEED_RPM 200        // Speed cap for short jogs (≤5mm)
+#define JOG_MEDIUM_MAX_SPEED_RPM 400       // Speed cap for medium jogs (≤20mm)
+#define JOG_LONG_MAX_SPEED_RPM 600         // Speed cap for long jogs (>20mm)
+
+//=============================================================================
+// MOVEMENT PROGRESS MONITORING CONSTANTS
+//=============================================================================
+#define MOVEMENT_TIMEOUT_MS 120000         // Maximum time allowed for any movement (2 minutes)
+#define MOVEMENT_STALL_TIMEOUT_MS 5000     // Time without progress before declaring stall (5 seconds)
+#define MOVEMENT_MIN_PROGRESS_PULSES 50    // Minimum pulse movement to avoid stall detection
+
+//=============================================================================
+// MOTOR HOMING CONSTANTS
+//=============================================================================
+// Rail 1 Homing Parameters
+#define RAIL1_HOME_VELOCITY_RPM 100         // Homing speed for Rail 1
+#define RAIL1_HOME_ACCEL_RPM_PER_SEC 500    // Homing acceleration for Rail 1
+
+// Rail 2 Homing Parameters
+#define RAIL2_HOME_VELOCITY_RPM 100         // Homing speed for Rail 2
+#define RAIL2_HOME_ACCEL_RPM_PER_SEC 500    // Homing acceleration for Rail 2
 
 //=============================================================================
 // JOGGING CONFIGURATION
@@ -264,6 +323,7 @@ int32_t mmToPulsesInteger(double mm, int rail);          // Optimized version us
 int32_t getPositionPulses(PositionTarget target);
 int getRailFromPosition(PositionTarget target);
 bool isValidPositionForRail(PositionTarget target, int rail);
+bool validateAllPredefinedPositions(); // Validate all positions against travel limits
 const char* getPositionName(PositionTarget pos);
 
 // Motor Control and Status
@@ -271,6 +331,11 @@ MotorDriver& getMotorByRail(int rail);
 const char* getMotorName(int rail);
 double getMotorPositionMm(int rail);
 int32_t getCarriageVelocityRpm(int rail, bool carriageLoaded);  // Get rail-specific velocity
+
+// Smart Homing Helper Functions
+int32_t getHomePrecisionDistancePulses(int rail);
+int32_t getHomeMinDistancePulses(int rail);
+
 void stopMotion(int rail);
 void stopAllMotion();
 bool isMotorReady(int rail);
@@ -313,11 +378,18 @@ bool isHomingComplete(int rail);
 bool isHomingInProgress(int rail);
 int getHomingDirection(int rail);
 double getHomeOffsetDistance(int rail);
+unsigned long getHomingTimeout(int rail);
 
 // Dual-Motor Homing Convenience Functions
 bool initiateHomingSequenceAll();
 void checkAllHomingProgress();
 bool isAllHomingComplete();
+
+// Smart Homing Functions
+bool initiateSmartHomingSequence(int rail);
+bool isSmartHomingBeneficial(int rail, int32_t* estimatedTimeSavingsMs);
+void calculateSmartHomingPhases(int rail, int32_t currentPositionPulses, bool* useSmartHoming, 
+                               int32_t* fastPhaseDistancePulses, int32_t* precisionPhaseDistancePulses);
 
 // Movement Progress Monitoring
 void checkMoveProgress();

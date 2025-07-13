@@ -4,6 +4,17 @@
 #include <SD.h>
 
 //=============================================================================
+// CONSOLE OUTPUT FORMAT STRINGS
+//=============================================================================
+// Consolidated format strings for cleaner, more concise position configuration messaging
+
+// System status and configuration format strings
+const char FMT_POSITION_SYSTEM_INIT[] PROGMEM = "Position system: %s";
+const char FMT_POSITION_OPERATION[] PROGMEM = "Position %s: %s";
+const char FMT_RAIL_POSITIONS_STATUS[] PROGMEM = "Rail %d: %d taught, %d default";
+const char FMT_POSITION_TAUGHT_SIMPLE[] PROGMEM = "%s taught @ %.2fmm";
+
+//=============================================================================
 // PROGMEM STRING CONSTANTS
 //=============================================================================
 // Format strings for sprintf_P()
@@ -52,22 +63,20 @@ const int NUM_TEACHABLE_POSITIONS = sizeof(teachablePositions) / sizeof(Teachabl
 //=============================================================================
 
 bool initPositionConfig() {
-    Console.serialInfo(F("Initializing dual-rail position configuration system..."));
+    char msg[MEDIUM_MSG_SIZE];
+    sprintf_P(msg, FMT_POSITION_SYSTEM_INIT, "initializing...");
+    Console.serialInfo(msg);
     
     // Initialize SD card
     sdCardInitialized = SD.begin();
     if (!sdCardInitialized) {
-        Console.serialWarning(F("SD card initialization failed - using factory defaults"));
-        Console.serialInfo(F("Factory defaults: Rail1 positions, Rail2 positions available"));
+        sprintf_P(msg, FMT_POSITION_SYSTEM_INIT, "SD failed - using defaults");
+        Console.serialWarning(msg);
         return false;
     }
     
-    Console.serialInfo(F("SD card initialized successfully"));
-    
     // Try to load positions from SD card
     if (loadPositionsFromSD()) {
-        Console.serialInfo(F("Taught positions loaded from SD card"));
-        
         // Show summary of loaded positions
         int taughtCount = 0;
         for (int i = 0; i < NUM_TEACHABLE_POSITIONS; i++) {
@@ -76,12 +85,12 @@ bool initPositionConfig() {
             }
         }
         
-        char msg[SMALL_MSG_SIZE];
         sprintf_P(msg, FMT_LOADED_POSITIONS, 
                 taughtCount, NUM_TEACHABLE_POSITIONS - taughtCount);
         Console.serialInfo(msg);
     } else {
-        Console.serialInfo(F("No taught positions found - using factory defaults"));
+        sprintf_P(msg, FMT_POSITION_SYSTEM_INIT, "using factory defaults");
+        Console.serialInfo(msg);
     }
     
     return true;
@@ -162,7 +171,6 @@ bool teachCurrentPosition(int rail, PositionTarget target) {
         char msg[SMALL_MSG_SIZE];
         sprintf_P(msg, FMT_RAIL_NOT_HOMED, rail);
         Console.serialError(msg);
-        Console.serialInfo(F("Teaching positions requires a proper reference point"));
         return false;
     }
     
@@ -200,16 +208,14 @@ bool teachCurrentPosition(int rail, PositionTarget target) {
         sprintf_P(msg, FMT_POSITION_TAUGHT_ACK, posInfo->name, currentPos);
         Console.acknowledge(msg);
         
-        sprintf_P(msg, FMT_TAUGHT_SAVED, 
-                posInfo->description, currentPos);
+        sprintf_P(msg, FMT_POSITION_TAUGHT_SIMPLE, posInfo->description, currentPos);
         Console.serialInfo(msg);
     } else {
         char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_POSITION_TAUGHT_ACK, posInfo->name, currentPos);
         Console.acknowledge(msg);
         
-        sprintf_P(msg, FMT_TAUGHT_NOT_SAVED, 
-                posInfo->description, currentPos);
+        sprintf_P(msg, FMT_POSITION_OPERATION, posInfo->description, "taught but save failed");
         Console.serialWarning(msg);
     }
     
@@ -248,7 +254,6 @@ bool teachRail2Handoff() {
 bool teachSaveAllPositions() {
     if (savePositionsToSD()) {
         Console.acknowledge(F("ALL_POSITIONS_SAVED"));
-        Console.serialInfo(F("All taught positions saved to SD card"));
         
         // Show summary
         int taughtCount = 0;
@@ -276,17 +281,9 @@ bool teachResetAllPositions() {
     useRuntimePositions = false;
     
     Console.acknowledge(F("ALL_POSITIONS_RESET"));
-    Console.serialInfo(F("All positions reset to factory defaults"));
-    
-    // Show factory defaults
-    Console.serialInfo(F("Factory default positions:"));
-    for (int i = 0; i < NUM_TEACHABLE_POSITIONS; i++) {
-        char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_FACTORY_DEFAULT, 
-                teachablePositions[i].description, 
-                teachablePositions[i].factoryDefault);
-        Console.serialInfo(msg);
-    }
+    char msg[MEDIUM_MSG_SIZE];
+    sprintf_P(msg, FMT_POSITION_OPERATION, "ALL", "reset to factory defaults");
+    Console.serialInfo(msg);
     
     return true;
 }
@@ -319,31 +316,41 @@ bool teachResetRail(int rail) {
 void teachShowStatus() {
     Console.acknowledge(F("TEACH_STATUS"));
     
-    Console.serialInfo(F("\n===== POSITION CONFIGURATION STATUS ====="));
+    // Show rail summaries
+    char msg[MEDIUM_MSG_SIZE];
     
-    // Show Rail 1 positions
-    Console.serialInfo(F("\nRAIL 1 POSITIONS:"));
-    teachShowRail(1);
-    
-    // Show Rail 2 positions
-    Console.serialInfo(F("\nRAIL 2 POSITIONS:"));
-    teachShowRail(2);
-    
-    // Show SD card status
-    Console.serialInfo(F("\nSD CARD STATUS:"));
-    Console.print(F("  SD Card: "));
-    Console.println(isSDCardAvailable() ? F("AVAILABLE") : F("NOT AVAILABLE"));
-    
-    if (isSDCardAvailable()) {
-        Console.print(F("  Config file: "));
-        Console.println(SD.exists(CONFIG_FILE_NAME) ? F("EXISTS") : F("NOT FOUND"));
-        
-        if (SD.exists(CONFIG_BACKUP_NAME)) {
-            Console.print(F("  Backup file: EXISTS"));
+    // Rail 1 summary
+    int rail1Taught = 0, rail1Default = 0;
+    for (int i = 0; i < NUM_TEACHABLE_POSITIONS; i++) {
+        if (teachablePositions[i].rail == 1) {
+            if (*(teachablePositions[i].runtimeVariable) >= 0) {
+                rail1Taught++;
+            } else {
+                rail1Default++;
+            }
         }
     }
+    sprintf_P(msg, FMT_RAIL_POSITIONS_STATUS, 1, rail1Taught, rail1Default);
+    Console.serialInfo(msg);
     
-    Console.serialInfo(F("==========================================\n"));
+    // Rail 2 summary
+    int rail2Taught = 0, rail2Default = 0;
+    for (int i = 0; i < NUM_TEACHABLE_POSITIONS; i++) {
+        if (teachablePositions[i].rail == 2) {
+            if (*(teachablePositions[i].runtimeVariable) >= 0) {
+                rail2Taught++;
+            } else {
+                rail2Default++;
+            }
+        }
+    }
+    sprintf_P(msg, FMT_RAIL_POSITIONS_STATUS, 2, rail2Taught, rail2Default);
+    Console.serialInfo(msg);
+    
+    // SD card status
+    sprintf_P(msg, FMT_POSITION_OPERATION, "SD Card", 
+        isSDCardAvailable() ? "available" : "not available");
+    Console.serialInfo(msg);
 }
 
 void teachShowRail(int rail) {
@@ -422,8 +429,6 @@ bool savePositionsToSD() {
         backupPositionsToSD();
     }
     
-    Console.serialInfo(F("Saving positions to SD card..."));
-    
     File configFile = SD.open(CONFIG_FILE_NAME, FILE_WRITE);
     if (!configFile) {
         Console.serialError(F("Failed to open config file for writing"));
@@ -468,7 +473,9 @@ bool savePositionsToSD() {
     
     // Verify the file was created
     if (SD.exists(CONFIG_FILE_NAME)) {
-        Console.serialInfo(F("Position config file saved successfully"));
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, FMT_POSITION_OPERATION, "config", "saved successfully");
+        Console.serialInfo(msg);
         return true;
     } else {
         Console.serialError(F("Config file not found after writing"));
@@ -485,8 +492,6 @@ bool loadPositionsFromSD() {
     if (!configFile) {
         return false;
     }
-    
-    Console.serialInfo(F("Loading positions from SD card..."));
     
     String line;
     bool foundPositions = false;
@@ -521,7 +526,6 @@ bool loadPositionsFromSD() {
     
     if (foundPositions) {
         useRuntimePositions = true;
-        Console.serialInfo(F("Taught positions loaded from SD card"));
         return true;
     }
     

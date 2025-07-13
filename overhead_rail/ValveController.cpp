@@ -5,11 +5,20 @@
 //=============================================================================
 // PROGMEM FORMAT STRINGS
 //=============================================================================
-const char FMT_VALVE_SET[] PROGMEM = "Valve set to %s";
+// Core valve operation formats - streamlined for operator clarity
+const char FMT_VALVE_INIT_SUCCESS[] PROGMEM = "Valve system: Initialization complete - %s position verified";
+const char FMT_VALVE_INIT_PRESSURE_WARNING[] PROGMEM = "Valve system: Initialization complete - WARNING: Low pressure (%d.%02d PSI), manual position verification required";
+const char FMT_VALVE_OPERATION_RESULT[] PROGMEM = "Valve: %s → %s%s";
+const char FMT_VALVE_STATUS_SUMMARY[] PROGMEM = "Valve: %s, Sensors: Ext=%s/Ret=%s, Pressure: %d.%02d PSI%s";
+
+// Operation formats (consolidated for reduced verbosity)  
 const char FMT_VALVE_ALREADY_AT[] PROGMEM = "Valve already at %s position";
-const char FMT_INSUFFICIENT_PRESSURE[] PROGMEM = "Insufficient pressure: %d.%02d PSI (min: %d.%02d PSI)";
 const char FMT_MOVING_VALVE[] PROGMEM = "Moving valve to %s position...";
 const char FMT_VALVE_SUCCESS[] PROGMEM = "Valve successfully moved to %s position";
+
+// Error and diagnostic formats (preserved for troubleshooting)
+const char FMT_VALVE_SET[] PROGMEM = "Valve set to %s";
+const char FMT_INSUFFICIENT_PRESSURE[] PROGMEM = "Insufficient pressure: %d.%02d PSI (min: %d.%02d PSI)";
 const char FMT_VALVE_TIMEOUT[] PROGMEM = "Timeout waiting for %s position confirmation (%lu ms)";
 const char FMT_SENSOR_ERROR[] PROGMEM = "Sensor error during %s operation";
 const char FMT_PNEUMATIC_VALVE[] PROGMEM = "Pneumatic Cylinder Valve: %s";
@@ -63,7 +72,7 @@ void initValveSystem(bool hasCCIOBoard)
         return;
     }
 
-    Console.serialInfo(F("Initializing pneumatic cylinder valve with CCIO board..."));
+    Console.serialInfo(F("Initializing valve system with safety verification..."));
 
     // Configure valve control pin as output
     pinMode(cylinderValve.controlPin, OUTPUT);
@@ -74,7 +83,45 @@ void initValveSystem(bool hasCCIOBoard)
     // Mark as initialized
     cylinderValve.initialized = true;
     
-    Console.serialInfo(F("Pneumatic cylinder valve initialized - Position: RETRACTED"));
+    // SAFETY: Explicitly verify cylinder is in retracted position
+    // This is critical for collision avoidance with Rail 1
+    if (isPressureSufficientForValve()) {
+        // Attempt explicit retraction to ensure safe state (operation details tracked internally)
+        ValveOperationResult result = retractCylinder(VALVE_SENSOR_TIMEOUT_MS);
+        
+        if (result == VALVE_OP_SUCCESS && isCylinderActuallyRetracted()) {
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, FMT_VALVE_INIT_SUCCESS, "RETRACTED - Rail 2 carriage safe");
+            Console.serialInfo(msg);
+        } else if (result == VALVE_OP_ALREADY_AT_POSITION && isCylinderActuallyRetracted()) {
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, FMT_VALVE_INIT_SUCCESS, "RETRACTED - Rail 2 carriage safe");
+            Console.serialInfo(msg);
+        } else {
+            Console.serialError(F("SAFETY CRITICAL: Cannot confirm cylinder retraction during startup!"));
+            Console.serialError(F("Rail 2 carriage may not be in safe position - manual verification required"));
+            
+            // Log detailed failure information for troubleshooting
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, PSTR("Retraction result: %s"), getValveOperationResultName(result));
+            Console.serialError(msg);
+            
+            if (result == VALVE_OP_SUCCESS || result == VALVE_OP_ALREADY_AT_POSITION) {
+                Console.serialError(F("Operation succeeded but sensor verification failed"));
+                Console.serialError(F("Check cylinder sensors and mechanical operation"));
+            }
+            
+            // Set error state but don't prevent initialization
+            lastValveOperationFailed = true;
+            strcpy(lastValveFailureDetails, "Startup safety verification failed");
+        }
+    } else {
+        // Low pressure warning with consolidated messaging
+        uint16_t currentPressure = readPressureScaled(airPressureSensor);
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, FMT_VALVE_INIT_PRESSURE_WARNING, currentPressure / 100, currentPressure % 100);
+        Console.serialWarning(msg);
+    }
 }
 
 //=============================================================================
@@ -138,11 +185,9 @@ ValveOperationResult safeSetValvePosition(ValvePosition targetPosition, unsigned
         return VALVE_OP_SENSOR_ERROR;
     }
     
-    // Check if already at target position
+    // Check if already at target position (silently handle - not critical operator info)
     if (isValveAtPosition(targetPosition))
     {
-        sprintf_P(msg, FMT_VALVE_ALREADY_AT, getValvePositionName(targetPosition));
-        Console.serialDiagnostic(msg);
         return VALVE_OP_ALREADY_AT_POSITION;
     }
     
@@ -158,10 +203,7 @@ ValveOperationResult safeSetValvePosition(ValvePosition targetPosition, unsigned
         return VALVE_OP_PRESSURE_LOW;
     }
     
-    // Perform the valve operation
-    sprintf_P(msg, FMT_MOVING_VALVE, getValvePositionName(targetPosition));
-    Console.serialInfo(msg);
-    
+    // Perform the valve operation (combine operation and result into single message)
     setValvePosition(targetPosition);
     
     // Wait for sensor confirmation (if sensors are available and working)
@@ -185,8 +227,8 @@ ValveOperationResult safeSetValvePosition(ValvePosition targetPosition, unsigned
         bool cylinderExtended = readDigitalSensor(cylinderExtendedSensor);
         bool cylinderRetracted = readDigitalSensor(cylinderRetractedSensor);
         
-        // Check for valid sensor state (both sensors shouldn't be active simultaneously)
-        if (cylinderExtended && cylinderRetracted)
+        // Check for valid sensor state (log once per operation, not continuously)
+        if (cylinderExtended && cylinderRetracted && !sensorConfirmation)
         {
             Console.serialWarning(F("Warning: Both cylinder sensors active - check sensor wiring"));
         }
@@ -206,10 +248,14 @@ ValveOperationResult safeSetValvePosition(ValvePosition targetPosition, unsigned
         delay(10); // Short delay to prevent excessive CPU usage
     }
     
-    // Evaluate results
+    // Evaluate results and provide consolidated operation feedback
     if (sensorConfirmation)
     {
-        sprintf_P(msg, FMT_VALVE_SUCCESS, getValvePositionName(targetPosition));
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, FMT_VALVE_OPERATION_RESULT, 
+                 getValvePositionName(cylinderValve.currentPosition), 
+                 getValvePositionName(targetPosition),
+                 " (confirmed)");
         Console.serialInfo(msg);
         lastValveOperationFailed = false;
         return VALVE_OP_SUCCESS;
@@ -262,58 +308,35 @@ void printValveStatus()
         return;
     }
     
-    sprintf_P(msg, FMT_PNEUMATIC_VALVE, getValvePositionName(cylinderValve.currentPosition));
+    // Consolidated valve status with key information for operators
+    bool extended = readDigitalSensor(cylinderExtendedSensor);
+    bool retracted = readDigitalSensor(cylinderRetractedSensor);
+    uint16_t pressure = readPressureScaled(airPressureSensor);
+    const char* pressureStatus = isPressureSufficientForValve() ? "" : " [LOW]";
+    
+    sprintf_P(msg, FMT_VALVE_STATUS_SUMMARY,
+             getValvePositionName(cylinderValve.currentPosition),
+             extended ? "Y" : "N",
+             retracted ? "Y" : "N", 
+             pressure / 100, pressure % 100,
+             pressureStatus);
     Console.serialInfo(msg);
     
-    // Show sensor states for confirmation
-    if (hasCCIO)
+    // Only report sensor issues if they exist (operator-actionable information)
+    if (extended && retracted)
     {
-        bool extended = readDigitalSensor(cylinderExtendedSensor);
-        bool retracted = readDigitalSensor(cylinderRetractedSensor);
-        
-        sprintf_P(msg, FMT_CYLINDER_SENSORS,
-                extended ? "ACTIVE" : "inactive",
-                retracted ? "ACTIVE" : "inactive");
-        Console.serialInfo(msg);
-        
-        // Check for sensor consistency
-        if (extended && retracted)
-        {
-            Console.serialWarning(F("Warning: Both cylinder sensors active simultaneously"));
-        }
-        else if (!extended && !retracted)
-        {
-            Console.serialWarning(F("Warning: No cylinder sensors active - position uncertain"));
-        }
+        Console.serialWarning(F("Warning: Both cylinder sensors active simultaneously"));
+    }
+    else if (!extended && !retracted)
+    {
+        Console.serialWarning(F("Warning: No cylinder sensors active - position uncertain"));
     }
     
-    // Show pressure status
-    if (isPressureSufficientForValve())
-    {
-        uint16_t pressure = readPressureScaled(airPressureSensor);
-        sprintf_P(msg, FMT_AIR_PRESSURE_SUFFICIENT, pressure / 100, pressure % 100);
-        Console.serialInfo(msg);
-    }
-    else
-    {
-        uint16_t pressure = readPressureScaled(airPressureSensor);
-        sprintf_P(msg, FMT_AIR_PRESSURE_LOW, 
-                pressure / 100, pressure % 100,
-                MIN_VALVE_PRESSURE_SCALED / 100, MIN_VALVE_PRESSURE_SCALED % 100);
-        Console.serialWarning(msg);
-    }
-    
-    // Show last operation status
+    // Show last operation failure details if relevant
     if (lastValveOperationFailed)
     {
         sprintf_P(msg, FMT_LAST_OP_FAILED, lastValveFailureDetails);
         Console.serialError(msg);
-    }
-    else
-    {
-        unsigned long timeSince = getTimeSinceLastValveOperation();
-        sprintf_P(msg, FMT_LAST_OP_SUCCESS, timeSince);
-        Console.serialInfo(msg);
     }
 }
 
@@ -474,7 +497,7 @@ void resetValveErrorState()
 {
     lastValveOperationFailed = false;
     memset(lastValveFailureDetails, 0, sizeof(lastValveFailureDetails));
-    Console.serialInfo(F("Valve error state cleared"));
+    Console.serialInfo(F("Valve: Error state cleared"));
 }
 
 unsigned long getTimeSinceLastValveOperation()

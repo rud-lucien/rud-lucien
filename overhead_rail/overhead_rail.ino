@@ -59,6 +59,13 @@ void setup()
     Console.serialInfo(F("Initializing pneumatic valve system..."));
     initValveSystem(hasCCIOBoard);
 
+    // Validate all predefined positions against travel limits
+    Console.serialInfo(F("Performing system configuration validation..."));
+    if (!validateAllPredefinedPositions()) {
+        Console.serialError(F("CRITICAL: Position validation failed - review configuration"));
+        Console.serialError(F("System will continue but some movements may be rejected"));
+    }
+
     // Initialize Ethernet interface
     Console.serialInfo(F("Initializing Ethernet interface..."));
     initEthernetController(false); // false = use static IP, true = use DHCP

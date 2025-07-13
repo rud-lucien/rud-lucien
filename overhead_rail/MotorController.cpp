@@ -7,14 +7,9 @@
 // Format strings for sprintf_P()
 const char FMT_MOTOR_ALERT_DETAILS[] PROGMEM = "%s Alert Details:\n%s";
 const char FMT_INITIALIZING[] PROGMEM = "Initializing %s...";
-const char FMT_VELOCITY_LIMIT[] PROGMEM = "%s: Setting velocity limit to %d RPM";
-const char FMT_ACCEL_LIMIT[] PROGMEM = "%s: Setting acceleration limit to %d RPM/s";
-const char FMT_ENABLE_REQUESTED[] PROGMEM = "%s: Enable requested";
-const char FMT_WAITING_HLFB[] PROGMEM = "%s: Waiting for HLFB...";
 const char FMT_ALERT_DETECTED[] PROGMEM = "%s: Motor alert detected";
-const char FMT_READY[] PROGMEM = "%s: Initialized and ready";
-const char FMT_INIT_FAILED[] PROGMEM = "%s: Initialization timed out or failed";
-const char FMT_HLFB_STATE[] PROGMEM = "%s HLFB State: %s";
+const char FMT_INIT_SUCCESS[] PROGMEM = "%s: Initialization complete - Ready at %d RPM/%d RPM/s";
+const char FMT_INIT_FAILED[] PROGMEM = "%s: Initialization failed - %s";
 const char FMT_MOTION_STOPPED[] PROGMEM = "%s motion stopped";
 const char FMT_CLEARING_FAULTS[] PROGMEM = "Attempting to clear %s faults...";
 const char FMT_ALERTS_DETECTED[] PROGMEM = "%s alerts detected:";
@@ -31,24 +26,19 @@ const char FMT_ALERTS_BEFORE_HOMING[] PROGMEM = "%s: Motor has active alerts - c
 const char FMT_ALERT_DURING_HOMING[] PROGMEM = "%s: Motor alert during homing";
 const char FMT_MOTOR_STATUS[] PROGMEM = "[INFO] %s Status:\n  Enabled: %s\n  Moving: %s\n  Position: %ld pulses (%.1f mm)\n  HLFB Status: %s\n  %s";
 
-// Homing operation format strings
-const char FMT_HOMING_INITIATED[] PROGMEM = "%s: Homing sequence initiated. Motor moving to find home position.";
-const char FMT_HOMING_DIAGNOSTIC[] PROGMEM = "[HOMING %s] Position: %ld, Movement: %ld pulses, HLFB: %s";
+// Homing operation format strings - streamlined for operator clarity
+const char FMT_HOMING_INITIATED[] PROGMEM = "%s: Homing sequence initiated";
 const char FMT_MINIMAL_MOVEMENT[] PROGMEM = "%s: Minimal movement detected during homing";
 const char FMT_HOMING_TIMEOUT[] PROGMEM = "%s: Homing operation timed out";
 const char FMT_FINAL_HLFB_STATE[] PROGMEM = "%s: Final HLFB state: %s";
 const char FMT_SET_HOME_TIMEOUT[] PROGMEM = "%s: Setting current position as home reference despite timeout";
-const char FMT_MIN_DISTANCE_REACHED[] PROGMEM = "%s: Minimum travel distance reached (%ld pulses) - Hardstop detection enabled";
-const char FMT_HLFB_NON_ASSERTED[] PROGMEM = "%s: HLFB went non-asserted - approaching hardstop";
-const char FMT_HARDSTOP_REACHED[] PROGMEM = "%s: Hardstop reached - HLFB reasserted after %ldms, additional travel: %ld pulses";
+const char FMT_HARDSTOP_REACHED[] PROGMEM = "%s: Hardstop reached, establishing home position";
 const char FMT_MOVING_FROM_HARDSTOP[] PROGMEM = "%s: Moving %.2fmm away from hardstop";
-const char FMT_WAITING_OFFSET[] PROGMEM = "%s: Waiting for offset move to complete...";
 const char FMT_ALERT_OFFSET_MOVE[] PROGMEM = "%s: Alert during offset move";
 const char FMT_OFFSET_TIMEOUT[] PROGMEM = "%s: Offset move timed out or failed to complete";
 const char FMT_HOME_OFFSET_ESTABLISHED[] PROGMEM = "%s: Home offset established as zero position";
 const char FMT_HARDSTOP_AS_ZERO[] PROGMEM = "%s: Hardstop established as zero position (no offset)";
 const char FMT_HOMING_COMPLETED[] PROGMEM = "%s: Homing sequence completed successfully in ";
-const char FMT_HOMING_STATE_RESET[] PROGMEM = "%s: Homing state variables reset";
 const char FMT_ABORTING_HOMING[] PROGMEM = "%s: Aborting homing operation";
 const char FMT_HOMING_ABORTED[] PROGMEM = "%s: Homing operation aborted successfully";
 
@@ -57,14 +47,10 @@ const char FMT_NOT_READY_JOG[] PROGMEM = "%s: Motor not ready for jogging";
 const char FMT_CANNOT_JOG_MOVING[] PROGMEM = "%s: Cannot jog while motor is moving";
 const char FMT_JOG_EXCEED_LIMITS[] PROGMEM = "%s: Jog would exceed travel limits (0 to %.1fmm)";
 const char FMT_JOG_POSITION_INFO[] PROGMEM = "%s: Current: %.2fmm, Target would be: %.2fmm";
-const char FMT_JOGGING[] PROGMEM = "%s: Jogging %s by %.2fmm at %d RPM %s";
+const char FMT_JOGGING[] PROGMEM = "%s: Jogging %s %.2fmm at %d RPM%s";
 const char FMT_JOG_INCREMENT_RANGE[] PROGMEM = "%s: Jog increment must be between 0 and %.1fmm";
 const char FMT_JOG_INCREMENT_SET[] PROGMEM = "%s: Jog increment set to %.2fmm";
 const char FMT_JOG_SPEED_RANGE[] PROGMEM = "%s: Jog speed must be between 10 and %d RPM";
-const char FMT_SPEED_CAPPED_VERY_SHORT[] PROGMEM = "%s: Speed capped to %d RPM for very short jog (%.2fmm)";
-const char FMT_SPEED_CAPPED_SHORT[] PROGMEM = "%s: Speed capped to %d RPM for short jog (%.2fmm)";
-const char FMT_SPEED_CAPPED_MEDIUM[] PROGMEM = "%s: Speed capped to %d RPM for medium jog (%.2fmm)";
-const char FMT_SPEED_CAPPED_LONG[] PROGMEM = "%s: Speed capped to %d RPM for long jog (%.2fmm)";
 const char FMT_JOG_SPEED_SET[] PROGMEM = "%s: Jog speed set to %d RPM";
 const char FMT_MOVE_POSITIONED[] PROGMEM = "%s: %s→%s (%.1fmm) at %d RPM %s";
 const char FMT_MOVE_TO_POSITION[] PROGMEM = "%s: Moving to %s (%.1fmm) at %d RPM %s";
@@ -79,6 +65,7 @@ const char FMT_RELATIVE_MOVE_RANGE[] PROGMEM = "%s: Relative move would exceed v
 const char FMT_RELATIVE_MOVE_DETAILS[] PROGMEM = "%s: Current: %.2fmm, Move: %.2fmm, Target would be: %.2fmm";
 const char FMT_RELATIVE_MOVE[] PROGMEM = "%s: Moving %.2fmm relative (%ld pulses) at %d RPM %s";
 const char FMT_INITIATE_HOMING[] PROGMEM = "Initiating homing sequence for %s";
+const char FMT_POSITION_LIMIT_ERROR[] PROGMEM = "POSITION DEFINITION ERROR: %s position %.2fmm exceeds %s travel limit (0-%.0fmm)";
 
 // Alert message constants
 const char ALERT_MOTION_CANCELED_IN_ALERT[] PROGMEM = "    MotionCanceledInAlert\n";
@@ -170,6 +157,11 @@ double getHomeOffsetDistance(int rail) {
     return (rail == 1) ? RAIL1_HOME_OFFSET_DISTANCE_MM : RAIL2_HOME_OFFSET_DISTANCE_MM;
 }
 
+// Get homing timeout for specific rail
+unsigned long getHomingTimeout(int rail) {
+    return (rail == 1) ? RAIL1_HOME_TIMEOUT_MS : RAIL2_HOME_TIMEOUT_MS;
+}
+
 // Get jog parameters by reference for modification
 double& getJogIncrementRef(int rail) {
     return (rail == 1) ? rail1JogIncrementMm : rail2JogIncrementMm;
@@ -182,6 +174,22 @@ int& getJogSpeedRef(int rail) {
 // Get deceleration config for specific rail
 RailDecelerationConfig& getDecelerationConfig(int rail) {
     return (rail == 1) ? rail1DecelConfig : rail2DecelConfig;
+}
+
+// Get smart homing constants in pulses for specific rail
+int32_t getHomePrecisionDistancePulses(int rail) {
+    return (rail == 1) ? HOME_PRECISION_DISTANCE_PULSES_RAIL1 : HOME_PRECISION_DISTANCE_PULSES_RAIL2;
+}
+
+int32_t getHomeMinDistancePulses(int rail) {
+    return (rail == 1) ? HOME_MIN_DISTANCE_PULSES_RAIL1 : HOME_MIN_DISTANCE_PULSES_RAIL2;
+}
+
+// Helper function to set motor velocity and update global tracking
+void setMotorVelocity(int rail, int32_t velocityPps) {
+    MotorDriver& motor = getMotorByRail(rail);
+    motor.VelMax(velocityPps);
+    currentVelMax = velocityPps; // Update global tracking
 }
 
 // Get motor reference by rail number
@@ -312,32 +320,21 @@ bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocity
     motor.HlfbMode(MotorDriver::HLFB_MODE_HAS_BIPOLAR_PWM);
     motor.HlfbCarrier(MotorDriver::HLFB_CARRIER_482_HZ);
 
-    // Set velocity and acceleration limits
-    sprintf_P(msg, FMT_VELOCITY_LIMIT, motorName, velocityRpm);
-    Console.serialInfo(msg);
-    
+    // Set velocity and acceleration limits (silently - details not critical for operator)
     int32_t velMax = rpmToPps(velocityRpm);
     motor.VelMax(velMax);
-
-    sprintf_P(msg, FMT_ACCEL_LIMIT, motorName, accelRpmPerSec);
-    Console.serialInfo(msg);
+    currentVelMax = velMax; // Update global tracking
     
     int32_t accelMax = rpmPerSecToPpsPerSec(accelRpmPerSec);
     motor.AccelMax(accelMax);
 
-    // Enable the motor
+    // Enable the motor and wait for HLFB to assert (up to 2 seconds)
     motor.EnableRequest(true);
-    sprintf_P(msg, FMT_ENABLE_REQUESTED, motorName);
-    Console.serialInfo(msg);
-
-    // Wait for HLFB to assert (up to 2 seconds)
-    sprintf_P(msg, FMT_WAITING_HLFB, motorName);
-    Console.serialInfo(msg);
     
     unsigned long startTime = millis();
     bool ready = false;
 
-    while (!ready && !timeoutElapsed(millis(), startTime, 2000))
+    while (!ready && !timeoutElapsed(millis(), startTime, MOTOR_INIT_TIMEOUT_MS))
     {
         if (motor.HlfbState() == MotorDriver::HLFB_ASSERTED)
         {
@@ -350,21 +347,20 @@ bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocity
             printMotorAlerts(motor, motorName);
             break;
         }
-        delay(10);
+        delay(MOTOR_INIT_POLL_DELAY_MS);
     }
 
     if (ready)
     {
-        sprintf_P(msg, FMT_READY, motorName);
+        sprintf_P(msg, FMT_INIT_SUCCESS, motorName, velocityRpm, accelRpmPerSec);
         Console.serialInfo(msg);
         return true;
     }
     else
     {
-        sprintf_P(msg, FMT_INIT_FAILED, motorName);
-        Console.serialError(msg);
-        sprintf_P(msg, FMT_HLFB_STATE, motorName,
-                motor.HlfbState() == MotorDriver::HLFB_ASSERTED ? "ASSERTED" : "NOT ASSERTED");
+        const char* failureReason = motor.StatusReg().bit.AlertsPresent ? 
+            "Motor alerts detected" : "HLFB timeout - motor not responding";
+        sprintf_P(msg, FMT_INIT_FAILED, motorName, failureReason);
         Console.serialError(msg);
         return false;
     }
@@ -516,8 +512,8 @@ double pulsesToMm(int32_t pulses, int rail)
 int32_t mmToPulsesScaled(int32_t mmScaled, int rail)
 {
     // Input: mm * 100, Output: pulses
-    // For both rails: (mmScaled * PULSES_PER_MM_SCALED) / (100 * 100)
-    // mmScaled is mm * 100, PULSES_PER_MM_SCALED is pulses per 100mm
+    // For both rails: (mmScaled * pulses_per_100mm) / 100
+    // mmScaled is mm * 100, pulses_per_100mm is pulses per 100mm
     // So: (mm * 100 * pulses_per_100mm) / 100 = mm * pulses_per_100mm / 100
     
     if (rail == 1) {
@@ -578,7 +574,29 @@ int getRailFromPosition(PositionTarget target)
 
 bool isValidPositionForRail(PositionTarget target, int rail)
 {
-    return (getRailFromPosition(target) == rail);
+    // First check if position belongs to the correct rail
+    if (getRailFromPosition(target) != rail) {
+        return false;
+    }
+    
+    // Get the position in millimeters for travel limit validation
+    int32_t targetPulses = getPositionPulses(target);
+    double targetMm = pulsesToMm(targetPulses, rail);
+    
+    // Get rail-specific max travel limit
+    double maxTravelMm = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
+    
+    // Validate position is within travel limits (0 to maxTravel)
+    if (targetMm < 0 || targetMm > maxTravelMm) {
+        // Log detailed error for debugging predefined position issues
+        char msg[LARGE_MSG_SIZE];
+        sprintf_P(msg, FMT_POSITION_LIMIT_ERROR,
+                 getPositionName(target), targetMm, getMotorName(rail), maxTravelMm);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    return true;
 }
 
 const char* getPositionName(PositionTarget pos) {
@@ -879,8 +897,473 @@ bool clearMotorFaultWithStatus(int rail)
 }
 
 //=============================================================================
-// MOTION DECELERATION
+// HOMING STATE AND PROGRESS FUNCTIONS
 //=============================================================================
+
+bool isHomingComplete(int rail) {
+    MotorHomingState& homingState = getHomingState(rail);
+    return homingState.isHomed && !homingState.homingInProgress;
+}
+
+bool isHomingInProgress(int rail) {
+    MotorHomingState& homingState = getHomingState(rail);
+    return homingState.homingInProgress;
+}
+
+void resetHomingState(int rail) {
+    MotorHomingState& homingState = getHomingState(rail);
+    homingState.homingInProgress = false;
+    homingState.isHomed = false;
+    homingState.hlfbWentNonAsserted = false;
+    homingState.minDistanceTraveled = false;
+    homingState.homingStartTime = 0;
+    homingState.hlfbNonAssertedTime = 0;
+    homingState.lastPositionCheckTime = 0;
+    homingState.minTimeAfterDistanceReached = 0;
+    homingState.startPulses = 0;
+    homingState.lastCheckedPosition = 0;
+    homingState.positionAtMinDistance = 0;
+    homingState.pulsesTraveledAfterMinDistance = 0;
+    homingState.previousEncoderState = false;
+    
+    // Reset global homing flags
+    if (rail == 1) {
+        rail1HomingInProgress = false;
+    } else if (rail == 2) {
+        rail2HomingInProgress = false;
+    }
+}
+
+//=============================================================================
+// HOMING OPERATIONS
+//=============================================================================
+
+bool initiateHomingSequence(int rail) {
+    MotorDriver& motor = getMotorByRail(rail);
+    const char* motorName = getMotorName(rail);
+    char msg[SMALL_MSG_SIZE];
+    
+    // Check if motor is ready for homing
+    if (!isMotorReady(rail)) {
+        sprintf_P(msg, FMT_NOT_READY_HOMING, motorName);
+        Console.serialError(msg);
+        return false;
+    }
+
+    // Check for active alerts before starting
+    if (motor.StatusReg().bit.AlertsPresent) {
+        sprintf_P(msg, FMT_ALERTS_BEFORE_HOMING, motorName);
+        Console.serialError(msg);
+        printMotorAlerts(motor, motorName);
+        return false;
+    }
+
+    // Reset homing state
+    resetHomingState(rail);
+    
+    // Get rail-specific parameters
+    int homingDirection = getHomingDirection(rail);
+    unsigned long homingTimeout = getHomingTimeout(rail);
+    
+    // Initialize homing state
+    MotorHomingState& homingState = getHomingState(rail);
+    homingState.homingInProgress = true;
+    homingState.homingStartTime = millis();
+    homingState.startPulses = motor.PositionRefCommanded();
+    homingState.lastCheckedPosition = homingState.startPulses;
+    homingState.lastPositionCheckTime = millis();
+    
+    // Set global homing flag
+    if (rail == 1) {
+        rail1HomingInProgress = true;
+    } else if (rail == 2) {
+        rail2HomingInProgress = true;
+    }
+    
+    // Set homing velocity and direction
+    int32_t homingVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
+    setMotorVelocity(rail, homingVelPps);
+    
+    // Move in homing direction (relative move to trigger HLFB change)
+    int32_t maxTravelPulses = mmToPulses((rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM, rail);
+    int32_t homingMovePulses = homingDirection * maxTravelPulses;
+    motor.Move(homingMovePulses);
+    
+    sprintf_P(msg, FMT_HOMING_INITIATED, motorName);
+    Console.serialInfo(msg);
+    
+    return true;
+}
+
+void checkHomingProgress(int rail) {
+    if (!isHomingInProgress(rail)) {
+        return;
+    }
+    
+    MotorDriver& motor = getMotorByRail(rail);
+    const char* motorName = getMotorName(rail);
+    MotorHomingState& homingState = getHomingState(rail);
+    unsigned long currentTime = millis();
+    char msg[MEDIUM_MSG_SIZE];
+    
+    // Check for alerts during homing
+    if (motor.StatusReg().bit.AlertsPresent) {
+        sprintf_P(msg, FMT_ALERT_DURING_HOMING, motorName);
+        Console.serialError(msg);
+        printMotorAlerts(motor, motorName);
+        abortHoming(rail);
+        return;
+    }
+    
+    // Check for timeout
+    unsigned long homingTimeout = getHomingTimeout(rail);
+    if (timeoutElapsed(currentTime, homingState.homingStartTime, homingTimeout)) {
+        sprintf_P(msg, FMT_HOMING_TIMEOUT, motorName);
+        Console.serialError(msg);
+        completeHomingSequence(rail);
+        return;
+    }
+    
+    // Get current position and calculate movement
+    int32_t currentPosition = motor.PositionRefCommanded();
+    int32_t totalMovement = abs(currentPosition - homingState.startPulses);
+    
+    // Check for minimum distance traveled (diagnostic info reduced)
+    if (!homingState.minDistanceTraveled && totalMovement >= HOMING_MIN_MOVEMENT_PULSES) {
+        homingState.minDistanceTraveled = true;
+        homingState.positionAtMinDistance = currentPosition;
+        homingState.minTimeAfterDistanceReached = currentTime;
+        // Silently enable hardstop detection - detailed progress not critical for operator
+    }
+    
+    // Monitor HLFB state changes
+    bool currentHlfbAsserted = (motor.HlfbState() == MotorDriver::HLFB_ASSERTED);
+    
+    // Detect HLFB going non-asserted (approaching hardstop)
+    if (homingState.minDistanceTraveled && currentHlfbAsserted && !homingState.hlfbWentNonAsserted) {
+        // We expect HLFB to be asserted initially, then go non-asserted as we approach hardstop
+        // No action needed here, just monitoring
+    } else if (homingState.minDistanceTraveled && !currentHlfbAsserted && !homingState.hlfbWentNonAsserted) {
+        // HLFB went non-asserted - we're approaching the hardstop (internal tracking)
+        homingState.hlfbWentNonAsserted = true;
+        homingState.hlfbNonAssertedTime = currentTime;
+        // Detailed HLFB transitions not critical for operator - tracked silently
+    } else if (homingState.hlfbWentNonAsserted && currentHlfbAsserted) {
+        // HLFB reasserted - we've reached the hardstop
+        homingState.pulsesTraveledAfterMinDistance = abs(currentPosition - homingState.positionAtMinDistance);
+        unsigned long hlfbDuration = timeDiff(currentTime, homingState.hlfbNonAssertedTime);
+        
+        sprintf_P(msg, FMT_HARDSTOP_REACHED, motorName);
+        Console.serialInfo(msg);
+        
+        // Stop the motor and complete homing
+        motor.MoveStopAbrupt();
+        completeHomingSequence(rail);
+        return;
+    }
+    
+    // Update tracking
+    homingState.lastCheckedPosition = currentPosition;
+    homingState.lastPositionCheckTime = currentTime;
+}
+
+void completeHomingSequence(int rail) {
+    MotorDriver& motor = getMotorByRail(rail);
+    const char* motorName = getMotorName(rail);
+    MotorHomingState& homingState = getHomingState(rail);
+    char msg[MEDIUM_MSG_SIZE];
+    
+    // Stop any ongoing motion
+    motor.MoveStopAbrupt();
+    
+    // Wait for motion to complete
+    unsigned long stopTime = millis();
+    while (!motor.StepsComplete() && !timeoutElapsed(millis(), stopTime, 2000)) {
+        delay(10);
+    }
+    
+    // Get offset distance and direction
+    double offsetDistanceMm = getHomeOffsetDistance(rail);
+    int homingDirection = getHomingDirection(rail);
+    
+    // Move away from hardstop if offset is needed
+    if (offsetDistanceMm > 0) {
+        sprintf_P(msg, FMT_MOVING_FROM_HARDSTOP, motorName, offsetDistanceMm);
+        Console.serialInfo(msg);
+        
+        // Calculate offset move in opposite direction from homing
+        int32_t offsetPulses = mmToPulses(offsetDistanceMm, rail) * (-homingDirection);
+        motor.Move(offsetPulses);
+        
+        // Wait for offset move to complete (silently - detailed progress not critical)
+        unsigned long offsetStartTime = millis();
+        while (!motor.StepsComplete() && !timeoutElapsed(millis(), offsetStartTime, 10000)) {
+            if (motor.StatusReg().bit.AlertsPresent) {
+                sprintf_P(msg, FMT_ALERT_OFFSET_MOVE, motorName);
+                Console.serialError(msg);
+                break;
+            }
+            delay(10);
+        }
+        
+        if (!motor.StepsComplete()) {
+            sprintf_P(msg, FMT_OFFSET_TIMEOUT, motorName);
+            Console.serialWarning(msg);
+        }
+        
+        sprintf_P(msg, FMT_HOME_OFFSET_ESTABLISHED, motorName);
+        Console.serialInfo(msg);
+    } else {
+        sprintf_P(msg, FMT_HARDSTOP_AS_ZERO, motorName);
+        Console.serialInfo(msg);
+    }
+    
+    // Set current position as home (zero)
+    motor.PositionRefSet(0);
+    
+    // Update homing state
+    homingState.isHomed = true;
+    homingState.homingInProgress = false;
+    
+    // Clear global homing flag
+    if (rail == 1) {
+        rail1HomingInProgress = false;
+    } else if (rail == 2) {
+        rail2HomingInProgress = false;
+    }
+    
+    // Calculate and display homing duration
+    unsigned long homingDuration = timeDiff(millis(), homingState.homingStartTime);
+    sprintf_P(msg, FMT_HOMING_COMPLETED, motorName);
+    Console.serialInfo(msg);
+    printHumanReadableTime(homingDuration / 1000);
+    Console.print("\n");
+    
+    // Homing state reset happens silently - not critical operator information
+}
+
+void abortHoming(int rail) {
+    MotorDriver& motor = getMotorByRail(rail);
+    const char* motorName = getMotorName(rail);
+    char msg[SMALL_MSG_SIZE];
+    
+    sprintf_P(msg, FMT_ABORTING_HOMING, motorName);
+    Console.serialInfo(msg);
+    
+    // Stop motor immediately
+    motor.MoveStopAbrupt();
+    
+    // Reset homing state
+    resetHomingState(rail);
+    
+    sprintf_P(msg, FMT_HOMING_ABORTED, motorName);
+    Console.serialInfo(msg);
+}
+
+//=============================================================================
+// DUAL-MOTOR HOMING FUNCTIONS
+//=============================================================================
+
+bool initiateHomingSequenceAll() {
+    bool rail1Success = initiateHomingSequence(1);
+    bool rail2Success = initiateHomingSequence(2);
+    return rail1Success && rail2Success;
+}
+
+void checkAllHomingProgress() {
+    checkHomingProgress(1);
+    checkHomingProgress(2);
+}
+
+bool isAllHomingComplete() {
+    return isHomingComplete(1) && isHomingComplete(2);
+}
+
+//=============================================================================
+// SMART HOMING FUNCTIONS (INTEGER MATH OPTIMIZED)
+//=============================================================================
+
+bool isSmartHomingBeneficial(int rail, int32_t* estimatedTimeSavingsMs) {
+    MotorDriver& motor = getMotorByRail(rail);
+    
+    // Check if rail has been homed before
+    MotorHomingState& homingState = getHomingState(rail);
+    if (!homingState.isHomed) {
+        if (estimatedTimeSavingsMs) *estimatedTimeSavingsMs = 0;
+        return false; // First-time homing always uses standard approach
+    }
+    
+    // Get current position in pulses
+    int32_t currentPositionPulses = motor.PositionRefCommanded();
+    int32_t distanceFromHomePulses = abs(currentPositionPulses);
+    
+    // Check minimum distance requirement using pulse constants
+    int32_t minDistancePulses = getHomeMinDistancePulses(rail);
+    if (distanceFromHomePulses < minDistancePulses) {
+        if (estimatedTimeSavingsMs) *estimatedTimeSavingsMs = 0;
+        return false; // Too close to home, no benefit
+    }
+    
+    // Calculate time savings using integer math
+    // Time = Distance / Velocity
+    // Standard homing: full distance at slow speed
+    // Smart homing: most distance at fast speed, small portion at slow speed
+    
+    int32_t fastVelocityPps = rpmToPps(HOME_FAST_APPROACH_VELOCITY_RPM);
+    int32_t slowVelocityPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
+    int32_t precisionDistancePulses = getHomePrecisionDistancePulses(rail);
+    
+    // Standard approach time (all at slow speed)
+    int32_t standardTimeMs = (distanceFromHomePulses * 1000) / slowVelocityPps;
+    
+    // Smart approach time (fast + precision phases)
+    int32_t fastPhaseDistance = distanceFromHomePulses - precisionDistancePulses;
+    int32_t fastPhaseTimeMs = (fastPhaseDistance * 1000) / fastVelocityPps;
+    int32_t precisionPhaseTimeMs = (precisionDistancePulses * 1000) / slowVelocityPps;
+    int32_t smartTimeMs = fastPhaseTimeMs + precisionPhaseTimeMs;
+    
+    // Calculate savings
+    int32_t timeSavingsMs = standardTimeMs - smartTimeMs;
+    
+    if (estimatedTimeSavingsMs) {
+        *estimatedTimeSavingsMs = timeSavingsMs;
+    }
+    
+    // Smart homing is beneficial if it saves at least 5 seconds
+    return (timeSavingsMs > 5000);
+}
+
+void calculateSmartHomingPhases(int rail, int32_t currentPositionPulses, bool* useSmartHoming, 
+                               int32_t* fastPhaseDistancePulses, int32_t* precisionPhaseDistancePulses) {
+    // Default values
+    *useSmartHoming = false;
+    *fastPhaseDistancePulses = 0;
+    *precisionPhaseDistancePulses = 0;
+    
+    // Check if smart homing is beneficial
+    int32_t timeSavingsMs;
+    if (!isSmartHomingBeneficial(rail, &timeSavingsMs)) {
+        return;
+    }
+    
+    // Calculate phases using pulse constants
+    int32_t distanceFromHomePulses = abs(currentPositionPulses);
+    int32_t precisionDistancePulses = getHomePrecisionDistancePulses(rail);
+    
+    // Ensure we don't exceed available distance
+    if (precisionDistancePulses > distanceFromHomePulses) {
+        precisionDistancePulses = distanceFromHomePulses;
+        *fastPhaseDistancePulses = 0;
+    } else {
+        *fastPhaseDistancePulses = distanceFromHomePulses - precisionDistancePulses;
+    }
+    
+    *precisionPhaseDistancePulses = precisionDistancePulses;
+    *useSmartHoming = true;
+}
+
+bool initiateSmartHomingSequence(int rail) {
+    MotorDriver& motor = getMotorByRail(rail);
+    const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
+    
+    // Check if motor is ready
+    if (!isMotorReady(rail)) {
+        sprintf_P(msg, FMT_NOT_READY_HOMING, motorName);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    // Get current position and calculate smart homing phases
+    int32_t currentPositionPulses = motor.PositionRefCommanded();
+    bool useSmartHoming;
+    int32_t fastPhaseDistancePulses, precisionPhaseDistancePulses;
+    
+    calculateSmartHomingPhases(rail, currentPositionPulses, &useSmartHoming, 
+                              &fastPhaseDistancePulses, &precisionPhaseDistancePulses);
+    
+    if (!useSmartHoming) {
+        // Fall back to standard homing
+        return initiateHomingSequence(rail);
+    }
+    
+    // Reset homing state for smart sequence
+    resetHomingState(rail);
+    
+    // Initialize homing state
+    MotorHomingState& homingState = getHomingState(rail);
+    homingState.homingInProgress = true;
+    homingState.homingStartTime = millis();
+    homingState.startPulses = currentPositionPulses;
+    
+    // Set global homing flag
+    if (rail == 1) {
+        rail1HomingInProgress = true;
+    } else {
+        rail2HomingInProgress = true;
+    }
+    
+    // Phase 1: Fast approach
+    if (fastPhaseDistancePulses > 0) {
+        int32_t fastVelocityPps = rpmToPps(HOME_FAST_APPROACH_VELOCITY_RPM);
+        setMotorVelocity(rail, fastVelocityPps);
+        
+        int homingDirection = getHomingDirection(rail);
+        int32_t fastPhasePulses = homingDirection * fastPhaseDistancePulses;
+        motor.Move(fastPhasePulses);
+        
+        sprintf_P(msg, PSTR("%s: Smart homing initiated - Fast approach phase (%ld pulses at %d RPM)"), 
+                 motorName, fastPhaseDistancePulses, HOME_FAST_APPROACH_VELOCITY_RPM);
+        Console.serialInfo(msg);
+        
+        // Wait for fast phase to complete
+        unsigned long phaseStartTime = millis();
+        while (!motor.StepsComplete() && !timeoutElapsed(millis(), phaseStartTime, 30000)) {
+            if (motor.StatusReg().bit.AlertsPresent) {
+                sprintf_P(msg, FMT_ALERT_DURING_HOMING, motorName);
+                Console.serialError(msg);
+                abortHoming(rail);
+                return false;
+            }
+            delay(10);
+        }
+        
+        if (!motor.StepsComplete()) {
+            sprintf_P(msg, PSTR("%s: Fast phase timeout"), motorName);
+            Console.serialWarning(msg);
+            abortHoming(rail);
+            return false;
+        }
+        
+        sprintf_P(msg, PSTR("%s: Fast approach phase completed"), motorName);
+        Console.serialInfo(msg);
+    }
+    
+    // Phase 2: Precision approach (same as standard homing)
+    int32_t precisionVelocityPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
+    setMotorVelocity(rail, precisionVelocityPps);
+    
+    // Continue with precision homing to find hardstop
+    int homingDirection = getHomingDirection(rail);
+    int32_t precisionPhasePulses = homingDirection * (precisionPhaseDistancePulses + 1000); // Extra margin
+    motor.Move(precisionPhasePulses);
+    
+    sprintf_P(msg, PSTR("%s: Precision homing phase started"), motorName);
+    Console.serialInfo(msg);
+    
+    // Mark that minimum distance has been traveled (since we did fast approach)
+    homingState.minDistanceTraveled = true;
+    homingState.positionAtMinDistance = motor.PositionRefCommanded();
+    
+    return true;
+}
+
+//=============================================================================
+// MOTION DECELERATION FUNCTIONS
+//=============================================================================
+
+// Scale factor for fixed-point math in deceleration calculations
+#define SCALE_FACTOR 100
 
 int32_t getDecelerationDistanceScaled(int rail, int32_t moveDistanceScaledMm) {
     RailDecelerationConfig& config = getDecelerationConfig(rail);
@@ -894,1212 +1377,647 @@ int32_t getDecelerationDistanceScaled(int rail, int32_t moveDistanceScaledMm) {
     }
 }
 
-int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32_t totalMoveDistanceMm, int32_t maxVelocity) {
+int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32_t totalMoveDistanceMm, int32_t maxVelocityPps) {
     RailDecelerationConfig& config = getDecelerationConfig(rail);
     
-    // If deceleration is disabled, return max velocity
-    if (!config.enableDeceleration)
-        return maxVelocity;
+    if (!config.enableDeceleration) {
+        return maxVelocityPps;
+    }
     
-    // Scale distances for fixed-point math
-    int32_t distanceToTargetScaled = distanceToTargetMm * SCALE_FACTOR;
-    int32_t totalMoveDistanceScaled = totalMoveDistanceMm * SCALE_FACTOR;
+    // Use the enhanced deceleration distance calculation
+    int32_t decelDistanceMm = getDecelerationDistanceScaled(rail, totalMoveDistanceMm * SCALE_FACTOR) / SCALE_FACTOR;
     
-    // Get appropriate deceleration distance for this move
-    int32_t decelDistanceScaled = getDecelerationDistanceScaled(rail, totalMoveDistanceScaled);
-    
-    // If we're not in deceleration zone yet, use max velocity
-    if (distanceToTargetScaled > decelDistanceScaled)
-        return maxVelocity;
+    // No deceleration needed if we're not in deceleration zone
+    if (distanceToTargetMm > decelDistanceMm) {
+        return maxVelocityPps;
+    }
     
     // Calculate deceleration ratio using integer math (0-1000 range for precision)
-    int32_t decelRatio1000 = (distanceToTargetScaled * 1000) / decelDistanceScaled;
+    int32_t decelRatio1000 = (distanceToTargetMm * 1000) / decelDistanceMm;
     
-    // Apply quadratic deceleration curve: ratio^2
+    // Apply quadratic deceleration curve: ratio^2 for smoother motion
     int32_t decelRatioSquared1000 = (decelRatio1000 * decelRatio1000) / 1000;
     
     // Calculate minimum velocity in PPS
-    int32_t minVelocityPPS = rpmToPps(config.minVelocityRPM);
+    int32_t minVelocityPps = rpmToPps(config.minVelocityRPM);
     
-    // Calculate target velocity using integer math
-    int32_t velocityRange = maxVelocity - minVelocityPPS;
+    // Calculate target velocity using integer math with quadratic curve
+    int32_t velocityRange = maxVelocityPps - minVelocityPps;
     int32_t velocityAdjustment = (velocityRange * decelRatioSquared1000) / 1000;
-    int32_t targetVelocity = minVelocityPPS + velocityAdjustment;
+    int32_t targetVelocity = minVelocityPps + velocityAdjustment;
     
-    // Safety check - never go below minimum
-    if (targetVelocity < minVelocityPPS)
-        targetVelocity = minVelocityPPS;
+    // Ensure we don't go below minimum or above maximum
+    if (targetVelocity < minVelocityPps) {
+        targetVelocity = minVelocityPps;
+    } else if (targetVelocity > maxVelocityPps) {
+        targetVelocity = maxVelocityPps;
+    }
     
     return targetVelocity;
 }
 
-
-
 //=============================================================================
-// POSITIONING AND MOVEMENT
+// CORE MOVEMENT FUNCTIONS
 //=============================================================================
 
-int32_t selectMoveVelocity(int rail, PositionTarget fromPos, PositionTarget toPos, bool carriageLoaded) {
-    // Calculate move distance using integer math
-    int32_t fromPulses = getPositionPulses(fromPos);
-    int32_t toPulses = getPositionPulses(toPos);
-    int32_t pulseDifference = abs(toPulses - fromPulses);
-    
-    // Convert to mm using integer math where possible
-    int32_t moveDistanceMm = pulseDifference / (int32_t)((rail == 1) ? RAIL1_PULSES_PER_MM : RAIL2_PULSES_PER_MM);
-    
-    // Base velocities - use rail-specific constants
-    int32_t emptyCarriageVelocity = getCarriageVelocityRpm(rail, false);
-    int32_t loadedCarriageVelocity = getCarriageVelocityRpm(rail, true);
-    
-    // Special cases for specific move types
-    if (rail == 1) {
-        // Rail 1 move analysis
-        if ((fromPos == RAIL1_STAGING_POS && toPos == RAIL1_HANDOFF_POS) ||
-            (fromPos == RAIL1_HANDOFF_POS && toPos == RAIL1_STAGING_POS)) {
-            // Staging↔Handoff: Always precision moves, reduce velocity by 30%
-            int32_t baseVel = carriageLoaded ? loadedCarriageVelocity : emptyCarriageVelocity;
-            return rpmToPps((baseVel * 70) / 100); // 70% using integer math
-        }
-    } else if (rail == 2) {
-        // Rail 2 move analysis
-        if ((fromPos == RAIL2_HANDOFF_POS && toPos == RAIL2_WC3_PICKUP_DROPOFF_POS) ||
-            (fromPos == RAIL2_WC3_PICKUP_DROPOFF_POS && toPos == RAIL2_HANDOFF_POS)) {
-            // Handoff↔WC3: Precision moves when loaded
-            if (carriageLoaded) {
-                return rpmToPps((loadedCarriageVelocity * 80) / 100); // 80% using integer math
-            }
-        }
-    }
-    
-    // For very short moves (< 200mm), reduce velocity by 20%
-    if (moveDistanceMm < 200) {
-        int32_t baseVel = carriageLoaded ? loadedCarriageVelocity : emptyCarriageVelocity;
-        return rpmToPps((baseVel * 80) / 100);
-    }
-    
-    // Standard velocity selection based on load
-    return rpmToPps(carriageLoaded ? loadedCarriageVelocity : emptyCarriageVelocity);
-}
-
-bool moveToPosition(int rail, PositionTarget fromPos, PositionTarget toPos, bool carriageLoaded) {
+bool moveToPositionFromCurrent(int rail, PositionTarget target, bool carriageLoaded) {
     MotorDriver& motor = getMotorByRail(rail);
     const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
     
-    // Validate positions
-    if (!isValidPositionForRail(fromPos, rail) || !isValidPositionForRail(toPos, rail)) {
-        char msg[MEDIUM_MSG_SIZE];
+    // Validate inputs
+    if (!isValidPositionForRail(target, rail)) {
         sprintf_P(msg, FMT_INVALID_POSITION, motorName);
         Console.serialError(msg);
         return false;
     }
     
-    // Get positions using integer math
-    int32_t fromPulses = getPositionPulses(fromPos);
-    int32_t toPulses = getPositionPulses(toPos);
+    // Check if motor is ready
+    if (!isMotorReady(rail)) {
+        sprintf_P(msg, FMT_MOTOR_CANNOT_MOVE, motorName);
+        Console.serialError(msg);
+        return false;
+    }
     
-    // Convert to mm for display purposes only
-    double fromPosMm = pulsesToMm(fromPulses, rail);
-    double toPosMm = pulsesToMm(toPulses, rail);
-    double moveDistanceMm = fabs(toPosMm - fromPosMm);
+    // Get target position and current position
+    int32_t targetPulses = getPositionPulses(target);
+    int32_t currentPulses = motor.PositionRefCommanded();
+    int32_t movePulses = targetPulses - currentPulses;
     
-    // Select appropriate velocity for this move
-    int32_t moveVelocity = selectMoveVelocity(rail, fromPos, toPos, carriageLoaded);
+    if (movePulses == 0) {
+        sprintf_P(msg, PSTR("%s: Already at target position %s"), motorName, getPositionName(target));
+        Console.serialInfo(msg);
+        return true;
+    }
     
-    // Set motor velocity
-    motor.VelMax(moveVelocity);
+    // Calculate movement distance and select velocity
+    double moveDistanceMm = abs(pulsesToMm(movePulses, rail));
+    int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
+    int32_t velocityPps = rpmToPps(velocityRpm);
     
-    // Initialize movement tracking before starting the move
-    initMovementTracking(rail, toPos, carriageLoaded);
+    // Set velocity and initiate move
+    setMotorVelocity(rail, velocityPps);
+    motor.Move(movePulses);
     
-    // Start the move
-    motor.Move(toPulses);
-    
-    // Log the move
-    char msg[MEDIUM_MSG_SIZE];
-    const char* fromName = getPositionName(fromPos);
-    const char* toName = getPositionName(toPos);
-    sprintf_P(msg, FMT_MOVE_POSITIONED, 
-            motorName, fromName, toName, moveDistanceMm,
-            (int)ppsToRpm(moveVelocity), carriageLoaded ? "[LOADED]" : "[EMPTY]");
+    // Log the movement
+    sprintf_P(msg, FMT_MOVE_TO_POSITION, motorName, getPositionName(target), 
+             pulsesToMm(targetPulses, rail), velocityRpm, 
+             carriageLoaded ? "(loaded)" : "(empty)");
     Console.serialInfo(msg);
     
     return true;
 }
 
-bool moveToPositionFromCurrent(int rail, PositionTarget toPos, bool carriageLoaded) {
+bool moveToPositionMm(int rail, double targetMm, bool carriageLoaded) {
     MotorDriver& motor = getMotorByRail(rail);
-    int32_t currentPulses = motor.PositionRefCommanded();
-    double currentPosMm = pulsesToMm(currentPulses, rail);
+    const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
     
-    int32_t toPulses = getPositionPulses(toPos);
-    double toPosMm = pulsesToMm(toPulses, rail);
-    double moveDistanceMm = fabs(toPosMm - currentPosMm);
-    
-    // Select velocity (without knowing exact from position, use distance-based selection)
-    int32_t moveVelocity;
-    if (moveDistanceMm < 200.0) {
-        // Short move - reduce velocity by 20%
-        int32_t baseVel = getCarriageVelocityRpm(rail, carriageLoaded);
-        moveVelocity = rpmToPps((baseVel * 80) / 100);
-    } else {
-        // Normal move - use full rail-specific velocity
-        moveVelocity = rpmToPps(getCarriageVelocityRpm(rail, carriageLoaded));
+    // Check if motor is ready
+    if (!isMotorReady(rail)) {
+        sprintf_P(msg, FMT_MOTOR_CANNOT_MOVE, motorName);
+        Console.serialError(msg);
+        return false;
     }
     
-    motor.VelMax(moveVelocity);
+    // Validate position range
+    double maxTravelMm = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
+    if (targetMm < 0 || targetMm > maxTravelMm) {
+        sprintf_P(msg, FMT_POSITION_MM_OUT_OF_RANGE, motorName, targetMm, maxTravelMm);
+        Console.serialError(msg);
+        return false;
+    }
     
-    // Initialize movement tracking before starting the move
-    initMovementTracking(rail, toPos, carriageLoaded);
+    // Convert to pulses and calculate move
+    int32_t targetPulses = mmToPulses(targetMm, rail);
+    int32_t currentPulses = motor.PositionRefCommanded();
+    int32_t movePulses = targetPulses - currentPulses;
     
-    motor.Move(toPulses);
+    if (movePulses == 0) {
+        sprintf_P(msg, PSTR("%s: Already at target position %.2fmm"), motorName, targetMm);
+        Console.serialInfo(msg);
+        return true;
+    }
     
-    char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, FMT_MOVE_TO_POSITION, 
-            getMotorName(rail), getPositionName(toPos), moveDistanceMm,
-            (int)ppsToRpm(moveVelocity), carriageLoaded ? "[LOADED]" : "[EMPTY]");
+    // Calculate movement distance and select velocity
+    double moveDistanceMm = abs(pulsesToMm(movePulses, rail));
+    int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
+    int32_t velocityPps = rpmToPps(velocityRpm);
+    
+    // Set velocity and initiate move
+    setMotorVelocity(rail, velocityPps);
+    motor.Move(movePulses);
+    
+    // Log the movement
+    sprintf_P(msg, FMT_MOVE_TO_MM, motorName, targetMm, targetPulses, velocityRpm,
+             carriageLoaded ? "(loaded)" : "(empty)");
     Console.serialInfo(msg);
     
     return true;
 }
+
+bool moveRelativeManual(int rail, double distanceMm, bool carriageLoaded) {
+    MotorDriver& motor = getMotorByRail(rail);
+    const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
+    
+    // Check if motor is ready
+    if (!isMotorReady(rail)) {
+        sprintf_P(msg, FMT_MOTOR_CANNOT_MOVE, motorName);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    // Calculate target position
+    double currentMm = getMotorPositionMm(rail);
+    double targetMm = currentMm + distanceMm;
+    double maxTravelMm = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
+    
+    // Validate move doesn't exceed limits
+    if (targetMm < 0 || targetMm > maxTravelMm) {
+        sprintf_P(msg, FMT_RELATIVE_MOVE_RANGE, motorName, maxTravelMm);
+        Console.serialError(msg);
+        sprintf_P(msg, FMT_RELATIVE_MOVE_DETAILS, motorName, currentMm, distanceMm, targetMm);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    // Convert to pulses and initiate move
+    int32_t movePulses = mmToPulses(distanceMm, rail);
+    
+    if (movePulses == 0) {
+        sprintf_P(msg, PSTR("%s: Zero distance move requested"), motorName);
+        Console.serialInfo(msg);
+        return true;
+    }
+    
+    // Calculate movement distance and select velocity
+    double moveDistanceMm = abs(distanceMm);
+    int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
+    int32_t velocityPps = rpmToPps(velocityRpm);
+    
+    // Set velocity and initiate move
+    setMotorVelocity(rail, velocityPps);
+    motor.Move(movePulses);
+    
+    // Log the movement
+    sprintf_P(msg, FMT_RELATIVE_MOVE, motorName, distanceMm, movePulses, velocityRpm,
+             carriageLoaded ? "(loaded)" : "(empty)");
+    Console.serialInfo(msg);
+    
+    return true;
+}
+
+void checkMoveProgress() {
+    // Check progress for both rails
+    checkMovementProgress(1);
+    checkMovementProgress(2);
+}
+
+//=============================================================================
+// JOGGING SYSTEM FUNCTIONS
+//=============================================================================
+
+bool jogMotor(int rail, bool positiveDirection) {
+    MotorDriver& motor = getMotorByRail(rail);
+    const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
+    
+    // Check if motor is ready for jogging
+    if (!isMotorReady(rail)) {
+        sprintf_P(msg, FMT_NOT_READY_JOG, motorName);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    // Check if motor is currently moving
+    if (isMotorMoving(rail)) {
+        sprintf_P(msg, FMT_CANNOT_JOG_MOVING, motorName);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    // Get jog parameters
+    double jogIncrementMm = getJogIncrementRef(rail);
+    int jogSpeedRpm = getJogSpeedRef(rail);
+    
+    // Calculate jog distance with direction
+    double jogDistanceMm = positiveDirection ? jogIncrementMm : -jogIncrementMm;
+    
+    // Check if jog would exceed travel limits
+    double currentMm = getMotorPositionMm(rail);
+    double targetMm = currentMm + jogDistanceMm;
+    double maxTravelMm = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
+    
+    if (targetMm < 0 || targetMm > maxTravelMm) {
+        sprintf_P(msg, FMT_JOG_EXCEED_LIMITS, motorName, maxTravelMm);
+        Console.serialError(msg);
+        sprintf_P(msg, FMT_JOG_POSITION_INFO, motorName, currentMm, targetMm);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    // Apply speed capping based on jog distance (silently for common operations)
+    int cappedSpeedRpm = jogSpeedRpm;
+    if (jogIncrementMm <= JOG_VERY_SHORT_THRESHOLD_MM) { // Very short jog
+        cappedSpeedRpm = min(jogSpeedRpm, JOG_VERY_SHORT_MAX_SPEED_RPM);
+    } else if (jogIncrementMm <= JOG_SHORT_THRESHOLD_MM) { // Short jog
+        cappedSpeedRpm = min(jogSpeedRpm, JOG_SHORT_MAX_SPEED_RPM);
+    } else if (jogIncrementMm <= JOG_MEDIUM_THRESHOLD_MM) { // Medium jog
+        cappedSpeedRpm = min(jogSpeedRpm, JOG_MEDIUM_MAX_SPEED_RPM);
+    } else { // Long jog
+        cappedSpeedRpm = min(jogSpeedRpm, JOG_LONG_MAX_SPEED_RPM);
+    }
+    
+    // Convert to pulses and set velocity
+    int32_t jogPulses = mmToPulses(jogDistanceMm, rail);
+    int32_t jogVelocityPps = rpmToPps(cappedSpeedRpm);
+    
+    setMotorVelocity(rail, jogVelocityPps);
+    motor.Move(jogPulses);
+    
+    // Log the jog operation with speed capping info included if relevant
+    const char* speedNote = "";
+    if (cappedSpeedRpm < jogSpeedRpm) {
+        speedNote = " (speed capped)";
+    }
+    
+    sprintf_P(msg, FMT_JOGGING, motorName, 
+             positiveDirection ? "forward" : "backward", 
+             jogIncrementMm, cappedSpeedRpm, speedNote);
+    Console.serialInfo(msg);
+    
+    return true;
+}
+
+bool setJogIncrement(int rail, double incrementMm) {
+    const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
+    
+    double maxTravelMm = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
+    
+    // Validate jog increment range
+    if (incrementMm <= 0 || incrementMm > maxTravelMm) {
+        sprintf_P(msg, FMT_JOG_INCREMENT_RANGE, motorName, maxTravelMm);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    // Set the jog increment
+    getJogIncrementRef(rail) = incrementMm;
+    
+    sprintf_P(msg, FMT_JOG_INCREMENT_SET, motorName, incrementMm);
+    Console.serialInfo(msg);
+    
+    return true;
+}
+
+bool setJogSpeed(int rail, int speedRpm) {
+    const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
+    
+    int maxSpeedRpm = (rail == 1) ? RAIL1_EMPTY_CARRIAGE_VELOCITY_RPM : RAIL2_EMPTY_CARRIAGE_VELOCITY_RPM;
+    
+    // Validate jog speed range
+    if (speedRpm < 10 || speedRpm > maxSpeedRpm) {
+        sprintf_P(msg, FMT_JOG_SPEED_RANGE, motorName, maxSpeedRpm);
+        Console.serialError(msg);
+        return false;
+    }
+    
+    // Set the jog speed
+    getJogSpeedRef(rail) = speedRpm;
+    
+    sprintf_P(msg, FMT_JOG_SPEED_SET, motorName, speedRpm);
+    Console.serialInfo(msg);
+    
+    return true;
+}
+
+//=============================================================================
+// SMART VELOCITY SELECTION
+//=============================================================================
+
+//=============================================================================
+// SMART VELOCITY SELECTION
+//=============================================================================
+
+//=============================================================================
+// SMART VELOCITY SELECTION
+//=============================================================================
+
+int32_t selectMoveVelocityByDistance(int rail, double moveDistanceMm, bool carriageLoaded) {
+    // Get base velocity based on carriage load
+    int32_t baseVelocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
+    
+    // Apply distance-based adjustments for better motion profiles
+    int32_t adjustedVelocityRpm = baseVelocityRpm;
+    
+    if (moveDistanceMm < 10.0) {
+        // Very short moves: reduce to 40% of base speed
+        adjustedVelocityRpm = (baseVelocityRpm * 40) / 100;
+    } else if (moveDistanceMm < 50.0) {
+        // Short moves: reduce to 60% of base speed
+        adjustedVelocityRpm = (baseVelocityRpm * 60) / 100;
+    } else if (moveDistanceMm < 200.0) {
+        // Medium moves: reduce to 80% of base speed
+        adjustedVelocityRpm = (baseVelocityRpm * 80) / 100;
+    } else {
+        // Long moves: use full base speed
+        adjustedVelocityRpm = baseVelocityRpm;
+    }
+    
+    // Ensure minimum velocity for reliable operation
+    const int32_t minVelocityRpm = 30;
+    if (adjustedVelocityRpm < minVelocityRpm) {
+        adjustedVelocityRpm = minVelocityRpm;
+    }
+    
+    return adjustedVelocityRpm;
+}
+
+int32_t selectMoveVelocity(int rail, PositionTarget fromPos, PositionTarget toPos, bool carriageLoaded) {
+    // Calculate distance between positions
+    int32_t fromPulses = getPositionPulses(fromPos);
+    int32_t toPulses = getPositionPulses(toPos);
+    double moveDistanceMm = abs(pulsesToMm(toPulses - fromPulses, rail));
+    
+    return selectMoveVelocityByDistance(rail, moveDistanceMm, carriageLoaded);
+}
+
+//=============================================================================
+// ENHANCED MOVEMENT VALIDATION AND PROGRESS MONITORING
+//=============================================================================
+
+bool checkMovementTimeout(int rail, unsigned long timeoutMs) {
+    MotorTargetState& targetState = getTargetState(rail);
+    
+    if (!targetState.movementInProgress) {
+        return false; // No move in progress, no timeout
+    }
+    
+    unsigned long currentTime = millis();
+    return timeoutElapsed(currentTime, targetState.movementStartTime, timeoutMs);
+}
+
+bool checkMovementProgress(int rail) {
+    MotorDriver& motor = getMotorByRail(rail);
+    MotorTargetState& targetState = getTargetState(rail);
+    const char* motorName = getMotorName(rail);
+    
+    // Check if motor is moving
+    if (!isMotorMoving(rail)) {
+        if (targetState.movementInProgress) {
+            // Movement completed
+            targetState.movementInProgress = false;
+            targetState.lastProgressCheck = millis();
+            return true; // Movement completed successfully
+        }
+        return false; // No movement to monitor
+    }
+    
+    // Update move tracking if not already started
+    if (!targetState.movementInProgress) {
+        targetState.movementInProgress = true;
+        targetState.movementStartTime = millis();
+        targetState.lastProgressCheck = millis();
+        targetState.lastPositionCheck = motor.PositionRefCommanded();
+        return false; // Just started, continue monitoring
+    }
+    
+    // Check for stall detection
+    unsigned long currentTime = millis();
+    int32_t currentPosition = motor.PositionRefCommanded();
+    
+    if (timeoutElapsed(currentTime, targetState.lastProgressCheck, MOVEMENT_STALL_TIMEOUT_MS)) {
+        int32_t positionChange = abs(currentPosition - targetState.lastPositionCheck);
+        
+        if (positionChange < MOVEMENT_MIN_PROGRESS_PULSES) {
+            // Stall detected
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, PSTR("%s: Movement stall detected - stopping"), motorName);
+            Console.serialError(msg);
+            
+            motor.MoveStopAbrupt();
+            targetState.movementInProgress = false;
+            return false; // Movement failed due to stall
+        }
+        
+        // Update progress tracking
+        targetState.lastProgressCheck = currentTime;
+        targetState.lastPositionCheck = currentPosition;
+    }
+    
+    // Check for overall timeout
+    if (checkMovementTimeout(rail, MOVEMENT_TIMEOUT_MS)) {
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, PSTR("%s: Movement timeout - stopping"), motorName);
+        Console.serialError(msg);
+        
+        motor.MoveStopAbrupt();
+        targetState.movementInProgress = false;
+        return false; // Movement failed due to timeout
+    }
+    
+    return false; // Movement still in progress
+}
+
+void updateDecelerationVelocity(int rail) {
+    MotorDriver& motor = getMotorByRail(rail);
+    MotorTargetState& targetState = getTargetState(rail);
+    
+    if (!targetState.movementInProgress || !isMotorMoving(rail)) {
+        return; // No active movement to update
+    }
+    
+    // Calculate distance to target
+    int32_t currentPosition = motor.PositionRefCommanded();
+    int32_t distanceToTarget = abs(targetState.targetPositionPulses - currentPosition);
+    double distanceToTargetMm = pulsesToMm(distanceToTarget, rail);
+    double totalMoveDistanceMm = pulsesToMm(abs(targetState.targetPositionPulses - targetState.startPositionPulses), rail);
+    
+    // Calculate decelerated velocity
+    int32_t maxVelocityPps = currentVelMax; // Use current velocity limit
+    int32_t newVelocityPps = calculateDeceleratedVelocity(rail, (int32_t)(distanceToTargetMm * 100), 
+                                                         (int32_t)(totalMoveDistanceMm * 100), maxVelocityPps);
+    
+    // Only update if velocity should change significantly
+    if (abs(newVelocityPps - currentVelMax) > (currentVelMax / 20)) { // 5% threshold
+        setMotorVelocity(rail, newVelocityPps);
+    }
+}
+
+//=============================================================================
+// POSITION NUMBER INTERFACE FUNCTIONS
+//=============================================================================
 
 bool moveToPosition(int rail, int positionNumber, bool carriageLoaded) {
     const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
+    
     PositionTarget target;
     
-    // Convert position number to PositionTarget enum based on rail
+    // Convert position numbers to position targets
     if (rail == 1) {
-        switch(positionNumber) {
+        switch (positionNumber) {
             case 0: target = RAIL1_HOME_POS; break;
             case 1: target = RAIL1_WC2_PICKUP_DROPOFF_POS; break;
             case 2: target = RAIL1_WC1_PICKUP_DROPOFF_POS; break;
             case 3: target = RAIL1_STAGING_POS; break;
             case 4: target = RAIL1_HANDOFF_POS; break;
-            default: 
-                {
-                    char msg[MEDIUM_MSG_SIZE];
-                    sprintf_P(msg, FMT_INVALID_POSITION_NUM_RAIL1, motorName, positionNumber);
-                    Console.serialError(msg);
-                    return false;
-                }
+            default:
+                sprintf_P(msg, FMT_INVALID_POSITION_NUM_RAIL1, motorName, positionNumber);
+                Console.serialError(msg);
+                return false;
         }
     } else if (rail == 2) {
-        switch(positionNumber) {
+        switch (positionNumber) {
             case 0: target = RAIL2_HOME_POS; break;
             case 1: target = RAIL2_HANDOFF_POS; break;
             case 2: target = RAIL2_WC3_PICKUP_DROPOFF_POS; break;
-            default: 
-                {
-                    char msg[MEDIUM_MSG_SIZE];
-                    sprintf_P(msg, FMT_INVALID_POSITION_NUM_RAIL2, motorName, positionNumber);
-                    Console.serialError(msg);
-                    return false;
-                }
+            default:
+                sprintf_P(msg, FMT_INVALID_POSITION_NUM_RAIL2, motorName, positionNumber);
+                Console.serialError(msg);
+                return false;
         }
     } else {
-        char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_INVALID_RAIL_NUM, rail);
         Console.serialError(msg);
         return false;
     }
     
-    // Use the existing moveToPositionFromCurrent function
     return moveToPositionFromCurrent(rail, target, carriageLoaded);
 }
 
-bool moveToAbsolutePosition(int rail, int32_t positionPulses) {
+bool moveToAbsolutePosition(int rail, int32_t positionPulses, bool carriageLoaded) {
     MotorDriver& motor = getMotorByRail(rail);
     const char* motorName = getMotorName(rail);
+    char msg[MEDIUM_MSG_SIZE];
     
-    // Safety check - ensure position is within rail limits
-    int32_t maxTravel = mmToPulses((rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM, rail);
-    
-    if (positionPulses < 0 || positionPulses > maxTravel) {
-        char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_POSITION_OUT_OF_RANGE, 
-                motorName, positionPulses, maxTravel);
+    // Validate position range
+    int32_t maxTravelPulses = mmToPulses((rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM, rail);
+    if (positionPulses < 0 || positionPulses > maxTravelPulses) {
+        sprintf_P(msg, FMT_POSITION_OUT_OF_RANGE, motorName, positionPulses, maxTravelPulses);
         Console.serialError(msg);
         return false;
     }
     
-    // Check for motor alerts
-    if (motor.StatusReg().bit.AlertsPresent) {
-        char msg[MEDIUM_MSG_SIZE];
+    // Check if motor is ready
+    if (!isMotorReady(rail)) {
         sprintf_P(msg, FMT_MOTOR_CANNOT_MOVE, motorName);
         Console.serialError(msg);
-        printMotorAlerts(motor, motorName);
         return false;
     }
     
-    // Command the absolute move
-    motor.Move(positionPulses, MotorDriver::MOVE_TARGET_ABSOLUTE);
-    
-    char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, FMT_MOVE_TO_ABSOLUTE, 
-            motorName, positionPulses, pulsesToMm(positionPulses, rail));
-    Console.serialInfo(msg);
-    
-    return true;
-}
-
-bool moveToPositionMm(int rail, double positionMm, bool carriageLoaded) {
-    const char* motorName = getMotorName(rail);
-    double maxTravel = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
-    
-    // Safety check
-    if (positionMm < 0 || positionMm > maxTravel) {
-        char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_POSITION_MM_OUT_OF_RANGE, 
-                motorName, positionMm, maxTravel);
-        Console.serialError(msg);
-        return false;
-    }
-    
-    // Convert to pulses and calculate move parameters
-    int32_t targetPulses = mmToPulses(positionMm, rail);
-    MotorDriver& motor = getMotorByRail(rail);
+    // Calculate move
     int32_t currentPulses = motor.PositionRefCommanded();
-    double currentPosMm = pulsesToMm(currentPulses, rail);
-    double moveDistanceMm = fabs(positionMm - currentPosMm);
+    int32_t movePulses = positionPulses - currentPulses;
     
-    // Select velocity based on distance and load
-    int32_t moveVelocity;
-    if (moveDistanceMm < 200.0) {
-        // Short move
-        int32_t baseVel = getCarriageVelocityRpm(rail, carriageLoaded);
-        moveVelocity = rpmToPps((baseVel * 80) / 100);
-    } else {
-        // Normal move
-        moveVelocity = rpmToPps(getCarriageVelocityRpm(rail, carriageLoaded));
-    }
-    
-    // Apply velocity and move
-    motor.VelMax(moveVelocity);
-    motor.Move(targetPulses, MotorDriver::MOVE_TARGET_ABSOLUTE);
-    
-    char msg[ALERT_MSG_SIZE];
-    sprintf_P(msg, FMT_MOVE_TO_MM, 
-            motorName, positionMm, targetPulses, (int)ppsToRpm(moveVelocity),
-            carriageLoaded ? "[LOADED]" : "[EMPTY]");
-    Console.serialInfo(msg);
-    
-    return true;
-}
-
-bool moveRelativeManual(int rail, double relativeMm, bool carriageLoaded) {
-    MotorDriver& motor = getMotorByRail(rail);
-    const char* motorName = getMotorName(rail);
-    
-    // Calculate target position
-    int32_t currentPulses = motor.PositionRefCommanded();
-    double currentPosMm = pulsesToMm(currentPulses, rail);
-    double targetPosMm = currentPosMm + relativeMm;
-    double maxTravel = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
-    
-    // Safety check
-    if (targetPosMm < 0 || targetPosMm > maxTravel) {
-        char msg[ALERT_MSG_SIZE];
-        sprintf_P(msg, FMT_RELATIVE_MOVE_RANGE, motorName, maxTravel);
-        Console.serialError(msg);
-        sprintf_P(msg, FMT_RELATIVE_MOVE_DETAILS, 
-                motorName, currentPosMm, relativeMm, targetPosMm);
-        Console.serialError(msg);
-        return false;
-    }
-    
-    // Calculate move distance for velocity selection
-    double moveDistanceMm = fabs(relativeMm);
-    
-    // Select velocity based on distance and load
-    int32_t moveVelocity;
-    if (moveDistanceMm < 200.0) {
-        // Short move
-        int32_t baseVel = getCarriageVelocityRpm(rail, carriageLoaded);
-        moveVelocity = rpmToPps((baseVel * 80) / 100);
-    } else {
-        // Normal move
-        moveVelocity = rpmToPps(getCarriageVelocityRpm(rail, carriageLoaded));
-    }
-    
-    // Convert to pulses and apply move
-    int32_t relativePulses = mmToPulses(relativeMm, rail);
-    motor.VelMax(moveVelocity);
-    motor.Move(relativePulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
-    
-    char msg[ALERT_MSG_SIZE];
-    sprintf_P(msg, FMT_RELATIVE_MOVE, 
-            motorName, relativeMm, relativePulses, (int)ppsToRpm(moveVelocity),
-            carriageLoaded ? "[LOADED]" : "[EMPTY]");
-    Console.serialInfo(msg);
-    
-    return true;
-}
-
-//=============================================================================
-// HOMING OPERATIONS
-//=============================================================================
-
-bool initiateHomingSequence(int rail)
-{
-    MotorDriver& motor = getMotorByRail(rail);
-    const char* motorName = getMotorName(rail);
-    MotorHomingState& homingState = getHomingState(rail);
-    
-    char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, FMT_INITIATE_HOMING, motorName);
-    Console.serialInfo(msg);
-
-    // Check if motor is ready
-    if (!isMotorReady(rail))
-    {
-        sprintf_P(msg, FMT_NOT_READY_HOMING, motorName);
-        Console.serialError(msg);
-        return false;
-    }
-
-    // Check for faults
-    if (motor.StatusReg().bit.AlertsPresent)
-    {
-        sprintf_P(msg, FMT_ALERTS_BEFORE_HOMING, motorName);
-        Console.serialError(msg);
-        return false;
-    }
-
-    // Reset homing state first
-    resetHomingState(rail);
-
-    // For "Upon every Enable" configuration, cycle the enable signal
-    motor.EnableRequest(false);
-    delay(200);
-    motor.EnableRequest(true);
-    delay(200);
-
-    // Set velocity for homing
-    int32_t homingVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
-    motor.VelMax(homingVelPps);
-
-    // Move in homing direction at continuous velocity
-    int homingDirection = getHomingDirection(rail);
-    motor.MoveVelocity(homingDirection * homingVelPps);
-
-    // Update state
-    homingState.homingInProgress = true;
-    homingState.homingStartTime = millis();
-    
-    // Update motor state tracking
-    if (rail == 1) {
-        rail1HomingInProgress = true;
-        rail1MotorState = MOTOR_STATE_HOMING;
-    } else {
-        rail2HomingInProgress = true;
-        rail2MotorState = MOTOR_STATE_HOMING;
-    }
-
-    sprintf_P(msg, FMT_HOMING_INITIATED, motorName);
-    Console.serialInfo(msg);
-    return true;
-}
-
-void checkHomingProgress(int rail)
-{
-    MotorDriver& motor = getMotorByRail(rail);
-    const char* motorName = getMotorName(rail);
-    MotorHomingState& homingState = getHomingState(rail);
-    
-    if (!homingState.homingInProgress)
-        return;
-
-    unsigned long currentTime = millis();
-    char msg[ALERT_MSG_SIZE];
-
-    // Add a delay before starting actual hardstop detection
-    static const unsigned long homingStartDelay = 500;
-    if (!waitTimeReached(currentTime, homingState.homingStartTime, homingStartDelay))
-        return;
-
-    MotorDriver::HlfbStates currentHlfbState = motor.HlfbState();
-    int32_t currentPosition = motor.PositionRefCommanded();
-
-    // Check if motor is actually moving during homing (every 100ms)
-    if (waitTimeReached(currentTime, homingState.lastPositionCheckTime, 100))
-    {
-        // Calculate movement since last check
-        int32_t movementSinceLastCheck = abs(currentPosition - homingState.lastCheckedPosition);
-
-        // Log movement data when we've crossed the minimum distance threshold
-        if (homingState.minDistanceTraveled)
-        {
-            sprintf_P(msg, FMT_HOMING_DIAGNOSTIC,
-                    motorName, currentPosition, movementSinceLastCheck,
-                    currentHlfbState == MotorDriver::HLFB_ASSERTED ? "ASSERTED" : "NOT_ASSERTED");
-            Console.serialDiagnostic(msg);
-        }
-
-        if (movementSinceLastCheck < 10 && homingState.hlfbWentNonAsserted)
-        {
-            sprintf_P(msg, FMT_MINIMAL_MOVEMENT, motorName);
-            Console.serialWarning(msg);
-        }
-
-        homingState.lastCheckedPosition = currentPosition;
-        homingState.lastPositionCheckTime = currentTime;
-    }
-
-    // Check for timeout first
-    if (timeoutElapsed(currentTime, homingState.homingStartTime, HOME_TIMEOUT_MS))
-    {
-        sprintf_P(msg, FMT_HOMING_TIMEOUT, motorName);
-        Console.serialError(msg);
-        sprintf_P(msg, FMT_FINAL_HLFB_STATE, motorName,
-                currentHlfbState == MotorDriver::HLFB_ASSERTED ? "ASSERTED" : "NOT ASSERTED");
-        Console.serialDiagnostic(msg);
-
-        motor.MoveStopAbrupt();
-
-        // Set current position as home despite timeout
-        sprintf_P(msg, FMT_SET_HOME_TIMEOUT, motorName);
+    if (movePulses == 0) {
+        sprintf_P(msg, PSTR("%s: Already at target position %ld pulses"), motorName, positionPulses);
         Console.serialInfo(msg);
-        motor.PositionRefSet(0);
-
-        // Complete homing setup
-        completeHomingSequence(rail);
-        return;
-    }
-
-    // Check for alerts during homing
-    if (motor.StatusReg().bit.AlertsPresent)
-    {
-        sprintf_P(msg, FMT_ALERT_DURING_HOMING, motorName);
-        Console.serialError(msg);
-        printMotorAlerts(motor, motorName);
-
-        // Stop motion and abort homing
-        motor.MoveStopAbrupt();
-        abortHoming(rail);
-        return;
-    }
-
-    // Calculate pulses moved during THIS specific homing attempt
-    int32_t pulsesMovedThisHoming = abs(currentPosition - homingState.startPulses);
-
-    // Check if we've moved enough distance to consider hardstop detection
-    if (pulsesMovedThisHoming >= HOMING_MIN_MOVEMENT_PULSES && !homingState.minDistanceTraveled)
-    {
-        homingState.minDistanceTraveled = true;
-        homingState.minTimeAfterDistanceReached = currentTime;
-        homingState.positionAtMinDistance = currentPosition;
-        sprintf_P(msg, FMT_MIN_DISTANCE_REACHED, 
-                motorName, pulsesMovedThisHoming);
-        Console.serialInfo(msg);
-    }
-
-    // After min distance reached, track additional travel
-    if (homingState.minDistanceTraveled)
-    {
-        homingState.pulsesTraveledAfterMinDistance = abs(currentPosition - homingState.positionAtMinDistance);
-    }
-
-    // Check for non-asserted state (HLFB indicates movement or fault)
-    if (currentHlfbState != MotorDriver::HLFB_ASSERTED)
-    {
-        if (!homingState.hlfbWentNonAsserted)
-        {
-            homingState.hlfbWentNonAsserted = true;
-            homingState.hlfbNonAssertedTime = currentTime;
-            sprintf_P(msg, FMT_HLFB_NON_ASSERTED, motorName);
-            Console.serialInfo(msg);
-        }
-    }
-
-    // Hardstop detection logic
-    if (homingState.hlfbWentNonAsserted &&
-        currentHlfbState == MotorDriver::HLFB_ASSERTED &&
-        timeoutElapsed(currentTime, homingState.hlfbNonAssertedTime, HOMING_DEBOUNCE_TIME_MS) &&
-        homingState.minDistanceTraveled &&
-        timeoutElapsed(currentTime, homingState.minTimeAfterDistanceReached, HOMING_MIN_TIME_AFTER_DISTANCE_MS) &&
-        homingState.pulsesTraveledAfterMinDistance >= HOMING_MIN_ADDITIONAL_PULSES)
-    {
-        sprintf_P(msg, FMT_HARDSTOP_REACHED,
-                motorName, timeDiff(currentTime, homingState.minTimeAfterDistanceReached), 
-                homingState.pulsesTraveledAfterMinDistance);
-        Console.serialInfo(msg);
-
-        // Stop the velocity move
-        motor.MoveStopAbrupt();
-
-        // Set position to zero at the actual hardstop before offset
-        motor.PositionRefSet(0);
-
-        // Move away from hardstop to complete homing
-        double homeOffset = getHomeOffsetDistance(rail);
-        if (homeOffset > 0)
-        {
-            sprintf_P(msg, FMT_MOVING_FROM_HARDSTOP, motorName, homeOffset);
-            Console.serialInfo(msg);
-
-            // Reset velocity to normal for homing operation
-            int32_t normalVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
-            motor.VelMax(normalVelPps);
-
-            // Move away from hardstop
-            int32_t offsetPulses = mmToPulses(homeOffset, rail);
-            int homingDirection = getHomingDirection(rail);
-            motor.Move(-homingDirection * offsetPulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
-
-            // Wait for offset move to complete
-            sprintf_P(msg, FMT_WAITING_OFFSET, motorName);
-            Console.serialInfo(msg);
-            
-            unsigned long offsetMoveStartTime = millis();
-            while (!motor.StepsComplete() && !timeoutElapsed(millis(), offsetMoveStartTime, 5000))
-            {
-                delay(10);
-
-                // Check for alerts during offset move
-                if (motor.StatusReg().bit.AlertsPresent)
-                {
-                    sprintf_P(msg, FMT_ALERT_OFFSET_MOVE, motorName);
-                    Console.serialError(msg);
-                    abortHoming(rail);
-                    return;
-                }
-            }
-            
-            if (!motor.StepsComplete())
-            {
-                sprintf_P(msg, FMT_OFFSET_TIMEOUT, motorName);
-                Console.serialError(msg);
-            }
-
-            // Re-zero at offset position
-            motor.PositionRefSet(0);
-            sprintf_P(msg, FMT_HOME_OFFSET_ESTABLISHED, motorName);
-            Console.serialInfo(msg);
-        }
-        else
-        {
-            sprintf_P(msg, FMT_HARDSTOP_AS_ZERO, motorName);
-            Console.serialInfo(msg);
-        }
-
-        // Complete the homing sequence
-        completeHomingSequence(rail);
-    }
-}
-
-void completeHomingSequence(int rail)
-{
-    MotorDriver& motor = getMotorByRail(rail);
-    const char* motorName = getMotorName(rail);
-    MotorHomingState& homingState = getHomingState(rail);
-    
-    // Reset to normal operation parameters (use homing speed as conservative default)
-    int32_t normalVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
-    int32_t normalAccelPps = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
-    motor.VelMax(normalVelPps);
-    motor.AccelMax(normalAccelPps);
-
-    // Set homing complete flags
-    homingState.isHomed = true;
-    homingState.homingInProgress = false;
-    
-    // Update motor state tracking
-    if (rail == 1) {
-        rail1HomingInProgress = false;
-        rail1MotorState = MOTOR_STATE_IDLE;
-    } else {
-        rail2HomingInProgress = false;
-        rail2MotorState = MOTOR_STATE_IDLE;
-    }
-
-    char msg[MEDIUM_MSG_SIZE];
-    unsigned long homingDurationMs = timeDiff(millis(), homingState.homingStartTime);
-    sprintf_P(msg, FMT_HOMING_COMPLETED, motorName);
-    Console.serialInfo(msg);
-    printHumanReadableTime(homingDurationMs / 1000);
-    Console.println();
-}
-
-void resetHomingState(int rail)
-{
-    MotorDriver& motor = getMotorByRail(rail);
-    MotorHomingState& homingState = getHomingState(rail);
-    
-    // Reset all homing state variables
-    homingState.homingInProgress = false;
-    homingState.hlfbWentNonAsserted = false;
-    homingState.hlfbNonAssertedTime = 0;
-    homingState.minDistanceTraveled = false;
-    homingState.lastPositionCheckTime = 0;
-    homingState.minTimeAfterDistanceReached = 0;
-    homingState.pulsesTraveledAfterMinDistance = 0;
-    homingState.positionAtMinDistance = 0;
-    homingState.lastCheckedPosition = 0;
-
-    // Capture the current position AFTER resetting variables
-    homingState.startPulses = motor.PositionRefCommanded();
-
-    char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, FMT_HOMING_STATE_RESET, getMotorName(rail));
-    Console.serialDiagnostic(msg);
-}
-
-void abortHoming(int rail)
-{
-    MotorDriver& motor = getMotorByRail(rail);
-    const char* motorName = getMotorName(rail);
-    MotorHomingState& homingState = getHomingState(rail);
-    
-    if (homingState.homingInProgress)
-    {
-        char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_ABORTING_HOMING, motorName);
-        Console.serialInfo(msg);
-        
-        motor.MoveStopAbrupt();
-
-        // Reset to normal operation parameters (use loaded carriage speed as conservative default)
-        int32_t normalVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
-        int32_t normalAccelPps = rpmPerSecToPpsPerSec(MAX_ACCEL_RPM_PER_SEC);
-        motor.VelMax(normalVelPps);
-        motor.AccelMax(normalAccelPps);
-
-        // Reset state
-        resetHomingState(rail);
-        
-        // Update motor state tracking
-        if (rail == 1) {
-            rail1HomingInProgress = false;
-            rail1MotorState = MOTOR_STATE_IDLE;
-        } else {
-            rail2HomingInProgress = false;
-            rail2MotorState = MOTOR_STATE_IDLE;
-        }
-
-        sprintf_P(msg, FMT_HOMING_ABORTED, motorName);
-        Console.serialInfo(msg);
-    }
-}
-
-bool isHomingComplete(int rail)
-{
-    MotorHomingState& homingState = getHomingState(rail);
-    return homingState.isHomed && !homingState.homingInProgress;
-}
-
-bool isHomingInProgress(int rail)
-{
-    MotorHomingState& homingState = getHomingState(rail);
-    return homingState.homingInProgress;
-}
-
-// Convenience functions for both motors
-bool initiateHomingSequenceAll()
-{
-    Console.serialInfo("Initiating homing sequence for both motors");
-    bool rail1Success = initiateHomingSequence(1);
-    bool rail2Success = initiateHomingSequence(2);
-    return rail1Success && rail2Success;
-}
-
-void checkAllHomingProgress()
-{
-    checkHomingProgress(1);
-    checkHomingProgress(2);
-}
-
-bool isAllHomingComplete()
-{
-    return isHomingComplete(1) && isHomingComplete(2);
-}
-
-//=============================================================================
-// MOVEMENT PROGRESS MONITORING
-//=============================================================================
-
-// Initialize movement tracking for a specific rail
-void initMovementTracking(int rail, PositionTarget target, bool carriageLoaded) {
-    MotorTargetState& state = getTargetState(rail);
-    MotorDriver& motor = getMotorByRail(rail);
-    
-    // Reset and initialize tracking state
-    memset(&state, 0, sizeof(MotorTargetState));
-    
-    state.movementInProgress = true;
-    state.targetPosition = target;
-    state.targetPositionPulses = getPositionPulses(target);
-    state.startPositionPulses = motor.PositionRefCommanded();
-    state.totalMoveDistancePulses = abs(state.targetPositionPulses - state.startPositionPulses);
-    // Store the rail-specific base velocity that would be used for this type of movement
-    state.originalVelocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
-    state.carriageLoaded = carriageLoaded;
-    state.movementStartTime = millis();
-    state.lastProgressCheck = millis();
-    state.lastDecelerationUpdate = millis();
-    state.lastPositionCheck = state.startPositionPulses;
-    state.decelerationActive = false;
-    state.movementValidated = false;
-    state.movementTimeoutCount = 0;
-    
-    char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, PSTR("Movement tracking initialized - Rail %d to %s (%.2fmm)"), 
-              rail, getPositionName(target), pulsesToMm(state.targetPositionPulses, rail));
-    Console.serialInfo(msg);
-}
-
-// Reset movement tracking for a specific rail
-void resetMovementTracking(int rail) {
-    MotorTargetState& state = getTargetState(rail);
-    memset(&state, 0, sizeof(MotorTargetState));
-}
-
-// Validate that movement completed successfully
-bool validateMovementCompletion(int rail) {
-    MotorTargetState& state = getTargetState(rail);
-    MotorDriver& motor = getMotorByRail(rail);
-    
-    if (!state.movementInProgress) {
-        return true; // No movement to validate
-    }
-    
-    int32_t currentPosition = motor.PositionRefCommanded();
-    double positionErrorMm = abs(pulsesToMm(currentPosition - state.targetPositionPulses, rail));
-    
-    char msg[MEDIUM_MSG_SIZE];
-    if (positionErrorMm <= MOVEMENT_POSITION_TOLERANCE_MM) {
-        sprintf_P(msg, PSTR("Rail %d: Movement validated - Target reached within %.1fmm tolerance"), 
-                  rail, MOVEMENT_POSITION_TOLERANCE_MM);
-        Console.serialInfo(msg);
-        state.movementValidated = true;
         return true;
-    } else {
-        sprintf_P(msg, PSTR("Rail %d: Movement validation FAILED - Position error: %.2fmm (tolerance: %.1fmm)"), 
-                  rail, positionErrorMm, MOVEMENT_POSITION_TOLERANCE_MM);
-        Console.error(msg);
-        return false;
     }
+    
+    // Calculate movement distance and select velocity
+    double moveDistanceMm = abs(pulsesToMm(movePulses, rail));
+    int32_t velocityRpm = selectMoveVelocityByDistance(rail, moveDistanceMm, carriageLoaded);
+    int32_t velocityPps = rpmToPps(velocityRpm);
+    
+    // Set velocity and initiate move
+    setMotorVelocity(rail, velocityPps);
+    motor.Move(movePulses);
+    
+    // Log the movement
+    sprintf_P(msg, FMT_MOVE_TO_ABSOLUTE, motorName, positionPulses, pulsesToMm(positionPulses, rail));
+    Console.serialInfo(msg);
+    
+    return true;
 }
 
-// Update velocity for real-time deceleration
-void updateDecelerationVelocity(int rail) {
-    MotorTargetState& state = getTargetState(rail);
-    MotorDriver& motor = getMotorByRail(rail);
-    unsigned long currentTime = millis();
+//=============================================================================
+// POSITION VALIDATION FUNCTION
+//=============================================================================
+
+bool validateAllPredefinedPositions() {
+    Console.serialInfo(F("Validating all predefined positions against travel limits..."));
     
-    // Track current velocity setting for this rail
-    static int32_t rail1CurrentVelocityPps = 0;
-    static int32_t rail2CurrentVelocityPps = 0;
-    int32_t* currentVelocityPps = (rail == 1) ? &rail1CurrentVelocityPps : &rail2CurrentVelocityPps;
+    bool allValid = true;
+    int validPositions = 0;
+    int totalPositions = 0;
     
-    // Only update at specified intervals to avoid overwhelming the motor
-    if (currentTime - state.lastDecelerationUpdate < DECELERATION_UPDATE_INTERVAL_MS) {
-        return;
-    }
+    // Rail 1 positions to validate
+    PositionTarget rail1Positions[] = {
+        RAIL1_HOME_POS,
+        RAIL1_WC2_PICKUP_DROPOFF_POS,
+        RAIL1_WC1_PICKUP_DROPOFF_POS,
+        RAIL1_STAGING_POS,
+        RAIL1_HANDOFF_POS
+    };
     
-    state.lastDecelerationUpdate = currentTime;
+    // Rail 2 positions to validate
+    PositionTarget rail2Positions[] = {
+        RAIL2_HOME_POS,
+        RAIL2_HANDOFF_POS,
+        RAIL2_WC3_PICKUP_DROPOFF_POS
+    };
     
-    if (!state.movementInProgress || !getDecelerationConfig(rail).enableDeceleration) {
-        return;
-    }
-    
-    int32_t currentPosition = motor.PositionRefCommanded();
-    int32_t distanceToTargetPulses = abs(state.targetPositionPulses - currentPosition);
-    double distanceToTargetMm = pulsesToMm(distanceToTargetPulses, rail);
-    double totalMoveDistanceMm = pulsesToMm(state.totalMoveDistancePulses, rail);
-    
-    // Calculate deceleration distance based on move length
-    int32_t decelerationDistanceMm = getDecelerationDistanceScaled(rail, (int32_t)(totalMoveDistanceMm * 100)) / 100;
-    
-    if (distanceToTargetMm <= decelerationDistanceMm) {
-        // Enter or continue deceleration
-        if (!state.decelerationActive) {
-            state.decelerationActive = true;
+    // Validate Rail 1 positions
+    Console.serialInfo(F("Validating Rail 1 predefined positions..."));
+    for (int i = 0; i < sizeof(rail1Positions) / sizeof(rail1Positions[0]); i++) {
+        totalPositions++;
+        PositionTarget pos = rail1Positions[i];
+        
+        if (isValidPositionForRail(pos, 1)) {
+            validPositions++;
+            int32_t pulses = getPositionPulses(pos);
+            double mm = pulsesToMm(pulses, 1);
             char msg[MEDIUM_MSG_SIZE];
-            sprintf_P(msg, PSTR("Rail %d: Entering deceleration phase - %.2fmm from target"), 
-                      rail, distanceToTargetMm);
+            sprintf_P(msg, PSTR("  %s: %.2fmm ✓"), getPositionName(pos), mm);
             Console.serialInfo(msg);
-        }
-        
-        int32_t maxVelocityRpm = getCarriageVelocityRpm(rail, state.carriageLoaded);
-        int32_t newVelocityRpm = calculateDeceleratedVelocity(rail, (int32_t)distanceToTargetMm, 
-                                                              (int32_t)totalMoveDistanceMm, maxVelocityRpm);
-        
-        int32_t newVelocityPps = rpmToPps(newVelocityRpm);
-        
-        // Only update if velocity changed significantly (avoid constant updates)
-        if (abs(*currentVelocityPps - newVelocityPps) > rpmToPps(5)) { // 5 RPM threshold
-            motor.VelMax(newVelocityPps);
-            *currentVelocityPps = newVelocityPps;
-        }
-    }
-}
-
-// Check for movement timeout and stall conditions
-bool checkMovementTimeout(int rail) {
-    MotorTargetState& state = getTargetState(rail);
-    unsigned long currentTime = millis();
-    char msg[MEDIUM_MSG_SIZE];
-    
-    if (!state.movementInProgress) {
-        return false;
-    }
-    
-    // Check for overall timeout
-    if (currentTime - state.movementStartTime > MOVEMENT_TIMEOUT_MS) {
-        sprintf_P(msg, PSTR("Rail %d: Movement TIMEOUT after %lu ms - Stopping motor"), 
-                  rail, currentTime - state.movementStartTime);
-        Console.error(msg);
-        stopMotion(rail);
-        resetMovementTracking(rail);
-        return true;
-    }
-    
-    // Check for stall conditions (position not changing)
-    if (currentTime - state.lastProgressCheck > MOVEMENT_STALL_CHECK_INTERVAL_MS) {
-        MotorDriver& motor = getMotorByRail(rail);
-        int32_t currentPosition = motor.PositionRefCommanded();
-        double progressMm = abs(pulsesToMm(currentPosition - state.lastPositionCheck, rail));
-        
-        if (progressMm < MOVEMENT_MIN_PROGRESS_MM) {
-            state.movementTimeoutCount++;
-            
-            if (state.movementTimeoutCount >= 3) {
-                sprintf_P(msg, PSTR("Rail %d: Movement STALLED - No progress for %d checks - Stopping motor"), 
-                          rail, state.movementTimeoutCount);
-                Console.error(msg);
-                stopMotion(rail);
-                resetMovementTracking(rail);
-                return true;
-            } else {
-                sprintf_P(msg, PSTR("Rail %d: Warning - Minimal progress detected (%.2fmm in %dms)"), 
-                          rail, progressMm, MOVEMENT_STALL_CHECK_INTERVAL_MS);
-                Console.serialInfo(msg);
-            }
         } else {
-            // Reset timeout counter if good progress is made
-            state.movementTimeoutCount = 0;
+            allValid = false;
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, PSTR("  %s: INVALID ✗"), getPositionName(pos));
+            Console.serialError(msg);
         }
+    }
+    
+    // Validate Rail 2 positions
+    Console.serialInfo(F("Validating Rail 2 predefined positions..."));
+    for (int i = 0; i < sizeof(rail2Positions) / sizeof(rail2Positions[0]); i++) {
+        totalPositions++;
+        PositionTarget pos = rail2Positions[i];
         
-        state.lastProgressCheck = currentTime;
-        state.lastPositionCheck = currentPosition;
-    }
-    
-    return false;
-}
-
-// Check progress for a specific rail
-bool checkMovementProgress(int rail) {
-    MotorTargetState& state = getTargetState(rail);
-    bool isCurrentlyMoving = isMotorMoving(rail);
-    
-    if (!state.movementInProgress) {
-        return false; // No movement to track
-    }
-    
-    // Check for timeout and stall conditions
-    if (checkMovementTimeout(rail)) {
-        return true; // Movement was stopped due to timeout/stall
-    }
-    
-    // Update deceleration velocity if still moving
-    if (isCurrentlyMoving) {
-        updateDecelerationVelocity(rail);
-        return false; // Still moving
-    }
-    
-    // Movement completed - validate and cleanup
-    bool validationPassed = validateMovementCompletion(rail);
-    
-    // Restore original velocity if it was modified during deceleration
-    if (state.decelerationActive) {
-        MotorDriver& motor = getMotorByRail(rail);
-        int32_t originalVelocityPps = rpmToPps(state.originalVelocityRpm);
-        motor.VelMax(originalVelocityPps);
-        
-        char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, PSTR("Rail %d: Velocity restored to %d RPM after deceleration"), 
-                  rail, state.originalVelocityRpm);
-        Console.serialInfo(msg);
-    }
-    
-    // Generate completion message
-    char msg[MEDIUM_MSG_SIZE];
-    double finalPositionMm = getMotorPositionMm(rail);
-    unsigned long totalTime = millis() - state.movementStartTime;
-    sprintf_P(msg, PSTR("Rail %d: Movement completed in %lums - Final position: %.2fmm %s"), 
-              rail, totalTime, finalPositionMm, validationPassed ? "(VALIDATED)" : "(VALIDATION FAILED)");
-    Console.serialInfo(msg);
-    
-    // Reset tracking state
-    resetMovementTracking(rail);
-    
-    return true; // Movement completed
-}
-
-void checkMoveProgress()
-{
-    char msg[MEDIUM_MSG_SIZE];
-    static bool rail1WasMoving = false;
-    static bool rail2WasMoving = false;
-    
-    // Check each rail independently using enhanced movement tracking
-    for (int rail = 1; rail <= 2; rail++) {
-        MotorTargetState& targetState = getTargetState(rail);
-        bool* wasMoving = (rail == 1) ? &rail1WasMoving : &rail2WasMoving;
-        bool isCurrentlyMoving = isMotorMoving(rail);
-        
-        // If we have active target tracking, use the enhanced monitoring
-        if (targetState.movementInProgress) {
-            // Use enhanced movement tracking with deceleration and validation
-            bool movementCompleted = checkMovementProgress(rail);
-            
-            if (movementCompleted) {
-                *wasMoving = false;
-            }
+        if (isValidPositionForRail(pos, 2)) {
+            validPositions++;
+            int32_t pulses = getPositionPulses(pos);
+            double mm = pulsesToMm(pulses, 2);
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, PSTR("  %s: %.2fmm ✓"), getPositionName(pos), mm);
+            Console.serialInfo(msg);
         } else {
-            // Fallback to basic movement tracking for movements without target tracking
-            if (isCurrentlyMoving && !*wasMoving) {
-                // Movement started without target tracking
-                sprintf_P(msg, PSTR("%s: Movement started (basic tracking)"), getMotorName(rail));
-                Console.serialInfo(msg);
-                *wasMoving = true;
-            } else if (*wasMoving && !isCurrentlyMoving) {
-                // Movement completed without target tracking
-                sprintf_P(msg, PSTR("%s: Movement completed - Position: %.2fmm"), 
-                         getMotorName(rail), getMotorPositionMm(rail));
-                Console.serialInfo(msg);
-                *wasMoving = false;
-            }
+            allValid = false;
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, PSTR("  %s: INVALID ✗"), getPositionName(pos));
+            Console.serialError(msg);
         }
     }
     
-    // Global operation state management
-    extern bool operationInProgress;
-    bool anyMotorMoving = isMotorMoving(1) || isMotorMoving(2);
-    bool anyTrackingActive = getTargetState(1).movementInProgress || getTargetState(2).movementInProgress;
+    // Summary report
+    char summary[MEDIUM_MSG_SIZE];
+    sprintf_P(summary, PSTR("Position validation complete: %d/%d positions valid"), 
+             validPositions, totalPositions);
     
-    // Clear global operation flag when all movements complete
-    if (operationInProgress && !anyMotorMoving && !rail1WasMoving && !rail2WasMoving && !anyTrackingActive) {
-        operationInProgress = false;
-        Console.serialInfo(F("All rail operations completed - system ready"));
+    if (allValid) {
+        Console.serialInfo(summary);
+        Console.serialInfo(F("All predefined positions are within travel limits"));
+    } else {
+        Console.serialError(summary);
+        Console.serialError(F("CRITICAL: Some predefined positions exceed travel limits!"));
+        Console.serialError(F("Review position definitions in MotorController.h"));
     }
-}
-
-//=============================================================================
-// MANUAL JOGGING OPERATIONS
-//=============================================================================
-
-bool jogMotor(int rail, bool direction, double customIncrement, bool carriageLoaded)
-{
-    MotorDriver& motor = getMotorByRail(rail);
-    const char* motorName = getMotorName(rail);
-    char msg[ALERT_MSG_SIZE];
-
-    // Check if motor is ready
-    if (!isMotorReady(rail))
-    {
-        sprintf_P(msg, FMT_NOT_READY_JOG, motorName);
-        Console.serialError(msg);
-        return false;
-    }
-
-    // Check if motor is currently moving
-    if (isMotorMoving(rail))
-    {
-        sprintf_P(msg, FMT_CANNOT_JOG_MOVING, motorName);
-        Console.serialError(msg);
-        return false;
-    }
-
-    // Determine increment to use
-    double increment = (customIncrement > 0) ? customIncrement : getJogIncrementRef(rail);
-
-    // Calculate movement direction (positive or negative)
-    double moveMm = direction ? increment : -increment;
-
-    // Get current position and validate move
-    double currentPosMm = getMotorPositionMm(rail);
-    double targetPositionMm = currentPosMm + moveMm;
-    double maxTravel = (rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
-
-    // Safety check - ensure jog won't exceed travel limits
-    if (targetPositionMm < 0 || targetPositionMm > maxTravel)
-    {
-        sprintf_P(msg, FMT_JOG_EXCEED_LIMITS, motorName, maxTravel);
-        Console.serialError(msg);
-        sprintf_P(msg, FMT_JOG_POSITION_INFO, 
-                motorName, currentPosMm, targetPositionMm);
-        Console.serialInfo(msg);
-        return false;
-    }
-
-    // Save current jog velocity setting for restoration
-    int32_t originalVelMax = rpmToPps(getJogSpeedRef(rail));
-
-    // Use setJogSpeed to apply velocity scaling if using custom increment
-    int jogSpeed = getJogSpeedRef(rail);
-    if (customIncrement > 0)
-    {
-        // This will automatically cap the speed based on the distance
-        setJogSpeed(rail, jogSpeed, customIncrement);
-        jogSpeed = getJogSpeedRef(rail); // Get the potentially capped speed
-    }
-
-    // Apply distance-based velocity capping for safety
-    int32_t jogVelocity = rpmToPps(jogSpeed);
     
-    // Additional safety: for very short jogs, reduce speed further
-    if (increment < 1.0)
-    {
-        jogVelocity = rpmToPps(min(jogSpeed, 100)); // Cap at 100 RPM for sub-mm moves
-    }
-
-    // Set velocity for jog
-    motor.VelMax(jogVelocity);
-
-    // Log the jog operation
-    sprintf_P(msg, FMT_JOGGING, 
-            motorName, direction ? "forward" : "backward", increment,
-            (int)ppsToRpm(jogVelocity), carriageLoaded ? "[LOADED]" : "[EMPTY]");
-    Console.serialInfo(msg);
-
-    // Perform the relative move
-    int32_t relativePulses = mmToPulses(moveMm, rail);
-    motor.Move(relativePulses, MotorDriver::MOVE_TARGET_REL_END_POSN);
-
-    return true;
-}
-
-bool setJogIncrement(int rail, double increment)
-{
-    const char* motorName = getMotorName(rail);
-    char msg[ALERT_MSG_SIZE];
-
-    // Validate increment is reasonable for the specific rail using header constants
-    double maxIncrement = (rail == 1) ? RAIL1_MAX_JOG_INCREMENT_MM : RAIL2_MAX_JOG_INCREMENT_MM;
-    
-    if (increment <= 0 || increment > maxIncrement)
-    {
-        sprintf_P(msg, FMT_JOG_INCREMENT_RANGE, motorName, maxIncrement);
-        Console.serialError(msg);
-        return false;
-    }
-
-    // Set the increment
-    getJogIncrementRef(rail) = increment;
-    sprintf_P(msg, FMT_JOG_INCREMENT_SET, motorName, increment);
-    Console.serialInfo(msg);
-
-    // Re-validate jog speed with the new distance
-    setJogSpeed(rail, getJogSpeedRef(rail), increment);
-
-    return true;
-}
-
-bool setJogSpeed(int rail, int speedRpm, double jogDistanceMm)
-{
-    const char* motorName = getMotorName(rail);
-    char msg[ALERT_MSG_SIZE];
-
-    // Get the jog distance - either from parameter or use current increment
-    double distanceToMoveMm = (jogDistanceMm > 0) ? jogDistanceMm : getJogIncrementRef(rail);
-
-    // Validate speed is reasonable - use rail-specific empty carriage speed as max for jogging
-    int maxSpeed = (rail == 1) ? RAIL1_EMPTY_CARRIAGE_VELOCITY_RPM : RAIL2_EMPTY_CARRIAGE_VELOCITY_RPM;
-    if (speedRpm < 10 || speedRpm > maxSpeed)
-    {
-        sprintf_P(msg, FMT_JOG_SPEED_RANGE, motorName, maxSpeed);
-        Console.serialError(msg);
-        return false;
-    }
-
-    // Apply distance-based speed caps for safety
-    int cappedSpeed = speedRpm;
-
-    // Use your existing velocity selection logic for safety
-    if (distanceToMoveMm < 1.0)
-    {
-        // Very short moves - extra conservative
-        cappedSpeed = min(speedRpm, 50);
-        if (cappedSpeed != speedRpm)
-        {
-            sprintf_P(msg, FMT_SPEED_CAPPED_VERY_SHORT, 
-                    motorName, cappedSpeed, distanceToMoveMm);
-            Console.serialInfo(msg);
-        }
-    }
-    else if (distanceToMoveMm < 10.0)
-    {
-        // Short moves
-        cappedSpeed = min(speedRpm, 150);
-        if (cappedSpeed != speedRpm)
-        {
-            sprintf_P(msg, FMT_SPEED_CAPPED_SHORT, 
-                    motorName, cappedSpeed, distanceToMoveMm);
-            Console.serialInfo(msg);
-        }
-    }
-    else if (distanceToMoveMm < 50.0)
-    {
-        // Medium moves
-        cappedSpeed = min(speedRpm, 250);
-        if (cappedSpeed != speedRpm)
-        {
-            sprintf_P(msg, FMT_SPEED_CAPPED_MEDIUM, 
-                    motorName, cappedSpeed, distanceToMoveMm);
-            Console.serialInfo(msg);
-        }
-    }
-    else
-    {
-        // Long moves - use requested speed up to max
-        cappedSpeed = min(speedRpm, maxSpeed);
-        if (cappedSpeed != speedRpm)
-        {
-            sprintf_P(msg, FMT_SPEED_CAPPED_LONG, 
-                    motorName, cappedSpeed, distanceToMoveMm);
-            Console.serialInfo(msg);
-        }
-    }
-
-    // Set the speed with the potentially capped value
-    getJogSpeedRef(rail) = cappedSpeed;
-       sprintf_P(msg, FMT_JOG_SPEED_SET, motorName, cappedSpeed);
-    Console.serialInfo(msg);
-
-    return true;
-}
-
-// Helper functions to get current jog parameters
-double getJogIncrement(int rail)
-{
-    return getJogIncrementRef(rail);
-}
-
-int getJogSpeed(int rail)
-{
-    return getJogSpeedRef(rail);
-}
-
-// Convenience functions for common jog operations
-bool jogForward(int rail, bool carriageLoaded = false)
-{
-    return jogMotor(rail, true, 0, carriageLoaded);
-}
-
-bool jogBackward(int rail, bool carriageLoaded = false)
-{
-    return jogMotor(rail, false, 0, carriageLoaded);
-}
-
-// Quick jog functions with predefined increments
-bool jogForwardMm(int rail, double distanceMm, bool carriageLoaded = false)
-{
-    return jogMotor(rail, true, distanceMm, carriageLoaded);
-}
-
-bool jogBackwardMm(int rail, double distanceMm, bool carriageLoaded = false)
-{
-    return jogMotor(rail, false, distanceMm, carriageLoaded);
+    return allValid;
 }
 

@@ -3,6 +3,19 @@
 #include "OutputManager.h"
 
 //=============================================================================
+// CONSOLE OUTPUT FORMAT STRINGS
+//=============================================================================
+// Consolidated format strings for cleaner, more concise encoder control messaging
+
+// Configuration and control format strings
+const char FMT_MPG_CONFIG_CHANGE[] PROGMEM = "MPG: %s";
+const char FMT_MPG_STATUS_RAIL[] PROGMEM = "MPG Rail %d: %s @ %.2fmm";
+const char FMT_MPG_SETTINGS[] PROGMEM = "Settings: %s, %dRPM";
+
+// Error and validation format strings
+const char FMT_RAIL_VALIDATION_ERROR[] PROGMEM = "Rail %d: %s";
+
+//=============================================================================
 // PROGMEM STRING CONSTANTS
 //=============================================================================
 // Format strings for sprintf_P()
@@ -86,8 +99,7 @@ void initEncoderControl(bool swapDirection, bool indexInverted)
     activeEncoderRail = 0;
     quadratureErrorDetected = false;
     
-    Console.serialInfo(F("Manual Pulse Generator (MPG) initialized"));
-    Console.serialInfo(F("Use 'encoder,enable,1' or 'encoder,enable,2' to start manual control"));
+    Console.serialInfo(F("Manual Pulse Generator (MPG) initialized - use 'encoder,enable,<rail>' to start"));
 }
 
 //=============================================================================
@@ -114,9 +126,8 @@ void enableEncoderControl(int rail)
     if (!isHomingComplete(rail))
     {
         char msg[SMALL_MSG_SIZE];
-        sprintf_P(msg, FMT_RAIL_MUST_BE_HOMED, rail);
+        sprintf_P(msg, FMT_RAIL_VALIDATION_ERROR, rail, "not homed");
         Console.serialError(msg);
-        Console.serialInfo(F("Use homing commands to establish reference position"));
         return;
     }
     
@@ -165,15 +176,11 @@ void enableEncoderControl(int rail)
     quadratureErrorDetected = false;
     
     char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, FMT_MPG_ENABLED, 
-            rail, scaledToMm(mpgBasePositionScaled));
+    sprintf_P(msg, FMT_MPG_STATUS_RAIL, rail, "ENABLED", scaledToMm(mpgBasePositionScaled));
     Console.serialInfo(msg);
     
-    sprintf_P(msg, FMT_MPG_MULTIPLIER_VELOCITY, 
-            getMultiplierName(currentMultiplierScaled), currentVelocityRpm);
+    sprintf_P(msg, FMT_MPG_SETTINGS, getMultiplierName(currentMultiplierScaled), currentVelocityRpm);
     Console.serialInfo(msg);
-    
-    Console.serialInfo(F("Turn handwheel to move motor. Use 'encoder,disable' to stop"));
 }
 
 void disableEncoderControl()
@@ -349,10 +356,7 @@ void setEncoderMultiplier(float multiplier)
     }
     
     char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, FMT_MPG_MULTIPLIER_SET, getMultiplierName(currentMultiplierScaled));
-    Console.serialInfo(msg);
-    
-    sprintf_P(msg, FMT_ONE_COUNT_EQUALS, scaledToMm(currentMultiplierScaled));
+    sprintf_P(msg, FMT_MPG_CONFIG_CHANGE, getMultiplierName(currentMultiplierScaled));
     Console.serialInfo(msg);
 }
 
@@ -370,7 +374,7 @@ void setEncoderVelocity(int velocityRpm)
     currentVelocityRpm = velocityRpm;
     
     char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, FMT_MPG_VELOCITY_SET, currentVelocityRpm);
+    sprintf_P(msg, FMT_MPG_CONFIG_CHANGE, "velocity updated");
     Console.serialInfo(msg);
 }
 
@@ -384,64 +388,38 @@ void printEncoderStatus()
     
     if (!encoderControlActive)
     {
-        Console.serialInfo(F("MPG Status: DISABLED"));
+        sprintf_P(msg, FMT_MPG_STATUS_RAIL, 0, "DISABLED", 0.0);
+        Console.serialInfo(msg);
     }
     else
     {
-        sprintf_P(msg, FMT_MPG_STATUS_ENABLED, activeEncoderRail);
-        Console.serialInfo(msg);
-        
-        // Get the most accurate position reading available from the stepper motor controller
+        // Get motor position and state efficiently
         MotorDriver& motor = getMotorByRail(activeEncoderRail);
-        bool motorMoving = isMotorMoving(activeEncoderRail);
-        bool motorInPosition = isMotorInPosition(activeEncoderRail);
-        bool motorReady = isMotorReady(activeEncoderRail);
-        
-        // Get commanded position (only position available from stepper controller)
         double commandedPos = pulsesToMm(motor.PositionRefCommanded(), activeEncoderRail);
         
-        if (motorMoving) {
-            // Motor is actively moving to commanded position
-            sprintf_P(msg, FMT_POSITION_MOVING, commandedPos);
-            Console.serialInfo(msg);
-        } else if (motorInPosition && motorReady) {
-            // Motor has completed movement and HLFB indicates it's settled at position
-            sprintf_P(msg, FMT_POSITION_SETTLED, commandedPos);
-            Console.serialInfo(msg);
-        } else if (!motorReady) {
-            // Motor has issues (alerts, not enabled, etc.)
-            sprintf_P(msg, FMT_POSITION_NOT_READY, commandedPos);
-            Console.serialWarning(msg);
-        } else {
-            // Steps complete but HLFB not asserted - may still be settling
-            sprintf_P(msg, FMT_POSITION_SETTLING, commandedPos);
-            Console.serialWarning(msg);
+        // Determine motor status concisely
+        const char* motorStatus = "SETTLED";
+        if (isMotorMoving(activeEncoderRail)) {
+            motorStatus = "MOVING";
+        } else if (!isMotorReady(activeEncoderRail)) {
+            motorStatus = "NOT READY";
+        } else if (!isMotorInPosition(activeEncoderRail)) {
+            motorStatus = "SETTLING";
         }
+        
+        sprintf_P(msg, FMT_MPG_STATUS_RAIL, activeEncoderRail, motorStatus, commandedPos);
+        Console.serialInfo(msg);
     }
     
-    sprintf_P(msg, FMT_MULTIPLIER_STATUS, getMultiplierName(currentMultiplierScaled));
+    // Consolidated settings display
+    sprintf_P(msg, FMT_MPG_SETTINGS, getMultiplierName(currentMultiplierScaled), currentVelocityRpm);
     Console.serialInfo(msg);
     
-    sprintf_P(msg, FMT_VELOCITY_RPM, currentVelocityRpm);
-    Console.serialInfo(msg);
-    
-    // Encoder hardware status
+    // Essential encoder hardware status
     sprintf_P(msg, FMT_ENCODER_POSITION, EncoderIn.Position());
     Console.serialInfo(msg);
     
-    sprintf_P(msg, FMT_ENCODER_VELOCITY, EncoderIn.Velocity());
-    Console.serialInfo(msg);
-    
-    // MPG tracking information (if encoder control is active)
-    if (encoderControlActive) {
-        int32_t encoderDelta = EncoderIn.Position() - mpgBaseEncoderCount;
-        double expectedPositionMm = scaledToMm(mpgBasePositionScaled + (encoderDelta * currentMultiplierScaled));
-        sprintf_P(msg, FMT_MPG_BASE_POSITION, scaledToMm(mpgBasePositionScaled), mpgBaseEncoderCount);
-        Console.serialInfo(msg);
-        sprintf_P(msg, FMT_MPG_EXPECTED_POSITION, expectedPositionMm, encoderDelta);
-        Console.serialInfo(msg);
-    }
-    
+    // Error status if applicable
     if (hasQuadratureError())
     {
         Console.serialWarning(F("Quadrature error detected!"));

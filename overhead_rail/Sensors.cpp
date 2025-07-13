@@ -6,7 +6,12 @@
 //=============================================================================
 // PROGMEM STRING CONSTANTS
 //=============================================================================
-// Format strings for sprintf_P()
+// Streamlined format strings for operator clarity
+const char FMT_SENSOR_INIT_SUMMARY[] PROGMEM = "Sensor system: %d sensors initialized (%s)";
+const char FMT_SENSOR_STATUS_SUMMARY[] PROGMEM = "Sensors - Carriages: WC1=%s WC2=%s WC3=%s R1=%s R2=%s | Labware: WC1=%s WC2=%s WC3=%s Handoff=%s | Cylinder: %s | Pressure: %.1f PSI%s";
+const char FMT_SENSOR_STATUS_LIMITED[] PROGMEM = "Sensors - Carriages: WC1=%s WC2=%s WC3=%s | Labware: WC1=%s WC2=%s WC3=%s | Pressure: %.1f PSI%s [Limited: No CCIO]";
+
+// Legacy format strings (preserved for detailed status functions)
 const char FMT_SENSOR_INIT_CCIO[] PROGMEM = "Initialized sensor '%s' on CCIO pin (CLEARCORE_PIN_CCIOA#)";
 const char FMT_SENSOR_INIT_CLEARCORE[] PROGMEM = "Initialized sensor '%s' on ClearCore pin %d";
 const char FMT_INITIAL_PRESSURE[] PROGMEM = "Initial system pressure: %.2f PSI";
@@ -57,22 +62,22 @@ static unsigned long lastCylinderWarning = 0;
 
 void initSensorSystem(bool hasCCIOBoard)
 {
-    Console.serialInfo(F("Initializing overhead rail sensor system..."));
+    Console.serialInfo(F("Initializing sensor system with pressure monitoring..."));
 
     // Store CCIO status
     hasCCIO = hasCCIOBoard;
 
-    // Initialize carriage position sensors (ClearCore main board)
+    // Initialize carriage position sensors (ClearCore main board) - silently for reduced noise
     initDigitalSensor(carriageSensorWC1, CARRIAGE_SENSOR_WC1_PIN, false, "Carriage_WC1");
     initDigitalSensor(carriageSensorWC2, CARRIAGE_SENSOR_WC2_PIN, false, "Carriage_WC2");
     initDigitalSensor(carriageSensorWC3, CARRIAGE_SENSOR_WC3_PIN, false, "Carriage_WC3");
 
-    // Initialize labware presence sensors (ClearCore main board)
+    // Initialize labware presence sensors (ClearCore main board) - silently
     initDigitalSensor(labwareSensorWC1, LABWARE_SENSOR_WC1_PIN, false, "Labware_WC1");
     initDigitalSensor(labwareSensorWC2, LABWARE_SENSOR_WC2_PIN, false, "Labware_WC2");
     initDigitalSensor(labwareSensorWC3, LABWARE_SENSOR_WC3_PIN, false, "Labware_WC3");
 
-    // Initialize pressure sensor (always available)
+    // Initialize pressure sensor (always available) - silently
     initPressureSensor();
 
     // Initialize CCIO-dependent sensors
@@ -85,13 +90,14 @@ void initSensorSystem(bool hasCCIOBoard)
         cylinderPosition.positionKnown = false;
         cylinderPosition.lastUpdateTime = millis();
         
-        Console.serialInfo(F("Sensor system initialization complete (limited functionality)"));
+        // Consolidated initialization summary
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, FMT_SENSOR_INIT_SUMMARY, 7, "Limited: 6 main sensors + pressure, no CCIO");
+        Console.serialInfo(msg);
         return;
     }
 
-    Console.serialInfo(F("Initializing CCIO sensors..."));
-
-    // Initialize CCIO sensors
+    // Initialize CCIO sensors (silently)
     initDigitalSensor(carriageSensorRail1Handoff, CARRIAGE_SENSOR_RAIL1_HANDOFF_PIN, true, "Carriage_R1_Handoff");
     initDigitalSensor(carriageSensorRail2Handoff, CARRIAGE_SENSOR_RAIL2_HANDOFF_PIN, true, "Carriage_R2_Handoff");
     initDigitalSensor(labwareSensorHandoff, LABWARE_SENSOR_HANDOFF_PIN, true, "Labware_Handoff");
@@ -104,7 +110,10 @@ void initSensorSystem(bool hasCCIOBoard)
     cylinderPosition.positionKnown = false;
     cylinderPosition.lastUpdateTime = millis();
 
-    Console.serialInfo(F("Sensor system initialization complete"));
+    // Consolidated initialization summary
+    char msg[MEDIUM_MSG_SIZE];
+    sprintf_P(msg, FMT_SENSOR_INIT_SUMMARY, 12, "Full system: 11 sensors + pressure");
+    Console.serialInfo(msg);
 }
 
 void initDigitalSensor(DigitalSensor& sensor, int pin, bool isCcioPin, const char* name)
@@ -136,13 +145,8 @@ void initDigitalSensor(DigitalSensor& sensor, int pin, bool isCcioPin, const cha
     updateDigitalSensor(sensor);
     sensor.lastState = sensor.currentState;  // Prevent initial false state change
 
-    char msg[MEDIUM_MSG_SIZE];
-    if (isCcioPin) {
-        sprintf_P(msg, FMT_SENSOR_INIT_CCIO, name);
-    } else {
-        sprintf_P(msg, FMT_SENSOR_INIT_CLEARCORE, name, pin);
-    }
-    Console.serialInfo(msg);
+    // Individual sensor initialization messages removed for cleaner startup
+    // Sensor details are tracked internally and available via status commands
 }
 
 void initPressureSensor()
@@ -155,18 +159,16 @@ void initPressureSensor()
     // Set the resolution of the ADC for better precision
     analogReadResolution(12); // 12-bit resolution for more precise readings
 
-    Console.serialInfo(F("Pressure sensor initialized on pin A10"));
-
-    // Read and report the initial pressure
+    // Read initial pressure
     float initialPressure = getPressurePsi();
-    char msg[ALERT_MSG_SIZE];
-    sprintf_P(msg, FMT_INITIAL_PRESSURE, initialPressure);
-    Console.serialInfo(msg);
-
-    // Check if pressure is sufficient for valve operation
+    
+    // Check if pressure is sufficient for valve operation and warn if needed
     if (!isPressureSufficient()) {
         Console.serialWarning(F("System pressure below minimum threshold (21.75 PSI) - Valve operations may be unreliable"));
     }
+
+    // Individual pressure sensor initialization messages removed for cleaner startup
+    // Pressure readings are tracked and available via status commands
 }
 
 //=============================================================================
@@ -375,53 +377,45 @@ bool isCylinderPositionKnown() {
 
 void printAllSensorStatus()
 {
-    Console.serialInfo(F("\n===== SENSOR STATUS REPORT ====="));
-    printCarriagePositions();
-    printLabwareStatus();
-    printCylinderStatus();
-    printPressureStatus();
-    Console.serialInfo(F("================================\n"));
-}
-
-void printCarriagePositions()
-{
-    Console.serialInfo(F("--- Carriage Position Sensors ---"));
     char msg[LARGE_MSG_SIZE];
     
     if (hasCCIO) {
-        sprintf_P(msg, FMT_CARRIAGE_STATUS_FULL,
+        sprintf_P(msg, FMT_SENSOR_STATUS_SUMMARY,
                 carriageSensorWC1.currentState ? "PRESENT" : "absent",
                 carriageSensorWC2.currentState ? "PRESENT" : "absent", 
                 carriageSensorWC3.currentState ? "PRESENT" : "absent",
                 carriageSensorRail1Handoff.currentState ? "PRESENT" : "absent",
-                carriageSensorRail2Handoff.currentState ? "PRESENT" : "absent");
-    } else {
-        sprintf_P(msg, FMT_CARRIAGE_STATUS_LIMITED,
-                carriageSensorWC1.currentState ? "PRESENT" : "absent",
-                carriageSensorWC2.currentState ? "PRESENT" : "absent", 
-                carriageSensorWC3.currentState ? "PRESENT" : "absent");
-    }
-    Console.serialInfo(msg);
-}
-
-void printLabwareStatus()
-{
-    Console.serialInfo(F("--- Labware Presence Sensors ---"));
-    char msg[ALERT_MSG_SIZE];
-    
-    if (hasCCIO) {
-        sprintf_P(msg, FMT_LABWARE_STATUS_FULL,
+                carriageSensorRail2Handoff.currentState ? "PRESENT" : "absent",
                 labwareSensorWC1.currentState ? "DETECTED" : "none",
                 labwareSensorWC2.currentState ? "DETECTED" : "none",
                 labwareSensorWC3.currentState ? "DETECTED" : "none", 
                 labwareSensorHandoff.currentState ? "DETECTED" : "none");
     } else {
-        sprintf_P(msg, FMT_LABWARE_STATUS_LIMITED,
+        sprintf_P(msg, FMT_SENSOR_STATUS_LIMITED,
+                carriageSensorWC1.currentState ? "PRESENT" : "absent",
+                carriageSensorWC2.currentState ? "PRESENT" : "absent", 
+                carriageSensorWC3.currentState ? "PRESENT" : "absent",
                 labwareSensorWC1.currentState ? "DETECTED" : "none",
                 labwareSensorWC2.currentState ? "DETECTED" : "none",
                 labwareSensorWC3.currentState ? "DETECTED" : "none");
     }
     Console.serialInfo(msg);
+    
+    // Show pressure and cylinder status
+    printPressureStatus();
+    printCylinderStatus();
+}
+
+void printCarriagePositions()
+{
+    // Simplified function - use printAllSensorStatus() for complete status
+    printAllSensorStatus();
+}
+
+void printLabwareStatus()
+{
+    // Simplified function - use printAllSensorStatus() for complete status
+    printAllSensorStatus();
 }
 
 void printPressureStatus()
