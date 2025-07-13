@@ -1,4 +1,5 @@
 #include "HandoffController.h"
+#include "LabwareAutomation.h"
 #include "Logging.h"
 #include "Sensors.h"
 #include "ValveController.h"
@@ -172,6 +173,9 @@ HandoffResult updateHandoff() {
                 Console.acknowledge(F("LABWARE_HANDOFF_COMPLETED"));
                 handoffState.currentState = HANDOFF_COMPLETED;
                 handoffState.currentResult = HANDOFF_SUCCESS;
+                
+                // Update cross-rail transfer counter for successful handoff
+                incrementCrossRailCounter();
             }
             break;
             

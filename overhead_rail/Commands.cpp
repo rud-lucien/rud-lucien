@@ -86,9 +86,9 @@ Commander::systemCommand_t API_tree[] = {
 
     // Labware automation command
     systemCommand("labware", "Labware automation and state management:\r\n"
-                            "  labware status      - Display current labware tracking state\r\n"
+                            "  labware status      - Display current labware tracking state and operation history\r\n"
                             "  labware audit       - Automatically validate and fix labware state\r\n"
-                            "  labware reset       - Clear all labware tracking (nuclear option)\r\n"
+                            "  labware reset       - Clear all labware tracking and reset operation history\r\n"
                             "  labware help        - Display detailed labware automation instructions",
                   cmd_labware),
 
@@ -100,7 +100,8 @@ Commander::systemCommand_t API_tree[] = {
                          "  Examples:\r\n"
                          "    goto wc1 with-labware   - Move to WC1 with labware\r\n"
                          "    goto wc2 no-labware     - Move to WC2 without labware\r\n"
-                         "    goto wc3 with-labware   - Move to WC3 with labware",
+                         "    goto wc3 with-labware   - Move to WC3 with labware\r\n"
+                         "  goto help               - Display detailed goto command instructions",
                   cmd_goto),
 
     // State command to display system state
@@ -483,6 +484,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         Console.println(F(""));
         Console.println(F("HOMING OPERATION:"));
         Console.println(F("  rail2 home          - Home carriage (find WC3 position)"));
+        Console.println(F("                        Automatically detects labware on carriage"));
         Console.println(F(""));
         Console.println(F("CARRIAGE MOVEMENT:"));
         Console.println(F("  rail2 move-wc3 no-labware     - Move empty carriage to WC3"));
@@ -504,6 +506,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         Console.println(F("SAFETY NOTES:"));
         Console.println(F("- Always specify labware status for movement commands"));
         Console.println(F("- Home carriage before first use"));
+        Console.println(F("- Homing automatically updates labware state and enables goto commands"));
         Console.println(F("- Check sensors before movement operations"));
         Console.println(F("- Ensure sufficient air pressure for pneumatic operations"));
         Console.println(F("- CRITICAL: Cylinder automatically retracts during ANY movement that"));
@@ -774,6 +777,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         Console.println(F(""));
         Console.println(F("HOMING OPERATION:"));
         Console.println(F("  rail1 home          - Home carriage (find home position)"));
+        Console.println(F("                        Automatically detects labware at handoff sensor"));
         Console.println(F(""));
         Console.println(F("CARRIAGE MOVEMENT:"));
         Console.println(F("  rail1 move-wc1 no-labware     - Move empty carriage to WC1"));
@@ -816,6 +820,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         Console.println(F("SAFETY NOTES:"));
         Console.println(F("- Always specify labware status for movement commands"));
         Console.println(F("- Home carriage before first use"));
+        Console.println(F("- Homing automatically updates labware state and enables goto commands"));
         Console.println(F("- Check sensors before movement operations"));
         Console.println(F("- Staging position is critical for coordinated Rail 1-2 operations"));
         Console.println(F("============================================"));
@@ -1023,6 +1028,7 @@ bool cmd_labware(char *args, CommandCaller *caller)
         Console.println(F("STATE MANAGEMENT:"));
         Console.println(F("  labware status      - Display current labware tracking state"));
         Console.println(F("                        Shows rail states, sensor readings, confidence levels"));
+        Console.println(F("                        Includes operation counters and time since last work"));
         Console.println(F(""));
         Console.println(F("RECOVERY OPERATIONS:"));
         Console.println(F("  labware audit       - Automatically validate and fix labware state"));
@@ -1030,21 +1036,34 @@ bool cmd_labware(char *args, CommandCaller *caller)
         Console.println(F("                        Updates tracking based on ground truth"));
         Console.println(F("  labware reset       - Clear all labware tracking (nuclear option)"));
         Console.println(F("                        Wipes all state, requires manual re-establishment"));
+        Console.println(F("                        Resets operation counters and timestamps"));
         Console.println(F(""));
         Console.println(F("SYSTEM ARCHITECTURE:"));
         Console.println(F("- Rail 1: Checkpoint-based tracking (sensors at WC1, WC2, handoff)"));
         Console.println(F("- Rail 2: Continuous tracking (carriage-mounted sensor)"));
         Console.println(F("- Confidence levels: HIGH (real-time), MEDIUM (recent sensor), LOW (inferred)"));
         Console.println(F(""));
+        Console.println(F("GOTO COMMAND CONTROL:"));
+        Console.println(F("- Rail homing AUTOMATICALLY enables goto commands when possible"));
+        Console.println(F("- Each rail homing updates labware state from sensors"));
+        Console.println(F("- 'labware audit' provides comprehensive validation if needed"));
+        Console.println(F("- Goto commands are DISABLED when system has dual labware conflicts"));
+        Console.println(F("- 'labware status' shows current goto command availability"));
+        Console.println(F(""));
         Console.println(F("USAGE SCENARIOS:"));
-        Console.println(F("- After motor faults: Use 'labware audit' to validate state"));
+        Console.println(F("- System startup: Home both rails to enable goto commands automatically"));
+        Console.println(F("- After motor faults: Home affected rail to update labware state"));
+        Console.println(F("- Complex issues: Use 'labware audit' for comprehensive validation"));
         Console.println(F("- System confusion: Use 'labware reset' to start fresh"));
         Console.println(F("- Regular monitoring: Use 'labware status' to check state"));
+        Console.println(F("- Goto disabled: Check status, resolve conflicts, re-home or run audit"));
         Console.println(F(""));
         Console.println(F("SAFETY FEATURES:"));
+        Console.println(F("- Automatic enablement: Homing both rails enables goto commands"));
         Console.println(F("- Conservative movement (with-labware speeds during audit)"));
         Console.println(F("- Sensor validation (ground truth confirmation)"));
         Console.println(F("- Collision avoidance (audit only moves to WC1/WC2)"));
+        Console.println(F("- Manual override: Manual audit available for complex situations"));
         Console.println(F("============================================"));
         return true;
         
@@ -1073,6 +1092,7 @@ bool cmd_labware(char *args, CommandCaller *caller)
 
 // Goto command lookup table for binary search
 const SubcommandInfo GOTO_ACTIONS[] = {
+    {"help", 2},           // Display goto command help
     {"no-labware", 0},     // Move to location without labware
     {"with-labware", 1}    // Move to location with labware
 };
@@ -1101,7 +1121,8 @@ bool cmd_goto(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0) {
         Console.error(F("Missing parameters. Usage: goto <location> <status>"));
-        Console.error(F("Example: goto wc1 pickup"));
+        Console.error(F("Example: goto wc1 with-labware"));
+        Console.error(F("Help: goto help"));
         return false;
     }
     
@@ -1109,10 +1130,82 @@ bool cmd_goto(char *args, CommandCaller *caller)
     char *location = strtok(trimmed, " ");
     char *action = strtok(NULL, " ");
     
+    // Special case: handle "goto help" as a single command
+    if (location != NULL && strcmp(trimLeadingSpaces(location), "help") == 0) {
+        // Display comprehensive goto help
+        Console.acknowledge(F("DISPLAYING_GOTO_HELP: Automated movement command reference follows:"));
+        Console.println(F("============================================"));
+        Console.println(F("Goto Command - Automated Labware Movement"));
+        Console.println(F("============================================"));
+        Console.println(F("COMMAND SYNTAX:"));
+        Console.println(F("  goto <location> <status>"));
+        Console.println(F(""));
+        Console.println(F("AVAILABLE LOCATIONS:"));
+        Console.println(F("  wc1    - Work Cell 1 (Rail 1)"));
+        Console.println(F("  wc2    - Work Cell 2 (Rail 1)"));
+        Console.println(F("  wc3    - Work Cell 3 (Rail 2)"));
+        Console.println(F(""));
+        Console.println(F("LABWARE STATUS:"));
+        Console.println(F("  with-labware    - Deliver labware to destination"));
+        Console.println(F("  no-labware      - Pickup labware from destination"));
+        Console.println(F(""));
+        Console.println(F("OPERATION EXAMPLES:"));
+        Console.println(F("  goto wc1 with-labware   - Deliver labware to WC1"));
+        Console.println(F("  goto wc1 no-labware     - Pickup labware from WC1"));
+        Console.println(F("  goto wc2 with-labware   - Deliver labware to WC2"));
+        Console.println(F("  goto wc2 no-labware     - Pickup labware from WC2"));
+        Console.println(F("  goto wc3 with-labware   - Deliver labware to WC3"));
+        Console.println(F("  goto wc3 no-labware     - Pickup labware from WC3"));
+        Console.println(F(""));
+        Console.println(F("INTELLIGENT FEATURES:"));
+        Console.println(F("- Automatic cross-rail transfers (WC1/WC2 ↔ WC3)"));
+        Console.println(F("- Comprehensive preflight safety validation"));
+        Console.println(F("- Collision zone management for Rail 2"));
+        Console.println(F("- Labware state consistency checking"));
+        Console.println(F("- Destination occupancy validation"));
+        Console.println(F(""));
+        Console.println(F("AUTOMATION CONTROL:"));
+        Console.println(F("- Goto commands automatically enabled after rail homing"));
+        Console.println(F("- Homing reads sensors and updates labware state automatically"));
+        Console.println(F("- Use 'labware audit' for comprehensive validation if needed"));
+        Console.println(F("- Goto commands disabled if dual labware conflicts exist"));
+        Console.println(F("- Check 'labware status' to see current automation state"));
+        Console.println(F(""));
+        Console.println(F("PREFLIGHT VALIDATION:"));
+        Console.println(F("- Automation system enabled (automatically enabled after homing both rails)"));
+        Console.println(F("- Emergency stop status"));
+        Console.println(F("- Rail homing completion"));
+        Console.println(F("- System readiness (motors, sensors)"));
+        Console.println(F("- Pneumatic pressure sufficiency"));
+        Console.println(F("- Labware state consistency"));
+        Console.println(F("- Destination availability"));
+        Console.println(F(""));
+        Console.println(F("ERROR HANDLING:"));
+        Console.println(F("- Clear error messages with specific solutions"));
+        Console.println(F("- Alternative manual commands suggested"));
+        Console.println(F("- System recovery guidance"));
+        Console.println(F(""));
+        Console.println(F("SAFETY NOTES:"));
+        Console.println(F("- Both Rails 1 & 2 must be homed before use"));
+        Console.println(F("- Sufficient air pressure required for operations"));
+        Console.println(F("- Delivery blocked if destination already has labware"));
+        Console.println(F("- Pickup blocked if destination has no labware"));
+        Console.println(F("- Cross-rail transfers handled automatically"));
+        Console.println(F(""));
+        Console.println(F("RELATED COMMANDS:"));
+        Console.println(F("  labware status  - Check current labware state"));
+        Console.println(F("  labware audit   - Validate and fix labware tracking"));
+        Console.println(F("  rail1 status    - Check Rail 1 system status"));
+        Console.println(F("  rail2 status    - Check Rail 2 system status"));
+        Console.println(F("============================================"));
+        return true;
+    }
+    
     if (location == NULL || action == NULL) {
         Console.error(F("Invalid format. Usage: goto <location> <status>"));
         Console.error(F("Locations: wc1, wc2, wc3"));
         Console.error(F("Status: with-labware, no-labware"));
+        Console.error(F("Help: goto help"));
         return false;
     }
     
@@ -1172,34 +1265,16 @@ bool cmd_goto(char *args, CommandCaller *caller)
     switch (locationCode) {
     
     case 0: // "wc1" - Work Cell 1
-        if (hasLabware) {
-            Console.serialInfo(F("WC1_WITH_LABWARE: Moving to WC1 with labware"));
-            return executeWC1WithLabware();
-        } else {
-            Console.serialInfo(F("WC1_NO_LABWARE: Moving to WC1 without labware"));
-            return executeWC1NoLabware();
-        }
-        break;
+        Console.serialInfo(hasLabware ? F("WC1_WITH_LABWARE: Moving to WC1 with labware") : F("WC1_NO_LABWARE: Moving to WC1 without labware"));
+        return moveRail1CarriageToWC1(hasLabware);
         
     case 1: // "wc2" - Work Cell 2
-        if (hasLabware) {
-            Console.serialInfo(F("WC2_WITH_LABWARE: Moving to WC2 with labware"));
-            return executeWC2WithLabware();
-        } else {
-            Console.serialInfo(F("WC2_NO_LABWARE: Moving to WC2 without labware"));
-            return executeWC2NoLabware();
-        }
-        break;
+        Console.serialInfo(hasLabware ? F("WC2_WITH_LABWARE: Moving to WC2 with labware") : F("WC2_NO_LABWARE: Moving to WC2 without labware"));
+        return moveRail1CarriageToWC2(hasLabware);
         
     case 2: // "wc3" - Work Cell 3
-        if (hasLabware) {
-            Console.serialInfo(F("WC3_WITH_LABWARE: Moving to WC3 with labware"));
-            return executeWC3WithLabware();
-        } else {
-            Console.serialInfo(F("WC3_NO_LABWARE: Moving to WC3 without labware"));
-            return executeWC3NoLabware();
-        }
-        break;
+        Console.serialInfo(hasLabware ? F("WC3_WITH_LABWARE: Moving to WC3 with labware") : F("WC3_NO_LABWARE: Moving to WC3 without labware"));
+        return moveRail2CarriageToWC3(hasLabware);
         
     default: // Unknown location (should not reach here due to earlier validation)
         Console.error(F("Internal error: Invalid location code"));
@@ -1209,113 +1284,3 @@ bool cmd_goto(char *args, CommandCaller *caller)
     return false; // Should never reach here
 }
 
-//=============================================================================
-// GOTO PREFLIGHT CHECKS
-//=============================================================================
-
-bool performGotoPreflightChecks(Location targetLocation, bool hasLabware) {
-    // Perform comprehensive pre-flight validation before automated movement
-    Console.serialInfo(F("PREFLIGHT_CHECKS: Validating system state for automated movement"));
-    
-    // TODO: Implement comprehensive preflight checks
-    // 1. Verify labware system is ready for automation
-    // 2. Check rail homing status
-    // 3. Validate current labware state matches intended action
-    // 4. Check for conflicts (dual labware, collision zones)
-    // 5. Verify target location is reachable and safe
-    // 6. Check pneumatic pressure for labware operations
-    // 7. Validate motion limits and safety zones
-    
-    Console.serialInfo(F("PREFLIGHT_PLACEHOLDER: Comprehensive validation not yet implemented"));
-    Console.serialInfo(F("- System ready check"));
-    Console.serialInfo(F("- Rail homing validation"));
-    Console.serialInfo(F("- Labware state consistency"));
-    Console.serialInfo(F("- Collision avoidance"));
-    Console.serialInfo(F("- Safety zone validation"));
-    
-    return true; // Placeholder - always pass for now
-}
-
-//=============================================================================
-// WC1 LOCATION IMPLEMENTATIONS
-//=============================================================================
-
-bool executeWC1WithLabware() {
-    // Move to WC1 with labware
-    Console.serialInfo(F("WC1_WITH_LABWARE_PLACEHOLDER: Implementation pending"));
-    
-    // TODO: Implement WC1 with-labware movement
-    // 1. Validate Rail 1 has labware
-    // 2. Move Rail 1 to WC1 position at with-labware speeds
-    // 3. Update labware tracking
-    
-    return true;
-}
-
-bool executeWC1NoLabware() {
-    // Move to WC1 without labware
-    Console.serialInfo(F("WC1_NO_LABWARE_PLACEHOLDER: Implementation pending"));
-    
-    // TODO: Implement WC1 no-labware movement
-    // 1. Validate Rail 1 is empty
-    // 2. Move Rail 1 to WC1 position at empty speeds
-    // 3. Update position tracking
-    
-    return true;
-}
-
-//=============================================================================
-// WC2 LOCATION IMPLEMENTATIONS
-//=============================================================================
-
-bool executeWC2WithLabware() {
-    // Move to WC2 with labware
-    Console.serialInfo(F("WC2_WITH_LABWARE_PLACEHOLDER: Implementation pending"));
-    
-    // TODO: Implement WC2 with-labware movement
-    // 1. Validate Rail 1 has labware
-    // 2. Move Rail 1 to WC2 position at with-labware speeds
-    // 3. Update labware tracking
-    
-    return true;
-}
-
-bool executeWC2NoLabware() {
-    // Move to WC2 without labware
-    Console.serialInfo(F("WC2_NO_LABWARE_PLACEHOLDER: Implementation pending"));
-    
-    // TODO: Implement WC2 no-labware movement
-    // 1. Validate Rail 1 is empty
-    // 2. Move Rail 1 to WC2 position at empty speeds
-    // 3. Update position tracking
-    
-    return true;
-}
-
-//=============================================================================
-// WC3 LOCATION IMPLEMENTATIONS
-//=============================================================================
-
-bool executeWC3WithLabware() {
-    // Move to WC3 with labware
-    Console.serialInfo(F("WC3_WITH_LABWARE_PLACEHOLDER: Implementation pending"));
-    
-    // TODO: Implement WC3 with-labware movement
-    // 1. Validate Rail 2 has labware
-    // 2. Move Rail 2 to WC3 position at with-labware speeds
-    // 3. Update labware tracking
-    
-    return true;
-}
-
-bool executeWC3NoLabware() {
-    // Move to WC3 without labware
-    Console.serialInfo(F("WC3_NO_LABWARE_PLACEHOLDER: Implementation pending"));
-    
-    // TODO: Implement WC3 no-labware movement
-    // 1. Validate Rail 2 is empty
-    // 2. Move Rail 2 to WC3 position at empty speeds
-    // 3. Update position tracking
-    
-    return true;
-}

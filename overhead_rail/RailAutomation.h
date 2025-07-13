@@ -7,6 +7,7 @@
 #include "Sensors.h"
 #include "Utils.h"
 #include "PositionConfig.h"
+#include "LabwareAutomation.h"
 
 //=============================================================================
 // RAIL AUTOMATION CONSTANTS
@@ -45,6 +46,13 @@
 //=============================================================================
 
 //-----------------------------------------------------------------------------
+// Cross-Rail Labware Detection Helper Functions
+// Smart detection functions for determining current labware location
+//-----------------------------------------------------------------------------
+bool isLabwareCurrentlyOnRail1();
+bool isLabwareCurrentlyOnRail2();
+
+//-----------------------------------------------------------------------------
 // Reusable Rail Automation Helper Functions
 // Rail-agnostic helper functions for common automation operations
 //-----------------------------------------------------------------------------
@@ -79,5 +87,11 @@ bool moveRail1CarriageToHandoff(bool carriageLoaded);
 //-----------------------------------------------------------------------------
 bool moveRail2CarriageToWC3(bool carriageLoaded);
 bool moveRail2CarriageToHandoff(bool carriageLoaded);
+
+//-----------------------------------------------------------------------------
+// Goto Command Preflight Validation
+// Comprehensive safety and readiness validation for automated movements
+//-----------------------------------------------------------------------------
+bool performGotoPreflightChecks(Location targetLocation, bool hasLabware);
 
 #endif // RAIL_AUTOMATION_H

@@ -1,5 +1,6 @@
 #include "MotorController.h"
 #include "Utils.h"
+#include "LabwareAutomation.h"
 
 //=============================================================================
 // PROGMEM STRING CONSTANTS
@@ -1138,6 +1139,9 @@ void completeHomingSequence(int rail) {
     Console.serialInfo(msg);
     printHumanReadableTime(homingDuration / 1000);
     Console.print("\n");
+    
+    // Automatically update labware state from sensors after successful homing
+    performAutomaticLabwareDetectionOnHoming(rail);
     
     // Homing state reset happens silently - not critical operator information
 }

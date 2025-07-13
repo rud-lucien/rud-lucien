@@ -44,6 +44,9 @@ bool isTimeAfter(unsigned long timeA, unsigned long timeB);
 // Convert seconds to a human-readable format
 void printHumanReadableTime(unsigned long secondsAgo);
 
+// Format seconds to a human-readable string
+void formatHumanReadableTime(unsigned long secondsAgo, char* buffer, size_t bufferSize);
+
 // Format absolute time (milliseconds since startup) to HH:MM:SS format
 void formatAbsoluteTime(unsigned long timeMs, char *buffer);
 

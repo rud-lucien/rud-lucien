@@ -85,19 +85,4 @@ bool cmd_goto(char *args, CommandCaller *caller);
 bool cmd_rail1(char *args, CommandCaller *caller);
 bool cmd_rail2(char *args, CommandCaller *caller);
 
-// Goto command helper functions
-bool performGotoPreflightChecks(Location targetLocation, bool hasLabware);
-
-// WC1 location implementations
-bool executeWC1WithLabware();
-bool executeWC1NoLabware();
-
-// WC2 location implementations
-bool executeWC2WithLabware();
-bool executeWC2NoLabware();
-
-// WC3 location implementations
-bool executeWC3WithLabware();
-bool executeWC3NoLabware();
-
 #endif // COMMANDS_H

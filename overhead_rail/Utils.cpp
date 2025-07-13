@@ -104,6 +104,64 @@ void printHumanReadableTime(unsigned long secondsAgo)
     Serial.print(timeMsg);
 }
 
+// Format time as a human-readable string
+void formatHumanReadableTime(unsigned long secondsAgo, char* buffer, size_t bufferSize)
+{
+    if (secondsAgo < 60)
+    {
+        // Less than a minute
+        snprintf_P(buffer, bufferSize, FMT_SECONDS, secondsAgo, (secondsAgo != 1) ? "s" : "");
+    }
+    else if (secondsAgo < 3600)
+    {
+        // Less than an hour
+        unsigned long minutes = secondsAgo / 60;
+        unsigned long seconds = secondsAgo % 60;
+        if (seconds > 0)
+        {
+            snprintf_P(buffer, bufferSize, FMT_MINUTES_SECONDS,
+                    minutes, (minutes != 1) ? "s" : "",
+                    seconds, (seconds != 1) ? "s" : "");
+        }
+        else
+        {
+            snprintf_P(buffer, bufferSize, FMT_MINUTES, minutes, (minutes != 1) ? "s" : "");
+        }
+    }
+    else if (secondsAgo < 86400)
+    {
+        // Less than a day
+        unsigned long hours = secondsAgo / 3600;
+        unsigned long minutes = (secondsAgo % 3600) / 60;
+        if (minutes > 0)
+        {
+            snprintf_P(buffer, bufferSize, FMT_HOURS_MINUTES,
+                    hours, (hours != 1) ? "s" : "",
+                    minutes, (minutes != 1) ? "s" : "");
+        }
+        else
+        {
+            snprintf_P(buffer, bufferSize, FMT_HOURS, hours, (hours != 1) ? "s" : "");
+        }
+    }
+    else
+    {
+        // More than a day
+        unsigned long days = secondsAgo / 86400;
+        unsigned long hours = (secondsAgo % 86400) / 3600;
+        if (hours > 0)
+        {
+            snprintf_P(buffer, bufferSize, FMT_DAYS_HOURS,
+                    days, (days != 1) ? "s" : "",
+                    hours, (hours != 1) ? "s" : "");
+        }
+        else
+        {
+            snprintf_P(buffer, bufferSize, FMT_DAYS, days, (days != 1) ? "s" : "");
+        }
+    }
+}
+
 // Formats time as hours:minutes:seconds since system startup
 void formatAbsoluteTime(unsigned long timeMs, char *buffer)
 {

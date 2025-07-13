@@ -1,4 +1,6 @@
 #include "RailAutomation.h"
+#include "HandoffController.h"
+#include "LabwareAutomation.h"
 #include "Logging.h"
 
 //=============================================================================
@@ -18,6 +20,24 @@ const char FMT_SMART_HOMING[] PROGMEM = "Rail %d: Smart re-homing (saves %.1fs)"
 // Safety and error format strings
 const char FMT_COLLISION_ERROR[] PROGMEM = "Rail 1 blocked: Rail 2 %s with extended cylinder";
 const char FMT_CYLINDER_SAFETY[] PROGMEM = "Collision zone movement - cylinder %s";
+
+//=============================================================================
+// CROSS-RAIL LABWARE DETECTION HELPER FUNCTIONS
+//=============================================================================
+// These functions help determine where labware is currently located to enable
+// intelligent cross-rail transfers when needed
+
+bool isLabwareCurrentlyOnRail1() {
+    // Check if labware is detected at any Rail 1 position
+    return isLabwarePresentAtWC1() || isLabwarePresentAtWC2() || 
+           (isCarriageAtRail1Handoff() && isLabwarePresentAtHandoff());
+}
+
+bool isLabwareCurrentlyOnRail2() {
+    // Check if labware is detected at any Rail 2 position
+    return isLabwarePresentAtWC3() || 
+           (isCarriageAtRail2Handoff() && isLabwarePresentAtHandoff());
+}
 
 //=============================================================================
 // REUSABLE RAIL AUTOMATION HELPER FUNCTIONS
@@ -123,6 +143,28 @@ bool ensureCylinderRetractedForSafeMovement(bool movementInCollisionZone) {
 // Including all safety checks and movement execution
 
 bool moveRail1CarriageToWC1(bool carriageLoaded) {
+    // SMART CROSS-RAIL LOGIC: Check if labware is on Rail 2 and needs transfer
+    if (carriageLoaded && isLabwareCurrentlyOnRail2()) {
+        Console.serialInfo(F("CROSS_RAIL_TRANSFER_REQUIRED: Labware detected on Rail 2, initiating transfer to WC1"));
+        
+        // Initiate handoff from Rail 2 to Rail 1 with WC1 as final destination
+        HandoffResult handoffResult = startHandoff(HANDOFF_RAIL2_TO_RAIL1, DEST_WC1);
+        
+        if (handoffResult == HANDOFF_SUCCESS) {
+            // Handoff initiated successfully - it will handle the complete transfer
+            Console.acknowledge(F("HANDOFF_INITIATED: Rail 2 → Rail 1 → WC1 transfer started"));
+            return true;
+        } else {
+            // Handoff failed to start
+            Console.error(F("HANDOFF_START_FAILED: Cannot initiate cross-rail transfer"));
+            char errorMsg[MEDIUM_MSG_SIZE];
+            sprintf_P(errorMsg, PSTR("Handoff error: %s"), getHandoffResultName(handoffResult));
+            Console.serialInfo(errorMsg);
+            return false;
+        }
+    }
+    
+    // STANDARD RAIL 1 LOGIC: Labware already on Rail 1 or empty movement
     // Use existing helper functions for validation
     if (!checkRailMovementReadiness(1)) return false;
     
@@ -134,6 +176,14 @@ bool moveRail1CarriageToWC1(bool carriageLoaded) {
     // Execute the movement
     if (moveToPositionFromCurrent(1, targetPos, carriageLoaded)) {
         Console.acknowledge(carriageLoaded ? F("WC1_REACHED_WITH_LABWARE") : F("WC1_REACHED"));
+        
+        // Update operation counters for successful labware operations
+        if (carriageLoaded) {
+            incrementDeliveryCounter(); // Delivering labware to WC1
+        } else {
+            incrementPickupCounter();   // Picking up labware from WC1
+        }
+        
         return true;
     } else {
         Console.error(F("MOVEMENT_FAILED"));
@@ -142,6 +192,28 @@ bool moveRail1CarriageToWC1(bool carriageLoaded) {
 }
 
 bool moveRail1CarriageToWC2(bool carriageLoaded) {
+    // SMART CROSS-RAIL LOGIC: Check if labware is on Rail 2 and needs transfer
+    if (carriageLoaded && isLabwareCurrentlyOnRail2()) {
+        Console.serialInfo(F("CROSS_RAIL_TRANSFER_REQUIRED: Labware detected on Rail 2, initiating transfer to WC2"));
+        
+        // Initiate handoff from Rail 2 to Rail 1 with WC2 as final destination
+        HandoffResult handoffResult = startHandoff(HANDOFF_RAIL2_TO_RAIL1, DEST_WC2);
+        
+        if (handoffResult == HANDOFF_SUCCESS) {
+            // Handoff initiated successfully - it will handle the complete transfer
+            Console.acknowledge(F("HANDOFF_INITIATED: Rail 2 → Rail 1 → WC2 transfer started"));
+            return true;
+        } else {
+            // Handoff failed to start
+            Console.error(F("HANDOFF_START_FAILED: Cannot initiate cross-rail transfer"));
+            char errorMsg[MEDIUM_MSG_SIZE];
+            sprintf_P(errorMsg, PSTR("Handoff error: %s"), getHandoffResultName(handoffResult));
+            Console.serialInfo(errorMsg);
+            return false;
+        }
+    }
+    
+    // STANDARD RAIL 1 LOGIC: Labware already on Rail 1 or empty movement
     // Use existing helper functions for validation
     if (!checkRailMovementReadiness(1)) return false;
     
@@ -153,6 +225,14 @@ bool moveRail1CarriageToWC2(bool carriageLoaded) {
     // Execute the movement
     if (moveToPositionFromCurrent(1, targetPos, carriageLoaded)) {
         Console.acknowledge(carriageLoaded ? F("WC2_REACHED_WITH_LABWARE") : F("WC2_REACHED"));
+        
+        // Update operation counters for successful labware operations
+        if (carriageLoaded) {
+            incrementDeliveryCounter(); // Delivering labware to WC2
+        } else {
+            incrementPickupCounter();   // Picking up labware from WC2
+        }
+        
         return true;
     } else {
         Console.error(F("MOVEMENT_FAILED"));
@@ -205,6 +285,28 @@ bool moveRail1CarriageToHandoff(bool carriageLoaded) {
 // Including all safety checks, cylinder retraction, and movement execution
 
 bool moveRail2CarriageToWC3(bool carriageLoaded) {
+    // SMART CROSS-RAIL LOGIC: Check if labware is on Rail 1 and needs transfer
+    if (carriageLoaded && isLabwareCurrentlyOnRail1()) {
+        Console.serialInfo(F("CROSS_RAIL_TRANSFER_REQUIRED: Labware detected on Rail 1, initiating transfer to WC3"));
+        
+        // Initiate handoff from Rail 1 to Rail 2 with WC3 as final destination
+        HandoffResult handoffResult = startHandoff(HANDOFF_RAIL1_TO_RAIL2, DEST_WC3);
+        
+        if (handoffResult == HANDOFF_SUCCESS) {
+            // Handoff initiated successfully - it will handle the complete transfer
+            Console.acknowledge(F("HANDOFF_INITIATED: Rail 1 → Rail 2 → WC3 transfer started"));
+            return true;
+        } else {
+            // Handoff failed to start
+            Console.error(F("HANDOFF_START_FAILED: Cannot initiate cross-rail transfer"));
+            char errorMsg[MEDIUM_MSG_SIZE];
+            sprintf_P(errorMsg, PSTR("Handoff error: %s"), getHandoffResultName(handoffResult));
+            Console.serialInfo(errorMsg);
+            return false;
+        }
+    }
+    
+    // STANDARD RAIL 2 LOGIC: Labware already on Rail 2 or empty movement
     // Use existing helper functions for validation
     if (!checkRailMovementReadiness(2)) return false;
     
@@ -219,6 +321,14 @@ bool moveRail2CarriageToWC3(bool carriageLoaded) {
     // Execute the movement
     if (moveToPositionFromCurrent(2, targetPos, carriageLoaded)) {
         Console.acknowledge(carriageLoaded ? F("WC3_REACHED_WITH_LABWARE") : F("WC3_REACHED"));
+        
+        // Update operation counters for successful labware operations
+        if (carriageLoaded) {
+            incrementDeliveryCounter(); // Delivering labware to WC3
+        } else {
+            incrementPickupCounter();   // Picking up labware from WC3
+        }
+        
         return true;
     } else {
         Console.error(F("MOVEMENT_FAILED"));
@@ -537,6 +647,189 @@ bool executeRailMoveRelative(int railNumber, double distanceMm, bool carriageLoa
         return true;
     } else {
         Console.error(F("MOVEMENT_FAILED"));
+        return false;
+    }
+}
+
+//=============================================================================
+// GOTO PREFLIGHT VALIDATION SYSTEM
+//=============================================================================
+// Comprehensive safety and readiness validation before automated goto operations
+// This prevents unsafe movements and provides clear feedback about system issues
+
+bool performGotoPreflightChecks(Location targetLocation, bool hasLabware) {
+    Console.serialInfo(F("PREFLIGHT_CHECKS: Validating system state for automated movement"));
+    
+    bool allChecksPass = true;
+    
+    //-------------------------------------------------------------------------
+    // 1. LABWARE AUTOMATION VALIDATION
+    //-------------------------------------------------------------------------
+    if (!isLabwareSystemReady()) {
+        Console.error(F("PREFLIGHT_FAIL: Labware automation system not ready"));
+        if (hasLabwareConflict()) {
+            Console.serialInfo(F("  Issue: Dual labware conflict detected (both rails have labware)"));
+            Console.serialInfo(F("  Solution: Use manual rail commands to resolve, then 'labware audit'"));
+        } else {
+            Console.serialInfo(F("  Issue: Automation not enabled"));
+            Console.serialInfo(F("  Solution: Use 'labware audit' to validate and enable automation"));
+        }
+        return false;
+    }
+    
+    //-------------------------------------------------------------------------
+    // 2. EMERGENCY STOP VALIDATION
+    //-------------------------------------------------------------------------
+    if (isEStopActive()) {
+        Console.error(F("PREFLIGHT_FAIL: Emergency stop is active"));
+        return false;
+    }
+    
+    //-------------------------------------------------------------------------
+    // 3. RAIL HOMING VALIDATION  
+    //-------------------------------------------------------------------------
+    // Both rails must be homed for safe automated movement
+    if (!isHomingComplete(1)) {
+        Console.error(F("PREFLIGHT_FAIL: Rail 1 not homed (use: rail1 home)"));
+        allChecksPass = false;
+    }
+    
+    if (!isHomingComplete(2)) {
+        Console.error(F("PREFLIGHT_FAIL: Rail 2 not homed (use: rail2 home)"));
+        allChecksPass = false;
+    }
+    
+    //-------------------------------------------------------------------------
+    // 4. RAIL SYSTEM READINESS
+    //-------------------------------------------------------------------------
+    // Check that both rail systems are ready for movement
+    if (!checkRailMovementReadiness(1)) {
+        Console.error(F("PREFLIGHT_FAIL: Rail 1 system not ready"));
+        allChecksPass = false;
+    }
+    
+    if (!checkRailMovementReadiness(2)) {
+        Console.error(F("PREFLIGHT_FAIL: Rail 2 system not ready"));
+        allChecksPass = false;
+    }
+    
+    //-------------------------------------------------------------------------
+    // 5. PNEUMATIC SYSTEM VALIDATION
+    //-------------------------------------------------------------------------
+    // Required for labware operations and collision avoidance
+    if (!isPressureSufficient()) {
+        Console.error(F("PREFLIGHT_FAIL: Insufficient air pressure"));
+        allChecksPass = false;
+    }
+    
+    //-------------------------------------------------------------------------
+    // 6. LABWARE STATE CONSISTENCY VALIDATION
+    //-------------------------------------------------------------------------
+    // Verify that intended action matches actual labware state
+    if (hasLabware) {
+        // For with-labware operations, ensure labware exists somewhere in system
+        bool rail1HasLabware = isLabwareCurrentlyOnRail1();
+        bool rail2HasLabware = isLabwareCurrentlyOnRail2();
+        
+        if (!rail1HasLabware && !rail2HasLabware) {
+            Console.error(F("PREFLIGHT_FAIL: No labware detected in system for 'with-labware' operation"));
+            Console.serialInfo(F("  Solution: Use 'labware audit' to validate state or use 'no-labware' command"));
+            allChecksPass = false;
+        }
+        
+        // Check for dual labware conflict (both rails have labware)
+        if (rail1HasLabware && rail2HasLabware) {
+            Console.error(F("PREFLIGHT_FAIL: Dual labware detected - system cannot determine source"));
+            Console.serialInfo(F("  Solution: Use manual rail commands to resolve, or 'labware reset' + audit"));
+            allChecksPass = false;
+        }
+    }
+    
+    //-------------------------------------------------------------------------
+    // 7. DESTINATION VALIDATION
+    //-------------------------------------------------------------------------
+    // Check if target location is reachable and safe
+    switch (targetLocation) {
+        case LOCATION_WC1:
+            // WC1 is on Rail 1
+            if (hasLabware && isLabwarePresentAtWC1()) {
+                Console.error(F("PREFLIGHT_FAIL: WC1 already has labware (delivery blocked)"));
+                Console.serialInfo(F("  Solution: Use 'goto wc1 no-labware' to pickup, or clear WC1 first"));
+                allChecksPass = false;
+            }
+            if (!hasLabware && !isLabwarePresentAtWC1()) {
+                Console.error(F("PREFLIGHT_FAIL: WC1 has no labware to pickup"));
+                Console.serialInfo(F("  Solution: Use 'goto wc1 with-labware' to deliver, or verify WC1 has labware"));
+                allChecksPass = false;
+            }
+            break;
+            
+        case LOCATION_WC2:
+            // WC2 is on Rail 1
+            if (hasLabware && isLabwarePresentAtWC2()) {
+                Console.error(F("PREFLIGHT_FAIL: WC2 already has labware (delivery blocked)"));
+                Console.serialInfo(F("  Solution: Use 'goto wc2 no-labware' to pickup, or clear WC2 first"));
+                allChecksPass = false;
+            }
+            if (!hasLabware && !isLabwarePresentAtWC2()) {
+                Console.error(F("PREFLIGHT_FAIL: WC2 has no labware to pickup"));
+                Console.serialInfo(F("  Solution: Use 'goto wc2 with-labware' to deliver, or verify WC2 has labware"));
+                allChecksPass = false;
+            }
+            break;
+            
+        case LOCATION_WC3:
+            // WC3 is on Rail 2
+            if (hasLabware && isLabwarePresentAtWC3()) {
+                Console.error(F("PREFLIGHT_FAIL: WC3 already has labware (delivery blocked)"));
+                Console.serialInfo(F("  Solution: Use 'goto wc3 no-labware' to pickup, or clear WC3 first"));
+                allChecksPass = false;
+            }
+            if (!hasLabware && !isLabwarePresentAtWC3()) {
+                Console.error(F("PREFLIGHT_FAIL: WC3 has no labware to pickup"));
+                Console.serialInfo(F("  Solution: Use 'goto wc3 with-labware' to deliver, or verify WC3 has labware"));
+                allChecksPass = false;
+            }
+            break;
+            
+        default:
+            Console.error(F("PREFLIGHT_FAIL: Invalid destination location"));
+            allChecksPass = false;
+            break;
+    }
+    
+    //-------------------------------------------------------------------------
+    // 8. COLLISION ZONE SAFETY VALIDATION
+    //-------------------------------------------------------------------------
+    // Ensure Rail 2 cylinder state is safe for movements
+    if (targetLocation == LOCATION_WC3) {
+        // Moving to WC3 requires Rail 2 collision zone safety
+        double rail2Position = getMotorPositionMm(2);
+        bool inCollisionZone = (rail2Position >= RAIL2_COLLISION_ZONE_START && 
+                               rail2Position <= RAIL2_COLLISION_ZONE_END);
+        
+        if (inCollisionZone && !isCylinderActuallyRetracted()) {
+            Console.error(F("PREFLIGHT_FAIL: Rail 2 cylinder extended in collision zone"));
+            Console.serialInfo(F("  Solution: Use 'rail2 retract' to ensure safe movement"));
+            allChecksPass = false;
+        }
+    }
+    
+    //-------------------------------------------------------------------------
+    // FINAL VALIDATION RESULT
+    //-------------------------------------------------------------------------
+    if (allChecksPass) {
+        Console.acknowledge(F("PREFLIGHT_PASS: All systems ready for automated movement"));
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, PSTR("Target: %s | Mode: %s"), 
+                 getLocationName(targetLocation), 
+                 hasLabware ? "with-labware" : "no-labware");
+        Console.serialInfo(msg);
+        return true;
+    } else {
+        Console.error(F("PREFLIGHT_FAIL: System not ready for automated movement"));
+        Console.serialInfo(F("Address the issues above before using goto commands"));
+        Console.serialInfo(F("Alternative: Use manual rail commands for direct control"));
         return false;
     }
 }

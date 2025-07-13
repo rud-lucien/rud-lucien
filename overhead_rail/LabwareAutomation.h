@@ -48,6 +48,17 @@ struct Rail2LabwareState {
     ConfidenceLevel confidence;   // Always HIGH due to continuous sensor
 };
 
+// Operation Tracking Counters for Statistics
+struct LabwareOperationCounters {
+    unsigned long pickupCount;        // Total successful pickup operations
+    unsigned long deliveryCount;      // Total successful delivery operations
+    unsigned long crossRailCount;     // Total successful cross-rail transfers
+    unsigned long startTime;          // When counters were last reset (millis)
+    unsigned long lastPickupTime;     // Timestamp of last pickup operation (millis)
+    unsigned long lastDeliveryTime;   // Timestamp of last delivery operation (millis)
+    unsigned long lastCrossRailTime;  // Timestamp of last cross-rail transfer (millis)
+};
+
 // Global System State
 struct SystemLabwareState {
     Rail1LabwareState rail1;
@@ -55,6 +66,7 @@ struct SystemLabwareState {
     bool automationEnabled;       // Can execute goto commands?
     bool dualLabwareConflict;     // Both rails have labware?
     unsigned long lastSystemAudit; // When was last full system audit?
+    LabwareOperationCounters counters; // Operation tracking for cycling tests
 };
 
 //=============================================================================
@@ -93,11 +105,29 @@ void updateRail2LabwareFromSensor();
 bool validateLabwareStateAtLocation(Location location);
 
 //-----------------------------------------------------------------------------
+// Automatic Labware Detection Functions (for homing integration)
+//-----------------------------------------------------------------------------
+void performAutomaticLabwareDetectionOnHoming(int railNumber);
+void updateRail1LabwareStateAfterHoming();
+void updateRail2LabwareStateAfterHoming();
+bool attemptToEnableAutomationAfterHoming();
+
+//-----------------------------------------------------------------------------
 // Audit and Recovery Functions
 //-----------------------------------------------------------------------------
 bool performLabwareAudit();
 Location findNearestSafeSensorForRail1();
 bool moveRail1ToNearestSensorAndValidate();
+
+//-----------------------------------------------------------------------------
+// Operation Tracking Functions
+//-----------------------------------------------------------------------------
+void incrementPickupCounter();
+void incrementDeliveryCounter();
+void incrementCrossRailCounter();
+void resetOperationCounters();
+unsigned long getUptimeHours();
+void printOperationCounters();
 
 //-----------------------------------------------------------------------------
 // Status Reporting Functions
