@@ -12,6 +12,7 @@
 #include "Commands.h"
 #include "Logging.h"
 #include "HandoffController.h"
+#include "LabwareAutomation.h"
 
 // Specify which ClearCore serial COM port is connected to the CCIO-8 board
 #define CcioPort ConnectorCOM0
@@ -70,6 +71,10 @@ void setup()
     Console.serialInfo(F("Initializing Ethernet interface..."));
     initEthernetController(false); // false = use static IP, true = use DHCP
 
+    // Initialize labware automation system
+    Console.serialInfo(F("Initializing labware automation system..."));
+    initLabwareSystem();
+
     commander.attachTree(API_tree);
     commander.init();
 
@@ -101,6 +106,9 @@ void loop()
 
     // Update all sensors and check for alerts
     updateAllSensors();
+
+    // Update labware automation system state
+    updateLabwareSystemState();
 
     // Process encoder input for manual control
     processEncoderInput();

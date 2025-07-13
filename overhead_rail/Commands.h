@@ -7,6 +7,7 @@
 #include "MotorController.h"
 #include "ValveController.h"
 #include "Sensors.h"
+#include "LabwareAutomation.h"
 // #include "Logging.h" // TODO: need to figure out what I want to log
 #include "CommandController.h"
 #include "Utils.h"
@@ -74,26 +75,29 @@ bool cmd_print_help(char *args, CommandCaller *caller);
 // Functions for reporting system state
 //-----------------------------------------------------------------------------
 bool cmd_log(char *args, CommandCaller *caller);
-// bool cmd_system_state(char *args, CommandCaller *caller); // New state command
-// bool cmd_network(char *args, CommandCaller *caller);      // Network configuration command
-
-//-----------------------------------------------------------------------------
-// Encoder Control Commands
-// Functions for controlling the MPG handwheel
-//-----------------------------------------------------------------------------
-// bool cmd_encoder(char *args, CommandCaller *caller);
-
-//-----------------------------------------------------------------------------
-// Position Configuration Commands 
-// Functions for managing position configurations
-//-----------------------------------------------------------------------------
-// bool cmd_teach(char *args, CommandCaller *caller);
+bool cmd_labware(char *args, CommandCaller *caller);
+bool cmd_goto(char *args, CommandCaller *caller);
 
 //-----------------------------------------------------------------------------
 // Rail Control Commands
-// Functions for controlling rail pneumatics and carriage movement
+// Functions for controlling individual rail systems
 //-----------------------------------------------------------------------------
 bool cmd_rail1(char *args, CommandCaller *caller);
 bool cmd_rail2(char *args, CommandCaller *caller);
+
+// Goto command helper functions
+bool performGotoPreflightChecks(Location targetLocation, bool hasLabware);
+
+// WC1 location implementations
+bool executeWC1WithLabware();
+bool executeWC1NoLabware();
+
+// WC2 location implementations
+bool executeWC2WithLabware();
+bool executeWC2NoLabware();
+
+// WC3 location implementations
+bool executeWC3WithLabware();
+bool executeWC3NoLabware();
 
 #endif // COMMANDS_H

@@ -2,6 +2,7 @@
 #include "Logging.h"
 #include "RailAutomation.h"
 #include "HandoffController.h"
+#include "LabwareAutomation.h"
 
 // ============================================================
 // Binary search function for subcommand lookup
@@ -82,6 +83,25 @@ Commander::systemCommand_t API_tree[] = {
                          "  log stats         - Show log buffer statistics and overflow info\r\n"
                          "  log help          - Display detailed logging information",
                   cmd_log),
+
+    // Labware automation command
+    systemCommand("labware", "Labware automation and state management:\r\n"
+                            "  labware status      - Display current labware tracking state\r\n"
+                            "  labware audit       - Automatically validate and fix labware state\r\n"
+                            "  labware reset       - Clear all labware tracking (nuclear option)\r\n"
+                            "  labware help        - Display detailed labware automation instructions",
+                  cmd_labware),
+
+    // Automated labware movement command
+    systemCommand("goto", "Automated work cell movement with labware tracking:\r\n"
+                         "  goto <location> <status>  - Move to work cell with labware status\r\n"
+                         "  Locations: wc1, wc2, wc3\r\n"
+                         "  Status: with-labware, no-labware\r\n"
+                         "  Examples:\r\n"
+                         "    goto wc1 with-labware   - Move to WC1 with labware\r\n"
+                         "    goto wc2 no-labware     - Move to WC2 without labware\r\n"
+                         "    goto wc3 with-labware   - Move to WC3 with labware",
+                  cmd_goto),
 
     // State command to display system state
     // systemCommand("system", "System commands:\r\n"
@@ -931,4 +951,371 @@ bool cmd_rail1(char *args, CommandCaller *caller)
     }
     
     return false; // Should never reach here
+}
+
+// ============================================================
+// Labware Automation Command Implementation
+// ============================================================
+
+// Define the labware subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo LABWARE_COMMANDS[] = {
+    {"audit", 0},
+    {"help", 1},
+    {"reset", 2},
+    {"status", 3}
+};
+
+static const size_t LABWARE_COMMAND_COUNT = sizeof(LABWARE_COMMANDS) / sizeof(SubcommandInfo);
+
+bool cmd_labware(char *args, CommandCaller *caller)
+{
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+    
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+    
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        Console.error(F("Missing parameter. Usage: labware <action>"));
+        return false;
+    }
+    
+    // Parse the argument - use spaces as separators
+    char *action = strtok(trimmed, " ");
+    
+    if (action == NULL) {
+        Console.error(F("Invalid format. Usage: labware <action>"));
+        return false;
+    }
+    
+    // Trim leading spaces from action
+    action = trimLeadingSpaces(action);
+    
+    // Convert action to lowercase for case-insensitive comparison
+    for (int i = 0; action[i]; i++) {
+        action[i] = tolower(action[i]);
+    }
+    
+    // Use binary search to find the command code
+    int cmdCode = findSubcommandCode(action, LABWARE_COMMANDS, LABWARE_COMMAND_COUNT);
+    
+    // Use switch-case for cleaner flow control
+    switch (cmdCode) {
+    
+    case 0: // "audit" - Automatically validate and fix labware state
+        Console.acknowledge(F("LABWARE_AUDIT_INITIATED: Analyzing system state and validating labware positions"));
+        
+        if (performLabwareAudit()) {
+            Console.acknowledge(F("AUDIT_COMPLETE: System ready for automation commands"));
+        } else {
+            Console.error(F("AUDIT_FAILED: Unable to validate labware state"));
+        }
+        return true;
+        
+    case 1: // "help" - Display help information
+        Console.acknowledge(F("DISPLAYING_LABWARE_HELP: Automation system guide follows:"));
+        Console.println(F("============================================"));
+        Console.println(F("Labware Automation Commands"));
+        Console.println(F("============================================"));
+        Console.println(F("STATE MANAGEMENT:"));
+        Console.println(F("  labware status      - Display current labware tracking state"));
+        Console.println(F("                        Shows rail states, sensor readings, confidence levels"));
+        Console.println(F(""));
+        Console.println(F("RECOVERY OPERATIONS:"));
+        Console.println(F("  labware audit       - Automatically validate and fix labware state"));
+        Console.println(F("                        Moves to nearest sensor, reads actual state"));
+        Console.println(F("                        Updates tracking based on ground truth"));
+        Console.println(F("  labware reset       - Clear all labware tracking (nuclear option)"));
+        Console.println(F("                        Wipes all state, requires manual re-establishment"));
+        Console.println(F(""));
+        Console.println(F("SYSTEM ARCHITECTURE:"));
+        Console.println(F("- Rail 1: Checkpoint-based tracking (sensors at WC1, WC2, handoff)"));
+        Console.println(F("- Rail 2: Continuous tracking (carriage-mounted sensor)"));
+        Console.println(F("- Confidence levels: HIGH (real-time), MEDIUM (recent sensor), LOW (inferred)"));
+        Console.println(F(""));
+        Console.println(F("USAGE SCENARIOS:"));
+        Console.println(F("- After motor faults: Use 'labware audit' to validate state"));
+        Console.println(F("- System confusion: Use 'labware reset' to start fresh"));
+        Console.println(F("- Regular monitoring: Use 'labware status' to check state"));
+        Console.println(F(""));
+        Console.println(F("SAFETY FEATURES:"));
+        Console.println(F("- Conservative movement (with-labware speeds during audit)"));
+        Console.println(F("- Sensor validation (ground truth confirmation)"));
+        Console.println(F("- Collision avoidance (audit only moves to WC1/WC2)"));
+        Console.println(F("============================================"));
+        return true;
+        
+    case 2: // "reset" - Clear all labware tracking (nuclear option)
+        Console.acknowledge(F("NUCLEAR_RESET_INITIATED: Clearing all labware tracking state"));
+        clearLabwareState();
+        Console.acknowledge(F("RESET_COMPLETE: Use 'labware audit' to establish current state"));
+        return true;
+        
+    case 3: // "status" - Display current labware tracking state
+        Console.acknowledge(F("DISPLAYING_LABWARE_STATUS: Current tracking state follows:"));
+        printLabwareSystemStatus();
+        return true;
+        
+    default: // Unknown command
+        Console.error(F("Unknown labware command. Available: status, audit, reset, help"));
+        return false;
+    }
+    
+    return false; // Should never reach here
+}
+
+//=============================================================================
+// AUTOMATED LABWARE MOVEMENT COMMAND IMPLEMENTATION
+//=============================================================================
+
+// Goto command lookup table for binary search
+const SubcommandInfo GOTO_ACTIONS[] = {
+    {"no-labware", 0},     // Move to location without labware
+    {"with-labware", 1}    // Move to location with labware
+};
+
+const size_t GOTO_ACTION_COUNT = sizeof(GOTO_ACTIONS) / sizeof(GOTO_ACTIONS[0]);
+
+// Location lookup table for goto command
+const SubcommandInfo GOTO_LOCATIONS[] = {
+    {"wc1", 0},        // Work Cell 1
+    {"wc2", 1},        // Work Cell 2
+    {"wc3", 2}         // Work Cell 3
+};
+
+const size_t GOTO_LOCATION_COUNT = sizeof(GOTO_LOCATIONS) / sizeof(GOTO_LOCATIONS[0]);
+
+bool cmd_goto(char *args, CommandCaller *caller)
+{
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+    
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+    
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        Console.error(F("Missing parameters. Usage: goto <location> <status>"));
+        Console.error(F("Example: goto wc1 pickup"));
+        return false;
+    }
+    
+    // Parse location and action arguments
+    char *location = strtok(trimmed, " ");
+    char *action = strtok(NULL, " ");
+    
+    if (location == NULL || action == NULL) {
+        Console.error(F("Invalid format. Usage: goto <location> <status>"));
+        Console.error(F("Locations: wc1, wc2, wc3"));
+        Console.error(F("Status: with-labware, no-labware"));
+        return false;
+    }
+    
+    // Trim and convert to lowercase
+    location = trimLeadingSpaces(location);
+    action = trimLeadingSpaces(action);
+    
+    for (int i = 0; location[i]; i++) {
+        location[i] = tolower(location[i]);
+    }
+    for (int i = 0; action[i]; i++) {
+        action[i] = tolower(action[i]);
+    }
+    
+    // Use binary search to find location and action codes
+    int locationCode = findSubcommandCode(location, GOTO_LOCATIONS, GOTO_LOCATION_COUNT);
+    int actionCode = findSubcommandCode(action, GOTO_ACTIONS, GOTO_ACTION_COUNT);
+    
+    if (locationCode == -1) {
+        Console.error((String(F("Unknown location: ")) + String(location)).c_str());
+        Console.error(F("Available locations: wc1, wc2, wc3"));
+        return false;
+    }
+    
+    if (actionCode == -1) {
+        Console.error((String(F("Unknown action: ")) + String(action)).c_str());
+        Console.error(F("Available actions: with-labware, no-labware"));
+        return false;
+    }
+    
+    // Convert codes to enums for processing
+    Location targetLocation;
+    bool hasLabware;
+    
+    switch (locationCode) {
+        case 0: targetLocation = LOCATION_WC1; break;
+        case 1: targetLocation = LOCATION_WC2; break;
+        case 2: targetLocation = LOCATION_WC3; break;
+        default: targetLocation = LOCATION_UNKNOWN; break;
+    }
+    
+    switch (actionCode) {
+        case 0: hasLabware = false; break;  // no-labware
+        case 1: hasLabware = true; break;   // with-labware
+        default: hasLabware = false; break;
+    }
+    
+    // Pre-flight checks before attempting automated movement
+    if (!performGotoPreflightChecks(targetLocation, hasLabware)) {
+        return false;
+    }
+    
+    Console.acknowledge((String(F("GOTO_INITIATED: Moving to ")) + getLocationName(targetLocation) + 
+                        String(F(" ")) + (hasLabware ? F("with-labware") : F("no-labware"))).c_str());
+    
+    // Execute the automated movement based on location and labware status
+    switch (locationCode) {
+    
+    case 0: // "wc1" - Work Cell 1
+        if (hasLabware) {
+            Console.serialInfo(F("WC1_WITH_LABWARE: Moving to WC1 with labware"));
+            return executeWC1WithLabware();
+        } else {
+            Console.serialInfo(F("WC1_NO_LABWARE: Moving to WC1 without labware"));
+            return executeWC1NoLabware();
+        }
+        break;
+        
+    case 1: // "wc2" - Work Cell 2
+        if (hasLabware) {
+            Console.serialInfo(F("WC2_WITH_LABWARE: Moving to WC2 with labware"));
+            return executeWC2WithLabware();
+        } else {
+            Console.serialInfo(F("WC2_NO_LABWARE: Moving to WC2 without labware"));
+            return executeWC2NoLabware();
+        }
+        break;
+        
+    case 2: // "wc3" - Work Cell 3
+        if (hasLabware) {
+            Console.serialInfo(F("WC3_WITH_LABWARE: Moving to WC3 with labware"));
+            return executeWC3WithLabware();
+        } else {
+            Console.serialInfo(F("WC3_NO_LABWARE: Moving to WC3 without labware"));
+            return executeWC3NoLabware();
+        }
+        break;
+        
+    default: // Unknown location (should not reach here due to earlier validation)
+        Console.error(F("Internal error: Invalid location code"));
+        return false;
+    }
+    
+    return false; // Should never reach here
+}
+
+//=============================================================================
+// GOTO PREFLIGHT CHECKS
+//=============================================================================
+
+bool performGotoPreflightChecks(Location targetLocation, bool hasLabware) {
+    // Perform comprehensive pre-flight validation before automated movement
+    Console.serialInfo(F("PREFLIGHT_CHECKS: Validating system state for automated movement"));
+    
+    // TODO: Implement comprehensive preflight checks
+    // 1. Verify labware system is ready for automation
+    // 2. Check rail homing status
+    // 3. Validate current labware state matches intended action
+    // 4. Check for conflicts (dual labware, collision zones)
+    // 5. Verify target location is reachable and safe
+    // 6. Check pneumatic pressure for labware operations
+    // 7. Validate motion limits and safety zones
+    
+    Console.serialInfo(F("PREFLIGHT_PLACEHOLDER: Comprehensive validation not yet implemented"));
+    Console.serialInfo(F("- System ready check"));
+    Console.serialInfo(F("- Rail homing validation"));
+    Console.serialInfo(F("- Labware state consistency"));
+    Console.serialInfo(F("- Collision avoidance"));
+    Console.serialInfo(F("- Safety zone validation"));
+    
+    return true; // Placeholder - always pass for now
+}
+
+//=============================================================================
+// WC1 LOCATION IMPLEMENTATIONS
+//=============================================================================
+
+bool executeWC1WithLabware() {
+    // Move to WC1 with labware
+    Console.serialInfo(F("WC1_WITH_LABWARE_PLACEHOLDER: Implementation pending"));
+    
+    // TODO: Implement WC1 with-labware movement
+    // 1. Validate Rail 1 has labware
+    // 2. Move Rail 1 to WC1 position at with-labware speeds
+    // 3. Update labware tracking
+    
+    return true;
+}
+
+bool executeWC1NoLabware() {
+    // Move to WC1 without labware
+    Console.serialInfo(F("WC1_NO_LABWARE_PLACEHOLDER: Implementation pending"));
+    
+    // TODO: Implement WC1 no-labware movement
+    // 1. Validate Rail 1 is empty
+    // 2. Move Rail 1 to WC1 position at empty speeds
+    // 3. Update position tracking
+    
+    return true;
+}
+
+//=============================================================================
+// WC2 LOCATION IMPLEMENTATIONS
+//=============================================================================
+
+bool executeWC2WithLabware() {
+    // Move to WC2 with labware
+    Console.serialInfo(F("WC2_WITH_LABWARE_PLACEHOLDER: Implementation pending"));
+    
+    // TODO: Implement WC2 with-labware movement
+    // 1. Validate Rail 1 has labware
+    // 2. Move Rail 1 to WC2 position at with-labware speeds
+    // 3. Update labware tracking
+    
+    return true;
+}
+
+bool executeWC2NoLabware() {
+    // Move to WC2 without labware
+    Console.serialInfo(F("WC2_NO_LABWARE_PLACEHOLDER: Implementation pending"));
+    
+    // TODO: Implement WC2 no-labware movement
+    // 1. Validate Rail 1 is empty
+    // 2. Move Rail 1 to WC2 position at empty speeds
+    // 3. Update position tracking
+    
+    return true;
+}
+
+//=============================================================================
+// WC3 LOCATION IMPLEMENTATIONS
+//=============================================================================
+
+bool executeWC3WithLabware() {
+    // Move to WC3 with labware
+    Console.serialInfo(F("WC3_WITH_LABWARE_PLACEHOLDER: Implementation pending"));
+    
+    // TODO: Implement WC3 with-labware movement
+    // 1. Validate Rail 2 has labware
+    // 2. Move Rail 2 to WC3 position at with-labware speeds
+    // 3. Update labware tracking
+    
+    return true;
+}
+
+bool executeWC3NoLabware() {
+    // Move to WC3 without labware
+    Console.serialInfo(F("WC3_NO_LABWARE_PLACEHOLDER: Implementation pending"));
+    
+    // TODO: Implement WC3 no-labware movement
+    // 1. Validate Rail 2 is empty
+    // 2. Move Rail 2 to WC3 position at empty speeds
+    // 3. Update position tracking
+    
+    return true;
 }
