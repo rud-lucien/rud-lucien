@@ -25,6 +25,9 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
+    // Initialize system start time for uptime tracking
+    initializeSystemStartTime();
+
     // Core system initialization
     initMotorManager();
     initPositionConfig();

@@ -62,6 +62,11 @@ public:
     void printStats();
     uint16_t getOverflowCount() const { return overflowCount; }
     
+    // Accessor methods for system state reporting
+    uint8_t getEntryCount() const { return count; }
+    const LogEntry& getLastEntry() const;
+    bool hasEntries() const { return count > 0; }
+    
     // Clear all entries
     void clear();
 };

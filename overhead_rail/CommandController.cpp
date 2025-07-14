@@ -1,5 +1,6 @@
 #include "CommandController.h"
 #include "Utils.h"
+#include "SystemState.h"
 #include <Ethernet.h>
 
 //=============================================================================
@@ -48,6 +49,14 @@ const size_t COMMAND_TABLE_SIZE = sizeof(COMMAND_TABLE) / sizeof(CommandInfo);
 
 // Operation state tracking
 bool operationInProgress = false;
+
+// Command tracking for system state reporting
+char lastExecutedCommand[MAX_COMMAND_LENGTH] = "";
+unsigned long lastCommandTime = 0;
+bool lastCommandSuccess = false;
+CommandType lastCommandType = CMD_READ_ONLY;
+char lastCommandSource[16] = "";
+unsigned long systemStartTime = 0;
 
 // Client tracking for async operations
 Stream *persistentClient = nullptr;
@@ -252,6 +261,13 @@ bool processCommand(const char *rawCommand, Stream *output, const char *sourceTa
 // This is a placeholder function that will be replaced when Commands.h is implemented
 bool executeCommand(const char *command, Stream *output)
 {
+    // Store command info for system state reporting
+    strncpy(lastExecutedCommand, command, MAX_COMMAND_LENGTH - 1);
+    lastExecutedCommand[MAX_COMMAND_LENGTH - 1] = '\0';
+    lastCommandTime = millis();
+    lastCommandType = getCommandType(command);
+    strcpy(lastCommandSource, (output == &Serial) ? "SERIAL" : "NETWORK");
+    
     char firstWord[16] = {0};
     int i = 0;
     while (command[i] && command[i] != ',' && command[i] != ' ' && i < 15)
@@ -277,6 +293,7 @@ bool executeCommand(const char *command, Stream *output)
         output->println(F("  teach - Teach position commands"));
         output->println(F("  stop - Emergency stop"));
         output->println(F("  abort - Abort current operation"));
+        lastCommandSuccess = true;
         return true;
     }
     else if (strcmp(firstWord, "status") == 0)
@@ -284,22 +301,26 @@ bool executeCommand(const char *command, Stream *output)
         output->println(F("System Status: OK"));
         output->print(F("Operation in progress: "));
         output->println(operationInProgress ? "YES" : "NO");
+        lastCommandSuccess = true;
         return true;
     }
     else if (strcmp(firstWord, "network") == 0)
     {
         printEthernetStatus();
+        lastCommandSuccess = true;
         return true;
     }
     else if (strcmp(firstWord, "system") == 0)
     {
-        output->println(F("Overhead Rail Control System"));
-        output->println(F("Firmware Version: 1.0"));
+        // Use the comprehensive SystemState module
+        printSystemState();
+        lastCommandSuccess = true;
         return true;
     }
     else
     {
         output->println(F("[ERROR] Command not implemented yet"));
+        lastCommandSuccess = false;
         return false;
     }
 }
@@ -432,6 +453,53 @@ Stream *getPersistentClient()
 void clearPersistentClient()
 {
     persistentClient = nullptr;
+}
+
+//=============================================================================
+// COMMAND TRACKING FUNCTIONS
+//=============================================================================
+
+void initializeSystemStartTime()
+{
+    systemStartTime = millis();
+}
+
+const char* getLastCommandStatus()
+{
+    static char statusBuffer[80];
+    
+    if (lastExecutedCommand[0] == '\0') {
+        // No commands issued yet
+        unsigned long uptime = millis() - systemStartTime;
+        if (uptime < 60000) { // Less than 1 minute
+            return "System starting up - no commands yet";
+        } else {
+            return "Ready - awaiting first command";
+        }
+    }
+    
+    // Show actual command info
+    unsigned long age = millis() - lastCommandTime;
+    
+    if (age < 5000) { // Less than 5 seconds - show recent
+        snprintf(statusBuffer, sizeof(statusBuffer), 
+                "RECENT: %s (%s) - %s", 
+                lastExecutedCommand,
+                lastCommandSource,
+                lastCommandSuccess ? "OK" : "FAILED");
+    } else if (age < 300000) { // Less than 5 minutes - show with time
+        snprintf(statusBuffer, sizeof(statusBuffer), 
+                "LAST: %s (%lus ago)", 
+                lastExecutedCommand, 
+                age / 1000);
+    } else {
+        // Old command - just show it was executed
+        snprintf(statusBuffer, sizeof(statusBuffer), 
+                "LAST: %s (>5min ago)", 
+                lastExecutedCommand);
+    }
+    
+    return statusBuffer;
 }
 
 //=============================================================================

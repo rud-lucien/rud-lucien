@@ -42,6 +42,14 @@ struct CommandInfo
 // Operation state tracking
 extern bool operationInProgress;
 
+// Command tracking for system state reporting
+extern char lastExecutedCommand[MAX_COMMAND_LENGTH];
+extern unsigned long lastCommandTime;
+extern bool lastCommandSuccess;
+extern CommandType lastCommandType;
+extern char lastCommandSource[16]; // "SERIAL" or "NETWORK"
+extern unsigned long systemStartTime;
+
 // Client tracking for async operations
 extern Stream *persistentClient;
 
@@ -72,6 +80,10 @@ char *trimLeadingSpaces(char *str);
 void sendCommandRejection(const char *command, const char *reason);
 const CommandInfo *findCommand(const char *cmdName);
 bool isCommandExcludedFromHistory(const char *command);
+
+// Command tracking functions
+const char *getLastCommandStatus();
+void initializeSystemStartTime();
 
 // Command execution functions (to be implemented when Commands.h is ready)
 bool executeCommand(const char *command, Stream *output);

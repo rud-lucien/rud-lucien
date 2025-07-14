@@ -253,6 +253,21 @@ void LogHistory::printStats()
     Console.println(statsMsg);
 }
 
+//=============================================================================
+// ACCESSOR METHODS FOR SYSTEM STATE REPORTING
+//=============================================================================
+const LogEntry& LogHistory::getLastEntry() const
+{
+    if (count == 0) {
+        // Return a static empty entry if no entries exist
+        static LogEntry emptyEntry = {"", 0, LogEntry::INFO};
+        return emptyEntry;
+    }
+    
+    uint8_t lastIdx = (head - 1 + LOG_HISTORY_SIZE) % LOG_HISTORY_SIZE;
+    return entries[lastIdx];
+}
+
 // Clear all entries
 void LogHistory::clear()
 {

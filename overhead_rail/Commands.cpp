@@ -106,9 +106,7 @@ Commander::systemCommand_t API_tree[] = {
 
     // State command to display system state
     // systemCommand("system", "System commands:\r\n"
-    //                         "  system,state    - Display current system state (sensors, actuators, positions)\r\n"
-    //                         "  system,safety   - Display comprehensive safety validation status\r\n"
-    //                         "  system,trays    - Display tray tracking and statistics\r\n"
+    //                         "  system,state    - Display current system state (sensors, actuators, positions)\r\n"                     
     //                         "  system,reset    - Reset system state after failure to retry operation\r\n"
     //                         "  system,help     - Display detailed instructions for system commands\r\n"
     //                         "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
