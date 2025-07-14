@@ -104,13 +104,12 @@ Commander::systemCommand_t API_tree[] = {
                          "  goto help               - Display detailed goto command instructions",
                   cmd_goto),
 
-    // State command to display system state
-    // systemCommand("system", "System commands:\r\n"
-    //                         "  system,state    - Display current system state (sensors, actuators, positions)\r\n"                     
-    //                         "  system,reset    - Reset system state after failure to retry operation\r\n"
-    //                         "  system,help     - Display detailed instructions for system commands\r\n"
-    //                         "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
-    //               cmd_system_state),
+    // System state command to display comprehensive system status
+    systemCommand("system", "System commands:\r\n"
+                            "  system,state    - Display comprehensive system status with readiness assessment\r\n"                     
+                            "  system,help     - Display detailed instructions for system commands\r\n"
+                            "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
+                  cmd_system),
 
 
    
@@ -373,6 +372,80 @@ bool cmd_log(char *args, CommandCaller *caller)
     }
     else {
         Console.error(F("Unknown log command. Available: on, off, now, history, errors, last, stats, help"));
+        return false;
+    }
+}
+
+// ============================================================
+// System State Command Implementation
+// ============================================================
+
+// Define the system subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo SYSTEM_COMMANDS[] = {
+    {"help", 1},
+    {"state", 0}
+};
+
+static const size_t SYSTEM_COMMAND_COUNT = sizeof(SYSTEM_COMMANDS) / sizeof(SubcommandInfo);
+
+bool cmd_system(char *args, CommandCaller *caller)
+{
+    // Create a local copy of arguments
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
+    
+    // Skip leading spaces
+    char *trimmed = trimLeadingSpaces(localArgs);
+    
+    // Check for empty argument
+    if (strlen(trimmed) == 0) {
+        Console.error(F("Missing parameter. Usage: system <action>"));
+        return false;
+    }
+    
+    // Parse the argument - use spaces or commas as separators
+    char *action = strtok(trimmed, " ,");
+    
+    // Find the command code
+    int commandCode = findSubcommandCode(action, SYSTEM_COMMANDS, SYSTEM_COMMAND_COUNT);
+    
+    switch (commandCode) {
+    case 0: // state
+        Console.acknowledge(F("DISPLAYING_SYSTEM_STATE: Comprehensive system status follows:"));
+        printSystemState();
+        return true;
+        
+    case 1: // help
+        Console.acknowledge(F("DISPLAYING_SYSTEM_HELP: System command guide follows:"));
+        Console.println(F("============================================"));
+        Console.println(F("System State Commands"));
+        Console.println(F("============================================"));
+        Console.println(F("STATUS COMMAND:"));
+        Console.println(F("  system,state        - Display comprehensive system status"));
+        Console.println(F("                        (motors, sensors, pneumatics, network, safety)"));
+        Console.println(F("                        Includes overall readiness assessment and error summary"));
+        Console.println(F(""));
+        Console.println(F("DISPLAYED INFORMATION:"));
+        Console.println(F("- Motor Status: HLFB, homing status, position for both rails"));
+        Console.println(F("- Sensor Status: All position sensors, labware detection, pressure"));
+        Console.println(F("- Pneumatic Systems: Valve position, cylinder sensors, air pressure"));
+        Console.println(F("- Labware Detection: Tracking status for all work cells"));
+        Console.println(F("- Network Status: Ethernet initialization, link status, clients"));
+        Console.println(F("- Manual Controls: MPG (encoder) status, active rail, multiplier"));
+        Console.println(F("- Safety Systems: Emergency stop, position limits"));
+        Console.println(F("- System Activity: Uptime, last command, overall readiness"));
+        Console.println(F("- Automation Readiness: YES/NO with specific error details"));
+        Console.println(F(""));
+        Console.println(F("RELATED COMMANDS:"));
+        Console.println(F("- Use 'log,history' for historical system operation data"));
+        Console.println(F("- Use 'log,errors' for troubleshooting past issues"));
+        Console.println(F("- Individual subsystem commands: encoder, network, labware"));
+        Console.println(F("============================================"));
+        return true;
+        
+    default:
+        Console.error(F("Unknown system command. Available: state, help"));
         return false;
     }
 }

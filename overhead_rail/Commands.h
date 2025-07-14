@@ -16,6 +16,7 @@
 #include "LogHistory.h"
 #include "PositionConfig.h" // Include PositionConfig for position management
 #include "RailAutomation.h" // Include RailAutomation for automated rail operations
+#include "SystemState.h"    // Include SystemState for system status reporting
 
 //=============================================================================
 // COMMAND CONSTANTS
@@ -61,6 +62,7 @@ bool cmd_print_help(char *args, CommandCaller *caller);
 // Functions for reporting system state
 //-----------------------------------------------------------------------------
 bool cmd_log(char *args, CommandCaller *caller);
+bool cmd_system(char *args, CommandCaller *caller);
 bool cmd_labware(char *args, CommandCaller *caller);
 bool cmd_goto(char *args, CommandCaller *caller);
 bool cmd_network(char *args, CommandCaller *caller);
