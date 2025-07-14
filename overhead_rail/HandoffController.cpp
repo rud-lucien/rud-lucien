@@ -454,7 +454,7 @@ bool checkHandoffSystemReadiness() {
 bool checkHandoffCollisionSafety(HandoffDirection dir, HandoffDestination dest) {
     // Check for the dangerous scenario where both carriages have labware
     bool rail1HasLabware = isLabwarePresentAtWC1() || isLabwarePresentAtWC2();
-    bool rail2HasLabware = isLabwarePresentAtWC3() || isLabwarePresentAtHandoff();
+    bool rail2HasLabware = isLabwarePresentOnRail2() || isLabwarePresentAtHandoff();
     
     if (rail1HasLabware && rail2HasLabware) {
         Console.error(F("CARRIAGE_COLLISION_RISK"));
@@ -497,7 +497,7 @@ bool checkHandoffCollisionSafety(HandoffDirection dir, HandoffDestination dest) 
         }
     } else if (dir == HANDOFF_RAIL1_TO_RAIL2) {
         // Rail1 → Rail2 always goes to WC3
-        if (isLabwarePresentAtWC3()) {
+        if (isLabwarePresentOnRail2()) {
             Console.error(F("WC3_POSITION_OCCUPIED"));
             return false;
         }
@@ -513,7 +513,7 @@ bool moveSourceRailToHandoffPosition() {
         return moveRail1CarriageToHandoff(hasLabware);
     } else {
         // Moving Rail 2 to handoff - check if labware is present  
-        bool hasLabware = isLabwarePresentAtWC3() || isLabwarePresentAtHandoff();
+        bool hasLabware = isLabwarePresentOnRail2() || isLabwarePresentAtHandoff();
         return moveRail2CarriageToHandoff(hasLabware);
     }
 }
@@ -598,7 +598,7 @@ bool verifyHandoffLabwareTransfer() {
         
     } else {
         // Rail 2 → Rail 1: Check if Rail 2 still has labware (should be gone after transfer)
-        sourceStillHasLabware = isLabwarePresentAtWC3();
+        sourceStillHasLabware = isLabwarePresentOnRail2();
         sourceExpectedEmpty = true;
         
         // Successful transfer: labware detected at handoff AND source is now empty

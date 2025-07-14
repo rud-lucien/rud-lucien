@@ -13,6 +13,10 @@
 // TYPE DEFINITIONS
 //=============================================================================
 
+// Buffer sizes for logging functions
+const size_t SENSOR_INFO_BUFFER_SIZE = 300;   // Buffer for sensor information string
+const size_t VELOCITY_PERCENT_BUFFER_SIZE = 20; // Buffer for velocity percentage string
+
 // Structure to manage periodic logging behavior
 struct LoggingManagement
 {

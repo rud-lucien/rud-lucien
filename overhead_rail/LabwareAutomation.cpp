@@ -295,7 +295,7 @@ bool performLabwareAudit() {
     // Step 4: Validate Rail 2 state (if carriage sensor available)
     Console.serialInfo(F("AUDIT_RAIL2: Validating Rail 2 labware state"));
     // For now, use WC3 sensor as proxy since carriage sensor not implemented
-    bool rail2HasLabware = isLabwarePresentAtWC3();
+    bool rail2HasLabware = isLabwarePresentOnRail2();
     labwareSystem.rail2.hasLabware = rail2HasLabware;
     labwareSystem.rail2.confidence = CONFIDENCE_MEDIUM; // Using WC3 sensor proxy
     labwareSystem.rail2.lastValidated = millis();
@@ -421,7 +421,7 @@ void printSensorReadings() {
     Console.serialInfo(F("SENSOR READINGS:"));
     Console.serialInfo(isLabwarePresentAtWC1() ? F("  WC1: LABWARE_PRESENT") : F("  WC1: NO_LABWARE"));
     Console.serialInfo(isLabwarePresentAtWC2() ? F("  WC2: LABWARE_PRESENT") : F("  WC2: NO_LABWARE"));
-    Console.serialInfo(isLabwarePresentAtWC3() ? F("  WC3: LABWARE_PRESENT") : F("  WC3: NO_LABWARE"));
+    Console.serialInfo(isLabwarePresentOnRail2() ? F("  Rail 2: LABWARE_PRESENT") : F("  Rail 2: NO_LABWARE"));
     Console.serialInfo(isLabwarePresentAtHandoff() ? F("  Handoff: LABWARE_PRESENT") : F("  Handoff: NO_LABWARE"));
     
     // TODO: Add Rail 2 carriage sensor when available
@@ -478,7 +478,7 @@ void updateRail2LabwareStateAfterHoming() {
     
     // Rail 2 has carriage-mounted sensor, read current state
     // For now, use WC3 sensor as proxy (since carriage homes to WC3)
-    bool labwareDetected = isLabwarePresentAtWC3();
+    bool labwareDetected = isLabwarePresentOnRail2();
     
     // Update Rail 2 state with sensor reading
     labwareSystem.rail2.hasLabware = labwareDetected;

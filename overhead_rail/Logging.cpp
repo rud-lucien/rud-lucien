@@ -105,7 +105,7 @@ void printValveSection()
 
 void printSensorSection()
 {
-    char sensorInfo[300];
+    char sensorInfo[SENSOR_INFO_BUFFER_SIZE];
     sprintf_P(sensorInfo, FMT_SENSOR_SECTION,
         isCarriageAtWC1() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isLabwarePresentAtWC1() ? PSTR("PRESENT") : PSTR("ABSENT"), 
@@ -113,7 +113,7 @@ void printSensorSection()
         isLabwarePresentAtWC2() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isCarriageAtRail1Handoff() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isCarriageAtWC3() ? PSTR("PRESENT") : PSTR("ABSENT"),
-        isLabwarePresentAtWC3() ? PSTR("PRESENT") : PSTR("ABSENT"),
+        isLabwarePresentOnRail2() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isCarriageAtRail2Handoff() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isLabwarePresentAtHandoff() ? PSTR("PRESENT") : PSTR("ABSENT")
     );
@@ -124,10 +124,11 @@ void printSensorSection()
 void printSystemSection()
 {
     char systemInfo[ALERT_MSG_SIZE];
-    uint16_t pressurePsi = getPressurePsi();
+    float pressurePsi = getPressurePsi();
+    uint16_t pressureScaled = (uint16_t)(pressurePsi * 100); // Convert to scaled integer for display
     sprintf_P(systemInfo, FMT_SYSTEM_SECTION,
         isEStopActive() ? PSTR("TRIGGERED") : PSTR("RELEASED"),
-        pressurePsi / 100, pressurePsi % 100,
+        pressureScaled / 100, pressureScaled % 100,
         isPressureSufficient() ? PSTR("") : PSTR(" (LOW)"),
         getConnectedClientCount()
     );
@@ -201,7 +202,7 @@ void printPositionSection(int railNumber)
 void printVelocitySection(int railNumber)
 {
     char velocityInfo[MEDIUM_MSG_SIZE];
-    char percentStr[20] = "";
+    char percentStr[VELOCITY_PERCENT_BUFFER_SIZE] = "";
     
     // Get velocity directly from motor connector
     MotorDriver& motor = getMotorByRail(railNumber);

@@ -17,12 +17,11 @@
 #define CARRIAGE_SENSOR_WC3_PIN 5      // IO-5: Carriage at WC3 position
 
 // ClearCore Analog Inputs
-#define LABWARE_SENSOR_WC3_PIN A9      // A9: Labware present at WC3 (analog)
 #define PNEUMATICS_PRESSURE_SENSOR_PIN A10  // A10: Air pressure sensor
 
 // CCIO-8 Board Digital Inputs (via CCIO) - Using proper ClearCore CCIO pin format
 #define CARRIAGE_SENSOR_RAIL2_HANDOFF_PIN CLEARCORE_PIN_CCIOA0    // CCIO IO-0: Rail 2 handoff position
-#define LABWARE_SENSOR_WC3_RAIL2_PIN CLEARCORE_PIN_CCIOA1         // CCIO IO-1: WC3 Rail 2 labware sensor
+#define LABWARE_SENSOR_RAIL2_PIN CLEARCORE_PIN_CCIOA1             // CCIO IO-1: Rail 2 carriage-mounted labware sensor
 #define CARRIAGE_SENSOR_RAIL1_HANDOFF_PIN CLEARCORE_PIN_CCIOA2    // CCIO IO-2: Rail 1 handoff position
 #define LABWARE_SENSOR_HANDOFF_PIN CLEARCORE_PIN_CCIOA3           // CCIO IO-3: Handoff labware sensor
 #define PNEUMATICS_CYLINDER_VALVE_PIN CLEARCORE_PIN_CCIOA4        // CCIO IO-4: Valve write (pneumatics control)
@@ -40,6 +39,10 @@ extern bool hasCCIO;
 const uint16_t MIN_SAFE_PRESSURE_SCALED = 2175;    // 21.75 PSI * 100 (minimum for valve operation)
 const uint16_t MAX_PRESSURE_SCALED = 8700;         // 87.0 PSI * 100 (6 bar maximum range)
 const uint16_t PRESSURE_WARNING_THRESHOLD_SCALED = 2500;  // 25.0 PSI * 100 (warning threshold)
+
+// Pressure monitoring intervals (milliseconds)
+const unsigned long PRESSURE_MONITORING_INTERVAL_MS = 10000;  // 10 seconds for periodic pressure checks
+const unsigned long CYLINDER_WARNING_INTERVAL_MS = 10000;     // 10 seconds for cylinder position warnings
 
 //=============================================================================
 // SENSOR STRUCTURES
@@ -78,15 +81,15 @@ struct CylinderPosition {
 // Carriage position sensors (detect rail at pickup/dropoff locations)
 extern DigitalSensor carriageSensorWC1;
 extern DigitalSensor carriageSensorWC2; 
-extern DigitalSensor carriageSensorWC3;
+extern DigitalSensor carriageSensorWC3;        // Rail 2 carriage at WC3 pickup/dropoff
 extern DigitalSensor carriageSensorRail1Handoff;
 extern DigitalSensor carriageSensorRail2Handoff;
 
 // Labware presence sensors (detect if plates are present)
-extern DigitalSensor labwareSensorWC1;
-extern DigitalSensor labwareSensorWC2;
-extern DigitalSensor labwareSensorWC3;
-extern DigitalSensor labwareSensorHandoff;
+extern DigitalSensor labwareSensorWC1;         // Rail 1 labware at WC1
+extern DigitalSensor labwareSensorWC2;         // Rail 1 labware at WC2
+extern DigitalSensor labwareSensorRail2;       // Rail 2 carriage-mounted labware sensor (CCIO)
+extern DigitalSensor labwareSensorHandoff;     // Handoff area labware sensor
 
 // Cylinder position sensors
 extern DigitalSensor cylinderRetractedSensor;
@@ -133,10 +136,10 @@ bool isCarriageAtRail1Handoff();
 bool isCarriageAtRail2Handoff();
 
 // Labware detection functions
-bool isLabwarePresentAtWC1();
-bool isLabwarePresentAtWC2();
-bool isLabwarePresentAtWC3();
-bool isLabwarePresentAtHandoff();
+bool isLabwarePresentAtWC1();       // Rail 1 labware at WC1
+bool isLabwarePresentAtWC2();       // Rail 1 labware at WC2
+bool isLabwarePresentOnRail2();     // Rail 2 carriage-mounted labware sensor
+bool isLabwarePresentAtHandoff();   // Handoff area labware
 
 // Cylinder position functions
 bool isCylinderRetracted();

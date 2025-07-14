@@ -35,7 +35,7 @@ bool isLabwareCurrentlyOnRail1() {
 
 bool isLabwareCurrentlyOnRail2() {
     // Check if labware is detected at any Rail 2 position
-    return isLabwarePresentAtWC3() || 
+    return isLabwarePresentOnRail2() || 
            (isCarriageAtRail2Handoff() && isLabwarePresentAtHandoff());
 }
 
@@ -81,7 +81,7 @@ bool parseAndValidateLabwareParameter(char* param, bool& carriageLoaded) {
         carriageLoaded = true;
         
         // Verify labware is actually present when specified
-        if (!isLabwarePresentAtHandoff() && !isLabwarePresentAtWC3()) {
+        if (!isLabwarePresentAtHandoff() && !isLabwarePresentOnRail2()) {
             Console.error(F("LABWARE_NOT_DETECTED"));
             return false;
         }
@@ -780,12 +780,12 @@ bool performGotoPreflightChecks(Location targetLocation, bool hasLabware) {
             
         case LOCATION_WC3:
             // WC3 is on Rail 2
-            if (hasLabware && isLabwarePresentAtWC3()) {
+            if (hasLabware && isLabwarePresentOnRail2()) {
                 Console.error(F("PREFLIGHT_FAIL: WC3 already has labware (delivery blocked)"));
                 Console.serialInfo(F("  Solution: Use 'goto wc3 no-labware' to pickup, or clear WC3 first"));
                 allChecksPass = false;
             }
-            if (!hasLabware && !isLabwarePresentAtWC3()) {
+            if (!hasLabware && !isLabwarePresentOnRail2()) {
                 Console.error(F("PREFLIGHT_FAIL: WC3 has no labware to pickup"));
                 Console.serialInfo(F("  Solution: Use 'goto wc3 with-labware' to deliver, or verify WC3 has labware"));
                 allChecksPass = false;

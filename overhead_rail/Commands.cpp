@@ -822,7 +822,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         
         // Labware detection
         Console.serialInfo(F("LABWARE DETECTION:"));
-        Console.serialInfo(isLabwarePresentAtWC3() ? F("  WC3 Labware Present: YES") : F("  WC3 Labware Present: NO"));
+        Console.serialInfo(isLabwarePresentOnRail2() ? F("  Rail 2 Labware Present: YES") : F("  Rail 2 Labware Present: NO"));
         Console.serialInfo(isLabwarePresentAtHandoff() ? F("  Handoff Labware Present: YES") : F("  Handoff Labware Present: NO"));
         
         // Collision zone analysis

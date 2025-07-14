@@ -8,8 +8,8 @@
 //=============================================================================
 // Streamlined format strings for operator clarity
 const char FMT_SENSOR_INIT_SUMMARY[] PROGMEM = "Sensor system: %d sensors initialized (%s)";
-const char FMT_SENSOR_STATUS_SUMMARY[] PROGMEM = "Sensors - Carriages: WC1=%s WC2=%s WC3=%s R1=%s R2=%s | Labware: WC1=%s WC2=%s WC3=%s Handoff=%s | Cylinder: %s | Pressure: %.1f PSI%s";
-const char FMT_SENSOR_STATUS_LIMITED[] PROGMEM = "Sensors - Carriages: WC1=%s WC2=%s WC3=%s | Labware: WC1=%s WC2=%s WC3=%s | Pressure: %.1f PSI%s [Limited: No CCIO]";
+const char FMT_SENSOR_STATUS_SUMMARY[] PROGMEM = "Sensors - Carriages: R1-Input=%s R1-Output=%s WC3=%s Handoff=%s | Labware: WC2-R1=%s Handoff-R1=%s Rail2=%s | Rail1-Home: Rail=%s Carriage=%s | Cylinder: %s | Pressure: %.1f PSI%s";
+const char FMT_SENSOR_STATUS_LIMITED[] PROGMEM = "Sensors - Carriages: R1-Input=%s R1-Output=%s WC3=%s | Labware: WC2-R1=%s | Rail1-Home: Rail=%s Carriage=%s | Pressure: %.1f PSI%s [Limited: No CCIO]";
 
 // Legacy format strings (preserved for detailed status functions)
 const char FMT_SENSOR_INIT_CCIO[] PROGMEM = "Initialized sensor '%s' on CCIO pin (CLEARCORE_PIN_CCIOA#)";
@@ -35,10 +35,10 @@ DigitalSensor carriageSensorRail1Handoff;
 DigitalSensor carriageSensorRail2Handoff;
 
 // Labware presence sensors
-DigitalSensor labwareSensorWC1;
-DigitalSensor labwareSensorWC2;
-DigitalSensor labwareSensorWC3;
-DigitalSensor labwareSensorHandoff;
+DigitalSensor labwareSensorWC1;         // Rail 1 labware at WC1
+DigitalSensor labwareSensorWC2;         // Rail 1 labware at WC2
+DigitalSensor labwareSensorRail2;       // Rail 2 carriage-mounted labware sensor (CCIO)
+DigitalSensor labwareSensorHandoff;     // Handoff area labware sensor
 
 // Cylinder position sensors
 DigitalSensor cylinderRetractedSensor;
@@ -75,7 +75,6 @@ void initSensorSystem(bool hasCCIOBoard)
     // Initialize labware presence sensors (ClearCore main board) - silently
     initDigitalSensor(labwareSensorWC1, LABWARE_SENSOR_WC1_PIN, false, "Labware_WC1");
     initDigitalSensor(labwareSensorWC2, LABWARE_SENSOR_WC2_PIN, false, "Labware_WC2");
-    initDigitalSensor(labwareSensorWC3, LABWARE_SENSOR_WC3_PIN, false, "Labware_WC3");
 
     // Initialize pressure sensor (always available) - silently
     initPressureSensor();
@@ -92,7 +91,7 @@ void initSensorSystem(bool hasCCIOBoard)
         
         // Consolidated initialization summary
         char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_SENSOR_INIT_SUMMARY, 7, "Limited: 6 main sensors + pressure, no CCIO");
+        sprintf_P(msg, FMT_SENSOR_INIT_SUMMARY, 6, "Limited: 5 main sensors + pressure, no CCIO");
         Console.serialInfo(msg);
         return;
     }
@@ -100,6 +99,7 @@ void initSensorSystem(bool hasCCIOBoard)
     // Initialize CCIO sensors (silently)
     initDigitalSensor(carriageSensorRail1Handoff, CARRIAGE_SENSOR_RAIL1_HANDOFF_PIN, true, "Carriage_R1_Handoff");
     initDigitalSensor(carriageSensorRail2Handoff, CARRIAGE_SENSOR_RAIL2_HANDOFF_PIN, true, "Carriage_R2_Handoff");
+    initDigitalSensor(labwareSensorRail2, LABWARE_SENSOR_RAIL2_PIN, true, "Labware_Rail2");
     initDigitalSensor(labwareSensorHandoff, LABWARE_SENSOR_HANDOFF_PIN, true, "Labware_Handoff");
     initDigitalSensor(cylinderRetractedSensor, CYLINDER_RETRACTED_SENSOR_PIN, true, "Cylinder_Retracted");
     initDigitalSensor(cylinderExtendedSensor, CYLINDER_EXTENDED_SENSOR_PIN, true, "Cylinder_Extended");
@@ -184,12 +184,12 @@ void updateAllSensors()
     
     updateDigitalSensor(labwareSensorWC1);
     updateDigitalSensor(labwareSensorWC2);
-    updateDigitalSensor(labwareSensorWC3);
 
     // Update CCIO sensors only if CCIO board is present
     if (hasCCIO) {
         updateDigitalSensor(carriageSensorRail1Handoff);
         updateDigitalSensor(carriageSensorRail2Handoff);
+        updateDigitalSensor(labwareSensorRail2);
         updateDigitalSensor(labwareSensorHandoff);
         updateDigitalSensor(cylinderRetractedSensor);
         updateDigitalSensor(cylinderExtendedSensor);
@@ -197,11 +197,9 @@ void updateAllSensors()
         // Update cylinder position logic
         updateCylinderPosition();
     }
-    
-    // Log any sensor changes
+
+    // Check for any sensor-related alerts
     logSensorChanges();
-    
-    // Check for sensor-related alerts
     checkSensorAlerts();
 }
 
@@ -334,7 +332,13 @@ bool isCarriageAtRail2Handoff() {
 
 bool isLabwarePresentAtWC1() { return labwareSensorWC1.currentState; }
 bool isLabwarePresentAtWC2() { return labwareSensorWC2.currentState; }
-bool isLabwarePresentAtWC3() { return labwareSensorWC3.currentState; }
+bool isLabwarePresentOnRail2() { 
+    if (!hasCCIO) {
+        Console.serialError(F("Cannot read Rail 2 labware sensor: CCIO board not detected"));
+        return false;
+    }
+    return labwareSensorRail2.currentState; 
+}
 
 bool isLabwarePresentAtHandoff() { 
     if (!hasCCIO) {
@@ -384,26 +388,27 @@ void printAllSensorStatus()
                 carriageSensorWC1.currentState ? "PRESENT" : "absent",
                 carriageSensorWC2.currentState ? "PRESENT" : "absent", 
                 carriageSensorWC3.currentState ? "PRESENT" : "absent",
-                carriageSensorRail1Handoff.currentState ? "PRESENT" : "absent",
                 carriageSensorRail2Handoff.currentState ? "PRESENT" : "absent",
-                labwareSensorWC1.currentState ? "DETECTED" : "none",
                 labwareSensorWC2.currentState ? "DETECTED" : "none",
-                labwareSensorWC3.currentState ? "DETECTED" : "none", 
-                labwareSensorHandoff.currentState ? "DETECTED" : "none");
+                labwareSensorHandoff.currentState ? "DETECTED" : "none",
+                labwareSensorRail2.currentState ? "DETECTED" : "none",
+                carriageSensorRail1Handoff.currentState ? "PRESENT" : "absent",
+                carriageSensorWC1.currentState ? "PRESENT" : "absent",
+                cylinderPosition.positionKnown ? (cylinderPosition.retracted ? "RETRACTED" : "EXTENDED") : "UNKNOWN",
+                getPressurePsi(),
+                isPressureWarningLevel() ? " [LOW]" : "");
     } else {
         sprintf_P(msg, FMT_SENSOR_STATUS_LIMITED,
                 carriageSensorWC1.currentState ? "PRESENT" : "absent",
                 carriageSensorWC2.currentState ? "PRESENT" : "absent", 
                 carriageSensorWC3.currentState ? "PRESENT" : "absent",
-                labwareSensorWC1.currentState ? "DETECTED" : "none",
                 labwareSensorWC2.currentState ? "DETECTED" : "none",
-                labwareSensorWC3.currentState ? "DETECTED" : "none");
+                carriageSensorRail1Handoff.currentState ? "PRESENT" : "absent",
+                carriageSensorWC1.currentState ? "PRESENT" : "absent",
+                getPressurePsi(),
+                isPressureWarningLevel() ? " [LOW]" : "");
     }
     Console.serialInfo(msg);
-    
-    // Show pressure and cylinder status
-    printPressureStatus();
-    printCylinderStatus();
 }
 
 void printCarriagePositions()
@@ -460,7 +465,7 @@ void checkSensorAlerts()
 {
     // Check for cylinder position issues (only if CCIO is available)
     if (hasCCIO && !cylinderPosition.positionKnown) {
-        if (waitTimeReached(millis(), lastCylinderWarning, 10000)) {  // Warn every 10 seconds
+        if (waitTimeReached(millis(), lastCylinderWarning, CYLINDER_WARNING_INTERVAL_MS)) {
             Console.serialWarning(F("Cylinder position ambiguous - check sensors"));
             lastCylinderWarning = millis();
         }
@@ -469,28 +474,26 @@ void checkSensorAlerts()
 
 void logSensorChanges()
 {
-    // Log carriage position changes (ClearCore sensors)
+    // Log Rail 1 carriage position changes
     if (sensorActivated(carriageSensorWC1)) {
         opLogHistory.addEntry("Carriage arrived at WC1", LogEntry::INFO);
     }
     if (sensorActivated(carriageSensorWC2)) {
         opLogHistory.addEntry("Carriage arrived at WC2", LogEntry::INFO);
     }
+    if (sensorActivated(carriageSensorRail1Handoff)) {
+        opLogHistory.addEntry("Carriage arrived at Rail 1 handoff", LogEntry::INFO);
+    }
+    
+    // Log Rail 2 carriage position changes
     if (sensorActivated(carriageSensorWC3)) {
         opLogHistory.addEntry("Carriage arrived at WC3", LogEntry::INFO);
     }
-    
-    // Log CCIO carriage position changes (only if CCIO is available)
-    if (hasCCIO) {
-        if (sensorActivated(carriageSensorRail1Handoff)) {
-            opLogHistory.addEntry("Carriage arrived at Rail 1 handoff", LogEntry::INFO);
-        }
-        if (sensorActivated(carriageSensorRail2Handoff)) {
-            opLogHistory.addEntry("Carriage arrived at Rail 2 handoff", LogEntry::INFO);
-        }
+    if (sensorActivated(carriageSensorRail2Handoff)) {
+        opLogHistory.addEntry("Carriage arrived at Rail 2 handoff", LogEntry::INFO);
     }
     
-    // Log labware detection changes (ClearCore sensors)
+    // Log Rail 1 labware detection changes
     if (sensorActivated(labwareSensorWC1)) {
         opLogHistory.addEntry("Labware detected at WC1", LogEntry::INFO);
     }
@@ -503,20 +506,20 @@ void logSensorChanges()
     if (sensorDeactivated(labwareSensorWC2)) {
         opLogHistory.addEntry("Labware removed from WC2", LogEntry::INFO);
     }
-    if (sensorActivated(labwareSensorWC3)) {
-        opLogHistory.addEntry("Labware detected at WC3", LogEntry::INFO);
+    if (sensorActivated(labwareSensorHandoff)) {
+        opLogHistory.addEntry("Labware detected at handoff", LogEntry::INFO);
     }
-    if (sensorDeactivated(labwareSensorWC3)) {
-        opLogHistory.addEntry("Labware removed from WC3", LogEntry::INFO);
+    if (sensorDeactivated(labwareSensorHandoff)) {
+        opLogHistory.addEntry("Labware removed from handoff", LogEntry::INFO);
     }
     
-    // Log CCIO labware and cylinder changes (only if CCIO is available)
+    // Log Rail 2 labware detection changes (CCIO sensor)
     if (hasCCIO) {
-        if (sensorActivated(labwareSensorHandoff)) {
-            opLogHistory.addEntry("Labware detected at handoff", LogEntry::INFO);
+        if (sensorActivated(labwareSensorRail2)) {
+            opLogHistory.addEntry("Labware detected on Rail 2 carriage", LogEntry::INFO);
         }
-        if (sensorDeactivated(labwareSensorHandoff)) {
-            opLogHistory.addEntry("Labware removed from handoff", LogEntry::INFO);
+        if (sensorDeactivated(labwareSensorRail2)) {
+            opLogHistory.addEntry("Labware removed from Rail 2 carriage", LogEntry::INFO);
         }
         
         // Log cylinder position changes

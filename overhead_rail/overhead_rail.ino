@@ -25,109 +25,89 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
-    // Initialize the motor manager (one-time system configuration)
+    // Core system initialization
     initMotorManager();
-
-    // Initialize SD card and load taught positions
     initPositionConfig();
-
-    // Initialize the output manager (must be before any Console calls)
     initOutputManager();
 
-    // Initialize encoder with default direction (modify if needed)
-    Console.serialInfo(F("Initializing MPG handwheel interface..."));
+    // Manual control interface
+    Console.serialInfo(F("Initializing handwheel interface..."));
     initEncoderControl(true, false);
 
-    // Check for CCIO-8 boards before initializing sensors
+    // CCIO board detection
     ccioBoardCount = CcioMgr.CcioCount();
     bool hasCCIOBoard = (ccioBoardCount > 0);
     
     char msg[SMALL_MSG_SIZE];
-    sprintf_P(msg, PSTR("Discovered CCIO boards: %d"), ccioBoardCount);
+    sprintf_P(msg, PSTR("CCIO boards detected: %d"), ccioBoardCount);
     Console.serialInfo(msg);
     
-    if (hasCCIOBoard) {
-        Console.serialInfo(F("CCIO board detected - enabling CCIO-dependent sensors"));
-    } else {
-        Console.serialWarning(F("No CCIO board detected - CCIO sensors will be disabled"));
+    if (!hasCCIOBoard) {
+        Console.serialWarning(F("CCIO board not detected - some sensors will be unavailable"));
     }
 
-    // Initialize the sensor system with CCIO board status
-    Console.serialInfo(F("Initializing sensor system..."));
+    // System hardware initialization
+    Console.serialInfo(F("Initializing sensors..."));
     initSensorSystem(hasCCIOBoard);
 
-    // Initialize the valve system with CCIO board status
-    Console.serialInfo(F("Initializing pneumatic valve system..."));
+    Console.serialInfo(F("Initializing pneumatics..."));
     initValveSystem(hasCCIOBoard);
 
-    // Validate all predefined positions against travel limits
-    Console.serialInfo(F("Performing system configuration validation..."));
+    // Configuration validation
+    Console.serialInfo(F("Validating system configuration..."));
     if (!validateAllPredefinedPositions()) {
-        Console.serialError(F("CRITICAL: Position validation failed - review configuration"));
-        Console.serialError(F("System will continue but some movements may be rejected"));
+        Console.serialError(F("CRITICAL: Position validation failed"));
+        Console.serialError(F("System will continue but movements may be restricted"));
     }
 
-    // Initialize Ethernet interface
-    Console.serialInfo(F("Initializing Ethernet interface..."));
-    initEthernetController(false); // false = use static IP, true = use DHCP
+    // Network and automation
+    Console.serialInfo(F("Initializing network interface..."));
+    initEthernetController(false); // static IP
 
-    // Initialize labware automation system
-    Console.serialInfo(F("Initializing labware automation system..."));
+    Console.serialInfo(F("Initializing automation system..."));
     initLabwareSystem();
 
+    // Command interface
     commander.attachTree(API_tree);
     commander.init();
 
-    Console.serialInfo(F("System ready."));
-    Console.serialInfo(F("Type 'help' for available commands"));
+    Console.serialInfo(F("System ready - Type 'help' for commands"));
 }
 
 void loop()
 {
     unsigned long currentTime = millis();
     
-    // Handle E-stop monitoring (highest priority)
+    // E-stop monitoring (highest priority)
     handleEStop();
 
-    // Handle incoming commands from serial and network
+    // Handle commands
     handleSerialCommands();
     handleEthernetCommands();
 
-    // Check homing progress for both motors
+    // Motor operations
     checkAllHomingProgress();
-
-    // Motor fault clearing is now synchronous (E-stop safe) when needed
-    // No background processing required
-    
-    // Monitor movement progress and completion
-    // This is critical for detecting when async movements finish
-    // and clearing operationInProgress flag
     checkMoveProgress();
 
-    // Update all sensors and check for alerts
+    // System monitoring
     updateAllSensors();
-
-    // Update labware automation system state
     updateLabwareSystemState();
 
-    // Process encoder input for manual control
+    // Manual control
     processEncoderInput();
     
-    // Update handoff controller (non-blocking state machine)
+    // Handoff operations
     if (isHandoffInProgress()) {
         updateHandoff();
     }
     
-    // Process Ethernet connections and communication
+    // Network management
     processEthernetConnections();
-    
-    // Test connection health periodically
     testConnections();
     
-    // Periodic pressure monitoring (every 10 seconds)
-    // Important for pneumatic system health and early warnings
+    // Periodic monitoring
     static unsigned long lastPressureCheck = 0;
-    if (waitTimeReached(currentTime, lastPressureCheck, 10000)) {
+    if (waitTimeReached(currentTime, lastPressureCheck, PRESSURE_MONITORING_INTERVAL_MS)) {
         if (!isPressureSufficient()) {
             Console.serialWarning(F("System pressure below minimum threshold"));
         }
@@ -137,17 +117,7 @@ void loop()
         lastPressureCheck = currentTime;
     }
     
-    // Periodic client timeout management (every 30 seconds)
-    // Clean up inactive connections to free resources
-    static unsigned long lastClientCheck = 0;
-    if (waitTimeReached(currentTime, lastClientCheck, 30000)) {
-        // Check for and disconnect inactive clients
-        // This function would need to be implemented in EthernetController
-        // cleanupInactiveClients();
-        lastClientCheck = currentTime;
-    }
-    
-    // Log system state periodically if logging is enabled
+    // Periodic logging
     if (logging.logInterval > 0 && waitTimeReached(currentTime, logging.previousLogTime, logging.logInterval))
     {
         logging.previousLogTime = currentTime;
