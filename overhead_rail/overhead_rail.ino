@@ -96,8 +96,8 @@ void loop()
     // Check homing progress for both motors
     checkAllHomingProgress();
 
-    // Process fault clearing for both motors
-    processAllFaultClearing();
+    // Motor fault clearing is now synchronous (E-stop safe) when needed
+    // No background processing required
     
     // Monitor movement progress and completion
     // This is critical for detecting when async movements finish

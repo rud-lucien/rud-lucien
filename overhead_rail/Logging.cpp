@@ -216,9 +216,26 @@ void printVelocitySection(int railNumber)
     );
     
     if (currentVelocityRpm > 0) {
-        int percentOfMax = (int)(currentVelocityRpm * 100 / maxVelocityRpm);
-        sprintf_P(percentStr, FMT_VELOCITY_PERCENT, percentOfMax);
-        strcat(velocityInfo, percentStr);
+        // Safeguard against division by zero in percentage calculation
+        if (maxVelocityRpm > 0) {
+            int percentOfMax = (int)(currentVelocityRpm * 100 / maxVelocityRpm);
+            sprintf_P(percentStr, FMT_VELOCITY_PERCENT, percentOfMax);
+        } else {
+            // Motor is moving but max velocity limit is zero - configuration issue
+            strcpy_P(percentStr, PSTR(" (velocity limits not set)"));
+        }
+        
+        // Safe concatenation with bounds checking
+        size_t currentLen = strlen(velocityInfo);
+        size_t percentLen = strlen(percentStr);
+        if (currentLen + percentLen < MEDIUM_MSG_SIZE - 1) {
+            strncat(velocityInfo, percentStr, MEDIUM_MSG_SIZE - currentLen - 1);
+        } else {
+            // Truncation indicator if buffer would overflow
+            if (MEDIUM_MSG_SIZE > currentLen + 4) {
+                strncat(velocityInfo, "...", MEDIUM_MSG_SIZE - currentLen - 1);
+            }
+        }
     }
     
     printColoredVelocitySection(velocityInfo);

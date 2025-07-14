@@ -19,7 +19,6 @@ const char FMT_MOTOR_FAULTED[] PROGMEM = "%s faulted. Cycling enable signal...";
 const char FMT_CLEARING_ALERTS[] PROGMEM = "Clearing %s alerts...";
 const char FMT_ALERTS_PERSIST[] PROGMEM = "%s: Alerts are still present after clearing.";
 const char FMT_ALERTS_CLEARED[] PROGMEM = "%s: Alerts successfully cleared.";
-const char FMT_FAULT_IN_PROGRESS[] PROGMEM = "%s fault clearing already in progress";
 const char FMT_INVALID_POSITION[] PROGMEM = "%s: Invalid position for rail";
 const char FMT_MOTOR_CANNOT_MOVE[] PROGMEM = "%s: Motor alert detected. Cannot move.";
 const char FMT_NOT_READY_HOMING[] PROGMEM = "%s: Motor not ready for homing";
@@ -83,20 +82,16 @@ const char ALERT_MOTOR_FAULTED[] PROGMEM = "    MotorFaulted\n";
 
 // System State
 bool motorInitialized = false;
-int32_t currentVelMax = 0;
-int32_t currentAccelMax = 0;
+
+// Per-Motor Velocity and Acceleration Tracking
+int32_t rail1CurrentVelMax = 0;
+int32_t rail1CurrentAccelMax = 0;
+int32_t rail2CurrentVelMax = 0;
+int32_t rail2CurrentAccelMax = 0;
 
 // Motor-Specific State Tracking
 MotorState rail1MotorState = MOTOR_STATE_NOT_READY;
 MotorState rail2MotorState = MOTOR_STATE_NOT_READY;
-
-// Fault Clearing State Management
-FaultClearingState rail1FaultClearState = FAULT_CLEAR_IDLE;
-FaultClearingState rail2FaultClearState = FAULT_CLEAR_IDLE;
-bool rail1FaultClearInProgress = false;
-bool rail2FaultClearInProgress = false;
-unsigned long rail1FaultClearTimer = 0;
-unsigned long rail2FaultClearTimer = 0;
 
 // Homing State Management
 bool rail1HomingInProgress = false;
@@ -187,11 +182,35 @@ int32_t getHomeMinDistancePulses(int rail) {
     return (rail == 1) ? HOME_MIN_DISTANCE_PULSES_RAIL1 : HOME_MIN_DISTANCE_PULSES_RAIL2;
 }
 
-// Helper function to set motor velocity and update global tracking
+// Helper function to set motor velocity and update per-motor tracking
 void setMotorVelocity(int rail, int32_t velocityPps) {
     MotorDriver& motor = getMotorByRail(rail);
     motor.VelMax(velocityPps);
-    currentVelMax = velocityPps; // Update global tracking
+    
+    // Update per-motor tracking
+    if (rail == 1) {
+        rail1CurrentVelMax = velocityPps;
+    } else {
+        rail2CurrentVelMax = velocityPps;
+    }
+}
+
+// Helper function to get current motor velocity
+int32_t getCurrentMotorVelocity(int rail) {
+    return (rail == 1) ? rail1CurrentVelMax : rail2CurrentVelMax;
+}
+
+// Helper function to set motor acceleration and update per-motor tracking
+void setMotorAcceleration(int rail, int32_t accelPpsPerSec) {
+    MotorDriver& motor = getMotorByRail(rail);
+    motor.AccelMax(accelPpsPerSec);
+    
+    // Update per-motor tracking
+    if (rail == 1) {
+        rail1CurrentAccelMax = accelPpsPerSec;
+    } else {
+        rail2CurrentAccelMax = accelPpsPerSec;
+    }
 }
 
 // Get motor reference by rail number
@@ -289,19 +308,38 @@ void printMotorAlerts(MotorDriver &motor, const char* motorName)
 {
     char msg[LARGE_MSG_SIZE];
     char alertList[ALERT_MSG_SIZE] = "";
+    size_t remainingSpace = ALERT_MSG_SIZE - 1; // Reserve space for null terminator
+    
+    // Helper macro for safe concatenation with bounds checking
+    #define SAFE_STRCAT_P(dest, src) do { \
+        size_t currentLen = strlen(dest); \
+        size_t srcLen = strlen_P(src); \
+        if (currentLen + srcLen < remainingSpace) { \
+            strncat_P(dest, src, remainingSpace - currentLen); \
+        } else { \
+            /* Truncation indicator if buffer would overflow */ \
+            if (remainingSpace > currentLen + 4) { \
+                strncat_P(dest, PSTR("...\n"), remainingSpace - currentLen); \
+            } \
+            goto alert_concatenation_complete; \
+        } \
+    } while(0)
     
     if (motor.AlertReg().bit.MotionCanceledInAlert)
-        strcat_P(alertList, ALERT_MOTION_CANCELED_IN_ALERT);
+        SAFE_STRCAT_P(alertList, ALERT_MOTION_CANCELED_IN_ALERT);
     if (motor.AlertReg().bit.MotionCanceledPositiveLimit)
-        strcat_P(alertList, ALERT_MOTION_CANCELED_POSITIVE_LIMIT);
+        SAFE_STRCAT_P(alertList, ALERT_MOTION_CANCELED_POSITIVE_LIMIT);
     if (motor.AlertReg().bit.MotionCanceledNegativeLimit)
-        strcat_P(alertList, ALERT_MOTION_CANCELED_NEGATIVE_LIMIT);
+        SAFE_STRCAT_P(alertList, ALERT_MOTION_CANCELED_NEGATIVE_LIMIT);
     if (motor.AlertReg().bit.MotionCanceledSensorEStop)
-        strcat_P(alertList, ALERT_MOTION_CANCELED_SENSOR_ESTOP);
+        SAFE_STRCAT_P(alertList, ALERT_MOTION_CANCELED_SENSOR_ESTOP);
     if (motor.AlertReg().bit.MotionCanceledMotorDisabled)
-        strcat_P(alertList, ALERT_MOTION_CANCELED_MOTOR_DISABLED);
+        SAFE_STRCAT_P(alertList, ALERT_MOTION_CANCELED_MOTOR_DISABLED);
     if (motor.AlertReg().bit.MotorFaulted)
-        strcat_P(alertList, ALERT_MOTOR_FAULTED);
+        SAFE_STRCAT_P(alertList, ALERT_MOTOR_FAULTED);
+
+alert_concatenation_complete:
+    #undef SAFE_STRCAT_P
 
     // Remove trailing newline
     int len = strlen(alertList);
@@ -318,23 +356,54 @@ bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocity
     sprintf_P(msg, FMT_INITIALIZING, motorName);
     Console.serialInfo(msg);
 
+    // Pre-initialization alert clearing: Check for existing alerts and attempt to clear them
+    if (motor.StatusReg().bit.AlertsPresent)
+    {
+        sprintf_P(msg, PSTR("%s: Pre-initialization alerts detected, attempting to clear..."), motorName);
+        Console.serialInfo(msg);
+        printMotorAlerts(motor, motorName);
+        
+        // Use E-stop safe alert clearing instead of unsafe blocking delays
+        if (!clearAlertsWithEStopMonitoring(motor, motorName))
+        {
+            sprintf_P(msg, PSTR("%s: Pre-initialization alert clearing failed or E-stop triggered"), motorName);
+            Console.serialError(msg);
+            return false;
+        }
+        else
+        {
+            sprintf_P(msg, PSTR("%s: Pre-initialization alerts successfully cleared"), motorName);
+            Console.serialInfo(msg);
+        }
+    }
+
     // Set the motor's HLFB mode to bipolar PWM
     motor.HlfbMode(MotorDriver::HLFB_MODE_HAS_BIPOLAR_PWM);
     motor.HlfbCarrier(MotorDriver::HLFB_CARRIER_482_HZ);
 
     // Set velocity and acceleration limits (silently - details not critical for operator)
     int32_t velMax = rpmToPps(velocityRpm);
-    motor.VelMax(velMax);
-    currentVelMax = velMax; // Update global tracking
-    
     int32_t accelMax = rpmPerSecToPpsPerSec(accelRpmPerSec);
+    
+    motor.VelMax(velMax);
     motor.AccelMax(accelMax);
+    
+    // Update per-motor tracking (determine rail from motor reference)
+    if (&motor == &RAIL1_MOTOR) {
+        rail1CurrentVelMax = velMax;
+        rail1CurrentAccelMax = accelMax;
+    } else if (&motor == &RAIL2_MOTOR) {
+        rail2CurrentVelMax = velMax;
+        rail2CurrentAccelMax = accelMax;
+    }
 
     // Enable the motor and wait for HLFB to assert (up to 2 seconds)
     motor.EnableRequest(true);
     
     unsigned long startTime = millis();
     bool ready = false;
+    int alertRetryCount = 0;
+    const int MAX_ALERT_RETRIES = 2;
 
     while (!ready && !timeoutElapsed(millis(), startTime, MOTOR_INIT_TIMEOUT_MS))
     {
@@ -345,9 +414,34 @@ bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocity
         else if (motor.StatusReg().bit.AlertsPresent)
         {
             sprintf_P(msg, FMT_ALERT_DETECTED, motorName);
-            Console.serialError(msg);
+            Console.serialWarning(msg);
             printMotorAlerts(motor, motorName);
-            break;
+            
+            // Attempt to clear alerts during initialization if retries remain
+            if (alertRetryCount < MAX_ALERT_RETRIES)
+            {
+                alertRetryCount++;
+                sprintf_P(msg, PSTR("%s: Attempting alert clearing during initialization (attempt %d/%d)"), 
+                         motorName, alertRetryCount, MAX_ALERT_RETRIES);
+                Console.serialInfo(msg);
+                
+                // Use E-stop safe alert clearing instead of unsafe blocking delays
+                if (!clearAlertsWithEStopMonitoring(motor, motorName))
+                {
+                    sprintf_P(msg, PSTR("%s: Alert clearing failed or E-stop triggered during initialization"), motorName);
+                    Console.serialError(msg);
+                    break;
+                }
+                
+                // Reset start time to give full timeout period after each retry
+                startTime = millis();
+            }
+            else
+            {
+                sprintf_P(msg, PSTR("%s: Maximum alert retry attempts exceeded during initialization"), motorName);
+                Console.serialError(msg);
+                break;
+            }
         }
         delay(MOTOR_INIT_POLL_DELAY_MS);
     }
@@ -361,7 +455,7 @@ bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocity
     else
     {
         const char* failureReason = motor.StatusReg().bit.AlertsPresent ? 
-            "Motor alerts detected" : "HLFB timeout - motor not responding";
+            "Motor alerts persist after clearing attempts" : "HLFB timeout - motor not responding";
         sprintf_P(msg, FMT_INIT_FAILED, motorName, failureReason);
         Console.serialError(msg);
         return false;
@@ -756,146 +850,149 @@ void clearMotorFaults(int rail)
 {
     MotorDriver& motor = getMotorByRail(rail);
     const char* motorName = getMotorName(rail);
-    bool* faultClearInProgress = (rail == 1) ? &rail1FaultClearInProgress : &rail2FaultClearInProgress;
-    FaultClearingState* faultClearState = (rail == 1) ? &rail1FaultClearState : &rail2FaultClearState;
-    unsigned long* faultClearTimer = (rail == 1) ? &rail1FaultClearTimer : &rail2FaultClearTimer;
+    char msg[MEDIUM_MSG_SIZE];
 
-    if (!*faultClearInProgress)
+    sprintf_P(msg, FMT_CLEARING_FAULTS, motorName);
+    Console.serialDiagnostic(msg);
+
+    if (motor.StatusReg().bit.AlertsPresent)
     {
-        char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_CLEARING_FAULTS, motorName);
+        sprintf_P(msg, FMT_ALERTS_DETECTED, motorName);
         Console.serialDiagnostic(msg);
+        printMotorAlerts(motor, motorName);
 
-        if (motor.StatusReg().bit.AlertsPresent)
+        // Use E-stop safe fault clearing - the RIGHT way
+        if (clearAlertsWithEStopMonitoring(motor, motorName))
         {
-            sprintf_P(msg, FMT_ALERTS_DETECTED, motorName);
-            Console.serialDiagnostic(msg);
-            printMotorAlerts(motor, motorName);
-
-            *faultClearState = FAULT_CLEAR_DISABLE;
-            *faultClearTimer = millis();
-            *faultClearInProgress = true;
+            sprintf_P(msg, FMT_ALERTS_CLEARED, motorName);
+            Console.serialInfo(msg);
         }
         else
         {
-            sprintf_P(msg, FMT_NO_ALERTS, motorName);
-            Console.serialInfo(msg);
+            sprintf_P(msg, FMT_ALERTS_PERSIST, motorName);
+            Console.serialError(msg);
         }
     }
-}
-
-void processFaultClearing(int rail)
-{
-    MotorDriver& motor = getMotorByRail(rail);
-    const char* motorName = getMotorName(rail);
-    bool* faultClearInProgress = (rail == 1) ? &rail1FaultClearInProgress : &rail2FaultClearInProgress;
-    FaultClearingState* faultClearState = (rail == 1) ? &rail1FaultClearState : &rail2FaultClearState;
-    unsigned long* faultClearTimer = (rail == 1) ? &rail1FaultClearTimer : &rail2FaultClearTimer;
-
-    if (!*faultClearInProgress)
-        return;
-
-    unsigned long currentTime = millis();
-
-    switch (*faultClearState)
+    else
     {
-    case FAULT_CLEAR_DISABLE:
-        if (motor.AlertReg().bit.MotorFaulted)
-        {
-            char msg[MEDIUM_MSG_SIZE];
-            sprintf_P(msg, FMT_MOTOR_FAULTED, motorName);
-            Console.serialDiagnostic(msg);
-            motor.EnableRequest(false);
-        }
-        *faultClearTimer = currentTime;
-        *faultClearState = FAULT_CLEAR_WAITING_DISABLE;
-        break;
-
-    case FAULT_CLEAR_WAITING_DISABLE:
-        if (timeoutElapsed(currentTime, *faultClearTimer, 100))
-            *faultClearState = FAULT_CLEAR_ENABLE;
-        break;
-
-    case FAULT_CLEAR_ENABLE:
-        motor.EnableRequest(true);
-        *faultClearTimer = currentTime;
-        *faultClearState = FAULT_CLEAR_WAITING_ENABLE;
-        break;
-
-    case FAULT_CLEAR_WAITING_ENABLE:
-        if (timeoutElapsed(currentTime, *faultClearTimer, 100))
-            *faultClearState = FAULT_CLEAR_ALERTS;
-        break;
-
-    case FAULT_CLEAR_ALERTS:
-        {
-            char msg[MEDIUM_MSG_SIZE];
-            sprintf_P(msg, FMT_CLEARING_ALERTS, motorName);
-            Console.serialDiagnostic(msg);
-            motor.ClearAlerts();
-
-            if (motor.StatusReg().bit.AlertsPresent)
-            {
-                sprintf_P(msg, FMT_ALERTS_PERSIST, motorName);
-                Console.serialError(msg);
-                printMotorAlerts(motor, motorName);
-            }
-            else
-            {
-                sprintf_P(msg, FMT_ALERTS_CLEARED, motorName);
-                Console.serialInfo(msg);
-            }
-
-            *faultClearState = FAULT_CLEAR_FINISHED;
-        }
-        break;
-
-    case FAULT_CLEAR_FINISHED:
-        *faultClearState = FAULT_CLEAR_IDLE;
-        *faultClearInProgress = false;
-        break;
-
-    default:
-        *faultClearState = FAULT_CLEAR_IDLE;
-        *faultClearInProgress = false;
-        break;
+        sprintf_P(msg, FMT_NO_ALERTS, motorName);
+        Console.serialInfo(msg);
     }
-}
-
-void processAllFaultClearing()
-{
-    processFaultClearing(1);
-    processFaultClearing(2);
-}
-
-bool isFaultClearingInProgress(int rail)
-{
-    return (rail == 1) ? rail1FaultClearInProgress : rail2FaultClearInProgress;
 }
 
 bool clearMotorFaultWithStatus(int rail)
 {
     MotorDriver& motor = getMotorByRail(rail);
     const char* motorName = getMotorName(rail);
-    bool* faultClearInProgress = (rail == 1) ? &rail1FaultClearInProgress : &rail2FaultClearInProgress;
     
-    // If fault clearing is already in progress, return false
-    if (*faultClearInProgress)
+    bool hadAlerts = motor.StatusReg().bit.AlertsPresent;
+    
+    if (hadAlerts)
+    {
+        // Use E-stop safe synchronous fault clearing
+        if (clearAlertsWithEStopMonitoring(motor, motorName))
+        {
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, FMT_ALERTS_CLEARED, motorName);
+            Console.serialInfo(msg);
+            return true; // Successfully cleared
+        }
+        else
+        {
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, FMT_ALERTS_PERSIST, motorName);
+            Console.serialError(msg);
+            return false; // Clearing failed or E-stop triggered
+        }
+    }
+    else
     {
         char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_FAULT_IN_PROGRESS, motorName);
+        sprintf_P(msg, FMT_NO_ALERTS, motorName);
         Console.serialInfo(msg);
+        return true; // No alerts to clear (immediate success)
+    }
+}
+
+bool clearAlertsWithEStopMonitoring(MotorDriver &motor, const char* motorName)
+{
+    const unsigned long ENABLE_DISABLE_DELAY_MS = 100;
+    const unsigned long CLEAR_ALERTS_DELAY_MS = 100;
+    const unsigned long TOTAL_TIMEOUT_MS = 2000; // Maximum time to wait for clearing
+    
+    unsigned long startTime = millis();
+    
+    // Phase 1: Disable motor with E-stop monitoring
+    motor.EnableRequest(false);
+    unsigned long phaseStartTime = millis();
+    
+    while (!timeoutElapsed(millis(), phaseStartTime, ENABLE_DISABLE_DELAY_MS))
+    {
+        // Critical: Continue monitoring E-stop during delay
+        handleEStop();
+        
+        // Check if E-stop was triggered during clearing
+        if (isEStopActive())
+        {
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, PSTR("%s: E-stop triggered during alert clearing - aborting"), motorName);
+            Console.serialError(msg);
+            return false;
+        }
+        
+        delay(10); // Small delay to prevent excessive CPU usage
+    }
+    
+    // Phase 2: Re-enable motor with E-stop monitoring
+    motor.EnableRequest(true);
+    phaseStartTime = millis();
+    
+    while (!timeoutElapsed(millis(), phaseStartTime, ENABLE_DISABLE_DELAY_MS))
+    {
+        // Critical: Continue monitoring E-stop during delay
+        handleEStop();
+        
+        if (isEStopActive())
+        {
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, PSTR("%s: E-stop triggered during alert clearing - aborting"), motorName);
+            Console.serialError(msg);
+            return false;
+        }
+        
+        delay(10);
+    }
+    
+    // Phase 3: Clear alerts with E-stop monitoring
+    motor.ClearAlerts();
+    phaseStartTime = millis();
+    
+    while (!timeoutElapsed(millis(), phaseStartTime, CLEAR_ALERTS_DELAY_MS))
+    {
+        // Critical: Continue monitoring E-stop during delay
+        handleEStop();
+        
+        if (isEStopActive())
+        {
+            char msg[MEDIUM_MSG_SIZE];
+            sprintf_P(msg, PSTR("%s: E-stop triggered during alert clearing - aborting"), motorName);
+            Console.serialError(msg);
+            return false;
+        }
+        
+        delay(10);
+    }
+    
+    // Verify clearing succeeded
+    if (motor.StatusReg().bit.AlertsPresent)
+    {
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, PSTR("%s: Alert clearing failed - alerts persist"), motorName);
+        Console.serialError(msg);
         return false;
     }
-
-    bool hadAlerts = motor.StatusReg().bit.AlertsPresent;
-
-    // Start fault clearing process
-    clearMotorFaults(rail);
-
-    // Return true if there were no alerts to clear (immediate success)
-    // Return false if clearing process has started (delayed result)
-    return !hadAlerts;
+    
+    return true; // Success
 }
 
 //=============================================================================
@@ -1080,7 +1177,8 @@ void completeHomingSequence(int rail) {
     
     // Wait for motion to complete
     unsigned long stopTime = millis();
-    while (!motor.StepsComplete() && !timeoutElapsed(millis(), stopTime, 2000)) {
+    unsigned long homingTimeout = getHomingTimeout(rail);
+    while (!motor.StepsComplete() && !timeoutElapsed(millis(), stopTime, homingTimeout)) {
         delay(10);
     }
     
@@ -1099,7 +1197,8 @@ void completeHomingSequence(int rail) {
         
         // Wait for offset move to complete (silently - detailed progress not critical)
         unsigned long offsetStartTime = millis();
-        while (!motor.StepsComplete() && !timeoutElapsed(millis(), offsetStartTime, 10000)) {
+        unsigned long homingTimeout = getHomingTimeout(rail);
+        while (!motor.StepsComplete() && !timeoutElapsed(millis(), offsetStartTime, homingTimeout)) {
             if (motor.StatusReg().bit.AlertsPresent) {
                 sprintf_P(msg, FMT_ALERT_OFFSET_MOVE, motorName);
                 Console.serialError(msg);
@@ -1323,7 +1422,8 @@ bool initiateSmartHomingSequence(int rail) {
         
         // Wait for fast phase to complete
         unsigned long phaseStartTime = millis();
-        while (!motor.StepsComplete() && !timeoutElapsed(millis(), phaseStartTime, 30000)) {
+        unsigned long homingTimeout = getHomingTimeout(rail);
+        while (!motor.StepsComplete() && !timeoutElapsed(millis(), phaseStartTime, homingTimeout)) {
             if (motor.StatusReg().bit.AlertsPresent) {
                 sprintf_P(msg, FMT_ALERT_DURING_HOMING, motorName);
                 Console.serialError(msg);
@@ -1395,6 +1495,12 @@ int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32
     // No deceleration needed if we're not in deceleration zone
     if (distanceToTargetMm > decelDistanceMm) {
         return maxVelocityPps;
+    }
+
+    // Safeguard against division by zero
+    if (decelDistanceMm <= 0) {
+        // If deceleration distance is invalid, use minimum velocity for safety
+        return rpmToPps(config.minVelocityRPM);
     }
     
     // Calculate deceleration ratio using integer math (0-1000 range for precision)
@@ -1705,13 +1811,13 @@ bool setJogSpeed(int rail, int speedRpm, double jogDistanceMm) {
     return true;
 }
 
-//=============================================================================
-// SMART VELOCITY SELECTION
-//=============================================================================
+double getJogIncrement(int rail) {
+    return getJogIncrementRef(rail);
+}
 
-//=============================================================================
-// SMART VELOCITY SELECTION
-//=============================================================================
+int getJogSpeed(int rail) {
+    return getJogSpeedRef(rail);
+}
 
 //=============================================================================
 // SMART VELOCITY SELECTION
@@ -1848,13 +1954,24 @@ void updateDecelerationVelocity(int rail) {
     double totalMoveDistanceMm = pulsesToMm(abs(targetState.targetPositionPulses - targetState.startPositionPulses), rail);
     
     // Calculate decelerated velocity
-    int32_t maxVelocityPps = currentVelMax; // Use current velocity limit
+    int32_t maxVelocityPps = getCurrentMotorVelocity(rail); // Use rail-specific velocity limit
     int32_t newVelocityPps = calculateDeceleratedVelocity(rail, (int32_t)(distanceToTargetMm * 100), 
                                                          (int32_t)(totalMoveDistanceMm * 100), maxVelocityPps);
     
     // Only update if velocity should change significantly
-    if (abs(newVelocityPps - currentVelMax) > (currentVelMax / 20)) { // 5% threshold
-        setMotorVelocity(rail, newVelocityPps);
+    int32_t currentVelocity = getCurrentMotorVelocity(rail);
+    
+    // Safeguard against division by zero in velocity comparison
+    if (currentVelocity > 0) {
+        int32_t velocityChangeThreshold = currentVelocity / 20; // 5% threshold
+        if (abs(newVelocityPps - currentVelocity) > velocityChangeThreshold) {
+            setMotorVelocity(rail, newVelocityPps);
+        }
+    } else {
+        // If current velocity is 0, always update to non-zero velocity
+        if (newVelocityPps > 0) {
+            setMotorVelocity(rail, newVelocityPps);
+        }
     }
 }
 
@@ -2032,14 +2149,5 @@ bool validateAllPredefinedPositions() {
     return allValid;
 }
 
-//=============================================================================
-// JOGGING GETTER FUNCTIONS
-//=============================================================================
 
-double getJogIncrement(int rail) {
-    return getJogIncrementRef(rail);
-}
 
-int getJogSpeed(int rail) {
-    return getJogSpeedRef(rail);
-}

@@ -98,8 +98,8 @@
 // HOMING CONFIGURATION
 //=============================================================================
 // Rail-Specific Homing Timeouts
-#define RAIL1_HOME_TIMEOUT_MS 120000       // Rail 1 homing timeout (2 minutes for 8.2m rail)
-#define RAIL2_HOME_TIMEOUT_MS 30000        // Rail 2 homing timeout (30 seconds for 1m rail)
+#define RAIL1_HOME_TIMEOUT_MS 300000       // Rail 1 homing timeout (5 minutes for 8.2m rail at slow homing speed)
+#define RAIL2_HOME_TIMEOUT_MS 60000        // Rail 2 homing timeout (1 minute for 1m rail - generous safety margin)
 
 // Legacy timeout for backward compatibility
 #define HOME_TIMEOUT_MS RAIL1_HOME_TIMEOUT_MS
@@ -230,17 +230,6 @@ typedef enum {
     POSITION_CUSTOM = 99
 } PositionTarget;
 
-// Fault Clearing State Machine
-enum FaultClearingState {
-    FAULT_CLEAR_IDLE,
-    FAULT_CLEAR_DISABLE,
-    FAULT_CLEAR_WAITING_DISABLE,
-    FAULT_CLEAR_ENABLE,
-    FAULT_CLEAR_WAITING_ENABLE,
-    FAULT_CLEAR_ALERTS,
-    FAULT_CLEAR_FINISHED
-};
-
 // Rail Deceleration Configuration
 struct RailDecelerationConfig {
     int32_t longMoveDecelerationDistanceMm;
@@ -346,12 +335,10 @@ MotorState updateMotorState(int rail);
 void printMotorStatus(int rail);
 void printAllMotorStatus();
 
-// Fault Management
-void clearMotorFaults(int rail);
-void processFaultClearing(int rail);
-void processAllFaultClearing();
-bool isFaultClearingInProgress(int rail);
-bool clearMotorFaultWithStatus(int rail);
+// Fault Management - E-stop Safe Interface
+void clearMotorFaults(int rail);                                              // E-stop safe synchronous fault clearing
+bool clearMotorFaultWithStatus(int rail);                                     // E-stop safe fault clearing with status
+bool clearAlertsWithEStopMonitoring(MotorDriver &motor, const char* motorName); // Core E-stop safe clearing function
 
 // Motion Deceleration
 RailDecelerationConfig& getDecelerationConfig(int rail);
@@ -361,9 +348,8 @@ int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32
 
 // Positioning and Movement
 int32_t selectMoveVelocity(int rail, PositionTarget fromPos, PositionTarget toPos, bool carriageLoaded);
-bool moveToPosition(int rail, PositionTarget fromPos, PositionTarget toPos, bool carriageLoaded);
 bool moveToPositionFromCurrent(int rail, PositionTarget toPos, bool carriageLoaded);
-bool moveToAbsolutePosition(int rail, int32_t positionPulses);
+bool moveToAbsolutePosition(int rail, int32_t positionPulses, bool carriageLoaded);  
 bool moveToPositionMm(int rail, double positionMm, bool carriageLoaded = false);
 bool moveRelativeManual(int rail, double relativeMm, bool carriageLoaded = false);
 bool moveToPosition(int rail, int positionNumber, bool carriageLoaded);
@@ -393,11 +379,8 @@ void calculateSmartHomingPhases(int rail, int32_t currentPositionPulses, bool* u
 
 // Movement Progress Monitoring
 void checkMoveProgress();
-void initMovementTracking(int rail, PositionTarget target, bool carriageLoaded);
-void resetMovementTracking(int rail);
-bool validateMovementCompletion(int rail);
 void updateDecelerationVelocity(int rail);
-bool checkMovementTimeout(int rail);
+bool checkMovementTimeout(int rail, unsigned long timeoutMs);  
 bool checkMovementProgress(int rail);
 MotorTargetState& getTargetState(int rail);
 
@@ -407,5 +390,10 @@ bool setJogIncrement(int rail, double increment);
 bool setJogSpeed(int rail, int speedRpm, double jogDistanceMm = 0);
 double getJogIncrement(int rail);
 int getJogSpeed(int rail);
+
+// Helper functions for per-motor state tracking
+void setMotorVelocity(int rail, int32_t velocityPps);
+int32_t getCurrentMotorVelocity(int rail);
+void setMotorAcceleration(int rail, int32_t accelPpsPerSec);
 
 #endif // MOTOR_CONTROLLER_H
