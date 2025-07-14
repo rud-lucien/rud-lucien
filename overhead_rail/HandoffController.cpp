@@ -22,13 +22,13 @@ const char FMT_HANDOFF_COLLISION[] PROGMEM = "Collision risk: %s has labware";
 // GLOBAL HANDOFF STATE
 //=============================================================================
 
-HandoffState_t handoffState = {
-    HANDOFF_IDLE,                    // currentState
-    HANDOFF_SUCCESS,                 // currentResult
-    HANDOFF_RAIL1_TO_RAIL2,         // direction
-    DEST_WC3,                       // destination
-    0,                              // operationStartTime
-    HANDOFF_TIMEOUT_DEFAULT         // currentTimeout
+HandoffState handoffState = {
+    HANDOFF_IDLE,                           // currentState
+    HANDOFF_SUCCESS,                        // currentResult
+    HANDOFF_RAIL1_TO_RAIL2,                // direction
+    DEST_WC1,                              // destination
+    0,                                     // operationStartTime
+    HANDOFF_TIMEOUT_COMPLETE_OPERATION     // currentTimeout (overall operation timeout)
 };
 
 //=============================================================================
@@ -86,14 +86,13 @@ HandoffResult startHandoff(HandoffDirection dir, HandoffDestination dest) {
     handoffState.currentState = HANDOFF_MOVING_SOURCE_TO_POS;
     handoffState.operationStartTime = millis();
     
-    // Set timeout based on destination
-    handoffState.currentTimeout = (dest == DEST_WC3) ? HANDOFF_TIMEOUT_WC3_EXT : HANDOFF_TIMEOUT_DEFAULT;
+    // Set overall operation timeout based on destination complexity
+    handoffState.currentTimeout = HANDOFF_TIMEOUT_COMPLETE_OPERATION;
     
     char msg[MEDIUM_MSG_SIZE];
     const char* dirStr = (dir == HANDOFF_RAIL1_TO_RAIL2) ? "Rail1→Rail2" : "Rail2→Rail1";
     const char* destStr = (dest == DEST_WC1) ? "WC1" : 
-                          (dest == DEST_WC2) ? "WC2" : 
-                          (dest == DEST_STAGING) ? "Staging" : "WC3";
+                          (dest == DEST_WC2) ? "WC2" : "WC3";
     sprintf_P(msg, FMT_HANDOFF_INIT, dirStr, destStr);
     Console.serialInfo(msg);
     
@@ -103,13 +102,32 @@ HandoffResult startHandoff(HandoffDirection dir, HandoffDestination dest) {
 }
 
 HandoffResult updateHandoff() {
-    // Check for timeout on any operation
+    // Check for overall operation timeout (prevents infinite operations)
     if (isHandoffOperationTimedOut()) {
         Console.error(F("HANDOFF_OPERATION_TIMEOUT"));
         
         char timeoutMsg[SMALL_MSG_SIZE];
         sprintf_P(timeoutMsg, PSTR("Handoff timed out in state: %s"), getHandoffStateName(handoffState.currentState));
         Console.serialInfo(timeoutMsg);
+        
+        handoffState.currentState = HANDOFF_ERROR;
+        handoffState.currentResult = HANDOFF_ERROR_TIMEOUT;
+        return handoffState.currentResult;
+    }
+    
+    // Check for phase-specific timeout (more granular timeout control)
+    if (handoffState.currentState != HANDOFF_IDLE && 
+        handoffState.currentState != HANDOFF_COMPLETED && 
+        handoffState.currentState != HANDOFF_ERROR &&
+        isCurrentPhaseTimedOut()) {
+        
+        Console.error(F("HANDOFF_PHASE_TIMEOUT"));
+        
+        char phaseTimeoutMsg[MEDIUM_MSG_SIZE];
+        sprintf_P(phaseTimeoutMsg, PSTR("Phase timeout: %s exceeded %lums"), 
+                 getHandoffStateName(handoffState.currentState),
+                 getCurrentPhaseTimeout(handoffState.currentState, handoffState.destination));
+        Console.serialInfo(phaseTimeoutMsg);
         
         handoffState.currentState = HANDOFF_ERROR;
         handoffState.currentResult = HANDOFF_ERROR_TIMEOUT;
@@ -161,11 +179,22 @@ HandoffResult updateHandoff() {
                 
                 if (positionValid) {
                     char msg[MEDIUM_MSG_SIZE];
-                    sprintf_P(msg, FMT_HANDOFF_STATE, "Extending cylinder");
+                    sprintf_P(msg, FMT_HANDOFF_STATE, "Movement complete, pausing for stability");
                     Console.serialInfo(msg);
-                    handoffState.currentState = HANDOFF_EXTENDING_CYLINDER;
-                    handoffState.operationStartTime = millis(); // Reset timer for next phase
+                    handoffState.currentState = HANDOFF_PAUSE_AFTER_MOVEMENT;
+                    handoffState.operationStartTime = millis(); // Reset timer for pause
                 }
+            }
+            break;
+            
+        case HANDOFF_PAUSE_AFTER_MOVEMENT:
+            // Safety pause after rail movement to allow motion to settle
+            if (timeoutElapsed(millis(), handoffState.operationStartTime, HANDOFF_PAUSE_AFTER_MOVE)) {
+                char msg[MEDIUM_MSG_SIZE];
+                sprintf_P(msg, FMT_HANDOFF_STATE, "Extending cylinder");
+                Console.serialInfo(msg);
+                handoffState.currentState = HANDOFF_EXTENDING_CYLINDER;
+                handoffState.operationStartTime = millis(); // Reset timer for next phase
             }
             break;
             
@@ -174,10 +203,10 @@ HandoffResult updateHandoff() {
                 ValveOperationResult result = extendCylinder();
                 if (result == VALVE_OP_SUCCESS && isCylinderActuallyExtended()) {
                     char msg[MEDIUM_MSG_SIZE];
-                    sprintf_P(msg, FMT_HANDOFF_STATE, "Waiting for transfer");
+                    sprintf_P(msg, FMT_HANDOFF_STATE, "Cylinder extended, pausing for stabilization");
                     Console.serialInfo(msg);
-                    handoffState.currentState = HANDOFF_WAITING_TRANSFER;
-                    handoffState.operationStartTime = millis(); // Reset timer for transfer phase
+                    handoffState.currentState = HANDOFF_PAUSE_AFTER_EXTENSION;
+                    handoffState.operationStartTime = millis(); // Reset timer for pause
                 } else if (result != VALVE_OP_SUCCESS) {
                     Console.error(F("CYLINDER_EXTENSION_FAILED"));
                     char errorMsg[MEDIUM_MSG_SIZE];
@@ -186,6 +215,17 @@ HandoffResult updateHandoff() {
                     handoffState.currentState = HANDOFF_ERROR;
                     handoffState.currentResult = HANDOFF_ERROR_VALVE;
                 }
+            }
+            break;
+            
+        case HANDOFF_PAUSE_AFTER_EXTENSION:
+            // Safety pause after cylinder extension to allow pressure to stabilize
+            if (timeoutElapsed(millis(), handoffState.operationStartTime, HANDOFF_PAUSE_AFTER_EXTEND)) {
+                char msg[MEDIUM_MSG_SIZE];
+                sprintf_P(msg, FMT_HANDOFF_STATE, "Waiting for transfer");
+                Console.serialInfo(msg);
+                handoffState.currentState = HANDOFF_WAITING_TRANSFER;
+                handoffState.operationStartTime = millis(); // Reset timer for transfer phase
             }
             break;
             
@@ -204,10 +244,10 @@ HandoffResult updateHandoff() {
                 ValveOperationResult result = retractCylinder();
                 if (result == VALVE_OP_SUCCESS && isCylinderActuallyRetracted()) {
                     char msg[MEDIUM_MSG_SIZE];
-                    sprintf_P(msg, FMT_HANDOFF_STATE, "Moving to destination");
+                    sprintf_P(msg, FMT_HANDOFF_STATE, "Cylinder retracted, pausing for stabilization");
                     Console.serialInfo(msg);
-                    handoffState.currentState = HANDOFF_MOVING_DEST_TO_TARGET;
-                    handoffState.operationStartTime = millis(); // Reset timer for final movement
+                    handoffState.currentState = HANDOFF_PAUSE_AFTER_RETRACTION;
+                    handoffState.operationStartTime = millis(); // Reset timer for pause
                 } else if (result != VALVE_OP_SUCCESS) {
                     Console.error(F("CYLINDER_RETRACTION_FAILED"));
                     char errorMsg[MEDIUM_MSG_SIZE];
@@ -216,6 +256,17 @@ HandoffResult updateHandoff() {
                     handoffState.currentState = HANDOFF_ERROR;
                     handoffState.currentResult = HANDOFF_ERROR_VALVE;
                 }
+            }
+            break;
+            
+        case HANDOFF_PAUSE_AFTER_RETRACTION:
+            // Safety pause after cylinder retraction to allow system to stabilize
+            if (timeoutElapsed(millis(), handoffState.operationStartTime, HANDOFF_PAUSE_AFTER_RETRACT)) {
+                char msg[MEDIUM_MSG_SIZE];
+                sprintf_P(msg, FMT_HANDOFF_STATE, "Moving to destination");
+                Console.serialInfo(msg);
+                handoffState.currentState = HANDOFF_MOVING_DEST_TO_TARGET;
+                handoffState.operationStartTime = millis(); // Reset timer for final movement
             }
             break;
             
@@ -260,17 +311,6 @@ HandoffResult updateHandoff() {
                             return handoffState.currentResult;
                         }
                     }
-                    else if (handoffState.destination == DEST_STAGING) {
-                        if (validateRailReadyForHandoff(1, RAIL1_STAGING_POSITION)) {
-                            Console.serialInfo(F("HANDOFF_DEST_POSITIONED: Rail 1 validated at staging"));
-                            destinationValid = true;
-                        } else {
-                            Console.error(F("HANDOFF_DEST_ERROR: Rail 1 failed staging position validation"));
-                            handoffState.currentState = HANDOFF_ERROR;
-                            handoffState.currentResult = HANDOFF_ERROR_POSITION;
-                            return handoffState.currentResult;
-                        }
-                    }
                 }
                 
                 if (destinationValid) {
@@ -292,7 +332,7 @@ HandoffResult updateHandoff() {
         case HANDOFF_ERROR:
             // Enhanced error reporting with proper string formatting
             {
-                char errorMsg[100];
+                char errorMsg[MEDIUM_MSG_SIZE];
                 sprintf_P(errorMsg, PSTR("HANDOFF_FAILED: %s"), getHandoffResultName(handoffState.currentResult));
                 Console.error(errorMsg);
             }
@@ -315,7 +355,7 @@ bool isHandoffInProgress() {
             handoffState.currentState != HANDOFF_ERROR);
 }
 
-HandoffState getCurrentHandoffState() {
+HandoffPhase getCurrentHandoffState() {
     return handoffState.currentState;
 }
 
@@ -331,7 +371,7 @@ HandoffResult getLastHandoffResult() {
 bool validateRailReadyForHandoff(int railNumber, double expectedPosition) {
     // Leverage existing MotorController functions
     if (!isHomingComplete(railNumber)) {
-        char errorMsg[80];
+        char errorMsg[SMALL_MSG_SIZE];
         sprintf_P(errorMsg, PSTR("POSITION_VALIDATION_FAILED: Rail %d not homed"), railNumber);
         Console.error(errorMsg);
         return false;
@@ -342,26 +382,26 @@ bool validateRailReadyForHandoff(int railNumber, double expectedPosition) {
     double tolerance = MOVEMENT_POSITION_TOLERANCE_MM;
     
     if (abs(currentPos - expectedPosition) > tolerance) {
-        char errorMsg[120];
+        char errorMsg[MEDIUM_MSG_SIZE];
         sprintf_P(errorMsg, PSTR("POSITION_VALIDATION_FAILED: Rail %d at %.1fmm, expected %.1fmm"), 
                  railNumber, currentPos, expectedPosition);
         Console.error(errorMsg);
         return false;
     }
     
-    char infoMsg[80];
+    char infoMsg[SMALL_MSG_SIZE];
     sprintf_P(infoMsg, PSTR("POSITION_VALIDATED: Rail %d ready at %.1fmm"), railNumber, expectedPosition);
     Console.serialInfo(infoMsg);
     return true;
 }
 
 bool validateRail1AtHandoffPosition() {
-    // Rail 1 handoff position is at 0mm (home position)
-    return validateRailReadyForHandoff(1, 0.0);
+    // Rail 1 handoff position - use the defined constant from MotorController.h (35mm)
+    return validateRailReadyForHandoff(1, RAIL1_HANDOFF);
 }
 
 bool validateRail2AtHandoffPosition() {
-    // Rail 2 handoff position - use the defined constant
+    // Rail 2 handoff position - use the defined constant from MotorController.h (900mm)
     return validateRailReadyForHandoff(2, RAIL2_HANDOFF);
 }
 
@@ -446,9 +486,6 @@ bool checkHandoffCollisionSafety(HandoffDirection dir, HandoffDestination dest) 
             case DEST_WC2:
                 destinationOccupied = isLabwarePresentAtWC2();
                 break;
-            case DEST_STAGING:
-                Console.error(F("Invalid destination: Staging is not a delivery target"));
-                return false;
             default:
                 Console.error(F("Invalid destination for Rail 2 → Rail 1 handoff"));
                 return false;
@@ -494,9 +531,6 @@ bool moveDestinationRailToTargetPosition() {
                 return moveRail1CarriageToWC1(hasLabware);
             case DEST_WC2:
                 return moveRail1CarriageToWC2(hasLabware);
-            case DEST_STAGING:
-                Console.error(F("Invalid destination: Staging is not a delivery target"));
-                return false;
             default:
                 Console.error(F("Invalid destination for Rail 2 → Rail 1 handoff"));
                 return false;
@@ -505,8 +539,8 @@ bool moveDestinationRailToTargetPosition() {
 }
 
 bool verifyHandoffLabwareTransfer() {
-    // Use sensor timeout for this verification
-    if (timeoutElapsed(millis(), handoffState.operationStartTime, HANDOFF_SENSOR_TIMEOUT)) {
+    // Use specific sensor verification timeout
+    if (timeoutElapsed(millis(), handoffState.operationStartTime, HANDOFF_TIMEOUT_SENSOR_VERIFY)) {
         Console.error(F("LABWARE_SENSOR_TIMEOUT"));
         
         // SAFETY: Automatically retract cylinder on sensor timeout to prevent collision
@@ -575,8 +609,8 @@ bool verifyHandoffLabwareTransfer() {
         // Failure scenarios with specific diagnostics
         if (!labwareAtHandoff && sourceStillHasLabware) {
             Console.error(F("LABWARE_TRANSFER_MECHANISM_FAILED"));
-            handoffState.currentState = HANDOFF_ERROR;
             handoffState.currentResult = HANDOFF_ERROR_SENSOR;
+            handoffState.currentState = HANDOFF_ERROR;
             return false;
         }
         
@@ -623,16 +657,53 @@ const char* getHandoffResultName(HandoffResult result) {
     }
 }
 
-const char* getHandoffStateName(HandoffState state) {
+const char* getHandoffStateName(HandoffPhase state) {
     switch (state) {
         case HANDOFF_IDLE:                    return "SYSTEM_IDLE";
         case HANDOFF_MOVING_SOURCE_TO_POS:    return "POSITIONING_SOURCE_RAIL";
+        case HANDOFF_PAUSE_AFTER_MOVE:        return "PAUSING_AFTER_MOVEMENT";
         case HANDOFF_EXTENDING_CYLINDER:      return "EXTENDING_TRANSFER_CYLINDER";
+        case HANDOFF_PAUSE_AFTER_EXTEND:      return "PAUSING_AFTER_EXTENSION";
         case HANDOFF_WAITING_TRANSFER:        return "WAITING_FOR_LABWARE_TRANSFER";
         case HANDOFF_RETRACTING_CYLINDER:     return "RETRACTING_TRANSFER_CYLINDER";
+        case HANDOFF_PAUSE_AFTER_RETRACTION:     return "PAUSING_AFTER_RETRACTION";
         case HANDOFF_MOVING_DEST_TO_TARGET:   return "MOVING_TO_DESTINATION";
         case HANDOFF_COMPLETED:               return "OPERATION_COMPLETED";
         case HANDOFF_ERROR:                   return "ERROR_STATE";
         default:                              return "UNKNOWN_STATE";
     }
+}
+
+//=============================================================================
+// ENHANCED TIMEOUT FUNCTIONS
+//=============================================================================
+
+// Get appropriate timeout for current handoff phase
+unsigned long getCurrentPhaseTimeout(HandoffPhase phase, HandoffDestination dest) {
+    switch (phase) {
+        case HANDOFF_MOVING_SOURCE_TO_POS:
+            return HANDOFF_TIMEOUT_RAIL_MOVEMENT;
+            
+        case HANDOFF_EXTENDING_CYLINDER:
+            return HANDOFF_TIMEOUT_PNEUMATIC_EXTEND;
+            
+        case HANDOFF_WAITING_TRANSFER:
+            return HANDOFF_TIMEOUT_SENSOR_VERIFY;
+            
+        case HANDOFF_RETRACTING_CYLINDER:
+            return HANDOFF_TIMEOUT_PNEUMATIC_RETRACT;
+            
+        case HANDOFF_MOVING_DEST_TO_TARGET:
+            // All rail movements use standard timeout
+            return HANDOFF_TIMEOUT_RAIL_MOVEMENT;
+                
+        default:
+            return HANDOFF_TIMEOUT_COMPLETE_OPERATION; // Fallback
+    }
+}
+
+// Check if current phase has timed out (more specific than overall timeout)
+bool isCurrentPhaseTimedOut() {
+    unsigned long phaseTimeout = getCurrentPhaseTimeout(handoffState.currentState, handoffState.destination);
+    return timeoutElapsed(millis(), handoffState.operationStartTime, phaseTimeout);
 }

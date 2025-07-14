@@ -58,15 +58,15 @@
 //=============================================================================
 // Rail 1 Positions (distances from home in mm)
 #define RAIL1_HOME_POSITION 0              // Home position
-#define RAIL1_WC2_PICKUP_DROPOFF 3700      // Workcell 2 pickup/dropoff
+#define RAIL1_WC2_PICKUP_DROPOFF 3700      // Workcell 2 pickup/dropoff 
 #define RAIL1_WC1_PICKUP_DROPOFF 5700      // Workcell 1 pickup/dropoff
-#define RAIL1_STAGING_POSITION 300        // Staging position
-#define RAIL1_HANDOFF 0                 // Handoff to Rail 2 this may or may not be the home position. need to figure this out
+#define RAIL1_STAGING_POSITION 150        // Staging position
+#define RAIL1_HANDOFF 35                 // Handoff to Rail 2 this may or may not be the home position. need to figure this out
 
 // Rail 2 Positions (distances from home in mm)
 #define RAIL2_HOME_POSITION 0              // Home position  
 #define RAIL2_HANDOFF 900                  // Handoff from Rail 1
-#define RAIL2_WC3_PICKUP_DROPOFF 0       // Workcell 3 pickup/dropoff. this maybe the home position so for now I define them both
+#define RAIL2_WC3_PICKUP_DROPOFF 95       // Workcell 3 pickup/dropoff. this maybe the home position so for now I define them both
 
 // Pre-calculated Position Values (pulses)
 #define RAIL1_HOME_POSITION_PULSES (int32_t)(RAIL1_HOME_POSITION * RAIL1_PULSES_PER_MM)

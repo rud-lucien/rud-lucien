@@ -9,11 +9,17 @@
 // HANDOFF SYSTEM CONSTANTS
 //=============================================================================
 
-// Handoff timeout configurations (milliseconds)
-#define HANDOFF_TIMEOUT_DEFAULT     30000    // 30 seconds default timeout
-#define HANDOFF_TIMEOUT_WC3_EXT     45000    // 45 seconds for WC3 with extension
-#define HANDOFF_SENSOR_TIMEOUT      10000    // 10 seconds for sensor confirmation
-#define HANDOFF_MOVEMENT_TIMEOUT    20000    // 20 seconds for rail movements
+// Handoff timeout configurations (milliseconds) - operation-specific
+#define HANDOFF_TIMEOUT_RAIL_MOVEMENT          5000     // 5 seconds for rail positioning (max 900mm at 250 RPM = ~3s)
+#define HANDOFF_TIMEOUT_PNEUMATIC_EXTEND       5000     // 5 seconds for cylinder extension (valve default 2s + margin)
+#define HANDOFF_TIMEOUT_PNEUMATIC_RETRACT      3000     // 3 seconds for cylinder retraction (faster than extension)
+#define HANDOFF_TIMEOUT_SENSOR_VERIFY          3000     // 3 seconds for sensor confirmation (quick sensor response)
+#define HANDOFF_TIMEOUT_COMPLETE_OPERATION     25000    // 25 seconds maximum for entire handoff sequence
+
+// Handoff safety pause durations (milliseconds)
+#define HANDOFF_PAUSE_AFTER_MOVE    1000     // 1 second pause after rail movement
+#define HANDOFF_PAUSE_AFTER_EXTEND  500      // 0.5 second pause after cylinder extension
+#define HANDOFF_PAUSE_AFTER_RETRACT 500      // 0.5 second pause after cylinder retraction
 
 //=============================================================================
 // HANDOFF ENUMS
@@ -29,7 +35,6 @@ enum HandoffDirection {
 enum HandoffDestination {
     DEST_WC1,        // Rail 1 WC1 position
     DEST_WC2,        // Rail 1 WC2 position  
-    DEST_STAGING,    // Rail 1 staging position
     DEST_WC3         // Rail 2 WC3 position (includes automatic extension)
 };
 
@@ -48,13 +53,16 @@ enum HandoffResult {
     HANDOFF_ERROR_POSITION        // Position validation failure
 };
 
-// Internal handoff state (for non-blocking operation)
-enum HandoffState {
+// Internal handoff state machine phases (for non-blocking operation)
+enum HandoffPhase {
     HANDOFF_IDLE,                    // No handoff in progress
     HANDOFF_MOVING_SOURCE_TO_POS,    // Moving source rail to handoff position
+    HANDOFF_PAUSE_AFTER_MOVEMENT,    // Safety pause after rail movement
     HANDOFF_EXTENDING_CYLINDER,      // Extending cylinder for transfer
+    HANDOFF_PAUSE_AFTER_EXTENSION,   // Safety pause after cylinder extension
     HANDOFF_WAITING_TRANSFER,        // Waiting for labware transfer confirmation
     HANDOFF_RETRACTING_CYLINDER,     // Retracting cylinder after transfer
+    HANDOFF_PAUSE_AFTER_RETRACTION,  // Safety pause after cylinder retraction
     HANDOFF_MOVING_DEST_TO_TARGET,   // Moving destination rail to target position
     HANDOFF_COMPLETED,               // Handoff completed successfully
     HANDOFF_ERROR                    // Error state
@@ -64,8 +72,8 @@ enum HandoffState {
 // HANDOFF STATE STRUCTURE
 //=============================================================================
 
-struct HandoffState_t {
-    HandoffState currentState;
+struct HandoffState {
+    HandoffPhase currentState;
     HandoffResult currentResult;
     HandoffDirection direction;
     HandoffDestination destination;
@@ -77,7 +85,7 @@ struct HandoffState_t {
 // GLOBAL HANDOFF STATE
 //=============================================================================
 
-extern HandoffState_t handoffState;
+extern HandoffState handoffState;
 
 //=============================================================================
 // FUNCTIONAL HANDOFF API
@@ -89,7 +97,7 @@ HandoffResult updateHandoff(); // Call periodically to advance state machine
 
 // Status query functions
 bool isHandoffInProgress();
-HandoffState getCurrentHandoffState();
+HandoffPhase getCurrentHandoffState();
 HandoffResult getLastHandoffResult();
 
 // Helper functions (internal - defined in .cpp)
@@ -100,8 +108,10 @@ bool moveSourceRailToHandoffPosition();
 bool moveDestinationRailToTargetPosition();
 bool verifyHandoffLabwareTransfer();
 bool isHandoffOperationTimedOut();
+bool isCurrentPhaseTimedOut();
+unsigned long getCurrentPhaseTimeout(HandoffPhase phase, HandoffDestination dest);
 const char* getHandoffResultName(HandoffResult result);
-const char* getHandoffStateName(HandoffState state);
+const char* getHandoffStateName(HandoffPhase state);
 
 // Enhanced position validation using existing MotorController functions
 bool validateRailReadyForHandoff(int railNumber, double expectedPosition);
