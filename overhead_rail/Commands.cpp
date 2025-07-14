@@ -122,7 +122,7 @@ Commander::systemCommand_t API_tree[] = {
     systemCommand("encoder", "Manual Pulse Generator (MPG) handwheel control:\r\n"
                              "  encoder enable <rail>    - Enable encoder control for Rail 1 or 2\r\n"
                              "  encoder disable          - Disable encoder control\r\n"
-                             "  encoder multiplier <X>   - Set encoder multiplier (X = 0.1, 1.0, or 10.0)\r\n"
+                             "  encoder multiplier <X>   - Set encoder multiplier (X = 1, 10, or 100)\r\n"
                              "  encoder velocity <RPM>   - Set encoder velocity (50-400 RPM)\r\n"
                              "  encoder status           - Display current encoder status and settings\r\n"
                              "  encoder help             - Display detailed setup and usage instructions",
@@ -1673,9 +1673,9 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.println(F(""));
         Console.println(F("CONFIGURATION:"));
         Console.println(F("  encoder multiplier <X>   - Set movement precision per encoder count"));
-        Console.println(F("                             0.1 = Fine (0.1mm per count)"));
-        Console.println(F("                             1.0 = Medium (1.0mm per count)"));
-        Console.println(F("                             10.0 = Coarse (10.0mm per count)"));
+        Console.println(F("                             1 = Fine (0.1mm per count)"));
+        Console.println(F("                             10 = General (1.0mm per count)"));
+        Console.println(F("                             100 = Rapid (10.0mm per count)"));
         Console.println(F("  encoder velocity <RPM>   - Set movement velocity (50-400 RPM)"));
         Console.println(F(""));
         Console.println(F("STATUS AND DIAGNOSTICS:"));
@@ -1691,7 +1691,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.println(F(""));
         Console.println(F("USAGE EXAMPLES:"));
         Console.println(F("  encoder enable 1         - Enable MPG for Rail 1"));
-        Console.println(F("  encoder multiplier 1.0   - Set medium precision"));
+        Console.println(F("  encoder multiplier 10    - Set general precision"));
         Console.println(F("  encoder velocity 150     - Set velocity to 150 RPM"));
         Console.println(F("  encoder enable 2         - Switch MPG to Rail 2"));
         Console.println(F("  encoder status           - Check current settings"));
@@ -1705,9 +1705,9 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.println(F("- Quadrature error detection and recovery"));
         Console.println(F(""));
         Console.println(F("OPERATIONAL TIPS:"));
-        Console.println(F("- Start with medium multiplier (1.0) for general use"));
-        Console.println(F("- Use fine multiplier (0.1) for precise positioning"));
-        Console.println(F("- Use coarse multiplier (10.0) for rapid movement"));
+        Console.println(F("- Start with general multiplier (10) for everyday use"));
+        Console.println(F("- Use fine multiplier (1) for precise positioning"));
+        Console.println(F("- Use rapid multiplier (100) for quick movement"));
         Console.println(F("- Higher velocity = faster response to encoder input"));
         Console.println(F("- Check 'encoder status' to verify active rail and settings"));
         Console.println(F("============================================"));
@@ -1716,7 +1716,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     case 3: // "multiplier" - Set encoder multiplier
         if (param1 == NULL) {
             Console.error(F("Missing multiplier value. Usage: encoder multiplier <value>"));
-            Console.error(F("Valid values: 0.1 (fine), 1.0 (medium), 10.0 (coarse)"));
+            Console.error(F("Valid values: 1 (fine), 10 (general), 100 (rapid)"));
             return false;
         }
         

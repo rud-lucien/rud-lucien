@@ -5,7 +5,7 @@
 // PROGMEM STRING CONSTANTS FOR MEMORY EFFICIENCY
 //=============================================================================
 // Format strings for sprintf_P()
-const char FMT_SENSOR_SECTION[] PROGMEM = " | Sensors: R1-WC1=%s, R1-WC1-Lab=%s, R1-WC2=%s, R1-WC2-Lab=%s, R1-HANDOFF=%s, R2-WC3=%s, R2-WC3-Lab=%s, R2-HANDOFF=%s, HANDOFF-Lab=%s";
+const char FMT_SENSOR_SECTION[] PROGMEM = " | Sensors: R1-WC1=%s, R1-WC1-Lab=%s, R1-WC2=%s, R1-WC2-Lab=%s, R1-HANDOFF=%s, R2-WC3=%s, R2-Carriage-Lab=%s, R2-HANDOFF=%s, HANDOFF-Lab=%s";
 const char FMT_SYSTEM_SECTION[] PROGMEM = " | System: E-Stop=%s, Pressure=%d.%02d PSI%s, Clients=%d";
 const char FMT_MOTOR_SECTION[] PROGMEM = " | R%d-Motor: State=%s, Homed=%s, HLFB=%s";
 const char FMT_POSITION_UNHOMED[] PROGMEM = " | R%d-Position: UNKNOWN (not homed), Target=None, LastTarget=None";

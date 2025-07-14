@@ -42,6 +42,8 @@ const char FMT_ENCODER_POSITION[] PROGMEM = "Encoder position: %ld counts";
 const char FMT_ENCODER_VELOCITY[] PROGMEM = "Encoder velocity: %ld counts/sec";
 const char FMT_MPG_BASE_POSITION[] PROGMEM = "MPG base position: %.2fmm (encoder count %ld)";
 const char FMT_MPG_EXPECTED_POSITION[] PROGMEM = "Expected position from MPG: %.2fmm (delta: %ld counts)";
+const char FMT_DYNAMIC_VELOCITY[] PROGMEM = "Dynamic velocity: %.1fx (encoder: %ldcps)";
+const char FMT_TIMEOUT_REMAINING[] PROGMEM = "Timeout safety: %lu seconds remaining";
 
 //=============================================================================
 // GLOBAL VARIABLES
@@ -56,6 +58,12 @@ bool quadratureErrorDetected = false;
 int32_t mpgBasePositionScaled = 0;             // Base position when MPG was enabled (scaled units)
 int32_t mpgBaseEncoderCount = 0;               // Base encoder count when MPG was enabled
 
+// Dynamic velocity and timeout safety tracking
+unsigned long lastEncoderActivity = 0;         // Last time encoder moved (for timeout)
+unsigned long lastTimeoutCheck = 0;            // Last time we checked for timeout  
+float currentVelocityScale = 1.0;              // Current velocity scaling factor
+int32_t smoothedEncoderVelocity = 0;           // Smoothed encoder velocity for stable scaling
+
 //=============================================================================
 // HELPER FUNCTIONS
 //=============================================================================
@@ -64,9 +72,9 @@ int32_t mpgBaseEncoderCount = 0;               // Base encoder count when MPG wa
 
 const char *getMultiplierName(int16_t multiplierScaled)
 {
-    if (multiplierScaled == MULTIPLIER_X1_SCALED) return "x1 (0.1mm/count)";
-    if (multiplierScaled == MULTIPLIER_X10_SCALED) return "x10 (1.0mm/count)";
-    if (multiplierScaled == MULTIPLIER_X100_SCALED) return "x100 (10mm/count)";
+    if (multiplierScaled == MULTIPLIER_X1_SCALED) return "1x (0.1mm/count)";
+    if (multiplierScaled == MULTIPLIER_X10_SCALED) return "10x (1.0mm/count)";
+    if (multiplierScaled == MULTIPLIER_X100_SCALED) return "100x (10mm/count)";
     
     static char buffer[30];
     double mmPerCount = (double)multiplierScaled / SCALE_FACTOR;
@@ -99,6 +107,12 @@ void initEncoderControl(bool swapDirection, bool indexInverted)
     activeEncoderRail = 0;
     quadratureErrorDetected = false;
     
+    // Initialize dynamic velocity and timeout tracking
+    lastEncoderActivity = millis();
+    lastTimeoutCheck = millis();
+    currentVelocityScale = 1.0;
+    smoothedEncoderVelocity = 0;
+    
     Console.serialInfo(F("Manual Pulse Generator (MPG) initialized - use 'encoder,enable,<rail>' to start"));
 }
 
@@ -110,7 +124,9 @@ void enableEncoderControl(int rail)
 {
     // Validate rail number
     if (rail != 1 && rail != 2) {
-        Console.serialError(F("Invalid rail number. Use 1 or 2"));
+        char msg[SMALL_MSG_SIZE];
+        sprintf_P(msg, FMT_RAIL_VALIDATION_ERROR, rail, "invalid rail number");
+        Console.serialError(msg);
         return;
     }
     
@@ -143,7 +159,9 @@ void enableEncoderControl(int rail)
     
     if (isMotorMoving(rail))
     {
-        Console.serialError(F("Cannot enable MPG during automated operation"));
+        char msg[SMALL_MSG_SIZE];
+        sprintf_P(msg, FMT_RAIL_VALIDATION_ERROR, rail, "cannot enable MPG during automated operation");
+        Console.serialError(msg);
         return;
     }
     
@@ -174,6 +192,12 @@ void enableEncoderControl(int rail)
     // Reset tracking variables
     lastEncoderUpdateTime = millis();
     quadratureErrorDetected = false;
+    
+    // Initialize dynamic velocity and timeout tracking for this session
+    lastEncoderActivity = millis();
+    lastTimeoutCheck = millis();
+    currentVelocityScale = 1.0;
+    smoothedEncoderVelocity = 0;
     
     char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_MPG_STATUS_RAIL, rail, "ENABLED", scaledToMm(mpgBasePositionScaled));
@@ -215,9 +239,11 @@ void processEncoderInput()
         return;
     }
     
-    // Check if motor is still ready
+    // Check if motor is still ready - do this once to avoid race conditions
     MotorState currentState = updateMotorState(activeEncoderRail);
-    if (currentState == MOTOR_STATE_FAULTED || isMotorMoving(activeEncoderRail))
+    bool motorMoving = isMotorMoving(activeEncoderRail);
+    
+    if (currentState == MOTOR_STATE_FAULTED || motorMoving)
     {
         Console.serialWarning(F("Motor state changed - disabling MPG control"));
         disableEncoderControl();
@@ -253,6 +279,17 @@ void processEncoderInput()
     
     // Calculate total encoder movement since MPG was enabled
     int32_t totalEncoderDelta = currentEncoderPosition - mpgBaseEncoderCount;
+    
+    // Check for potential overflow before multiplication
+    if (abs(totalEncoderDelta) > (INT32_MAX / abs(currentMultiplierScaled)))
+    {
+        Console.serialError(F("Encoder movement too large - resetting MPG base position"));
+        mpgBasePositionScaled = mmToScaled(getMotorPositionMm(activeEncoderRail));
+        mpgBaseEncoderCount = currentEncoderPosition;
+        lastEncoderPosition = currentEncoderPosition;
+        return;
+    }
+    
     int32_t targetPositionScaled = mpgBasePositionScaled + (totalEncoderDelta * currentMultiplierScaled);
     
     // Get max travel for this rail (convert to scaled units)
@@ -296,15 +333,67 @@ void processEncoderInput()
     // Get motor reference for this rail
     MotorDriver& motor = getMotorByRail(activeEncoderRail);
     
-    // Calculate velocity using integer math
-    int32_t velocityPps = rpmToPps(currentVelocityRpm);
+    // Current time for timing calculations
+    unsigned long currentTime = millis();
     
-    // Boost velocity for MPG responsiveness (use integer math for 50% boost)
-    velocityPps = velocityPps + (velocityPps >> 1); // 50% faster for immediate response
+    // **TIMEOUT SAFETY CHECK**
+    // Check for encoder timeout periodically to avoid constant checking
+    if (waitTimeReached(currentTime, lastTimeoutCheck, ENCODER_ACTIVITY_CHECK_INTERVAL_MS))
+    {
+        if (waitTimeReached(currentTime, lastEncoderActivity, ENCODER_TIMEOUT_MS))
+        {
+            Console.serialWarning(F("Encoder timeout (5min) - disabling MPG control for safety"));
+            disableEncoderControl();
+            return;
+        }
+        lastTimeoutCheck = currentTime;
+    }
     
-    // Ensure velocity stays within reasonable bounds
-    if (velocityPps < 500) velocityPps = 500;   // Higher minimum for responsiveness
-    if (velocityPps > 12000) velocityPps = 12000; // Higher maximum for speed
+    // **DYNAMIC VELOCITY ADJUSTMENT**
+    // Calculate current encoder velocity (counts per second) with smoothing to prevent jerkiness
+    int32_t timeDeltaMs = currentTime - lastEncoderUpdateTime;
+    if (timeDeltaMs > 0) 
+    {
+        // Calculate instantaneous encoder velocity
+        int32_t instantVelocityCps = (abs(encoderDelta) * 1000) / timeDeltaMs;
+        
+        // Apply exponential smoothing to prevent jerky response
+        // smoothedVelocity = (old * (factor-1) + new) / factor
+        smoothedEncoderVelocity = ((smoothedEncoderVelocity * (ENCODER_VELOCITY_SMOOTHING_FACTOR - 1)) + instantVelocityCps) / ENCODER_VELOCITY_SMOOTHING_FACTOR;
+        
+        // Calculate velocity scale based on smoothed encoder speed
+        if (smoothedEncoderVelocity <= ENCODER_VELOCITY_THRESHOLD_CPS) {
+            // Slow encoder movement = precise control (reduced velocity)
+            currentVelocityScale = ENCODER_MIN_VELOCITY_SCALE + 
+                ((float)smoothedEncoderVelocity / ENCODER_VELOCITY_THRESHOLD_CPS) * (1.0 - ENCODER_MIN_VELOCITY_SCALE);
+        } else {
+            // Fast encoder movement = rapid positioning (increased velocity)
+            float excessSpeed = smoothedEncoderVelocity - ENCODER_VELOCITY_THRESHOLD_CPS;
+            float scaleRange = ENCODER_MAX_VELOCITY_SCALE - 1.0;
+            currentVelocityScale = 1.0 + (excessSpeed / 10.0) * scaleRange; // Scale gradually
+            
+            // Clamp to maximum
+            if (currentVelocityScale > ENCODER_MAX_VELOCITY_SCALE) {
+                currentVelocityScale = ENCODER_MAX_VELOCITY_SCALE;
+            }
+        }
+    }
+    
+    // Calculate base velocity and apply dynamic scaling
+    int32_t baseVelocityPps = rpmToPps(currentVelocityRpm);
+    int32_t velocityPps = (int32_t)(baseVelocityPps * currentVelocityScale);
+    
+    // Apply the existing 50% boost for MPG responsiveness
+    velocityPps = velocityPps + (velocityPps >> 1);
+    
+    // Ensure velocity stays within hardware bounds
+    if (velocityPps < 500) velocityPps = 500;       // Higher minimum for responsiveness
+    if (velocityPps > 12000) velocityPps = 12000;   // Hardware maximum limit
+    
+    // Update activity timestamp when encoder moves
+    if (encoderDelta != 0) {
+        lastEncoderActivity = currentTime;
+    }
     
     // Set velocity for smooth movement
     motor.VelMax(velocityPps);
@@ -315,14 +404,21 @@ void processEncoderInput()
     int32_t targetPulses = mmToPulses(targetPositionMm, activeEncoderRail);
     motor.Move(targetPulses, MotorDriver::MOVE_TARGET_ABSOLUTE);
     
-    // Log the movement with reduced verbosity (every 50ms instead of 100ms)
-    unsigned long currentTime = millis();
-    if (waitTimeReached(currentTime, lastEncoderUpdateTime, 50)) // More frequent logging for debugging
+    // Log the movement with velocity information (every 50ms for debugging)
+    if (waitTimeReached(currentTime, lastEncoderUpdateTime, 50))
     {
         char msg[MEDIUM_MSG_SIZE];
         sprintf_P(msg, FMT_MPG_RAIL_MOVEMENT, 
                 activeEncoderRail, totalEncoderDelta, targetPositionMm, getMultiplierName(currentMultiplierScaled));
         Console.serialDiagnostic(msg);
+        
+        // Additional diagnostic: show dynamic velocity scaling when it's significantly different from 1.0
+        if (fabs(currentVelocityScale - 1.0) > 0.2) {
+            char velMsg[SMALL_MSG_SIZE];
+            sprintf_P(velMsg, FMT_DYNAMIC_VELOCITY, currentVelocityScale, smoothedEncoderVelocity);
+            Console.serialDiagnostic(velMsg);
+        }
+        
         lastEncoderUpdateTime = currentTime;
     }
     
@@ -336,22 +432,22 @@ void processEncoderInput()
 
 void setEncoderMultiplier(float multiplier)
 {
-    // Validate multiplier against predefined values and convert to scaled integer
-    if (fabs(multiplier - 0.1f) < 0.01f)
+    // Validate multiplier against standard MPG values (1x, 10x, 100x)
+    if (fabs(multiplier - 1.0f) < 0.01f)
     {
-        currentMultiplierScaled = MULTIPLIER_X1_SCALED;
-    }
-    else if (fabs(multiplier - 1.0f) < 0.01f)
-    {
-        currentMultiplierScaled = MULTIPLIER_X10_SCALED;
+        currentMultiplierScaled = MULTIPLIER_X1_SCALED;  // 1x = 0.1mm per count (fine)
     }
     else if (fabs(multiplier - 10.0f) < 0.01f)
     {
-        currentMultiplierScaled = MULTIPLIER_X100_SCALED;
+        currentMultiplierScaled = MULTIPLIER_X10_SCALED; // 10x = 1.0mm per count (general)
+    }
+    else if (fabs(multiplier - 100.0f) < 0.01f)
+    {
+        currentMultiplierScaled = MULTIPLIER_X100_SCALED; // 100x = 10.0mm per count (rapid)
     }
     else
     {
-        Console.serialError(F("Invalid multiplier. Use 0.1, 1.0, or 10.0"));
+        Console.serialError(F("Invalid multiplier. Use 1, 10, or 100"));
         return;
     }
     
@@ -411,13 +507,29 @@ void printEncoderStatus()
         Console.serialInfo(msg);
     }
     
-    // Consolidated settings display
-    sprintf_P(msg, FMT_MPG_SETTINGS, getMultiplierName(currentMultiplierScaled), currentVelocityRpm);
-    Console.serialInfo(msg);
+    // Consolidated settings display with dynamic velocity info
+    char settingsMsg[ALERT_MSG_SIZE];
+    if (encoderControlActive && fabs(currentVelocityScale - 1.0) > 0.1) {
+        sprintf_P(settingsMsg, "Settings: %s, %dRPM (Dynamic: %.1fx)", 
+                getMultiplierName(currentMultiplierScaled), currentVelocityRpm, currentVelocityScale);
+    } else {
+        sprintf_P(msg, FMT_MPG_SETTINGS, getMultiplierName(currentMultiplierScaled), currentVelocityRpm);
+        strcpy(settingsMsg, msg);
+    }
+    Console.serialInfo(settingsMsg);
     
     // Essential encoder hardware status
     sprintf_P(msg, FMT_ENCODER_POSITION, EncoderIn.Position());
     Console.serialInfo(msg);
+    
+    // Timeout safety status (only show if encoder is active)
+    if (encoderControlActive) {
+        unsigned long timeSinceActivity = millis() - lastEncoderActivity;
+        unsigned long remainingTimeout = (timeSinceActivity < ENCODER_TIMEOUT_MS) ? 
+            (ENCODER_TIMEOUT_MS - timeSinceActivity) / 1000 : 0;
+        sprintf_P(msg, FMT_TIMEOUT_REMAINING, remainingTimeout);
+        Console.serialInfo(msg);
+    }
     
     // Error status if applicable
     if (hasQuadratureError())

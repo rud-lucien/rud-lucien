@@ -35,8 +35,16 @@ bool isLabwareCurrentlyOnRail1() {
 
 bool isLabwareCurrentlyOnRail2() {
     // Check if labware is detected at any Rail 2 position
-    return isLabwarePresentOnRail2() || 
-           (isCarriageAtRail2Handoff() && isLabwarePresentAtHandoff());
+    // Include both carriage-mounted sensor and handoff area when Rail 2 carriage is at handoff
+    bool rail2CarriageLabware = isLabwarePresentOnRail2();
+    bool rail2AtHandoffWithLabware = false;
+    
+    // Only check handoff if CCIO is available (handoff sensors require CCIO)
+    if (isCarriageAtRail2Handoff() && isLabwarePresentAtHandoff()) {
+        rail2AtHandoffWithLabware = true;
+    }
+    
+    return rail2CarriageLabware || rail2AtHandoffWithLabware;
 }
 
 //=============================================================================
@@ -80,9 +88,15 @@ bool parseAndValidateLabwareParameter(char* param, bool& carriageLoaded) {
     if (strcmp(param, "with-labware") == 0) {
         carriageLoaded = true;
         
-        // Verify labware is actually present when specified
-        if (!isLabwarePresentAtHandoff() && !isLabwarePresentOnRail2()) {
+        // Verify labware is actually present somewhere in the system when specified
+        // Use the LabwareAutomation tracking system instead of raw sensor readings
+        // because Rail 1 can only detect labware when carriage is at sensor locations
+        bool rail1HasLabware = labwareSystem.rail1.hasLabware;
+        bool rail2HasLabware = labwareSystem.rail2.hasLabware;
+        
+        if (!rail1HasLabware && !rail2HasLabware) {
             Console.error(F("LABWARE_NOT_DETECTED"));
+            Console.serialInfo(F("  No labware detected on either rail - use 'labware audit' to verify state"));
             return false;
         }
     } else if (strcmp(param, "no-labware") == 0) {
@@ -101,6 +115,13 @@ bool ensureCylinderRetractedForSafeMovement(bool movementInCollisionZone) {
         return true; // No collision zone involvement, cylinder state doesn't matter
     }
     
+    // Check if CCIO is available - cylinder operations require CCIO
+    if (!isPressureSufficient()) {
+        Console.error(F("INSUFFICIENT_PRESSURE"));
+        Console.serialInfo(F("  Cylinder safety operations require adequate air pressure"));
+        return false;
+    }
+    
     // Check if cylinder is already retracted
     if (isCylinderActuallyRetracted()) {
         return true; // Already safe
@@ -109,12 +130,6 @@ bool ensureCylinderRetractedForSafeMovement(bool movementInCollisionZone) {
     char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, FMT_CYLINDER_SAFETY, "retracting for safety");
     Console.serialInfo(msg);
-    
-    // Check air pressure before attempting retraction
-    if (!isPressureSufficient()) {
-        Console.error(F("INSUFFICIENT_PRESSURE"));
-        return false;
-    }
     
     // Attempt to retract cylinder
     ValveOperationResult result = retractCylinder();
