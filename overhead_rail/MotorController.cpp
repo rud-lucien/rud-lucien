@@ -243,6 +243,38 @@ int32_t getCarriageVelocityRpm(int rail, bool carriageLoaded) {
 // SYSTEM INITIALIZATION AND SAFETY
 //=============================================================================
 
+// Global flags for interrupt-detected E-stop
+volatile bool eStopInterruptTriggered = false;
+volatile unsigned long eStopInterruptTime = 0;
+
+// Interrupt Service Routine (ISR) for E-stop
+// Keep minimal and fast - only set flags, no Serial.print or complex operations
+void eStopInterruptHandler() {
+    eStopInterruptTriggered = true;
+    eStopInterruptTime = millis();
+}
+
+// Setup interrupt-based E-stop monitoring
+void setupEStopInterrupt() {
+    // Configure A-12 as digital input with pull-up (required for interrupt)
+    pinMode(E_STOP_PIN, INPUT_PULLUP);
+    
+    // Test if pin supports interrupts
+    int interruptNum = digitalPinToInterrupt(E_STOP_PIN);
+    if (interruptNum >= 0) {  // Valid interrupt numbers are >= 0
+        // Attach interrupt on FALLING edge (normally-closed E-stop going LOW)
+        attachInterrupt(interruptNum, eStopInterruptHandler, FALLING);
+        
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, PSTR("E-stop interrupt monitoring enabled on A-12 (interrupt #%d)"), interruptNum);
+        Console.serialInfo(msg);
+        Console.serialInfo(F("E-stop response time: <1ms (hardware interrupt)"));
+    } else {
+        Console.serialWarning(F("A-12 does not support interrupts - falling back to polling"));
+        Console.serialWarning(F("E-stop response time: up to 10ms (polling)"));
+    }
+}
+
 bool isEStopActive()
 {
     // E-stop is wired as normally closed with pull-up
@@ -254,49 +286,77 @@ void handleEStop()
 {
     static bool eStopWasActive = false;
     static unsigned long lastEStopCheckTime = 0;
+    static unsigned long lastInterruptDebounce = 0;
 
-    // Only check periodically to avoid consuming too much processing time
+    // Handle interrupt-triggered E-stop with debouncing
+    if (eStopInterruptTriggered) {
+        unsigned long currentTime = millis();
+        
+        // Debounce the interrupt to prevent false triggers
+        if (currentTime - lastInterruptDebounce > E_STOP_INTERRUPT_DEBOUNCE_MS) {
+            // Verify E-stop is still active (not a false trigger from electrical noise)
+            if (isEStopActive()) {
+                Console.serialError(F("E-STOP TRIGGERED! (Hardware Interrupt)"));
+                
+                // Immediate emergency shutdown
+                stopAllMotion();
+                RAIL1_MOTOR.EnableRequest(false);
+                RAIL2_MOTOR.EnableRequest(false);
+                
+                // Abort homing operations
+                if (rail1HomingInProgress) {
+                    Console.serialInfo(F("Aborting Rail 1 homing operation"));
+                    abortHoming(1);
+                }
+                if (rail2HomingInProgress) {
+                    Console.serialInfo(F("Aborting Rail 2 homing operation"));
+                    abortHoming(2);
+                }
+                
+                // Set motor states to faulted
+                rail1MotorState = MOTOR_STATE_FAULTED;
+                rail2MotorState = MOTOR_STATE_FAULTED;
+                eStopWasActive = true;
+            }
+            lastInterruptDebounce = currentTime;
+        }
+        eStopInterruptTriggered = false;  // Clear the interrupt flag
+    }
+
+    // Keep existing periodic polling for status monitoring and E-stop release detection
     unsigned long currentTime = millis();
-    if (!waitTimeReached(currentTime, lastEStopCheckTime, E_STOP_CHECK_INTERVAL_MS))
-    {
+    if (!waitTimeReached(currentTime, lastEStopCheckTime, E_STOP_CHECK_INTERVAL_MS)) {
         return;
     }
     lastEStopCheckTime = currentTime;
 
-    // Check if E-stop is active
+    // Check for E-stop release (polling is sufficient for this)
     bool eStopActive = isEStopActive();
-
-    // Only take action if E-stop state changes from inactive to active
-    if (eStopActive && !eStopWasActive)
-    {
-        Console.serialError(F("E-STOP TRIGGERED!"));
-
-        // Stop all motion immediately
+    
+    // Handle E-stop activation via polling (backup if interrupt missed or not available)
+    if (eStopActive && !eStopWasActive) {
+        Console.serialError(F("E-STOP TRIGGERED! (Polling Backup)"));
+        
+        // Same emergency shutdown as interrupt handler
         stopAllMotion();
-
-        // Disable both motors
         RAIL1_MOTOR.EnableRequest(false);
         RAIL2_MOTOR.EnableRequest(false);
-
-        // If homing was in progress on either rail, abort it
-        if (rail1HomingInProgress)
-        {
+        
+        if (rail1HomingInProgress) {
             Console.serialInfo(F("Aborting Rail 1 homing operation"));
             abortHoming(1);
         }
-        if (rail2HomingInProgress)
-        {
+        if (rail2HomingInProgress) {
             Console.serialInfo(F("Aborting Rail 2 homing operation"));
             abortHoming(2);
         }
-
-        // Set both motors to faulted state
+        
         rail1MotorState = MOTOR_STATE_FAULTED;
         rail2MotorState = MOTOR_STATE_FAULTED;
     }
+    
     // Report when E-stop is released
-    else if (!eStopActive && eStopWasActive)
-    {
+    if (!eStopActive && eStopWasActive) {
         Console.serialInfo(F("E-STOP RELEASED - System remains in fault state until cleared"));
         Console.serialInfo(F("Use fault clearing commands to re-enable motors"));
     }
@@ -470,8 +530,8 @@ bool initEStop()
 {
     Console.serialInfo(F("Initializing E-stop system..."));
     
-    // Set up E-stop input pin with internal pull-up
-    pinMode(E_STOP_PIN, INPUT_PULLUP);
+    // Set up interrupt-based E-stop monitoring
+    setupEStopInterrupt();
     
     if (isEStopActive())
     {

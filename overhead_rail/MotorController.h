@@ -17,8 +17,9 @@
 #define RAIL2_MOTOR         ConnectorM1    // Rail 2 carriage motor
 
 // Emergency Stop Configuration
-#define E_STOP_PIN 0                       // Emergency stop input pin
-#define E_STOP_CHECK_INTERVAL_MS 10        // E-stop monitoring frequency
+#define E_STOP_PIN A12                     // Emergency stop input pin (interrupt-capable)
+#define E_STOP_CHECK_INTERVAL_MS 10        // E-stop monitoring frequency (for status polling)
+#define E_STOP_INTERRUPT_DEBOUNCE_MS 50    // Debounce time for interrupt (prevent false triggers)
 
 //=============================================================================
 // MOTOR & MOTION PARAMETERS
@@ -286,6 +287,8 @@ struct MotorTargetState {
 // System Initialization and Safety
 bool isEStopActive();
 void handleEStop();
+void setupEStopInterrupt();               // Initialize interrupt-based E-stop monitoring
+void eStopInterruptHandler();             // Interrupt service routine for E-stop
 void printMotorAlerts(MotorDriver &motor, const char* motorName);
 bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocityRpm, int32_t accelRpmPerSec);
 bool initEStop();
