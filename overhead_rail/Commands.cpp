@@ -106,9 +106,11 @@ Commander::systemCommand_t API_tree[] = {
 
     // System state command to display comprehensive system status
     systemCommand("system", "System commands:\r\n"
-                            "  system,state    - Display comprehensive system status with readiness assessment\r\n"                     
-                            "  system,help     - Display detailed instructions for system commands\r\n"
-                            "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
+                            "  system state    - Display comprehensive system status with readiness assessment\r\n"
+                            "  system home     - Home both rails sequentially (Rail 1 first, then Rail 2)\r\n"
+                            "  system reset    - Clear operational state for clean automation (motor faults, encoder, etc.)\r\n"
+                            "  system help     - Display detailed instructions for system commands\r\n"
+                            "                    (Use 'log history' or 'log errors' for operation troubleshooting)",
                   cmd_system),
 
 
@@ -382,7 +384,9 @@ bool cmd_log(char *args, CommandCaller *caller)
 
 // Define the system subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
 static const SubcommandInfo SYSTEM_COMMANDS[] = {
-    {"help", 1},
+    {"help", 3},
+    {"home", 2}, 
+    {"reset", 1},
     {"state", 0}
 };
 
@@ -404,8 +408,8 @@ bool cmd_system(char *args, CommandCaller *caller)
         return false;
     }
     
-    // Parse the argument - use spaces or commas as separators
-    char *action = strtok(trimmed, " ,");
+    // Parse the argument - use spaces as separators
+    char *action = strtok(trimmed, " ");
     
     // Find the command code
     int commandCode = findSubcommandCode(action, SYSTEM_COMMANDS, SYSTEM_COMMAND_COUNT);
@@ -416,15 +420,34 @@ bool cmd_system(char *args, CommandCaller *caller)
         printSystemState();
         return true;
         
-    case 1: // help
+    case 1: // reset
+        Console.acknowledge(F("SYSTEM_RESET_INITIATED: Clearing operational state for clean automation"));
+        resetSystemState();
+        return true;
+        
+    case 2: // home
+        Console.acknowledge(F("SYSTEM_HOME_INITIATED: Sequential homing of both rails"));
+        return homeSystemRails();
+        
+    case 3: // help
         Console.acknowledge(F("DISPLAYING_SYSTEM_HELP: System command guide follows:"));
         Console.println(F("============================================"));
         Console.println(F("System State Commands"));
         Console.println(F("============================================"));
         Console.println(F("STATUS COMMAND:"));
-        Console.println(F("  system,state        - Display comprehensive system status"));
+        Console.println(F("  system state        - Display comprehensive system status"));
         Console.println(F("                        (motors, sensors, pneumatics, network, safety)"));
         Console.println(F("                        Includes overall readiness assessment and error summary"));
+        Console.println(F(""));
+        Console.println(F("HOMING COMMAND:"));
+        Console.println(F("  system home         - Home both rails sequentially (Rail 1 first, then Rail 2)"));
+        Console.println(F("                        Verifies successful homing of each rail before proceeding"));
+        Console.println(F("                        Use for first-time system initialization"));
+        Console.println(F(""));
+        Console.println(F("RESET COMMAND:"));
+        Console.println(F("  system reset        - Clear operational state for clean automation"));
+        Console.println(F("                        Clears motor faults, resets encoder, syncs hardware state"));
+        Console.println(F("                        Prepares system for fresh goto commands"));
         Console.println(F(""));
         Console.println(F("DISPLAYED INFORMATION:"));
         Console.println(F("- Motor Status: HLFB, homing status, position for both rails"));
@@ -438,14 +461,14 @@ bool cmd_system(char *args, CommandCaller *caller)
         Console.println(F("- Automation Readiness: YES/NO with specific error details"));
         Console.println(F(""));
         Console.println(F("RELATED COMMANDS:"));
-        Console.println(F("- Use 'log,history' for historical system operation data"));
-        Console.println(F("- Use 'log,errors' for troubleshooting past issues"));
+        Console.println(F("- Use 'log history' for historical system operation data"));
+        Console.println(F("- Use 'log errors' for troubleshooting past issues"));
         Console.println(F("- Individual subsystem commands: encoder, network, labware"));
         Console.println(F("============================================"));
         return true;
         
     default:
-        Console.error(F("Unknown system command. Available: state, help"));
+        Console.error(F("Unknown system command. Available: state, home, reset, help"));
         return false;
     }
 }

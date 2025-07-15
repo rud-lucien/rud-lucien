@@ -85,6 +85,9 @@ void printEncoderStatus();
 bool hasQuadratureError();
 void clearQuadratureError();
 
+// Timeout management
+void resetEncoderTimeouts();                // Reset timeout tracking to current time
+
 // Utility functions for integer math conversion
 // Note: These are declared in Utils.h and implemented in Utils.cpp
 // int32_t mmToScaled(double mm);     - Convert mm to scaled integer units

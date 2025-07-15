@@ -6,6 +6,7 @@
 #include "Sensors.h"
 #include "EthernetController.h"
 #include "LabwareAutomation.h"
+#include "RailAutomation.h"
 #include "Utils.h"
 
 // Global system state data
@@ -85,14 +86,14 @@ void printSafetySystemState()
     Console.serialDiagnostic(F("---------------"));
     
     // Emergency stop status
-    char msg[100];
+    char msg[MEDIUM_MSG_SIZE];
     sprintf_P(msg, PSTR("  Emergency Stop: %s"), 
-              SystemStateData.emergencyStopActivated ? "ACTIVATED ⚠️" : "Normal ✓");
+              SystemStateData.emergencyStopActivated ? "ACTIVATED" : "Normal");
     Console.serialDiagnostic(msg);
     
     // System limits
     sprintf_P(msg, PSTR("  Position Limits: %s"), 
-              SystemStateData.atPositionLimit ? "AT-LIMIT ⚠️" : "OK ✓");
+              SystemStateData.atPositionLimit ? "AT-LIMIT" : "OK");
     Console.serialDiagnostic(msg);
 }
 
@@ -105,23 +106,23 @@ void printSystemReadinessState()
     Console.serialDiagnostic(F("SYSTEM ACTIVITY & READINESS:"));
     Console.serialDiagnostic(F("----------------------------"));
     
-    char msg[150];
+    char msg[MEDIUM_MSG_SIZE];
     
     // System timing
     unsigned long uptime = millis() - systemStartTime;
-    sprintf_P(msg, PSTR("  System Uptime: %lu seconds"), uptime / 1000);
+    sprintf_P(msg, PSTR("  System Uptime: %lu seconds"), uptime / MILLISECONDS_PER_SECOND);
     Console.serialDiagnostic(msg);
     
     // Command activity from global variables
-    if (lastExecutedCommand[0] != '\0') {
+    if (lastExecutedCommand[0] != STRING_TERMINATOR) {
         sprintf_P(msg, PSTR("  Last Command: %s"), lastExecutedCommand);
         Console.serialDiagnostic(msg);
         
         unsigned long timeSinceCommand = millis() - lastCommandTime;
-        sprintf_P(msg, PSTR("  Time Since Command: %lu seconds"), timeSinceCommand / 1000);
+        sprintf_P(msg, PSTR("  Time Since Command: %lu seconds"), timeSinceCommand / MILLISECONDS_PER_SECOND);
         Console.serialDiagnostic(msg);
         
-        sprintf_P(msg, PSTR("  Command Result: %s"), lastCommandSuccess ? "SUCCESS ✓" : "FAILED ❌");
+        sprintf_P(msg, PSTR("  Command Result: %s"), lastCommandSuccess ? "SUCCESS" : "FAILED");
         Console.serialDiagnostic(msg);
     } else {
         Console.serialDiagnostic(F("  Last Command: None"));
@@ -131,7 +132,7 @@ void printSystemReadinessState()
     bool systemReady = isSystemReadyForAutomation();
     Console.serialDiagnostic(F(""));
     sprintf_P(msg, PSTR("  OVERALL SYSTEM STATUS: %s"), 
-              systemReady ? "READY FOR AUTOMATION ✓" : "NOT READY ❌");
+              systemReady ? "READY FOR AUTOMATION" : "NOT READY");
     Console.serialDiagnostic(msg);
     
     if (!systemReady) {
@@ -196,7 +197,7 @@ bool isSystemReadyForAutomation()
     }
     
     // Check motor readiness for both rails
-    for (uint8_t railId = 1; railId <= 2; railId++) {
+    for (uint8_t railId = FIRST_RAIL_ID; railId <= LAST_RAIL_ID; railId++) {
         if (!isHomingComplete(railId)) {
             return false;
         }
@@ -237,7 +238,7 @@ const char* getSystemErrorSummary()
     }
     
     // Check motors
-    for (uint8_t railId = 1; railId <= 2; railId++) {
+    for (uint8_t railId = FIRST_RAIL_ID; railId <= LAST_RAIL_ID; railId++) {
         if (!isHomingComplete(railId)) {
             errorMsg += "RAIL" + String(railId) + "_NOT_HOMED ";
         }
@@ -286,4 +287,215 @@ void setPositionLimit(bool atLimit)
 bool getPositionLimitStatus()
 {
     return SystemStateData.atPositionLimit;
+}
+
+//=============================================================================
+// SYSTEM RESET FUNCTION
+//=============================================================================
+void resetSystemState()
+{
+    // Track overall reset success
+    bool resetSuccessful = true;
+    char msg[LARGE_MSG_SIZE];
+    
+    Console.serialInfo(F("SYSTEM RESET: Clearing operational state"));
+    
+    // 1. MOTOR FAULT RECOVERY
+    // =======================
+    for (uint8_t railId = FIRST_RAIL_ID; railId <= LAST_RAIL_ID; railId++) {
+        if (hasMotorFault(railId)) {
+            bool faultCleared = false;
+            int clearAttempts = 0;
+            
+            sprintf_P(msg, PSTR("Rail %d: Clearing motor faults (%d attempts max)"), 
+                     railId, MAX_FAULT_CLEAR_ATTEMPTS);
+            Console.serialInfo(msg);
+            
+            while (!faultCleared && clearAttempts < MAX_FAULT_CLEAR_ATTEMPTS) {
+                clearAttempts++;
+                sprintf_P(msg, PSTR("  Attempt %d/%d"), clearAttempts, MAX_FAULT_CLEAR_ATTEMPTS);
+                Console.serialInfo(msg);
+                
+                if (executeRailClearFault(railId)) {
+                    faultCleared = true;
+                    Console.serialInfo(F("  Faults cleared"));
+                } else {
+                    Console.serialWarning(F("  Failed"));
+                    delay(FAULT_CLEAR_RETRY_DELAY_MS);
+                }
+            }
+            
+            if (!faultCleared) {
+                sprintf_P(msg, PSTR("Rail %d: Faults persist - manual 'rail%d clear-fault' required"), 
+                         railId, railId);
+                Console.serialError(msg);
+                resetSuccessful = false;
+            }
+        }
+    }
+    
+    // Re-enable motors if successful
+    if (resetSuccessful && !isEStopActive()) {
+        for (uint8_t railId = FIRST_RAIL_ID; railId <= LAST_RAIL_ID; railId++) {
+            if (!hasMotorFault(railId)) {
+                executeRailInit(railId);
+                sprintf_P(msg, PSTR("Rail %d: Motor enabled"), railId);
+                Console.serialInfo(msg);
+            }
+        }
+    }
+    
+    // 2. ENCODER/MPG RESET
+    // ====================
+    Console.serialInfo(F("MPG: Reset to defaults"));
+    disableEncoderControl();
+    setEncoderMultiplier(DEFAULT_ENCODER_MULTIPLIER);
+    resetEncoderTimeouts();
+    Console.serialInfo(F("MPG: Disabled, 10x multiplier, timeouts cleared"));
+    
+    // 3. POSITION RESET
+    // =================
+    Console.serialInfo(F("POSITIONING: Moving to reset positions"));
+    
+    if (resetSuccessful && !isEStopActive()) {
+        bool positioningSuccessful = true;
+        
+        // Step 1: Retract cylinder
+        Console.serialInfo(F("Rail 2: Retracting cylinder"));
+        ValveOperationResult cylinderResult = retractCylinder();
+        if (cylinderResult != VALVE_OP_SUCCESS) {
+            Console.serialWarning(F("Rail 2: Cylinder retraction failed"));
+            positioningSuccessful = false;
+        }
+        
+        // Step 2: Move Rail 2 to Workcell 3
+        if (positioningSuccessful && isHomingComplete(2)) {
+            Console.serialInfo(F("Rail 2: Moving to Workcell 3"));
+            if (!executeRailMoveToPosition(2, RAIL2_WC3_PICKUP_DROPOFF, false)) {
+                Console.serialWarning(F("Rail 2: Move to WC3 failed"));
+                positioningSuccessful = false;
+            }
+        }
+        
+        // Step 3: Move Rail 1 to Staging
+        if (positioningSuccessful && isHomingComplete(1)) {
+            Console.serialInfo(F("Rail 1: Moving to Staging"));
+            if (!executeRailMoveToPosition(1, RAIL1_STAGING_POSITION, false)) {
+                Console.serialWarning(F("Rail 1: Move to Staging failed"));
+                positioningSuccessful = false;
+            }
+        }
+        
+        if (!positioningSuccessful) {
+            Console.serialWarning(F("POSITIONING: Some moves failed - manual positioning required"));
+            resetSuccessful = false;
+        }
+    } else {
+        Console.serialWarning(F("POSITIONING: Skipped due to faults/E-stop"));
+    }
+    
+    // 4. SYNC AND TIMEOUTS
+    // ====================
+    Console.serialInfo(F("SYNC: Resetting timeouts and updating state"));
+    resetSystemTimeouts();
+    
+    if (performLabwareAudit()) {
+        Console.serialInfo(F("SYNC: Labware state updated"));
+    } else {
+        Console.serialWarning(F("SYNC: Labware sync incomplete - run 'labware audit'"));
+    }
+    
+    // Final status
+    if (resetSuccessful) {
+        Console.serialInfo(F("SYSTEM RESET: Complete - ready for automation"));
+        Console.acknowledge(F("RESET_SUCCESS"));
+    } else {
+        Console.serialWarning(F("SYSTEM RESET: Partial - manual intervention required"));
+        Console.error(F("RESET_PARTIAL"));
+    }
+}
+
+//=============================================================================
+// SYSTEM HOMING FUNCTION
+//=============================================================================
+bool homeSystemRails()
+{
+    char msg[MEDIUM_MSG_SIZE];
+    bool homingSuccessful = true;
+    
+    Console.serialInfo(F("SYSTEM HOME: Starting sequential rail homing"));
+    
+    // Pre-check: Verify system is safe for homing
+    if (isEStopActive()) {
+        Console.error(F("HOME FAILED: E-Stop active - release to continue"));
+        return false;
+    }
+    
+    // Step 1: Home Rail 1
+    // ===================
+    Console.serialInfo(F("Rail 1: Homing"));
+    
+    if (!executeRailHome(1)) {
+        Console.error(F("Rail 1: Homing failed"));
+        homingSuccessful = false;
+    } else {
+        if (isHomingComplete(1)) {
+            sprintf_P(msg, PSTR("Rail 1: Homed at %.2fmm"), getMotorPositionMm(1));
+            Console.serialInfo(msg);
+        } else {
+            Console.error(F("Rail 1: Homing verification failed"));
+            homingSuccessful = false;
+        }
+    }
+    
+    // Step 2: Home Rail 2 (only if Rail 1 succeeded)
+    // ===============================================
+    if (homingSuccessful) {
+        Console.serialInfo(F("Rail 2: Homing"));
+        
+        if (!executeRailHome(2)) {
+            Console.error(F("Rail 2: Homing failed"));
+            homingSuccessful = false;
+        } else {
+            if (isHomingComplete(2)) {
+                sprintf_P(msg, PSTR("Rail 2: Homed at %.2fmm"), getMotorPositionMm(2));
+                Console.serialInfo(msg);
+            } else {
+                Console.error(F("Rail 2: Homing verification failed"));
+                homingSuccessful = false;
+            }
+        }
+    } else {
+        Console.serialWarning(F("Rail 2: Skipped due to Rail 1 failure"));
+    }
+    
+    // Final status
+    if (homingSuccessful) {
+        Console.serialInfo(F("SYSTEM HOME: Complete - ready for automation"));
+        Console.acknowledge(F("HOME_SUCCESS"));
+    } else {
+        Console.serialWarning(F("SYSTEM HOME: Partial - use individual rail commands"));
+        Console.error(F("HOME_PARTIAL"));
+    }
+    
+    return homingSuccessful;
+}
+
+//=============================================================================
+// TIMEOUT RESET FUNCTIONS
+//=============================================================================
+void resetSystemTimeouts()
+{
+    Console.serialInfo(F("TIMEOUTS: Clearing stale timeout tracking"));
+    
+    // Reset encoder timeouts (critical for MPG safety)
+    resetEncoderTimeouts();
+    
+    // Reset network client timeouts (prevent immediate disconnections)
+    resetClientTimeouts();
+    
+    // Reset command timing for accurate diagnostics
+    lastCommandTime = millis();
+    
+    Console.serialInfo(F("TIMEOUTS: Reset complete"));
 }

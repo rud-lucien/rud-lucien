@@ -428,3 +428,18 @@ void printEthernetStatus()
     
     Console.serialInfo(F("=== END ETHERNET STATUS ==="));
 }
+
+//=============================================================================
+// TIMEOUT MANAGEMENT FUNCTIONS
+//=============================================================================
+void resetClientTimeouts()
+{
+    unsigned long currentTime = millis();
+    
+    // Reset all client activity timestamps to current time
+    for (int i = 0; i < MAX_ETHERNET_CLIENTS; i++) {
+        clientLastActivityTime[i] = currentTime;
+    }
+    
+    Console.serialInfo(F("Client activity timeouts reset - all clients have fresh timeout window"));
+}

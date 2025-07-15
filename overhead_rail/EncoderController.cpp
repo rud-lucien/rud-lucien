@@ -564,3 +564,16 @@ void clearQuadratureError()
     
     Console.serialInfo(F("Quadrature error cleared"));
 }
+
+//=============================================================================
+// TIMEOUT MANAGEMENT FUNCTIONS
+//=============================================================================
+void resetEncoderTimeouts()
+{
+    unsigned long currentTime = millis();
+    lastEncoderActivity = currentTime;
+    lastTimeoutCheck = currentTime;
+    lastEncoderUpdateTime = currentTime;
+    
+    Console.serialInfo(F("Encoder timeout tracking reset - fresh timeout window started"));
+}

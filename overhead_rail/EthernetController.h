@@ -47,4 +47,7 @@ int getConnectedClientCount();              // Get count of currently connected 
 // Status and diagnostics
 void printEthernetStatus();                 // Print Ethernet connection status
 
+// Timeout management
+void resetClientTimeouts();                 // Reset all client activity timeouts to current time
+
 #endif // ETHERNET_CONTROLLER_H
