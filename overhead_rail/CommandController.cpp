@@ -30,17 +30,17 @@ extern EthernetClient clients[];
 const CommandInfo COMMAND_TABLE[] = {
     {"abort", CMD_EMERGENCY, 0},
     {"encoder", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY | CMD_FLAG_ASYNC},
-    {"goto", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"goto", CMD_AUTOMATED, CMD_FLAG_ASYNC},
     {"h", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
     {"help", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"jog", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"jog", CMD_MANUAL, CMD_FLAG_ASYNC},
     {"labware", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
     {"log", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
     {"network", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"rail1", CMD_MODIFYING, CMD_FLAG_ASYNC},
-    {"rail2", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"rail1", CMD_AUTOMATED, CMD_FLAG_ASYNC},
+    {"rail2", CMD_AUTOMATED, CMD_FLAG_ASYNC},
     {"system", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"teach", CMD_MODIFYING, 0}
+    {"teach", CMD_MANUAL, 0}
 };
 
 // Number of commands in the table
@@ -48,6 +48,7 @@ const size_t COMMAND_TABLE_SIZE = sizeof(COMMAND_TABLE) / sizeof(CommandInfo);
 
 // Operation state tracking
 bool operationInProgress = false;
+int currentOperationType = 0; // 0 = no operation, 1-6 = specific operation types
 
 // Command tracking for system state reporting
 char lastExecutedCommand[MAX_COMMAND_LENGTH] = "";
@@ -217,7 +218,7 @@ bool processCommand(const char *rawCommand, Stream *output, const char *sourceTa
     if (cmdInfo && strcmp(cmdInfo->name, "abort") == 0)
     {
         Console.acknowledge(F("Abort command received"));
-        operationInProgress = false; // Clear any operation in progress
+        clearOperationInProgress(); // Clear any operation in progress and reset type
         clearPersistentClient();
         return true;
     }
@@ -236,11 +237,18 @@ bool processCommand(const char *rawCommand, Stream *output, const char *sourceTa
         if (isAsyncCommand)
         {
             persistentClient = output;
+            
+            // Automatically set operation type for async commands
+            int operationType = determineOperationTypeFromCommand(originalCommand);
+            if (operationType > 0) {
+                setOperationInProgress(operationType);
+            }
         }
 
         // Execute the command (placeholder for now - will be implemented when Commands.h is ready)
         bool success = executeCommand(originalCommand, output);
 
+        // For non-async commands, clear the operation state if it was set
         if (!isAsyncCommand)
         {
             Console.setCurrentClient(nullptr);
@@ -381,82 +389,185 @@ CommandType getCommandType(const char *originalCommand)
         // Special handling for rail commands that have emergency subcommands
         if (strcmp(firstWord, "rail1") == 0 || strcmp(firstWord, "rail2") == 0)
         {
-            // Check for emergency subcommands
+            // Emergency subcommands (always allowed)
             if (strstr(originalCommand, ",abort") != nullptr ||
                 strstr(originalCommand, ",stop") != nullptr)
             {
                 return CMD_EMERGENCY;
             }
 
-            // Check for read-only subcommands
+            // Read-only subcommands (allowed during operations)
             if (strstr(originalCommand, ",status") != nullptr ||
                 strstr(originalCommand, ",help") != nullptr)
             {
                 return CMD_READ_ONLY;
             }
 
-            // All other rail commands are modifying
-            return CMD_MODIFYING;
+            // Automated subcommands (block everything except emergency/read-only)
+            if (strstr(originalCommand, ",home") != nullptr ||
+                strstr(originalCommand, ",move-wc1") != nullptr ||
+                strstr(originalCommand, ",move-wc2") != nullptr ||
+                strstr(originalCommand, ",move-wc3") != nullptr ||
+                strstr(originalCommand, ",move-staging") != nullptr ||
+                strstr(originalCommand, ",move-handoff") != nullptr ||
+                strstr(originalCommand, ",move-mm-to") != nullptr ||
+                strstr(originalCommand, ",move-rel") != nullptr)
+            {
+                return CMD_AUTOMATED;
+            }
+
+            // Manual subcommands (blocked during automation)
+            if (strstr(originalCommand, ",init") != nullptr ||
+                strstr(originalCommand, ",clear-fault") != nullptr ||
+                strstr(originalCommand, ",extend") != nullptr ||
+                strstr(originalCommand, ",retract") != nullptr)
+            {
+                return CMD_MANUAL;
+            }
+
+            // Default to automated for unknown rail subcommands
+            return CMD_AUTOMATED;
+        }
+
+        // Special handling for goto commands (automated movement)
+        if (strcmp(firstWord, "goto") == 0)
+        {
+            // Read-only subcommands (allowed during operations)
+            if (strstr(originalCommand, ",help") != nullptr)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // Automated subcommands (block everything except emergency/read-only)
+            if (strstr(originalCommand, ",wc1,") != nullptr ||
+                strstr(originalCommand, ",wc2,") != nullptr ||
+                strstr(originalCommand, ",wc3,") != nullptr)
+            {
+                return CMD_AUTOMATED;
+            }
+
+            // Default to automated for unknown goto subcommands
+            return CMD_AUTOMATED;
         }
 
         // Special handling for system commands
         if (strcmp(firstWord, "system") == 0)
         {
-            // System status commands are read-only
+            // Read-only subcommands (allowed during operations)
             if (strstr(originalCommand, ",state") != nullptr ||
                 strstr(originalCommand, ",help") != nullptr)
             {
                 return CMD_READ_ONLY;
             }
 
-            // System reset/home commands are modifying
-            return CMD_MODIFYING;
+            // Automated subcommands (block everything except emergency/read-only)
+            if (strstr(originalCommand, ",home") != nullptr ||
+                strstr(originalCommand, ",reset") != nullptr)
+            {
+                return CMD_AUTOMATED;
+            }
+
+            // Default to automated for unknown system subcommands
+            return CMD_AUTOMATED;
         }
 
         // Special handling for teach commands
         if (strcmp(firstWord, "teach") == 0)
         {
-            // Status commands are read-only
+            // Read-only subcommands (allowed during operations)
             if (strstr(originalCommand, ",status") != nullptr)
             {
                 return CMD_READ_ONLY;
             }
 
-            // All other teach commands are modifying
-            return CMD_MODIFYING;
+            // Manual subcommands (blocked during automation)
+            if (strstr(originalCommand, ",reset") != nullptr ||
+                strstr(originalCommand, ",1,staging") != nullptr ||
+                strstr(originalCommand, ",1,wc1") != nullptr ||
+                strstr(originalCommand, ",1,wc2") != nullptr ||
+                strstr(originalCommand, ",1,handoff") != nullptr ||
+                strstr(originalCommand, ",2,handoff") != nullptr ||
+                strstr(originalCommand, ",2,wc3") != nullptr)
+            {
+                return CMD_MANUAL;
+            }
+
+            // Default to manual for unknown teach subcommands (position teaching)
+            return CMD_MANUAL;
         }
 
         // Special handling for labware commands
         if (strcmp(firstWord, "labware") == 0)
         {
-            // Status and help are read-only
+            // Read-only subcommands (allowed during operations)
             if (strstr(originalCommand, ",status") != nullptr ||
                 strstr(originalCommand, ",help") != nullptr)
             {
                 return CMD_READ_ONLY;
             }
 
-            // Audit and reset are modifying
-            return CMD_MODIFYING;
+            // Automated subcommands (block everything except emergency/read-only)
+            if (strstr(originalCommand, ",audit") != nullptr ||
+                strstr(originalCommand, ",reset") != nullptr)
+            {
+                return CMD_AUTOMATED;
+            }
+
+            // Default to automated for unknown labware subcommands
+            return CMD_AUTOMATED;
         }
 
-        // Special handling for encoder commands
+        // Special handling for encoder commands (manual control)
         if (strcmp(firstWord, "encoder") == 0)
         {
-            // Status and help are read-only
+            // Read-only subcommands (allowed during operations)
             if (strstr(originalCommand, ",status") != nullptr ||
                 strstr(originalCommand, ",help") != nullptr)
             {
                 return CMD_READ_ONLY;
             }
 
-            // All other encoder commands are modifying
-            return CMD_MODIFYING;
+            // Manual subcommands (blocked during automation)
+            if (strstr(originalCommand, ",enable") != nullptr ||
+                strstr(originalCommand, ",disable") != nullptr ||
+                strstr(originalCommand, ",multiplier") != nullptr ||
+                strstr(originalCommand, ",velocity") != nullptr)
+            {
+                return CMD_MANUAL;
+            }
+
+            // Default to manual for unknown encoder subcommands
+            return CMD_MANUAL;
         }
 
-        // Special handling for jog commands (all modifying)
+        // Special handling for jog commands (manual control)
         if (strcmp(firstWord, "jog") == 0)
         {
+            // Read-only subcommands (allowed during operations)
+            if (strstr(originalCommand, ",status") != nullptr ||
+                strstr(originalCommand, ",help") != nullptr)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // Manual subcommands (blocked during automation)
+            if (strstr(originalCommand, ",1,+") != nullptr ||
+                strstr(originalCommand, ",1,-") != nullptr ||
+                strstr(originalCommand, ",2,+") != nullptr ||
+                strstr(originalCommand, ",2,-") != nullptr ||
+                strstr(originalCommand, ",increment") != nullptr ||
+                strstr(originalCommand, ",speed") != nullptr)
+            {
+                return CMD_MANUAL;
+            }
+
+            // Default to manual for unknown jog subcommands
+            return CMD_MANUAL;
+        }
+
+        // Special handling for network commands
+        if (strcmp(firstWord, "network") == 0)
+        {
             // Status and help are read-only
             if (strstr(originalCommand, ",status") != nullptr ||
                 strstr(originalCommand, ",help") != nullptr)
@@ -464,28 +575,34 @@ CommandType getCommandType(const char *originalCommand)
                 return CMD_READ_ONLY;
             }
 
-            // All other jog commands are modifying
-            return CMD_MODIFYING;
+            // All other network commands are manual
+            return CMD_MANUAL;
         }
 
-        // Special handling for network commands (all read-only)
-        if (strcmp(firstWord, "network") == 0)
-        {
-            return CMD_READ_ONLY;
-        }
-
-        // Special handling for log commands (all read-only)
+        // Special handling for log commands
         if (strcmp(firstWord, "log") == 0)
         {
-            return CMD_READ_ONLY;
+            // Read-only log commands (display information only)
+            if (strstr(originalCommand, ",history") != nullptr ||
+                strstr(originalCommand, ",errors") != nullptr ||
+                strstr(originalCommand, ",last") != nullptr ||
+                strstr(originalCommand, ",stats") != nullptr ||
+                strstr(originalCommand, ",now") != nullptr ||
+                strstr(originalCommand, ",help") != nullptr)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // All other log commands are manual
+            return CMD_MANUAL;
         }
 
         // For other commands, use the type from the table
         return cmdInfo->type;
     }
 
-    // Unknown commands are treated as modifying (conservative approach)
-    return CMD_MODIFYING;
+    // Unknown commands are treated as automated (conservative approach)
+    return CMD_AUTOMATED;
 }
 
 bool canExecuteCommand(const char *command)
@@ -504,14 +621,16 @@ bool canExecuteCommand(const char *command)
         return true;
     }
 
-    // For other modifying commands, check if an operation is in progress
+    // Check if an operation is in progress
     if (operationInProgress)
     {
-        sendCommandRejection(command, "Operation in progress");
+        // During automation, only allow emergency and read-only commands
+        // Block both manual and other automated commands
+        sendCommandRejection(command, "Automated operation in progress");
         return false;
     }
 
-    // Command is allowed
+    // When no operation is in progress, allow both manual and automated commands
     return true;
 }
 
@@ -557,6 +676,12 @@ void clearPersistentClient()
 // COMMAND TRACKING FUNCTIONS
 //=============================================================================
 
+// Time constants for command status reporting
+const unsigned long STARTUP_GRACE_PERIOD_MS = 60000;    // 1 minute startup grace period
+const unsigned long RECENT_COMMAND_THRESHOLD_MS = 5000;  // Commands within 5 seconds are "recent"
+const unsigned long STALE_COMMAND_THRESHOLD_MS = 300000; // Commands older than 5 minutes are "stale"
+const size_t COMMAND_STATUS_BUFFER_SIZE = 80;           // Buffer size for status messages
+
 void initializeSystemStartTime()
 {
     systemStartTime = millis();
@@ -564,12 +689,12 @@ void initializeSystemStartTime()
 
 const char* getLastCommandStatus()
 {
-    static char statusBuffer[80];
+    static char statusBuffer[COMMAND_STATUS_BUFFER_SIZE];
     
     if (lastExecutedCommand[0] == '\0') {
         // No commands issued yet
         unsigned long uptime = millis() - systemStartTime;
-        if (uptime < 60000) { // Less than 1 minute
+        if (uptime < STARTUP_GRACE_PERIOD_MS) {
             return "System starting up - no commands yet";
         } else {
             return "Ready - awaiting first command";
@@ -579,19 +704,23 @@ const char* getLastCommandStatus()
     // Show actual command info
     unsigned long age = millis() - lastCommandTime;
     
-    if (age < 5000) { // Less than 5 seconds - show recent
+    if (age < RECENT_COMMAND_THRESHOLD_MS) {
+        // Recently executed command - show full details
         snprintf(statusBuffer, sizeof(statusBuffer), 
                 "RECENT: %s (%s) - %s", 
                 lastExecutedCommand,
                 lastCommandSource,
                 lastCommandSuccess ? "OK" : "FAILED");
-    } else if (age < 300000) { // Less than 5 minutes - show with time
+    } else if (age < STALE_COMMAND_THRESHOLD_MS) {
+        // Moderately old command - show with age
+        // Safe division: ensure we show at least 1 second to avoid division issues
+        unsigned long ageSeconds = (age >= 1000) ? age / 1000 : 1;
         snprintf(statusBuffer, sizeof(statusBuffer), 
                 "LAST: %s (%lus ago)", 
                 lastExecutedCommand, 
-                age / 1000);
+                ageSeconds);
     } else {
-        // Old command - just show it was executed
+        // Stale command - just acknowledge it happened
         snprintf(statusBuffer, sizeof(statusBuffer), 
                 "LAST: %s (>5min ago)", 
                 lastExecutedCommand);
@@ -604,14 +733,32 @@ const char* getLastCommandStatus()
 // UTILITY FUNCTIONS
 //=============================================================================
 
+void resetCommandControllerState()
+{
+    // Clear operation tracking
+    clearOperationInProgress();
+    
+    // Reset command buffers to clean state
+    memset(serialCommandBuffer, 0, sizeof(serialCommandBuffer));
+    memset(ethernetCommandBuffer, 0, sizeof(ethernetCommandBuffer));
+    
+    // Reset command history tracking (keep system start time)
+    lastExecutedCommand[0] = '\0';
+    lastCommandTime = millis();  // Reset to current time for clean slate
+    lastCommandSuccess = false;
+    lastCommandType = CMD_READ_ONLY;
+    strcpy(lastCommandSource, "RESET");
+}
+
 void sendCommandRejection(const char *command, const char *reason)
 {
     char msg[MEDIUM_MSG_SIZE];
 
     if (operationInProgress)
     {
-        // This is truly a BUSY condition
-        sprintf_P(msg, FMT_COMMAND_BUSY, command, reason);
+        // This is truly a BUSY condition - use operation type name for better feedback
+        const char* operationName = getOperationTypeName(currentOperationType);
+        sprintf_P(msg, FMT_COMMAND_BUSY, command, operationName);
     }
     else
     {
@@ -627,16 +774,99 @@ const char *getOperationTypeName(int type)
     switch (type)
     {
     case 1:
-        return "Homing";
+        return "Rail homing operation";
     case 2:
-        return "Movement";
+        return "Automated rail movement";
     case 3:
-        return "Teaching";
+        return "Labware positioning operation";
     case 4:
-        return "Valve operation";
+        return "Manual positioning operation";
+    case 5:
+        return "Position teaching operation";
+    case 6:
+        return "System configuration operation";
     default:
-        return "Automated";
+        return "Automated operation";
     }
+}
+
+void setOperationInProgress(int operationType)
+{
+    operationInProgress = true;
+    currentOperationType = operationType;
+}
+
+void clearOperationInProgress()
+{
+    operationInProgress = false;
+    currentOperationType = 0;
+}
+
+int determineOperationTypeFromCommand(const char *command)
+{
+    // Extract first word (main command)
+    char firstWord[16] = {0};
+    int i = 0;
+    while (command[i] && command[i] != ',' && command[i] != ' ' && i < 15)
+    {
+        firstWord[i] = command[i];
+        i++;
+    }
+    firstWord[i] = '\0';
+
+    // Rail homing operations
+    if ((strcmp(firstWord, "rail1") == 0 || strcmp(firstWord, "rail2") == 0) && strstr(command, ",home") != nullptr)
+    {
+        return 1; // Rail homing operation
+    }
+    
+    // System homing operations
+    if (strcmp(firstWord, "system") == 0 && strstr(command, ",home") != nullptr)
+    {
+        return 1; // Rail homing operation
+    }
+
+    // Automated rail movements
+    if ((strcmp(firstWord, "rail1") == 0 || strcmp(firstWord, "rail2") == 0) && 
+        (strstr(command, ",move-") != nullptr))
+    {
+        return 2; // Automated rail movement
+    }
+
+    // Labware positioning operations (goto commands)
+    if (strcmp(firstWord, "goto") == 0)
+    {
+        return 3; // Labware positioning operation
+    }
+
+    // Labware audit operations
+    if (strcmp(firstWord, "labware") == 0 && strstr(command, ",audit") != nullptr)
+    {
+        return 3; // Labware positioning operation
+    }
+
+    // Manual positioning operations (jog, encoder)
+    if (strcmp(firstWord, "jog") == 0 || 
+        (strcmp(firstWord, "encoder") == 0 && strstr(command, ",enable") != nullptr))
+    {
+        return 4; // Manual positioning operation
+    }
+
+    // Position teaching operations
+    if (strcmp(firstWord, "teach") == 0 && strstr(command, ",status") == nullptr)
+    {
+        return 5; // Position teaching operation
+    }
+
+    // System configuration operations
+    if (strcmp(firstWord, "system") == 0 && 
+        (strstr(command, ",reset") != nullptr))
+    {
+        return 6; // System configuration operation
+    }
+
+    // Default to generic automated operation
+    return 0; // Will use default case in getOperationTypeName
 }
 
 char *trimLeadingSpaces(char *str)

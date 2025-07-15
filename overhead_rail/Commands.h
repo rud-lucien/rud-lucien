@@ -9,14 +9,13 @@
 #include "Sensors.h"
 #include "LabwareAutomation.h"
 #include "Logging.h"
-#include "CommandController.h"
 #include "Utils.h"
 #include "EncoderController.h"
 #include "EthernetController.h"
 #include "LogHistory.h"
-#include "PositionConfig.h" // Include PositionConfig for position management
-#include "RailAutomation.h" // Include RailAutomation for automated rail operations
-#include "SystemState.h"    // Include SystemState for system status reporting
+#include "PositionConfig.h" 
+#include "RailAutomation.h" 
+#include "SystemState.h"    
 
 //=============================================================================
 // COMMAND CONSTANTS

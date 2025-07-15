@@ -400,6 +400,10 @@ void resetSystemState()
     Console.serialInfo(F("SYNC: Resetting timeouts and updating state"));
     resetSystemTimeouts();
     
+    // Clear any operation in progress state
+    resetCommandControllerState();
+    Console.serialInfo(F("SYNC: Command controller state reset"));
+    
     if (performLabwareAudit()) {
         Console.serialInfo(F("SYNC: Labware state updated"));
     } else {

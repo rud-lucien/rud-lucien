@@ -1,4 +1,5 @@
 #include "Commands.h"
+#include "CommandController.h"
 #include "Logging.h"
 #include "RailAutomation.h"
 #include "HandoffController.h"

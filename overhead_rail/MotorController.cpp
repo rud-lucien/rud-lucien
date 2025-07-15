@@ -1,4 +1,5 @@
 #include "MotorController.h"
+#include "CommandController.h"
 #include "Utils.h"
 #include "LabwareAutomation.h"
 
@@ -1103,12 +1104,15 @@ bool initiateHomingSequence(int rail) {
     homingState.lastCheckedPosition = homingState.startPulses;
     homingState.lastPositionCheckTime = millis();
     
-    // Set global homing flag
+    // Set global homing flag and operation state
     if (rail == 1) {
         rail1HomingInProgress = true;
     } else if (rail == 2) {
         rail2HomingInProgress = true;
     }
+    
+    // Set operation in progress with homing type
+    setOperationInProgress(1); // 1 = Rail homing operation
     
     // Set homing velocity and direction
     int32_t homingVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
@@ -1264,6 +1268,11 @@ void completeHomingSequence(int rail) {
         rail2HomingInProgress = false;
     }
     
+    // Clear operation state if no rails are homing anymore
+    if (!rail1HomingInProgress && !rail2HomingInProgress) {
+        clearOperationInProgress();
+    }
+    
     // Calculate and display homing duration
     unsigned long homingDuration = timeDiff(millis(), homingState.homingStartTime);
     sprintf_P(msg, FMT_HOMING_COMPLETED, motorName);
@@ -1290,6 +1299,11 @@ void abortHoming(int rail) {
     
     // Reset homing state
     resetHomingState(rail);
+    
+    // Clear operation state if no rails are homing anymore
+    if (!rail1HomingInProgress && !rail2HomingInProgress) {
+        clearOperationInProgress();
+    }
     
     sprintf_P(msg, FMT_HOMING_ABORTED, motorName);
     Console.serialInfo(msg);

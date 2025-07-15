@@ -16,9 +16,10 @@
 // Command types for operation-in-progress filtering
 enum CommandType
 {
-    CMD_EMERGENCY, // Always allowed (stop, abort, estop)
-    CMD_READ_ONLY, // Always allowed (status, get position, etc.)
-    CMD_MODIFYING  // Rejected during operations (move, config, etc.)
+    CMD_EMERGENCY,  // Always allowed (stop, abort, estop)
+    CMD_READ_ONLY,  // Always allowed (status, get position, etc.)
+    CMD_MANUAL,     // Manual operations (blocked during automation)
+    CMD_AUTOMATED   // Automated operations (block everything except emergency/read-only)
 };
 
 // Command lookup table structure
@@ -41,6 +42,7 @@ struct CommandInfo
 //=============================================================================
 // Operation state tracking
 extern bool operationInProgress;
+extern int currentOperationType;
 
 // Command tracking for system state reporting
 extern char lastExecutedCommand[MAX_COMMAND_LENGTH];
@@ -76,6 +78,9 @@ void clearPersistentClient();
 
 // Utility Functions
 const char *getOperationTypeName(int type);
+void setOperationInProgress(int operationType);
+void clearOperationInProgress();
+int determineOperationTypeFromCommand(const char *command);
 char *trimLeadingSpaces(char *str);
 void sendCommandRejection(const char *command, const char *reason);
 const CommandInfo *findCommand(const char *cmdName);
@@ -84,6 +89,9 @@ bool isCommandExcludedFromHistory(const char *command);
 // Command tracking functions
 const char *getLastCommandStatus();
 void initializeSystemStartTime();
+
+// System reset function
+void resetCommandControllerState();
 
 // Command execution functions - now connected to Commands.cpp
 bool executeCommand(const char *command, Stream *output);
