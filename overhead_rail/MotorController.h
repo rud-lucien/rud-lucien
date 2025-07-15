@@ -297,7 +297,6 @@ bool initMotorManager();
 
 // Unit Conversion Utilities
 int32_t rpmToPps(double rpm);
-double ppsToRpm(int32_t pps);
 int32_t rpmPerSecToPpsPerSec(double rpmPerSec);
 int32_t rail1MmToPulses(double mm);
 int32_t rail2MmToPulses(double mm);
@@ -308,8 +307,6 @@ double pulsesToMm(int32_t pulses, int rail);
 
 // Optimized integer math conversion functions (for performance)
 int32_t mmToPulsesScaled(int32_t mmScaled, int rail);     // Input: mm * 100, Output: pulses
-int32_t pulsesToMmScaled(int32_t pulses, int rail);      // Input: pulses, Output: mm * 100
-int32_t mmToPulsesInteger(double mm, int rail);          // Optimized version using integer math internally
 
 // Position and Rail Utilities
 int32_t getPositionPulses(PositionTarget target);
@@ -350,12 +347,9 @@ int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32
 
 
 // Positioning and Movement
-int32_t selectMoveVelocity(int rail, PositionTarget fromPos, PositionTarget toPos, bool carriageLoaded);
 bool moveToPositionFromCurrent(int rail, PositionTarget toPos, bool carriageLoaded);
-bool moveToAbsolutePosition(int rail, int32_t positionPulses, bool carriageLoaded);  
 bool moveToPositionMm(int rail, double positionMm, bool carriageLoaded = false);
 bool moveRelativeMm(int rail, double relativeMm, bool carriageLoaded = false);
-bool moveToPosition(int rail, int positionNumber, bool carriageLoaded);
 
 // Homing Operations
 bool initiateHomingSequence(int rail);

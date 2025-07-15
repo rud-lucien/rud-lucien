@@ -55,11 +55,6 @@ const char FMT_JOG_SPEED_SET[] PROGMEM = "%s: Jog speed set to %d RPM";
 const char FMT_JOG_SPEED_SET_WITH_DISTANCE[] PROGMEM = "%s: Jog speed set to %d RPM, increment set to %.2fmm";
 const char FMT_MOVE_POSITIONED[] PROGMEM = "%s: %s→%s (%.1fmm) at %d RPM %s";
 const char FMT_MOVE_TO_POSITION[] PROGMEM = "%s: Moving to %s (%.1fmm) at %d RPM %s";
-const char FMT_INVALID_POSITION_NUM_RAIL1[] PROGMEM = "%s: Invalid position number %d (valid: 0-4)";
-const char FMT_INVALID_POSITION_NUM_RAIL2[] PROGMEM = "%s: Invalid position number %d (valid: 0-2)";
-const char FMT_INVALID_RAIL_NUM[] PROGMEM = "Invalid rail number %d (valid: 1-2)";
-const char FMT_POSITION_OUT_OF_RANGE[] PROGMEM = "%s: Position %ld pulses outside valid range (0 to %ld)";
-const char FMT_MOVE_TO_ABSOLUTE[] PROGMEM = "%s: Moving to absolute position %ld pulses (%.1fmm)";
 const char FMT_POSITION_MM_OUT_OF_RANGE[] PROGMEM = "%s: Position %.2fmm outside valid range (0 to %.2fmm)";
 const char FMT_MOVE_TO_MM[] PROGMEM = "%s: Moving to %.2fmm (%ld pulses) at %d RPM %s";
 const char FMT_RELATIVE_MOVE_RANGE[] PROGMEM = "%s: Relative move would exceed valid range (0 to %.2fmm)";
@@ -621,11 +616,6 @@ int32_t rpmToPps(double rpm)
     return (int32_t)((rpm * PULSES_PER_REV) / 60.0);
 }
 
-double ppsToRpm(int32_t pps)
-{
-    return (double)pps * 60.0 / PULSES_PER_REV;
-}
-
 int32_t rpmPerSecToPpsPerSec(double rpmPerSec)
 {
     return (int32_t)((rpmPerSec * PULSES_PER_REV) / 60.0);
@@ -677,26 +667,6 @@ int32_t mmToPulsesScaled(int32_t mmScaled, int rail)
     } else {
         return (mmScaled * RAIL2_PULSES_PER_MM_SCALED) / 10000;
     }
-}
-
-int32_t pulsesToMmScaled(int32_t pulses, int rail)
-{
-    // Input: pulses, Output: mm * 100
-    // pulses * 10000 / PULSES_PER_MM_SCALED = mm * 100
-    
-    if (rail == 1) {
-        return (pulses * 10000) / RAIL1_PULSES_PER_MM_SCALED;
-    } else {
-        return (pulses * 10000) / RAIL2_PULSES_PER_MM_SCALED;
-    }
-}
-
-int32_t mmToPulsesInteger(double mm, int rail)
-{
-    // Optimized version that uses integer math internally
-    // Convert mm to scaled integer, then use integer math
-    int32_t mmScaled = (int32_t)(mm * 100);
-    return mmToPulsesScaled(mmScaled, rail);
 }
 
 //=============================================================================
@@ -1913,15 +1883,6 @@ int32_t selectMoveVelocityByDistance(int rail, double moveDistanceMm, bool carri
     return adjustedVelocityRpm;
 }
 
-int32_t selectMoveVelocity(int rail, PositionTarget fromPos, PositionTarget toPos, bool carriageLoaded) {
-    // Calculate distance between positions
-    int32_t fromPulses = getPositionPulses(fromPos);
-    int32_t toPulses = getPositionPulses(toPos);
-    double moveDistanceMm = abs(pulsesToMm(toPulses - fromPulses, rail));
-    
-    return selectMoveVelocityByDistance(rail, moveDistanceMm, carriageLoaded);
-}
-
 //=============================================================================
 // ENHANCED MOVEMENT VALIDATION AND PROGRESS MONITORING
 //=============================================================================
@@ -2038,91 +1999,7 @@ void updateDecelerationVelocity(int rail) {
 //=============================================================================
 // POSITION NUMBER INTERFACE FUNCTIONS
 //=============================================================================
-
-bool moveToPosition(int rail, int positionNumber, bool carriageLoaded) {
-    const char* motorName = getMotorName(rail);
-    char msg[MEDIUM_MSG_SIZE];
-    
-    PositionTarget target;
-    
-    // Convert position numbers to position targets
-    if (rail == 1) {
-        switch (positionNumber) {
-            case 0: target = RAIL1_HOME_POS; break;
-            case 1: target = RAIL1_WC2_PICKUP_DROPOFF_POS; break;
-            case 2: target = RAIL1_WC1_PICKUP_DROPOFF_POS; break;
-            case 3: target = RAIL1_STAGING_POS; break;
-            case 4: target = RAIL1_HANDOFF_POS; break;
-            default:
-                sprintf_P(msg, FMT_INVALID_POSITION_NUM_RAIL1, motorName, positionNumber);
-                Console.serialError(msg);
-                return false;
-        }
-    } else if (rail == 2) {
-        switch (positionNumber) {
-            case 0: target = RAIL2_HOME_POS; break;
-            case 1: target = RAIL2_HANDOFF_POS; break;
-            case 2: target = RAIL2_WC3_PICKUP_DROPOFF_POS; break;
-            default:
-                sprintf_P(msg, FMT_INVALID_POSITION_NUM_RAIL2, motorName, positionNumber);
-                Console.serialError(msg);
-                return false;
-        }
-    } else {
-        sprintf_P(msg, FMT_INVALID_RAIL_NUM, rail);
-        Console.serialError(msg);
-        return false;
-    }
-    
-    return moveToPositionFromCurrent(rail, target, carriageLoaded);
-}
-
-bool moveToAbsolutePosition(int rail, int32_t positionPulses, bool carriageLoaded) {
-    MotorDriver& motor = getMotorByRail(rail);
-    const char* motorName = getMotorName(rail);
-    char msg[MEDIUM_MSG_SIZE];
-    
-    // Validate position range
-    int32_t maxTravelPulses = mmToPulses((rail == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM, rail);
-    if (positionPulses < 0 || positionPulses > maxTravelPulses) {
-        sprintf_P(msg, FMT_POSITION_OUT_OF_RANGE, motorName, positionPulses, maxTravelPulses);
-        Console.serialError(msg);
-        return false;
-    }
-    
-    // Check if motor is ready
-    if (!isMotorReady(rail)) {
-        sprintf_P(msg, FMT_MOTOR_CANNOT_MOVE, motorName);
-        Console.serialError(msg);
-        return false;
-    }
-    
-    // Calculate move
-    int32_t currentPulses = motor.PositionRefCommanded();
-    int32_t movePulses = positionPulses - currentPulses;
-    
-    if (movePulses == 0) {
-        sprintf_P(msg, PSTR("%s: Already at target position %ld pulses"), motorName, positionPulses);
-        Console.serialInfo(msg);
-        return true;
-    }
-    
-    // Calculate movement distance and select velocity
-    double moveDistanceMm = abs(pulsesToMm(movePulses, rail));
-    int32_t velocityRpm = selectMoveVelocityByDistance(rail, moveDistanceMm, carriageLoaded);
-    int32_t velocityPps = rpmToPps(velocityRpm);
-    
-    // Set velocity and initiate move
-    setMotorVelocity(rail, velocityPps);
-    motor.Move(movePulses);
-    
-    // Log the movement
-    sprintf_P(msg, FMT_MOVE_TO_ABSOLUTE, motorName, positionPulses, pulsesToMm(positionPulses, rail));
-    Console.serialInfo(msg);
-    
-    return true;
-}
-
+// POSITION VALIDATION FUNCTION
 //=============================================================================
 // POSITION VALIDATION FUNCTION
 //=============================================================================
