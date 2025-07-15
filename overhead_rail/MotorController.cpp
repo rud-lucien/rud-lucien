@@ -178,6 +178,16 @@ int32_t getHomeMinDistancePulses(int rail) {
     return (rail == 1) ? HOME_MIN_DISTANCE_PULSES_RAIL1 : HOME_MIN_DISTANCE_PULSES_RAIL2;
 }
 
+// Get rail-specific homing approach velocity
+int32_t getHomeApproachVelocityRpm(int rail) {
+    return (rail == 1) ? RAIL1_HOME_APPROACH_VELOCITY_RPM : RAIL2_HOME_APPROACH_VELOCITY_RPM;
+}
+
+// Get rail-specific smart homing fast approach velocity
+int32_t getHomeFastApproachVelocityRpm(int rail) {
+    return (rail == 1) ? RAIL1_HOME_FAST_APPROACH_VELOCITY_RPM : RAIL2_HOME_FAST_APPROACH_VELOCITY_RPM;
+}
+
 // Helper function to set motor velocity and update per-motor tracking
 void setMotorVelocity(int rail, int32_t velocityPps) {
     MotorDriver& motor = getMotorByRail(rail);
@@ -1148,7 +1158,7 @@ bool initiateHomingSequence(int rail) {
     setOperationInProgress(1); // 1 = Rail homing operation
     
     // Set homing velocity and direction
-    int32_t homingVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM, rail);
+    int32_t homingVelPps = rpmToPps(getHomeApproachVelocityRpm(rail), rail);
     setMotorVelocity(rail, homingVelPps);
     
     // Move in homing direction (relative move to trigger HLFB change)
@@ -1195,8 +1205,11 @@ void checkHomingProgress(int rail) {
     int32_t currentPosition = motor.PositionRefCommanded();
     int32_t totalMovement = abs(currentPosition - homingState.startPulses);
     
+    // Get rail-specific minimum movement pulses
+    int32_t minMovementPulses = (rail == 1) ? RAIL1_HOMING_MIN_MOVEMENT_PULSES : RAIL2_HOMING_MIN_MOVEMENT_PULSES;
+    
     // Check for minimum distance traveled (diagnostic info reduced)
-    if (!homingState.minDistanceTraveled && totalMovement >= HOMING_MIN_MOVEMENT_PULSES) {
+    if (!homingState.minDistanceTraveled && totalMovement >= minMovementPulses) {
         homingState.minDistanceTraveled = true;
         homingState.positionAtMinDistance = currentPosition;
         homingState.minTimeAfterDistanceReached = currentTime;
@@ -1391,8 +1404,8 @@ bool isSmartHomingBeneficial(int rail, int32_t* estimatedTimeSavingsMs) {
     // Standard homing: full distance at slow speed
     // Smart homing: most distance at fast speed, small portion at slow speed
     
-    int32_t fastVelocityPps = rpmToPps(HOME_FAST_APPROACH_VELOCITY_RPM, rail);
-    int32_t slowVelocityPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM, rail);
+    int32_t fastVelocityPps = rpmToPps(getHomeFastApproachVelocityRpm(rail), rail);
+    int32_t slowVelocityPps = rpmToPps(getHomeApproachVelocityRpm(rail), rail);
     int32_t precisionDistancePulses = getHomePrecisionDistancePulses(rail);
     
     // Standard approach time (all at slow speed)
@@ -1487,7 +1500,7 @@ bool initiateSmartHomingSequence(int rail) {
     
     // Phase 1: Fast approach
     if (fastPhaseDistancePulses > 0) {
-        int32_t fastVelocityPps = rpmToPps(HOME_FAST_APPROACH_VELOCITY_RPM, rail);
+        int32_t fastVelocityPps = rpmToPps(getHomeFastApproachVelocityRpm(rail), rail);
         setMotorVelocity(rail, fastVelocityPps);
         
         int homingDirection = getHomingDirection(rail);
@@ -1495,7 +1508,7 @@ bool initiateSmartHomingSequence(int rail) {
         motor.Move(fastPhasePulses);
         
         sprintf_P(msg, PSTR("%s: Smart homing initiated - Fast approach phase (%ld pulses at %d RPM)"), 
-                 motorName, fastPhaseDistancePulses, HOME_FAST_APPROACH_VELOCITY_RPM);
+                 motorName, fastPhaseDistancePulses, getHomeFastApproachVelocityRpm(rail));
         Console.serialInfo(msg);
         
         // Wait for fast phase to complete
@@ -1523,7 +1536,7 @@ bool initiateSmartHomingSequence(int rail) {
     }
     
     // Phase 2: Precision approach (same as standard homing)
-    int32_t precisionVelocityPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM, rail);
+    int32_t precisionVelocityPps = rpmToPps(getHomeApproachVelocityRpm(rail), rail);
     setMotorVelocity(rail, precisionVelocityPps);
     
     // Continue with precision homing to find hardstop

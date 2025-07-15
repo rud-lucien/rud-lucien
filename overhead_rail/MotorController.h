@@ -107,19 +107,27 @@
 #define RAIL1_HOME_TIMEOUT_MS 300000       // Rail 1 homing timeout (5 minutes for 8.2m rail at slow homing speed)
 #define RAIL2_HOME_TIMEOUT_MS 60000        // Rail 2 homing timeout (1 minute for 1m rail - generous safety margin)
 
-// Legacy timeout for backward compatibility
-#define HOME_TIMEOUT_MS RAIL1_HOME_TIMEOUT_MS
-
 // Homing Tolerances and Delays
 #define HOME_VERIFICATION_TOLERANCE_PULSES 10
 #define HOME_COMPLETION_DELAY_MS 1000
 
 // Homing Motion Parameters
-#define HOME_APPROACH_VELOCITY_RPM 40      // Homing approach speed
-#define HOMING_MIN_MOVEMENT_PULSES 200     // Minimum travel before hardstop detection
+#define HOMING_MIN_MOVEMENT_MM 3.4         // Minimum travel distance before hardstop detection (in mm)
 #define HOMING_MIN_ADDITIONAL_PULSES 100   // Additional travel after minimum distance
 #define HOMING_DEBOUNCE_TIME_MS 250        // HLFB state debounce time
 #define HOMING_MIN_TIME_AFTER_DISTANCE_MS 500
+
+// Rail-Specific Homing Velocities
+#define RAIL1_HOME_APPROACH_VELOCITY_RPM 40     // Rail 1 homing approach speed (conservative for 8.2m rail)
+#define RAIL2_HOME_APPROACH_VELOCITY_RPM 50     // Rail 2 homing approach speed (slightly faster for 1m precision rail)
+
+// Rail-Specific Smart Homing Fast Approach Velocities  
+#define RAIL1_HOME_FAST_APPROACH_VELOCITY_RPM 220   // Rail 1 fast approach (longer distance = more benefit from speed)
+#define RAIL2_HOME_FAST_APPROACH_VELOCITY_RPM 180   // Rail 2 fast approach (shorter distance = prioritize precision over speed)
+
+// Rail-specific pulse calculations for homing
+#define RAIL1_HOMING_MIN_MOVEMENT_PULSES (int32_t)(HOMING_MIN_MOVEMENT_MM * RAIL1_PULSES_PER_MM)  // ~200 pulses
+#define RAIL2_HOMING_MIN_MOVEMENT_PULSES (int32_t)(HOMING_MIN_MOVEMENT_MM * RAIL2_PULSES_PER_MM)  // ~50 pulses
 
 // Rail-Specific Homing Parameters
 #define RAIL1_HOMING_DIRECTION -1          // Rail 1 homes toward home position (negative direction)
@@ -131,8 +139,7 @@
 // SMART HOMING CONSTANTS
 //=============================================================================
 
-// Smart homing speeds and distances
-#define HOME_FAST_APPROACH_VELOCITY_RPM 200    // Fast approach speed for re-homing
+// Smart homing distances (velocities are now rail-specific above)
 #define HOME_PRECISION_DISTANCE_MM 50          // Distance to switch to precision homing
 #define HOME_MIN_DISTANCE_FOR_SMART_MM 100     // Minimum distance to enable smart homing
 
@@ -170,15 +177,12 @@
 #define MOVEMENT_MIN_PROGRESS_PULSES 50    // Minimum pulse movement to avoid stall detection
 
 //=============================================================================
-// MOTOR HOMING CONSTANTS
+// MOTOR HOMING CONSTANTS - REMOVED (using generic homing parameters above)
 //=============================================================================
-// Rail 1 Homing Parameters
-#define RAIL1_HOME_VELOCITY_RPM 100         // Homing speed for Rail 1
-#define RAIL1_HOME_ACCEL_RPM_PER_SEC 500    // Homing acceleration for Rail 1
-
-// Rail 2 Homing Parameters
-#define RAIL2_HOME_VELOCITY_RPM 100         // Homing speed for Rail 2
-#define RAIL2_HOME_ACCEL_RPM_PER_SEC 500    // Homing acceleration for Rail 2
+// Note: Rail-specific homing velocities and accelerations were removed because:
+// 1. The homing implementation uses generic HOME_APPROACH_VELOCITY_RPM (40 RPM)
+// 2. Both rails had identical values (100 RPM velocity, 500 RPM/s acceleration)
+// 3. Homing timeouts remain rail-specific via getHomingTimeout() function
 
 //=============================================================================
 // JOGGING CONFIGURATION
@@ -330,6 +334,8 @@ int32_t getRailAccelerationRpmPerSec(int rail);               // Get rail-specif
 // Smart Homing Helper Functions
 int32_t getHomePrecisionDistancePulses(int rail);
 int32_t getHomeMinDistancePulses(int rail);
+int32_t getHomeApproachVelocityRpm(int rail);           // Get rail-specific homing approach velocity
+int32_t getHomeFastApproachVelocityRpm(int rail);       // Get rail-specific smart homing fast velocity
 
 void stopMotion(int rail);
 void stopAllMotion();
