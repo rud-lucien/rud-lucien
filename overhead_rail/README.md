@@ -169,11 +169,11 @@ moveToPositionFromCurrent(2, RAIL2_WC3_PICKUP_DROPOFF_POS, false);
 ```cpp
 // Move to specific coordinates in millimeters
 moveToPositionMm(int rail, double positionMm, bool carriageLoaded);
-moveRelativeManual(int rail, double relativeMm, bool carriageLoaded);
+moveRelativeMm(int rail, double relativeMm, bool carriageLoaded);
 
 // Examples:
 moveToPositionMm(1, 3700.0, true);      // Rail 1 to 3700mm, loaded
-moveRelativeManual(2, 50.0, false);     // Rail 2 forward 50mm, empty
+moveRelativeMm(2, 50.0, false);     // Rail 2 forward 50mm, empty
 ```
 
 ### Homing Operations
@@ -582,7 +582,7 @@ void processEncoderInput();            // Process handwheel input
 ```cpp
 bool moveToPositionFromCurrent(int rail, PositionTarget pos, bool loaded);
 bool moveToPositionMm(int rail, double positionMm, bool loaded);
-bool moveRelativeManual(int rail, double relativeMm, bool loaded);
+bool moveRelativeMm(int rail, double relativeMm, bool loaded);
 bool jogMotor(int rail, bool direction, double increment, bool loaded);
 ```
 

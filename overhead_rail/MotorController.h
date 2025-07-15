@@ -354,7 +354,7 @@ int32_t selectMoveVelocity(int rail, PositionTarget fromPos, PositionTarget toPo
 bool moveToPositionFromCurrent(int rail, PositionTarget toPos, bool carriageLoaded);
 bool moveToAbsolutePosition(int rail, int32_t positionPulses, bool carriageLoaded);  
 bool moveToPositionMm(int rail, double positionMm, bool carriageLoaded = false);
-bool moveRelativeManual(int rail, double relativeMm, bool carriageLoaded = false);
+bool moveRelativeMm(int rail, double relativeMm, bool carriageLoaded = false);
 bool moveToPosition(int rail, int positionNumber, bool carriageLoaded);
 
 // Homing Operations

@@ -657,7 +657,7 @@ bool executeRailMoveRelative(int railNumber, double distanceMm, bool carriageLoa
         F("Moving empty carriage relative distance..."));
     
     // Execute the movement
-    if (moveRelativeManual(railNumber, distanceMm, carriageLoaded)) {
+    if (moveRelativeMm(railNumber, distanceMm, carriageLoaded)) {
         Console.acknowledge(F("MOVE_COMPLETED"));
         return true;
     } else {

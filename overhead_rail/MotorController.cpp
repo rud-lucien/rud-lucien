@@ -1687,7 +1687,7 @@ bool moveToPositionMm(int rail, double targetMm, bool carriageLoaded) {
     return true;
 }
 
-bool moveRelativeManual(int rail, double distanceMm, bool carriageLoaded) {
+bool moveRelativeMm(int rail, double distanceMm, bool carriageLoaded) {
     MotorDriver& motor = getMotorByRail(rail);
     const char* motorName = getMotorName(rail);
     char msg[MEDIUM_MSG_SIZE];
