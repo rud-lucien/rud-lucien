@@ -687,3 +687,4 @@ pressure_regulator_test/.vscode/c_cpp_properties.json
 pressure_regulator_test/.vscode/launch.json
 Project.toml
 stty.exe.stackdump
+.DS_Store
