@@ -628,3 +628,25 @@ void printOperationCounters() {
         Console.serialInfo(F("  Last Work Activity: Never"));
     }
 }
+
+//=============================================================================
+// TIMEOUT RESET FUNCTIONS
+//=============================================================================
+
+void resetLabwareTimeouts() {
+    unsigned long currentTime = millis();
+    
+    Console.serialInfo(F("LABWARE TIMEOUTS: Clearing session timeout tracking"));
+    
+    // Reset only the current session audit timestamp (preserves operational history)
+    labwareSystem.lastSystemAudit = currentTime;
+    
+    // Reset rail validation timestamps to current time (prevents stale validation warnings)
+    labwareSystem.rail1.lastValidated = currentTime;
+    labwareSystem.rail2.lastValidated = currentTime;
+    
+    // Preserve all operation counters and timestamps - they contain valuable operational history
+    // Do NOT reset: startTime, lastPickupTime, lastDeliveryTime, lastCrossRailTime, pickup/delivery/crossRail counts
+    
+    Console.serialInfo(F("LABWARE TIMEOUTS: Session timeout tracking reset (operational history preserved)"));
+}

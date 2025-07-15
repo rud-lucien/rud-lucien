@@ -531,3 +531,37 @@ void logSensorChanges()
         }
     }
 }
+
+//=============================================================================
+// TIMEOUT RESET FUNCTIONS
+//=============================================================================
+
+void resetSensorTimeouts() {
+    unsigned long currentTime = millis();
+    
+    Console.serialInfo(F("SENSOR TIMEOUTS: Clearing sensor timeout tracking"));
+    
+    // Reset cylinder position tracking timestamps
+    cylinderPosition.lastUpdateTime = currentTime;
+    
+    // Reset sensor debounce timing for all sensors
+    carriageSensorWC1.lastChangeTime = currentTime;
+    carriageSensorWC2.lastChangeTime = currentTime;
+    carriageSensorWC3.lastChangeTime = currentTime;
+    carriageSensorRail1Handoff.lastChangeTime = currentTime;
+    carriageSensorRail2Handoff.lastChangeTime = currentTime;
+    
+    labwareSensorWC1.lastChangeTime = currentTime;
+    labwareSensorWC2.lastChangeTime = currentTime;
+    labwareSensorRail2.lastChangeTime = currentTime;
+    labwareSensorHandoff.lastChangeTime = currentTime;
+    
+    cylinderRetractedSensor.lastChangeTime = currentTime;
+    cylinderExtendedSensor.lastChangeTime = currentTime;
+    
+    // Reset warning timestamps
+    extern unsigned long lastCylinderWarning;
+    lastCylinderWarning = currentTime;
+    
+    Console.serialInfo(F("SENSOR TIMEOUTS: All sensor timeout tracking reset"));
+}

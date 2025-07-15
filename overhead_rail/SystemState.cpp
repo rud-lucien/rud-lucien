@@ -5,6 +5,7 @@
 #include "ValveController.h"
 #include "Sensors.h"
 #include "EthernetController.h"
+#include "HandoffController.h"
 #include "LabwareAutomation.h"
 #include "RailAutomation.h"
 #include "Utils.h"
@@ -494,8 +495,23 @@ void resetSystemTimeouts()
     // Reset network client timeouts (prevent immediate disconnections)
     resetClientTimeouts();
     
+    // Reset motor timeouts (prevent movement/homing failures)
+    resetMotorTimeouts();
+    
+    // Reset valve timeouts (prevent pneumatic operation failures)
+    resetValveTimeouts();
+    
+    // Reset sensor timeouts (prevent debounce/validation failures)
+    resetSensorTimeouts();
+    
+    // Reset handoff timeouts (prevent handoff operation failures)
+    resetHandoffTimeouts();
+    
+    // Reset labware session timeouts (preserve operational history)
+    resetLabwareTimeouts();
+    
     // Reset command timing for accurate diagnostics
     lastCommandTime = millis();
     
-    Console.serialInfo(F("TIMEOUTS: Reset complete"));
+    Console.serialInfo(F("TIMEOUTS: Reset complete - all module timeouts cleared"));
 }

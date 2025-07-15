@@ -97,4 +97,7 @@ bool isCylinderActuallyExtended();   // Verify cylinder is extended via sensors
 void resetValveErrorState();
 unsigned long getTimeSinceLastValveOperation();
 
+// Timeout reset functions
+void resetValveTimeouts();
+
 #endif // VALVE_CONTROLLER_H

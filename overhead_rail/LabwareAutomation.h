@@ -136,4 +136,7 @@ void printLabwareSystemStatus();
 void printLabwareStateDetails();
 void printSensorReadings();
 
+// Timeout reset functions
+void resetLabwareTimeouts();
+
 #endif // LABWARE_AUTOMATION_H

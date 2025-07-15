@@ -591,3 +591,23 @@ bool isCylinderActuallyExtended()
     
     return sensorExtended && !sensorRetracted;
 }
+
+//=============================================================================
+// TIMEOUT RESET FUNCTIONS
+//=============================================================================
+
+void resetValveTimeouts() {
+    unsigned long currentTime = millis();
+    
+    Console.serialInfo(F("VALVE TIMEOUTS: Clearing valve operation timeout tracking"));
+    
+    // Reset valve operation timestamp tracking
+    lastValveOperationTime = currentTime;
+    cylinderValve.lastOperationTime = currentTime;
+    
+    // Clear any failure state that might be timeout-related
+    lastValveOperationFailed = false;
+    lastValveFailureDetails[0] = '\0';  // Clear failure details
+    
+    Console.serialInfo(F("VALVE TIMEOUTS: All valve timeout tracking reset"));
+}

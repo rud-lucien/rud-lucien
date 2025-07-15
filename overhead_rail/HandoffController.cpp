@@ -707,3 +707,26 @@ bool isCurrentPhaseTimedOut() {
     unsigned long phaseTimeout = getCurrentPhaseTimeout(handoffState.currentState, handoffState.destination);
     return timeoutElapsed(millis(), handoffState.operationStartTime, phaseTimeout);
 }
+
+//=============================================================================
+// TIMEOUT RESET FUNCTIONS
+//=============================================================================
+
+void resetHandoffTimeouts() {
+    unsigned long currentTime = millis();
+    
+    Console.serialInfo(F("HANDOFF TIMEOUTS: Clearing handoff timeout tracking"));
+    
+    // Reset handoff operation timing
+    handoffState.operationStartTime = currentTime;
+    handoffState.currentTimeout = HANDOFF_TIMEOUT_COMPLETE_OPERATION;
+    
+    // Reset handoff state if stuck in error/timeout state
+    if (handoffState.currentResult == HANDOFF_ERROR_TIMEOUT) {
+        handoffState.currentState = HANDOFF_IDLE;
+        handoffState.currentResult = HANDOFF_SUCCESS;
+        Console.serialInfo(F("HANDOFF TIMEOUTS: Cleared timeout error state"));
+    }
+    
+    Console.serialInfo(F("HANDOFF TIMEOUTS: All handoff timeout tracking reset"));
+}

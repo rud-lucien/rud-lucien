@@ -118,4 +118,7 @@ bool validateRailReadyForHandoff(int railNumber, double expectedPosition);
 bool validateRail1AtHandoffPosition();
 bool validateRail2AtHandoffPosition();
 
+// Timeout reset functions
+void resetHandoffTimeouts();
+
 #endif // HANDOFF_CONTROLLER_H

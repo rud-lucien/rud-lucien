@@ -2209,5 +2209,37 @@ bool validateAllPredefinedPositions() {
     return allValid;
 }
 
+//=============================================================================
+// TIMEOUT RESET FUNCTIONS
+//=============================================================================
 
+void resetMotorTimeouts() {
+    unsigned long currentTime = millis();
+    
+    Console.serialInfo(F("MOTOR TIMEOUTS: Clearing movement and homing timeout tracking"));
+    
+    // Reset movement tracking for both rails
+    for (int rail = 1; rail <= 2; rail++) {
+        MotorTargetState& targetState = getTargetState(rail);
+        
+        // Reset movement timeout tracking
+        targetState.movementStartTime = currentTime;
+        targetState.lastProgressCheck = currentTime;
+        targetState.lastDecelerationUpdate = currentTime;
+        targetState.movementInProgress = false;  // Clear any stale movement flags
+        targetState.movementTimeoutCount = 0;    // Reset timeout warning counter
+        
+        // Reset movement tracking positions
+        targetState.lastPositionCheck = 0;
+        
+        // Reset homing timeout tracking
+        MotorHomingState& homingState = getHomingState(rail);
+        homingState.homingStartTime = currentTime;
+        homingState.lastPositionCheckTime = currentTime;
+        homingState.hlfbNonAssertedTime = currentTime;
+        homingState.minTimeAfterDistanceReached = currentTime;
+    }
+    
+    Console.serialInfo(F("MOTOR TIMEOUTS: All motor timeout tracking reset"));
+}
 

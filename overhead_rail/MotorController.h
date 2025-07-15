@@ -399,4 +399,9 @@ void setMotorVelocity(int rail, int32_t velocityPps);
 int32_t getCurrentMotorVelocity(int rail);
 void setMotorAcceleration(int rail, int32_t accelPpsPerSec);
 
+//=============================================================================
+// TIMEOUT RESET FUNCTIONS
+//=============================================================================
+void resetMotorTimeouts();                  // Reset all motor-related timeout tracking
+
 #endif // MOTOR_CONTROLLER_H

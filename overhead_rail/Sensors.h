@@ -157,4 +157,7 @@ void printCylinderStatus();
 void checkSensorAlerts();
 void logSensorChanges();
 
+// Timeout reset functions
+void resetSensorTimeouts();
+
 #endif // SENSORS_H
