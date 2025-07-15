@@ -47,7 +47,7 @@ void printSystemState()
     Console.serialDiagnostic(F("PNEUMATIC SYSTEMS:"));
     Console.serialDiagnostic(F("------------------"));
     printPressureStatus();
-    printValveStatus();
+    printValveDetailedStatus();  // Use detailed version for comprehensive system state
     
     // Labware system - use existing function from LabwareAutomation.cpp
     Console.serialDiagnostic(F(""));
@@ -161,7 +161,7 @@ void printValveSystemState()
 {
     Console.serialDiagnostic(F("Pneumatic Systems:"));
     printPressureStatus();   // Use existing function
-    printValveStatus();      // Use existing function
+    printValveDetailedStatus();  // Use detailed version for consistency
 }
 
 void printNetworkSystemState()

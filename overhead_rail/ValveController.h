@@ -80,21 +80,17 @@ ValveOperationResult extendCylinder(unsigned long timeoutMs = VALVE_SENSOR_TIMEO
 ValveOperationResult retractCylinder(unsigned long timeoutMs = VALVE_SENSOR_TIMEOUT_MS);
 
 // Status and diagnostics
-void printValveStatus();
 void printValveDetailedStatus();
 const char* getValvePositionName(ValvePosition position);
 const char* getValveOperationResultName(ValveOperationResult result);
 
 // Safety and validation
-bool isValveOperationSafe();
 bool isPressureSufficientForValve();
-bool isValveSystemReady();
 bool validateValvePosition();  // Check if valve state matches sensor readings
 bool isCylinderActuallyRetracted();  // Verify cylinder is retracted via sensors
 bool isCylinderActuallyExtended();   // Verify cylinder is extended via sensors
 
 // Utility functions
-void resetValveErrorState();
 unsigned long getTimeSinceLastValveOperation();
 
 // Timeout reset functions

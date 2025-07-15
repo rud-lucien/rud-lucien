@@ -24,7 +24,7 @@ const char FMT_MOTOR_CANNOT_MOVE[] PROGMEM = "%s: Motor alert detected. Cannot m
 const char FMT_NOT_READY_HOMING[] PROGMEM = "%s: Motor not ready for homing";
 const char FMT_ALERTS_BEFORE_HOMING[] PROGMEM = "%s: Motor has active alerts - clear faults before homing";
 const char FMT_ALERT_DURING_HOMING[] PROGMEM = "%s: Motor alert during homing";
-const char FMT_MOTOR_STATUS[] PROGMEM = "[INFO] %s Status:\n  Enabled: %s\n  Moving: %s\n  Position: %ld pulses (%.1f mm)\n  HLFB Status: %s\n  %s";
+const char FMT_MOTOR_STATUS[] PROGMEM = "[INFO] %s Status:\n  Enabled: %s\n  Homed: %s\n  Moving: %s\n  Position: %ld pulses (%.1f mm)\n  HLFB Status: %s\n  %s";
 
 // Homing operation format strings - streamlined for operator clarity
 const char FMT_HOMING_INITIATED[] PROGMEM = "%s: Homing sequence initiated";
@@ -847,6 +847,7 @@ void printMotorStatus(int rail)
     sprintf_P(msg, FMT_MOTOR_STATUS,
             motorName,
             motor.EnableRequest() ? "Yes" : "No",
+            isHomingComplete(rail) ? "Yes" : "No",
             isMotorMoving(rail) ? "Yes" : "No",
             motor.PositionRefCommanded(),
             getMotorPositionMm(rail),
