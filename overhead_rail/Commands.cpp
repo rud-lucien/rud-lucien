@@ -74,43 +74,43 @@ Commander::systemCommand_t API_tree[] = {
 
     // Logging command
     systemCommand("log", "Logging controls and history:\r\n"
-                         "  log on [interval] - Enable periodic logging (interval in ms, default 250)\r\n"
-                         "  log off           - Disable periodic logging\r\n"
-                         "  log now           - Log system state immediately\r\n"
-                         "  log history       - Show complete operation log history\r\n"
-                         "  log errors        - Show only errors and warnings for quick debugging\r\n"
-                         "  log last [count]  - Show last N log entries (default: 10)\r\n"
-                         "  log stats         - Show log buffer statistics and overflow info\r\n"
-                         "  log help          - Display detailed logging information",
+                         "  log,on,[interval] - Enable periodic logging (interval in ms, default 250)\r\n"
+                         "  log,off           - Disable periodic logging\r\n"
+                         "  log,now           - Log system state immediately\r\n"
+                         "  log,history       - Show complete operation log history\r\n"
+                         "  log,errors        - Show only errors and warnings for quick debugging\r\n"
+                         "  log,last,[count]  - Show last N log entries (default: 10)\r\n"
+                         "  log,stats         - Show log buffer statistics and overflow info\r\n"
+                         "  log,help          - Display detailed logging information",
                   cmd_log),
 
     // Labware automation command
     systemCommand("labware", "Labware automation and state management:\r\n"
-                            "  labware status      - Display current labware tracking state and operation history\r\n"
-                            "  labware audit       - Automatically validate and fix labware state\r\n"
-                            "  labware reset       - Clear all labware tracking and reset operation history\r\n"
-                            "  labware help        - Display detailed labware automation instructions",
+                            "  labware,status      - Display current labware tracking state and operation history\r\n"
+                            "  labware,audit       - Automatically validate and fix labware state\r\n"
+                            "  labware,reset       - Clear all labware tracking and reset operation history\r\n"
+                            "  labware,help        - Display detailed labware automation instructions",
                   cmd_labware),
 
     // Automated labware movement command
     systemCommand("goto", "Automated work cell movement with labware tracking:\r\n"
-                         "  goto <location> <status>  - Move to work cell with labware status\r\n"
+                         "  goto,<location>,<status>  - Move to work cell with labware status\r\n"
                          "  Locations: wc1, wc2, wc3\r\n"
                          "  Status: with-labware, no-labware\r\n"
                          "  Examples:\r\n"
-                         "    goto wc1 with-labware   - Move to WC1 with labware\r\n"
-                         "    goto wc2 no-labware     - Move to WC2 without labware\r\n"
-                         "    goto wc3 with-labware   - Move to WC3 with labware\r\n"
-                         "  goto help               - Display detailed goto command instructions",
+                         "    goto,wc1,with-labware   - Move to WC1 with labware\r\n"
+                         "    goto,wc2,no-labware     - Move to WC2 without labware\r\n"
+                         "    goto,wc3,with-labware   - Move to WC3 with labware\r\n"
+                         "  goto,help               - Display detailed goto command instructions",
                   cmd_goto),
 
     // System state command to display comprehensive system status
     systemCommand("system", "System commands:\r\n"
-                            "  system state    - Display comprehensive system status with readiness assessment\r\n"
-                            "  system home     - Home both rails sequentially (Rail 1 first, then Rail 2)\r\n"
-                            "  system reset    - Clear operational state for clean automation (motor faults, encoder, etc.)\r\n"
-                            "  system help     - Display detailed instructions for system commands\r\n"
-                            "                    (Use 'log history' or 'log errors' for operation troubleshooting)",
+                            "  system,state    - Display comprehensive system status with readiness assessment\r\n"
+                            "  system,home     - Home both rails sequentially (Rail 1 first, then Rail 2)\r\n"
+                            "  system,reset    - Clear operational state for clean automation (motor faults, encoder, etc.)\r\n"
+                            "  system,help     - Display detailed instructions for system commands\r\n"
+                            "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
                   cmd_system),
 
 
@@ -119,23 +119,23 @@ Commander::systemCommand_t API_tree[] = {
 
     // Encoder control commands
     systemCommand("encoder", "Manual Pulse Generator (MPG) handwheel control:\r\n"
-                             "  encoder enable <rail>    - Enable encoder control for Rail 1 or 2\r\n"
-                             "  encoder disable          - Disable encoder control\r\n"
-                             "  encoder multiplier <X>   - Set encoder multiplier (X = 1, 10, or 100)\r\n"
-                             "  encoder velocity <RPM>   - Set encoder velocity (50-400 RPM)\r\n"
-                             "  encoder status           - Display current encoder status and settings\r\n"
-                             "  encoder help             - Display detailed setup and usage instructions",
+                             "  encoder,enable,<rail>    - Enable encoder control for Rail 1 or 2\r\n"
+                             "  encoder,disable          - Disable encoder control\r\n"
+                             "  encoder,multiplier,<X>   - Set encoder multiplier (X = 1, 10, or 100)\r\n"
+                             "  encoder,velocity,<RPM>   - Set encoder velocity (50-400 RPM)\r\n"
+                             "  encoder,status           - Display current encoder status and settings\r\n"
+                             "  encoder,help             - Display detailed setup and usage instructions",
                   cmd_encoder),
 
     // Jog command
     systemCommand("jog", "Manual jogging control for dual-rail system:\r\n"
-                         "  jog <rail> + [mm]        - Jog rail forward by increment or custom distance\r\n"
-                         "  jog <rail> - [mm]        - Jog rail backward by increment or custom distance\r\n"
-                         "  jog <rail> increment <mm> - Set default jog increment for rail\r\n"
-                         "  jog <rail> speed <rpm>   - Set jog speed for rail\r\n"
-                         "  jog <rail> status        - Display jog settings for specific rail\r\n"
-                         "  jog status               - Display jog settings for all rails\r\n"
-                         "  jog help                 - Display detailed usage instructions",
+                         "  jog,<rail>,+,[mm]        - Jog rail forward by increment or custom distance\r\n"
+                         "  jog,<rail>,-,[mm]        - Jog rail backward by increment or custom distance\r\n"
+                         "  jog,<rail>,increment,<mm> - Set default jog increment for rail\r\n"
+                         "  jog,<rail>,speed,<rpm>   - Set jog speed for rail\r\n"
+                         "  jog,<rail>,status        - Display jog settings for specific rail\r\n"
+                         "  jog,status               - Display jog settings for all rails\r\n"
+                         "  jog,help                 - Display detailed usage instructions",
                   cmd_jog),
 
     // Abort command
@@ -143,73 +143,73 @@ Commander::systemCommand_t API_tree[] = {
 
     // Network management command
     systemCommand("network", "Network management:\r\n"
-                             "  network status     - Display current network status and client info\r\n"
-                             "  network disconnect - Disconnect the current client\r\n"
-                             "  network help       - Display detailed network management instructions",
+                             "  network,status     - Display current network status and client info\r\n"
+                             "  network,disconnect - Disconnect the current client\r\n"
+                             "  network,help       - Display detailed network management instructions",
                   cmd_network),
 
     // Teach position command
     systemCommand("teach", "Position teaching system with automatic SD card persistence:\r\n"
-                          "  teach <rail> <position>  - Teach current position and auto-save to SD card\r\n"
-                          "  teach <rail> status      - Show taught positions for specific rail\r\n"
-                          "  teach status             - Show all taught positions and system status\r\n"
-                          "  teach <rail> reset       - Reset rail positions to factory defaults\r\n"
-                          "  teach reset              - Reset all positions to factory defaults\r\n"
+                          "  teach,<rail>,<position>  - Teach current position and auto-save to SD card\r\n"
+                          "  teach,<rail>,status      - Show taught positions for specific rail\r\n"
+                          "  teach,status             - Show all taught positions and system status\r\n"
+                          "  teach,<rail>,reset       - Reset rail positions to factory defaults\r\n"
+                          "  teach,reset              - Reset all positions to factory defaults\r\n"
                           "  \r\n"
                           "  Rail 1 positions: staging, wc1, wc2, handoff\r\n"
                           "  Rail 2 positions: handoff, wc3\r\n"
                           "  \r\n"
                           "  Examples:\r\n"
-                          "    teach 1 staging        - Teach Rail 1 staging position\r\n"
-                          "    teach 2 wc3            - Teach Rail 2 WC3 position\r\n"
-                          "    teach 1 status         - Show Rail 1 position status\r\n"
-                          "    teach 1 reset          - Reset Rail 1 to defaults",
+                          "    teach,1,staging        - Teach Rail 1 staging position\r\n"
+                          "    teach,2,wc3            - Teach Rail 2 WC3 position\r\n"
+                          "    teach,1,status         - Show Rail 1 position status\r\n"
+                          "    teach,1,reset          - Reset Rail 1 to defaults",
                   cmd_teach),
 
    
 
     // Rail 1 control command
     systemCommand("rail1", "Rail 1 Control Commands:\r\n"
-                          "  rail1 init          - Initialize Rail 1 motor system\r\n"
-                          "  rail1 clear-fault   - Clear motor fault condition\r\n"
-                          "  rail1 abort         - Abort current operation gracefully\r\n"
-                          "  rail1 stop          - Emergency stop motor movement\r\n"
-                          "  rail1 home          - Home carriage to reference position\r\n"
-                          "  rail1 move-wc1 no-labware     - Move empty carriage to WC1\r\n"
-                          "  rail1 move-wc1 with-labware   - Move carriage with labware to WC1\r\n"
-                          "  rail1 move-wc2 no-labware     - Move empty carriage to WC2\r\n"
-                          "  rail1 move-wc2 with-labware   - Move carriage with labware to WC2\r\n"
-                          "  rail1 move-staging no-labware     - Move empty carriage to staging position\r\n"
-                          "  rail1 move-staging with-labware   - Move carriage with labware to staging position\r\n"
-                          "  rail1 move-handoff no-labware - Move empty carriage to handoff\r\n"
-                          "  rail1 move-handoff with-labware - Move carriage with labware to handoff\r\n"
-                          "  rail1 move-mm-to X no-labware - Move empty carriage to absolute position X mm\r\n"
-                          "  rail1 move-mm-to X with-labware - Move carriage with labware to absolute position X mm\r\n"
-                          "  rail1 move-rel X no-labware   - Move empty carriage X mm relative to current position\r\n"
-                          "  rail1 move-rel X with-labware - Move carriage with labware X mm relative to current position\r\n"
-                          "  rail1 status        - Show comprehensive system status and diagnostics\r\n"
-                          "  rail1 help          - Display detailed usage instructions",
+                          "  rail1,init          - Initialize Rail 1 motor system\r\n"
+                          "  rail1,clear-fault   - Clear motor fault condition\r\n"
+                          "  rail1,abort         - Abort current operation gracefully\r\n"
+                          "  rail1,stop          - Emergency stop motor movement\r\n"
+                          "  rail1,home          - Home carriage to reference position\r\n"
+                          "  rail1,move-wc1,no-labware     - Move empty carriage to WC1\r\n"
+                          "  rail1,move-wc1,with-labware   - Move carriage with labware to WC1\r\n"
+                          "  rail1,move-wc2,no-labware     - Move empty carriage to WC2\r\n"
+                          "  rail1,move-wc2,with-labware   - Move carriage with labware to WC2\r\n"
+                          "  rail1,move-staging,no-labware     - Move empty carriage to staging position\r\n"
+                          "  rail1,move-staging,with-labware   - Move carriage with labware to staging position\r\n"
+                          "  rail1,move-handoff,no-labware - Move empty carriage to handoff\r\n"
+                          "  rail1,move-handoff,with-labware - Move carriage with labware to handoff\r\n"
+                          "  rail1,move-mm-to,X,no-labware - Move empty carriage to absolute position X mm\r\n"
+                          "  rail1,move-mm-to,X,with-labware - Move carriage with labware to absolute position X mm\r\n"
+                          "  rail1,move-rel,X,no-labware   - Move empty carriage X mm relative to current position\r\n"
+                          "  rail1,move-rel,X,with-labware - Move carriage with labware X mm relative to current position\r\n"
+                          "  rail1,status        - Show comprehensive system status and diagnostics\r\n"
+                          "  rail1,help          - Display detailed usage instructions",
                   cmd_rail1),
 
     // Rail 2 control command
     systemCommand("rail2", "Rail 2 Control Commands:\r\n"
-                          "  rail2 init          - Initialize Rail 2 motor system\r\n"
-                          "  rail2 clear-fault   - Clear motor fault condition\r\n"
-                          "  rail2 abort         - Abort current operation gracefully\r\n"
-                          "  rail2 stop          - Emergency stop motor movement\r\n"
-                          "  rail2 extend        - Extend pneumatic drive\r\n"
-                          "  rail2 retract       - Retract pneumatic drive\r\n"
-                          "  rail2 home          - Home carriage to reference position\r\n"
-                          "  rail2 move-wc3 no-labware     - Move empty carriage to WC3\r\n"
-                          "  rail2 move-wc3 with-labware   - Move carriage with labware to WC3\r\n"
-                          "  rail2 move-handoff no-labware - Move empty carriage to handoff\r\n"
-                          "  rail2 move-handoff with-labware - Move carriage with labware to handoff\r\n"
-                          "  rail2 move-mm-to X no-labware - Move empty carriage to absolute position X mm\r\n"
-                          "  rail2 move-mm-to X with-labware - Move carriage with labware to absolute position X mm\r\n"
-                          "  rail2 move-rel X no-labware   - Move empty carriage X mm relative to current position\r\n"
-                          "  rail2 move-rel X with-labware - Move carriage with labware X mm relative to current position\r\n"
-                          "  rail2 status        - Show comprehensive system status and diagnostics\r\n"
-                          "  rail2 help          - Display detailed usage instructions\r\n"
+                          "  rail2,init          - Initialize Rail 2 motor system\r\n"
+                          "  rail2,clear-fault   - Clear motor fault condition\r\n"
+                          "  rail2,abort         - Abort current operation gracefully\r\n"
+                          "  rail2,stop          - Emergency stop motor movement\r\n"
+                          "  rail2,extend        - Extend pneumatic drive\r\n"
+                          "  rail2,retract       - Retract pneumatic drive\r\n"
+                          "  rail2,home          - Home carriage to reference position\r\n"
+                          "  rail2,move-wc3,no-labware     - Move empty carriage to WC3\r\n"
+                          "  rail2,move-wc3,with-labware   - Move carriage with labware to WC3\r\n"
+                          "  rail2,move-handoff,no-labware - Move empty carriage to handoff\r\n"
+                          "  rail2,move-handoff,with-labware - Move carriage with labware to handoff\r\n"
+                          "  rail2,move-mm-to,X,no-labware - Move empty carriage to absolute position X mm\r\n"
+                          "  rail2,move-mm-to,X,with-labware - Move carriage with labware to absolute position X mm\r\n"
+                          "  rail2,move-rel,X,no-labware   - Move empty carriage X mm relative to current position\r\n"
+                          "  rail2,move-rel,X,with-labware - Move carriage with labware X mm relative to current position\r\n"
+                          "  rail2,status        - Show comprehensive system status and diagnostics\r\n"
+                          "  rail2,help          - Display detailed usage instructions\r\n"
                           "  SAFETY: Cylinder auto-retracts for ANY movement involving collision zone (500-700mm)",
                   cmd_rail2),
 };
@@ -232,7 +232,7 @@ bool cmd_log(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameter. Usage: log <action>"));
+        Console.error(F("Missing parameter. Usage: log,<action>"));
         return false;
     }
     
@@ -241,7 +241,7 @@ bool cmd_log(char *args, CommandCaller *caller)
     char *param1 = strtok(nullptr, " ");
     
     if (action == NULL) {
-        Console.error(F("Invalid format. Usage: log <action>"));
+        Console.error(F("Invalid format. Usage: log,<action>"));
         return false;
     }
     
@@ -340,20 +340,20 @@ bool cmd_log(char *args, CommandCaller *caller)
         Console.println(F("Logging System Commands"));
         Console.println(F("============================================"));
         Console.println(F("PERIODIC LOGGING:"));
-        Console.println(F("  log on [interval]   - Enable periodic system state logging"));
+        Console.println(F("  log,on,[interval]   - Enable periodic system state logging"));
         Console.println(F("                        interval: 100-60000ms (default: 250ms)"));
-        Console.println(F("  log off             - Disable periodic logging"));
+        Console.println(F("  log,off             - Disable periodic logging"));
         Console.println(F(""));
         Console.println(F("IMMEDIATE LOGGING:"));
-        Console.println(F("  log now             - Log current system state immediately"));
+        Console.println(F("  log,now             - Log current system state immediately"));
         Console.println(F(""));
         Console.println(F("LOG HISTORY REVIEW:"));
-        Console.println(F("  log history         - Show complete operation log history"));
-        Console.println(F("  log errors          - Show only errors and warnings"));
-        Console.println(F("  log last [count]    - Show last N entries (default: 10, max: 50)"));
+        Console.println(F("  log,history         - Show complete operation log history"));
+        Console.println(F("  log,errors          - Show only errors and warnings"));
+        Console.println(F("  log,last,[count]    - Show last N entries (default: 10, max: 50)"));
         Console.println(F(""));
         Console.println(F("DIAGNOSTICS:"));
-        Console.println(F("  log stats           - Show log buffer statistics and current status"));
+        Console.println(F("  log,stats           - Show log buffer statistics and current status"));
         Console.println(F(""));
         Console.println(F("LOGGED INFORMATION:"));
         Console.println(F("- Valve states and sensor feedback"));
@@ -404,7 +404,7 @@ bool cmd_system(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameter. Usage: system <action>"));
+        Console.error(F("Missing parameter. Usage: system,<action>"));
         return false;
     }
     
@@ -435,17 +435,17 @@ bool cmd_system(char *args, CommandCaller *caller)
         Console.println(F("System State Commands"));
         Console.println(F("============================================"));
         Console.println(F("STATUS COMMAND:"));
-        Console.println(F("  system state        - Display comprehensive system status"));
+        Console.println(F("  system,state        - Display comprehensive system status"));
         Console.println(F("                        (motors, sensors, pneumatics, network, safety)"));
         Console.println(F("                        Includes overall readiness assessment and error summary"));
         Console.println(F(""));
         Console.println(F("HOMING COMMAND:"));
-        Console.println(F("  system home         - Home both rails sequentially (Rail 1 first, then Rail 2)"));
+        Console.println(F("  system,home         - Home both rails sequentially (Rail 1 first, then Rail 2)"));
         Console.println(F("                        Verifies successful homing of each rail before proceeding"));
         Console.println(F("                        Use for first-time system initialization"));
         Console.println(F(""));
         Console.println(F("RESET COMMAND:"));
-        Console.println(F("  system reset        - Clear operational state for clean automation"));
+        Console.println(F("  system,reset        - Clear operational state for clean automation"));
         Console.println(F("                        Clears motor faults, resets encoder, syncs hardware state"));
         Console.println(F("                        Prepares system for fresh goto commands"));
         Console.println(F(""));
@@ -515,7 +515,7 @@ bool cmd_teach(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameters. Usage: teach <rail|status|reset> [position|status|reset]"));
+        Console.error(F("Missing parameters. Usage: teach,<rail|status|reset>,[position|status|reset]"));
         Console.error(F("Examples: teach 1 staging, teach status, teach reset"));
         return false;
     }
@@ -525,7 +525,7 @@ bool cmd_teach(char *args, CommandCaller *caller)
     char *param2 = strtok(nullptr, " ");
     
     if (param1 == NULL) {
-        Console.error(F("Invalid format. Usage: teach <rail|status|reset> [position|status|reset]"));
+        Console.error(F("Invalid format. Usage: teach,<rail|status|reset>,[position|status|reset]"));
         return false;
     }
     
@@ -558,7 +558,7 @@ bool cmd_teach(char *args, CommandCaller *caller)
     
     // We have a valid rail number, check for second parameter
     if (param2 == NULL) {
-        Console.error(F("Missing position or command. Usage: teach <rail> <position|status|reset>"));
+        Console.error(F("Missing position or command. Usage: teach,<rail>,<position|status|reset>"));
         if (rail == 1) {
             Console.error(F("Rail 1 positions: staging, wc1, wc2, handoff"));
         } else {
@@ -669,7 +669,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameter. Usage: rail2 <action>"));
+        Console.error(F("Missing parameter. Usage: rail2,<action>"));
         return false;
     }
     
@@ -679,7 +679,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
     char *param2 = strtok(nullptr, " ");
     
     if (action == NULL) {
-        Console.error(F("Invalid format. Usage: rail2 <action>"));
+        Console.error(F("Invalid format. Usage: rail2,<action>"));
         return false;
     }
     
@@ -742,35 +742,35 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         Console.println(F("Rail 2 Control Commands"));
         Console.println(F("============================================"));
         Console.println(F("MOTOR CONTROL:"));
-        Console.println(F("  rail2 init          - Initialize Rail 2 motor system"));
-        Console.println(F("  rail2 clear-fault   - Clear motor fault condition"));
-        Console.println(F("  rail2 abort         - Abort current operation gracefully"));
-        Console.println(F("  rail2 stop          - Emergency stop motor movement"));
+        Console.println(F("  rail2,init          - Initialize Rail 2 motor system"));
+        Console.println(F("  rail2,clear-fault   - Clear motor fault condition"));
+        Console.println(F("  rail2,abort         - Abort current operation gracefully"));
+        Console.println(F("  rail2,stop          - Emergency stop motor movement"));
         Console.println(F(""));
         Console.println(F("PNEUMATIC DRIVE CONTROL:"));
-        Console.println(F("  rail2 extend        - Extend pneumatic drive"));
-        Console.println(F("  rail2 retract       - Retract pneumatic drive"));
+        Console.println(F("  rail2,extend        - Extend pneumatic drive"));
+        Console.println(F("  rail2,retract       - Retract pneumatic drive"));
         Console.println(F(""));
         Console.println(F("HOMING OPERATION:"));
-        Console.println(F("  rail2 home          - Home carriage (find WC3 position)"));
+        Console.println(F("  rail2,home          - Home carriage (find WC3 position)"));
         Console.println(F("                        Automatically detects labware on carriage"));
         Console.println(F(""));
         Console.println(F("CARRIAGE MOVEMENT:"));
-        Console.println(F("  rail2 move-wc3 no-labware     - Move empty carriage to WC3"));
-        Console.println(F("  rail2 move-handoff no-labware - Move empty carriage to handoff"));
-        Console.println(F("  rail2 move-wc3 with-labware   - Move carriage with labware to WC3"));
-        Console.println(F("  rail2 move-handoff with-labware - Move carriage with labware to handoff"));
+        Console.println(F("  rail2,move-wc3,no-labware     - Move empty carriage to WC3"));
+        Console.println(F("  rail2,move-handoff,no-labware - Move empty carriage to handoff"));
+        Console.println(F("  rail2,move-wc3,with-labware   - Move carriage with labware to WC3"));
+        Console.println(F("  rail2,move-handoff,with-labware - Move carriage with labware to handoff"));
         Console.println(F(""));
         Console.println(F("MANUAL POSITIONING:"));
-        Console.print(F("  rail2 move-mm-to X no-labware   - Move empty carriage to absolute position X mm (0-"));
+        Console.print(F("  rail2,move-mm-to,X,no-labware   - Move empty carriage to absolute position X mm (0-"));
         Console.print(RAIL2_MAX_TRAVEL_MM);
         Console.println(F(")"));
-        Console.println(F("  rail2 move-mm-to X with-labware - Move carriage with labware to absolute position X mm"));
-        Console.println(F("  rail2 move-rel X no-labware     - Move empty carriage X mm relative (+ forward, - backward)"));
-        Console.println(F("  rail2 move-rel X with-labware   - Move carriage with labware X mm relative"));
+        Console.println(F("  rail2,move-mm-to,X,with-labware - Move carriage with labware to absolute position X mm"));
+        Console.println(F("  rail2,move-rel,X,no-labware     - Move empty carriage X mm relative (+ forward, - backward)"));
+        Console.println(F("  rail2,move-rel,X,with-labware   - Move carriage with labware X mm relative"));
         Console.println(F(""));
         Console.println(F("STATUS AND DIAGNOSTICS:"));
-        Console.println(F("  rail2 status        - Show comprehensive system status"));
+        Console.println(F("  rail2,status        - Show comprehensive system status"));
         Console.println(F(""));
         Console.println(F("SAFETY NOTES:"));
         Console.println(F("- Always specify labware status for movement commands"));
@@ -811,7 +811,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         
     case 7: // "move-mm-to" - Move to absolute millimeter position
         if (param1 == NULL || param2 == NULL) {
-            Console.error(F("Missing parameters. Usage: rail2 move-mm-to <position_mm> <with-labware|no-labware>"));
+            Console.error(F("Missing parameters. Usage: rail2,move-mm-to,<position_mm>,<with-labware|no-labware>"));
             return false;
         }
         
@@ -826,7 +826,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         
     case 8: // "move-rel" - Move relative distance
         if (param1 == NULL || param2 == NULL) {
-            Console.error(F("Missing parameters. Usage: rail2 move-rel <distance_mm> <with-labware|no-labware>"));
+            Console.error(F("Missing parameters. Usage: rail2,move-rel,<distance_mm>,<with-labware|no-labware>"));
             return false;
         }
         
@@ -877,7 +877,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         // Current position
         Console.serialInfo(F("CURRENT POSITION:"));
         if (!isHomingComplete(2)) {
-            Console.serialInfo(F("  Position: UNKNOWN (not homed) - Use 'rail2 home' first"));
+            Console.serialInfo(F("  Position: UNKNOWN (not homed) - Use 'rail2,home' first"));
         } else {
             currentPos = getMotorPositionMm(2);
             Console.serialInfo((String(F("  Position: ")) + String(currentPos, 2) + F("mm")).c_str());
@@ -991,7 +991,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameter. Usage: rail1 <action>"));
+        Console.error(F("Missing parameter. Usage: rail1,<action>"));
         return false;
     }
     
@@ -1001,7 +1001,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
     char *param2 = strtok(nullptr, " ");
     
     if (action == NULL) {
-        Console.error(F("Invalid format. Usage: rail1 <action>"));
+        Console.error(F("Invalid format. Usage: rail1,<action>"));
         return false;
     }
     
@@ -1039,35 +1039,35 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         Console.println(F("Rail 1 Control Commands"));
         Console.println(F("============================================"));
         Console.println(F("MOTOR CONTROL:"));
-        Console.println(F("  rail1 init          - Initialize Rail 1 motor system"));
-        Console.println(F("  rail1 clear-fault   - Clear motor fault condition"));
-        Console.println(F("  rail1 abort         - Abort current operation gracefully"));
-        Console.println(F("  rail1 stop          - Emergency stop motor movement"));
+        Console.println(F("  rail1,init          - Initialize Rail 1 motor system"));
+        Console.println(F("  rail1,clear-fault   - Clear motor fault condition"));
+        Console.println(F("  rail1,abort         - Abort current operation gracefully"));
+        Console.println(F("  rail1,stop          - Emergency stop motor movement"));
         Console.println(F(""));
         Console.println(F("HOMING OPERATION:"));
-        Console.println(F("  rail1 home          - Home carriage (find home position)"));
+        Console.println(F("  rail1,home          - Home carriage (find home position)"));
         Console.println(F("                        Automatically detects labware at handoff sensor"));
         Console.println(F(""));
         Console.println(F("CARRIAGE MOVEMENT:"));
-        Console.println(F("  rail1 move-wc1 no-labware     - Move empty carriage to WC1"));
-        Console.println(F("  rail1 move-wc2 no-labware     - Move empty carriage to WC2"));
-        Console.println(F("  rail1 move-staging no-labware - Move empty carriage to staging"));
-        Console.println(F("  rail1 move-handoff no-labware - Move empty carriage to handoff"));
-        Console.println(F("  rail1 move-wc1 with-labware   - Move carriage with labware to WC1"));
-        Console.println(F("  rail1 move-wc2 with-labware   - Move carriage with labware to WC2"));
-        Console.println(F("  rail1 move-staging with-labware - Move carriage with labware to staging"));
-        Console.println(F("  rail1 move-handoff with-labware - Move carriage with labware to handoff"));
+        Console.println(F("  rail1,move-wc1,no-labware     - Move empty carriage to WC1"));
+        Console.println(F("  rail1,move-wc2,no-labware     - Move empty carriage to WC2"));
+        Console.println(F("  rail1,move-staging,no-labware - Move empty carriage to staging"));
+        Console.println(F("  rail1,move-handoff,no-labware - Move empty carriage to handoff"));
+        Console.println(F("  rail1,move-wc1,with-labware   - Move carriage with labware to WC1"));
+        Console.println(F("  rail1,move-wc2,with-labware   - Move carriage with labware to WC2"));
+        Console.println(F("  rail1,move-staging,with-labware - Move carriage with labware to staging"));
+        Console.println(F("  rail1,move-handoff,with-labware - Move carriage with labware to handoff"));
         Console.println(F(""));
         Console.println(F("MANUAL POSITIONING:"));
-        Console.print(F("  rail1 move-mm-to X no-labware   - Move empty carriage to absolute position X mm (0-"));
+        Console.print(F("  rail1,move-mm-to,X,no-labware   - Move empty carriage to absolute position X mm (0-"));
         Console.print(RAIL1_MAX_TRAVEL_MM);
         Console.println(F(")"));
-        Console.println(F("  rail1 move-mm-to X with-labware - Move carriage with labware to absolute position X mm"));
-        Console.println(F("  rail1 move-rel X no-labware     - Move empty carriage X mm relative (+ forward, - backward)"));
-        Console.println(F("  rail1 move-rel X with-labware   - Move carriage with labware X mm relative"));
+        Console.println(F("  rail1,move-mm-to,X,with-labware - Move carriage with labware to absolute position X mm"));
+        Console.println(F("  rail1,move-rel,X,no-labware     - Move empty carriage X mm relative (+ forward, - backward)"));
+        Console.println(F("  rail1,move-rel,X,with-labware   - Move carriage with labware X mm relative"));
         Console.println(F(""));
         Console.println(F("STATUS AND DIAGNOSTICS:"));
-        Console.println(F("  rail1 status        - Show comprehensive system status"));
+        Console.println(F("  rail1,status        - Show comprehensive system status"));
         Console.println(F(""));
         Console.println(F("POSITION REFERENCE:"));
         Console.print(F("- Home: "));
@@ -1103,7 +1103,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         
     case 6: // "move-mm-to" - Move to absolute millimeter position
         if (param1 == NULL || param2 == NULL) {
-            Console.error(F("Missing parameters. Usage: rail1 move-mm-to <position_mm> <with-labware|no-labware>"));
+            Console.error(F("Missing parameters. Usage: rail1,move-mm-to,<position_mm>,<with-labware|no-labware>"));
             return false;
         }
         
@@ -1118,7 +1118,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         
     case 7: // "move-rel" - Move relative distance
         if (param1 == NULL || param2 == NULL) {
-            Console.error(F("Missing parameters. Usage: rail1 move-rel <distance_mm> <with-labware|no-labware>"));
+            Console.error(F("Missing parameters. Usage: rail1,move-rel,<distance_mm>,<with-labware|no-labware>"));
             return false;
         }
         
@@ -1253,7 +1253,7 @@ bool cmd_labware(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameter. Usage: labware <action>"));
+        Console.error(F("Missing parameter. Usage: labware,<action>"));
         return false;
     }
     
@@ -1261,7 +1261,7 @@ bool cmd_labware(char *args, CommandCaller *caller)
     char *action = strtok(trimmed, " ");
     
     if (action == NULL) {
-        Console.error(F("Invalid format. Usage: labware <action>"));
+        Console.error(F("Invalid format. Usage: labware,<action>"));
         return false;
     }
     
@@ -1389,9 +1389,9 @@ bool cmd_goto(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameters. Usage: goto <location> <status>"));
-        Console.error(F("Example: goto wc1 with-labware"));
-        Console.error(F("Help: goto help"));
+        Console.error(F("Missing parameters. Usage: goto,<location>,<status>"));
+        Console.error(F("Example: goto,wc1,with-labware"));
+        Console.error(F("Help: goto,help"));
         return false;
     }
     
@@ -1407,7 +1407,7 @@ bool cmd_goto(char *args, CommandCaller *caller)
         Console.println(F("Goto Command - Automated Labware Movement"));
         Console.println(F("============================================"));
         Console.println(F("COMMAND SYNTAX:"));
-        Console.println(F("  goto <location> <status>"));
+        Console.println(F("  goto,<location>,<status>"));
         Console.println(F(""));
         Console.println(F("AVAILABLE LOCATIONS:"));
         Console.println(F("  wc1    - Work Cell 1 (Rail 1)"));
@@ -1419,12 +1419,12 @@ bool cmd_goto(char *args, CommandCaller *caller)
         Console.println(F("  no-labware      - Pickup labware from destination"));
         Console.println(F(""));
         Console.println(F("OPERATION EXAMPLES:"));
-        Console.println(F("  goto wc1 with-labware   - Deliver labware to WC1"));
-        Console.println(F("  goto wc1 no-labware     - Pickup labware from WC1"));
-        Console.println(F("  goto wc2 with-labware   - Deliver labware to WC2"));
-        Console.println(F("  goto wc2 no-labware     - Pickup labware from WC2"));
-        Console.println(F("  goto wc3 with-labware   - Deliver labware to WC3"));
-        Console.println(F("  goto wc3 no-labware     - Pickup labware from WC3"));
+        Console.println(F("  goto,wc1,with-labware   - Deliver labware to WC1"));
+        Console.println(F("  goto,wc1,no-labware     - Pickup labware from WC1"));
+        Console.println(F("  goto,wc2,with-labware   - Deliver labware to WC2"));
+        Console.println(F("  goto,wc2,no-labware     - Pickup labware from WC2"));
+        Console.println(F("  goto,wc3,with-labware   - Deliver labware to WC3"));
+        Console.println(F("  goto,wc3,no-labware     - Pickup labware from WC3"));
         Console.println(F(""));
         Console.println(F("INTELLIGENT FEATURES:"));
         Console.println(F("- Automatic cross-rail transfers (WC1/WC2 ↔ WC3)"));
@@ -1471,7 +1471,7 @@ bool cmd_goto(char *args, CommandCaller *caller)
     }
     
     if (location == NULL || action == NULL) {
-        Console.error(F("Invalid format. Usage: goto <location> <status>"));
+        Console.error(F("Invalid format. Usage: goto,<location>,<status>"));
         Console.error(F("Locations: wc1, wc2, wc3"));
         Console.error(F("Status: with-labware, no-labware"));
         Console.error(F("Help: goto help"));
@@ -1578,7 +1578,7 @@ bool cmd_network(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameter. Usage: network <action>"));
+        Console.error(F("Missing parameter. Usage: network,<action>"));
         return false;
     }
     
@@ -1586,7 +1586,7 @@ bool cmd_network(char *args, CommandCaller *caller)
     char *action = strtok(trimmed, " ");
     
     if (action == NULL) {
-        Console.error(F("Invalid format. Usage: network <action>"));
+        Console.error(F("Invalid format. Usage: network,<action>"));
         return false;
     }
     
@@ -1695,7 +1695,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     
     // Check for empty argument
     if (strlen(trimmed) == 0) {
-        Console.error(F("Missing parameter. Usage: encoder <action>"));
+        Console.error(F("Missing parameter. Usage: encoder,<action>"));
         return false;
     }
     
@@ -1705,7 +1705,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
     char *param2 = strtok(nullptr, " ");
     
     if (action == NULL) {
-        Console.error(F("Invalid format. Usage: encoder <action>"));
+        Console.error(F("Invalid format. Usage: encoder,<action>"));
         return false;
     }
     
@@ -1735,9 +1735,9 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         
     case 1: // "enable" - Enable encoder control for specific rail
         if (param1 == NULL) {
-            Console.error(F("Missing rail parameter. Usage: encoder enable <rail>"));
-            Console.error(F("Example: encoder enable 1  (for Rail 1)"));
-            Console.error(F("Example: encoder enable 2  (for Rail 2)"));
+            Console.error(F("Missing rail parameter. Usage: encoder,enable,<rail>"));
+            Console.error(F("Example: encoder,enable,1  (for Rail 1)"));
+            Console.error(F("Example: encoder,enable,2  (for Rail 2)"));
             return false;
         }
         
@@ -1745,8 +1745,8 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         
         if (railNumber != 1 && railNumber != 2) {
             Console.error(F("Invalid rail number. Use 1 or 2"));
-            Console.error(F("Example: encoder enable 1  (for Rail 1)"));
-            Console.error(F("Example: encoder enable 2  (for Rail 2)"));
+            Console.error(F("Example: encoder,enable,1  (for Rail 1)"));
+            Console.error(F("Example: encoder,enable,2  (for Rail 2)"));
             return false;
         }
         
@@ -1760,20 +1760,20 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.println(F("Manual Pulse Generator (MPG) Commands"));
         Console.println(F("============================================"));
         Console.println(F("CONTROL OPERATIONS:"));
-        Console.println(F("  encoder enable <rail>    - Enable MPG control for specific rail"));
+        Console.println(F("  encoder,enable,<rail>    - Enable MPG control for specific rail"));
         Console.println(F("                             Rail 1: Controls WC1, WC2, staging, handoff"));
         Console.println(F("                             Rail 2: Controls WC3, handoff (with collision avoidance)"));
-        Console.println(F("  encoder disable          - Disable MPG control completely"));
+        Console.println(F("  encoder,disable          - Disable MPG control completely"));
         Console.println(F(""));
         Console.println(F("CONFIGURATION:"));
-        Console.println(F("  encoder multiplier <X>   - Set movement precision per encoder count"));
+        Console.println(F("  encoder,multiplier,<X>   - Set movement precision per encoder count"));
         Console.println(F("                             1 = Fine (0.1mm per count)"));
         Console.println(F("                             10 = General (1.0mm per count)"));
         Console.println(F("                             100 = Rapid (10.0mm per count)"));
-        Console.println(F("  encoder velocity <RPM>   - Set movement velocity (50-400 RPM)"));
+        Console.println(F("  encoder,velocity,<RPM>   - Set movement velocity (50-400 RPM)"));
         Console.println(F(""));
         Console.println(F("STATUS AND DIAGNOSTICS:"));
-        Console.println(F("  encoder status           - Display current MPG status and settings"));
+        Console.println(F("  encoder,status           - Display current MPG status and settings"));
         Console.println(F("                             Shows active rail, position, multiplier, velocity"));
         Console.println(F("                             Includes encoder hardware status"));
         Console.println(F(""));
@@ -1784,12 +1784,12 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         Console.println(F("- Position tracking: absolute positioning for immediate response"));
         Console.println(F(""));
         Console.println(F("USAGE EXAMPLES:"));
-        Console.println(F("  encoder enable 1         - Enable MPG for Rail 1"));
-        Console.println(F("  encoder multiplier 10    - Set general precision"));
-        Console.println(F("  encoder velocity 150     - Set velocity to 150 RPM"));
-        Console.println(F("  encoder enable 2         - Switch MPG to Rail 2"));
-        Console.println(F("  encoder status           - Check current settings"));
-        Console.println(F("  encoder disable          - Stop MPG control"));
+        Console.println(F("  encoder,enable,1         - Enable MPG for Rail 1"));
+        Console.println(F("  encoder,multiplier,10    - Set general precision"));
+        Console.println(F("  encoder,velocity,150     - Set velocity to 150 RPM"));
+        Console.println(F("  encoder,enable,2         - Switch MPG to Rail 2"));
+        Console.println(F("  encoder,status           - Check current settings"));
+        Console.println(F("  encoder,disable          - Stop MPG control"));
         Console.println(F(""));
         Console.println(F("SAFETY REQUIREMENTS:"));
         Console.println(F("- Rail must be homed before enabling MPG control"));
@@ -1809,7 +1809,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         
     case 3: // "multiplier" - Set encoder multiplier
         if (param1 == NULL) {
-            Console.error(F("Missing multiplier value. Usage: encoder multiplier <value>"));
+            Console.error(F("Missing multiplier value. Usage: encoder,multiplier,<value>"));
             Console.error(F("Valid values: 1 (fine), 10 (general), 100 (rapid)"));
             return false;
         }
@@ -1827,7 +1827,7 @@ bool cmd_encoder(char *args, CommandCaller *caller)
         
     case 5: // "velocity" - Set encoder velocity
         if (param1 == NULL) {
-            Console.error(F("Missing velocity value. Usage: encoder velocity <RPM>"));
+            Console.error(F("Missing velocity value. Usage: encoder,velocity,<RPM>"));
             Console.error(F("Valid range: 50-400 RPM"));
             return false;
         }
@@ -1857,7 +1857,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
     // Parse first argument
     char *param1 = strtok(args, " ");
     if (param1 == NULL) {
-        Console.error(F("Missing jog command. Usage: jog <rail> <+|-> [distance] | jog <rail> <setting> <value> | jog <rail|all> status | jog help"));
+        Console.error(F("Missing jog command. Usage: jog,<rail>,<+|-> [distance] | jog,<rail>,<setting>,<value> | jog,<rail|all>,status | jog,help"));
         return false;
     }
     
@@ -1872,21 +1872,21 @@ bool cmd_jog(char *args, CommandCaller *caller)
         Console.println(F("Provides precision movement with configurable increments and speeds."));
         Console.println(F(""));
         Console.println(F("BASIC JOGGING:"));
-        Console.println(F("  jog <rail> +             - Jog rail forward by default increment"));
-        Console.println(F("  jog <rail> -             - Jog rail backward by default increment"));
+        Console.println(F("  jog,<rail>,+             - Jog rail forward by default increment"));
+        Console.println(F("  jog,<rail>,-             - Jog rail backward by default increment"));
         Console.println(F(""));
         Console.println(F("CUSTOM DISTANCE JOGGING:"));
-        Console.println(F("  jog <rail> + <mm>        - Jog forward by specific distance"));
-        Console.println(F("  jog <rail> - <mm>        - Jog backward by specific distance"));
+        Console.println(F("  jog,<rail>,+,<mm>        - Jog forward by specific distance"));
+        Console.println(F("  jog,<rail>,-,<mm>        - Jog backward by specific distance"));
         Console.println(F(""));
         Console.println(F("CONFIGURATION:"));
-        Console.println(F("  jog <rail> increment <mm> - Set default jog increment"));
-        Console.println(F("  jog <rail> speed <rpm>    - Set jog speed"));
+        Console.println(F("  jog,<rail>,increment,<mm> - Set default jog increment"));
+        Console.println(F("  jog,<rail>,speed,<rpm>    - Set jog speed"));
         Console.println(F(""));
         Console.println(F("STATUS AND INFORMATION:"));
-        Console.println(F("  jog <rail> status        - Show jog settings for specific rail"));
-        Console.println(F("  jog all status           - Show jog settings for all rails"));
-        Console.println(F("  jog status               - Show jog settings for all rails"));
+        Console.println(F("  jog,<rail>,status        - Show jog settings for specific rail"));
+        Console.println(F("  jog,all,status           - Show jog settings for all rails"));
+        Console.println(F("  jog,status               - Show jog settings for all rails"));
         Console.println(F(""));
         Console.println(F("RAIL SPECIFICATION:"));
         Console.println(F("- Rail 1: Process rail (typically higher speeds)"));
@@ -1903,10 +1903,10 @@ bool cmd_jog(char *args, CommandCaller *caller)
         Console.println(F("- Intelligent speed capping based on distance"));
         Console.println(F(""));
         Console.println(F("USAGE EXAMPLES:"));
-        Console.println(F("  jog 1 +                  - Rail 1 forward by default"));
-        Console.println(F("  jog 2 - 5.0              - Rail 2 backward 5.0mm"));
-        Console.println(F("  jog 1 increment 2.0      - Set Rail 1 increment to 2.0mm"));
-        Console.println(F("  jog 2 speed 100          - Set Rail 2 speed to 100 RPM"));
+        Console.println(F("  jog,1,+                  - Rail 1 forward by default"));
+        Console.println(F("  jog,2,-,5.0              - Rail 2 backward 5.0mm"));
+        Console.println(F("  jog,1,increment,2.0      - Set Rail 1 increment to 2.0mm"));
+        Console.println(F("  jog,2,speed,100          - Set Rail 2 speed to 100 RPM"));
         Console.println(F("============================================"));
         return true;
     }
@@ -1939,7 +1939,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
     // Parse second argument (command/direction)
     char *param2 = strtok(NULL, " ");
     if (param2 == NULL) {
-        Console.error(F("Missing command. Usage: jog <rail> <+|-> [value]"));
+        Console.error(F("Missing command. Usage: jog,<rail>,<+|-> [value]"));
         return false;
     }
     
@@ -1958,7 +1958,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
     if (strcmp(param2, "increment") == 0) {
         char *param3 = strtok(NULL, " ");
         if (param3 == NULL) {
-            Console.error(F("Missing increment value. Usage: jog <rail> increment <mm>"));
+            Console.error(F("Missing increment value. Usage: jog,<rail>,increment,<mm>"));
             return false;
         }
         
@@ -1981,7 +1981,7 @@ bool cmd_jog(char *args, CommandCaller *caller)
     if (strcmp(param2, "speed") == 0) {
         char *param3 = strtok(NULL, " ");
         if (param3 == NULL) {
-            Console.error(F("Missing speed value. Usage: jog <rail> speed <rpm>"));
+            Console.error(F("Missing speed value. Usage: jog,<rail>,speed,<rpm>"));
             return false;
         }
         

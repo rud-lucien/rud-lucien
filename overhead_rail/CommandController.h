@@ -85,7 +85,7 @@ bool isCommandExcludedFromHistory(const char *command);
 const char *getLastCommandStatus();
 void initializeSystemStartTime();
 
-// Command execution functions (to be implemented when Commands.h is ready)
+// Command execution functions - now connected to Commands.cpp
 bool executeCommand(const char *command, Stream *output);
 
 #endif // COMMAND_CONTROLLER_H

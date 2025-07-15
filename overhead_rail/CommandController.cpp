@@ -1,4 +1,5 @@
 #include "CommandController.h"
+#include "Commands.h"
 #include "Utils.h"
 #include "SystemState.h"
 #include <Ethernet.h>
@@ -25,23 +26,21 @@ extern EthernetClient clients[];
 //=============================================================================
 
 // Command lookup table - MUST BE ALPHABETICALLY SORTED for binary search
-// Note: This is a basic set for the overhead rail system - expand as needed
+// Complete command set for the overhead rail system
 const CommandInfo COMMAND_TABLE[] = {
     {"abort", CMD_EMERGENCY, 0},
     {"encoder", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY | CMD_FLAG_ASYNC},
-    {"estop", CMD_EMERGENCY, 0},
+    {"goto", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"h", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
     {"help", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"home", CMD_MODIFYING, CMD_FLAG_ASYNC},
-    {"motor", CMD_MODIFYING, CMD_FLAG_ASYNC},
-    {"move", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"jog", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"labware", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
+    {"log", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
     {"network", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"position", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"sensor", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"status", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"stop", CMD_EMERGENCY, 0},
+    {"rail1", CMD_MODIFYING, CMD_FLAG_ASYNC},
+    {"rail2", CMD_MODIFYING, CMD_FLAG_ASYNC},
     {"system", CMD_READ_ONLY, CMD_FLAG_NO_HISTORY},
-    {"teach", CMD_MODIFYING, 0},
-    {"valve", CMD_MODIFYING, CMD_FLAG_ASYNC}
+    {"teach", CMD_MODIFYING, 0}
 };
 
 // Number of commands in the table
@@ -255,10 +254,9 @@ bool processCommand(const char *rawCommand, Stream *output, const char *sourceTa
 }
 
 //=============================================================================
-// COMMAND EXECUTION (PLACEHOLDER)
+// COMMAND EXECUTION - Direct dispatch to Commands.cpp functions
 //=============================================================================
 
-// This is a placeholder function that will be replaced when Commands.h is implemented
 bool executeCommand(const char *command, Stream *output)
 {
     // Store command info for system state reporting
@@ -277,52 +275,87 @@ bool executeCommand(const char *command, Stream *output)
     }
     firstWord[i] = '\0';
 
-    // Basic command implementations for testing
-    if (strcmp(firstWord, "help") == 0)
-    {
-        output->println(F("Available commands:"));
-        output->println(F("  help - Show this help"));
-        output->println(F("  status - Show system status"));
-        output->println(F("  network - Show network status"));
-        output->println(F("  system - Show system information"));
-        output->println(F("  motor - Motor control (home, move, stop)"));
-        output->println(F("  encoder - Encoder/MPG control"));
-        output->println(F("  valve - Valve control"));
-        output->println(F("  sensor - Sensor status"));
-        output->println(F("  position - Position information"));
-        output->println(F("  teach - Teach position commands"));
-        output->println(F("  stop - Emergency stop"));
-        output->println(F("  abort - Abort current operation"));
-        lastCommandSuccess = true;
-        return true;
+    // Calculate args pointer (skip "command,")
+    const char* argsStart = strchr(command, ',');
+    char* args = const_cast<char*>(argsStart ? argsStart + 1 : "");
+    
+    // Create a CommandCaller wrapper for the Stream
+    class StreamCommandCaller : public CommandCaller {
+    private:
+        Stream* stream;
+    public:
+        StreamCommandCaller(Stream* s) : stream(s) {}
+        
+        size_t write(uint8_t c) override {
+            return stream->write(c);
+        }
+        
+        size_t write(const uint8_t *buffer, size_t size) override {
+            return stream->write(buffer, size);
+        }
+        
+        int available() override {
+            return stream->available();
+        }
+        
+        int read() override {
+            return stream->read();
+        }
+        
+        int peek() override {
+            return stream->peek();
+        }
+        
+        void flush() override {
+            stream->flush();
+        }
+    };
+    
+    StreamCommandCaller caller(output);
+
+    // Dispatch to appropriate command function
+    bool success = false;
+    
+    if (strcmp(firstWord, "rail1") == 0) {
+        success = cmd_rail1(args, &caller);
     }
-    else if (strcmp(firstWord, "status") == 0)
-    {
-        output->println(F("System Status: OK"));
-        output->print(F("Operation in progress: "));
-        output->println(operationInProgress ? "YES" : "NO");
-        lastCommandSuccess = true;
-        return true;
+    else if (strcmp(firstWord, "rail2") == 0) {
+        success = cmd_rail2(args, &caller);
     }
-    else if (strcmp(firstWord, "network") == 0)
-    {
-        printEthernetStatus();
-        lastCommandSuccess = true;
-        return true;
+    else if (strcmp(firstWord, "goto") == 0) {
+        success = cmd_goto(args, &caller);
     }
-    else if (strcmp(firstWord, "system") == 0)
-    {
-        // Use the comprehensive SystemState module
-        printSystemState();
-        lastCommandSuccess = true;
-        return true;
+    else if (strcmp(firstWord, "jog") == 0) {
+        success = cmd_jog(args, &caller);
     }
-    else
-    {
-        output->println(F("[ERROR] Command not implemented yet"));
-        lastCommandSuccess = false;
-        return false;
+    else if (strcmp(firstWord, "encoder") == 0) {
+        success = cmd_encoder(args, &caller);
     }
+    else if (strcmp(firstWord, "teach") == 0) {
+        success = cmd_teach(args, &caller);
+    }
+    else if (strcmp(firstWord, "labware") == 0) {
+        success = cmd_labware(args, &caller);
+    }
+    else if (strcmp(firstWord, "log") == 0) {
+        success = cmd_log(args, &caller);
+    }
+    else if (strcmp(firstWord, "system") == 0) {
+        success = cmd_system(args, &caller);
+    }
+    else if (strcmp(firstWord, "help") == 0 || strcmp(firstWord, "h") == 0) {
+        success = cmd_print_help(args, &caller);
+    }
+    else if (strcmp(firstWord, "network") == 0) {
+        success = cmd_network(args, &caller);
+    }
+    else {
+        output->println(F("[ERROR] Command not recognized"));
+        success = false;
+    }
+
+    lastCommandSuccess = success;
+    return success;
 }
 
 //=============================================================================
@@ -345,29 +378,24 @@ CommandType getCommandType(const char *originalCommand)
     const CommandInfo *cmdInfo = findCommand(firstWord);
     if (cmdInfo)
     {
-        // For most commands, just return the type from the table
-        if (strcmp(firstWord, "motor") != 0 && strcmp(firstWord, "system") != 0)
+        // Special handling for rail commands that have emergency subcommands
+        if (strcmp(firstWord, "rail1") == 0 || strcmp(firstWord, "rail2") == 0)
         {
-            return cmdInfo->type;
-        }
-
-        // Special handling for motor commands
-        if (strcmp(firstWord, "motor") == 0)
-        {
-            // Check for motor stop/abort which are emergency commands
-            if (strstr(originalCommand, "stop") != nullptr ||
-                strstr(originalCommand, "abort") != nullptr)
+            // Check for emergency subcommands
+            if (strstr(originalCommand, ",abort") != nullptr ||
+                strstr(originalCommand, ",stop") != nullptr)
             {
                 return CMD_EMERGENCY;
             }
 
-            // Check for motor status which is read-only
-            if (strstr(originalCommand, "status") != nullptr)
+            // Check for read-only subcommands
+            if (strstr(originalCommand, ",status") != nullptr ||
+                strstr(originalCommand, ",help") != nullptr)
             {
                 return CMD_READ_ONLY;
             }
 
-            // All other motor commands are modifying
+            // All other rail commands are modifying
             return CMD_MODIFYING;
         }
 
@@ -375,15 +403,85 @@ CommandType getCommandType(const char *originalCommand)
         if (strcmp(firstWord, "system") == 0)
         {
             // System status commands are read-only
-            if (strstr(originalCommand, "status") != nullptr ||
-                strstr(originalCommand, "info") != nullptr)
+            if (strstr(originalCommand, ",state") != nullptr ||
+                strstr(originalCommand, ",help") != nullptr)
             {
                 return CMD_READ_ONLY;
             }
 
-            // System reset/config commands are modifying
+            // System reset/home commands are modifying
             return CMD_MODIFYING;
         }
+
+        // Special handling for teach commands
+        if (strcmp(firstWord, "teach") == 0)
+        {
+            // Status commands are read-only
+            if (strstr(originalCommand, ",status") != nullptr)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // All other teach commands are modifying
+            return CMD_MODIFYING;
+        }
+
+        // Special handling for labware commands
+        if (strcmp(firstWord, "labware") == 0)
+        {
+            // Status and help are read-only
+            if (strstr(originalCommand, ",status") != nullptr ||
+                strstr(originalCommand, ",help") != nullptr)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // Audit and reset are modifying
+            return CMD_MODIFYING;
+        }
+
+        // Special handling for encoder commands
+        if (strcmp(firstWord, "encoder") == 0)
+        {
+            // Status and help are read-only
+            if (strstr(originalCommand, ",status") != nullptr ||
+                strstr(originalCommand, ",help") != nullptr)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // All other encoder commands are modifying
+            return CMD_MODIFYING;
+        }
+
+        // Special handling for jog commands (all modifying)
+        if (strcmp(firstWord, "jog") == 0)
+        {
+            // Status and help are read-only
+            if (strstr(originalCommand, ",status") != nullptr ||
+                strstr(originalCommand, ",help") != nullptr)
+            {
+                return CMD_READ_ONLY;
+            }
+
+            // All other jog commands are modifying
+            return CMD_MODIFYING;
+        }
+
+        // Special handling for network commands (all read-only)
+        if (strcmp(firstWord, "network") == 0)
+        {
+            return CMD_READ_ONLY;
+        }
+
+        // Special handling for log commands (all read-only)
+        if (strcmp(firstWord, "log") == 0)
+        {
+            return CMD_READ_ONLY;
+        }
+
+        // For other commands, use the type from the table
+        return cmdInfo->type;
     }
 
     // Unknown commands are treated as modifying (conservative approach)
