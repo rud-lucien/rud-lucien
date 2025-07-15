@@ -34,14 +34,6 @@ bool waitTimeReached(unsigned long current, unsigned long previous, unsigned lon
     return timeDiff(current, previous) >= waitTime;
 }
 
-// Safe time comparison that handles rollover (true if timeA is after timeB)
-bool isTimeAfter(unsigned long timeA, unsigned long timeB)
-{
-    // Using signed arithmetic to handle rollover correctly
-    // This works because of two's complement arithmetic
-    return (long)(timeA - timeB) > 0;
-}
-
 // Helper function to print time in a human-readable format
 void printHumanReadableTime(unsigned long secondsAgo)
 {
@@ -173,17 +165,6 @@ void formatAbsoluteTime(unsigned long timeMs, char *buffer)
 
     // Format as HH:MM:SS
     snprintf(buffer, 12, "%02lu:%02lu:%02lu", hours, minutes, seconds);
-}
-
-bool isRecentEvent(unsigned long eventTime, unsigned long maxAgeMs) {
-    return timeDiff(millis(), eventTime) <= maxAgeMs;
-}
-
-void printTimeAgo(unsigned long eventTime) {
-    unsigned long ageMs = timeDiff(millis(), eventTime);
-    Serial.print("(");
-    printHumanReadableTime(ageMs / 1000);
-    Serial.print(" ago)");
 }
 
 //=============================================================================

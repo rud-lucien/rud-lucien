@@ -34,7 +34,7 @@ const char FMT_EXTENDED_SENSOR[] PROGMEM = "  Extended Sensor: %s";
 const char FMT_RETRACTED_SENSOR[] PROGMEM = "  Retracted Sensor: %s";
 const char FMT_AIR_PRESSURE[] PROGMEM = "Air Pressure: %d.%02d PSI";
 const char FMT_PRESSURE_STATUS[] PROGMEM = "Pressure Status: %s (min required: %d.%02d PSI)";
-const char FMT_LAST_OPERATION[] PROGMEM = "Last Operation: %lu ms ago";
+const char FMT_LAST_OPERATION[] PROGMEM = "Last Operation: %s ago";
 const char FMT_LAST_RESULT_FAILED[] PROGMEM = "Last Result: FAILED - %s";
 
 //=============================================================================
@@ -362,7 +362,9 @@ void printValveDetailedStatus()
     if (lastValveOperationTime > 0)
     {
         unsigned long timeSince = getTimeSinceLastValveOperation();
-        sprintf_P(msg, FMT_LAST_OPERATION, timeSince);
+        char timeBuffer[40];
+        formatHumanReadableTime(timeSince / 1000, timeBuffer, sizeof(timeBuffer));
+        sprintf_P(msg, FMT_LAST_OPERATION, timeBuffer);
         Console.serialInfo(msg);
         
         if (lastValveOperationFailed)

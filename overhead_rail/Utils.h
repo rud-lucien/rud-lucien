@@ -38,9 +38,6 @@ bool timeoutElapsed(unsigned long current, unsigned long previous, unsigned long
 // Safe waiting check
 bool waitTimeReached(unsigned long current, unsigned long previous, unsigned long waitTime);
 
-// Safe time comparison that handles rollover (true if timeA is after timeB)
-bool isTimeAfter(unsigned long timeA, unsigned long timeB);
-
 // Convert seconds to a human-readable format
 void printHumanReadableTime(unsigned long secondsAgo);
 
@@ -49,8 +46,5 @@ void formatHumanReadableTime(unsigned long secondsAgo, char* buffer, size_t buff
 
 // Format absolute time (milliseconds since startup) to HH:MM:SS format
 void formatAbsoluteTime(unsigned long timeMs, char *buffer);
-
-bool isRecentEvent(unsigned long eventTime, unsigned long maxAgeMs);
-void printTimeAgo(unsigned long eventTime);
 
 #endif // UTILS_H

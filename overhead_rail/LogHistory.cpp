@@ -161,6 +161,13 @@ void LogHistory::printColoredEntry(const LogEntry& entry)
 {
     const char* message = entry.message;
     
+    // Format timestamp as [HH:MM:SS] prefix
+    char timestamp[12];
+    formatAbsoluteTime(entry.timestamp, timestamp);
+    Console.print('[');
+    Console.print(timestamp);
+    Console.print("] ");
+    
     // **PERFORMANCE FIX**: Use stored severity instead of string parsing when possible
     // This is much faster and more reliable than string searching
     bool useSeverityColor = true;
