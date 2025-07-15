@@ -1,20 +1,463 @@
-# Overhead Rail System - Dual-Rail Motor Control System
+# OVERHEAD RAIL AUTOMATION SYSTEM
 
-A comprehensive Arduino-based control system for dual overhead rail transportation using ClearCore motor drivers. This system provides complete motor control, positioning, homing, pneumatic valve control, sensor monitoring, and manual operation capabilities for two independent rail systems.
+## SYSTEM PURPOSE
+This program controls a dual-rail overhead automation system designed for precise labware handling across multiple workcells. The system manages automated transport of laboratory samples, plates, and equipment between three workcells using two independent rail systems with different precision requirements and integrated pneumatic handoff mechanisms.
 
-## Table of Contents
-- [System Overview](#system-overview)
-- [Hardware Configuration](#hardware-configuration)
-- [Quick Start](#quick-start)
-- [Motor Control](#motor-control)
-- [Pneumatic Valve Control](#pneumatic-valve-control)
-- [Sensor System](#sensor-system)
-- [Manual Control (MPG/Handwheel)](#manual-control-mpghandwheel)
-- [Logging System](#logging-system)
-- [Velocity Configuration](#velocity-configuration)
-- [Command Interface](#command-interface)
-- [Safety Features](#safety-features)
-- [Position Reference](#position-reference)
+## CORE FUNCTIONALITY
+- **Dual-Rail Precision Motion Control**: Rail 1 (8.2m, high-precision) and Rail 2 (1m, standard precision)
+- **Cross-Rail Labware Transfer**: Automated handoff system between Rails 1 and 2
+- **Multi-Workcell Integration**: Automated transport to Workcell 1, Workcell 2, and Workcell 3
+- **Pneumatic Cylinder Control**: Automated extend/retract for labware handling at Rail 2
+- **Dynamic Position Teaching**: Field-adjustable positions with SD card persistence
+- **Comprehensive Labware Tracking**: Real-time monitoring of labware location and state
+- **Manual Control Interface**: MPG handwheel for precise manual positioning
+- **Collision Prevention**: Intelligent collision zone detection and cylinder safety management
+- **Network Integration**: Serial and Ethernet interfaces with extensive command documentation
+- **Historical Logging**: Comprehensive operation history and error diagnosis capabilities
+
+## REQUIRED HARDWARE COMPONENTS
+
+### 1. CONTROLLER & I/O
+- **ClearCore Industrial I/O and Motion Controller** (main controller)
+- **CCIO-8 Digital I/O Expansion** (8-point expansion for sensors and pneumatic control)
+- **CABLE-RIBBON6** (6 inch ribbon cable for CCIO connection)
+
+### 2. DUAL MOTION SYSTEM
+
+#### Rail 1 (8.2m Long-Distance Rail)
+- **NEMA 23 ClearPath-SDSK Model CPM-SDSK-2321S-RLS** (servo motor with integrated drive)
+- **8.2 meter linear rail system** with precision positioning capability
+
+**REQUIRED MOTOR CONFIGURATION (using Teknic ClearPath-MSP software):**
+- Input Resolution: **3200 pulses per revolution** (high precision for long distance)
+- Input Format: Step and Direction
+- Torque Limit: 50%
+- HLFB Output: ASG-POSITION WITH MEASURED TORQUE
+- Homing Configuration:
+  * Homing Mode: Normal
+  * Homing Style: User seeks home; ClearPath ASG signals when homing is complete
+  * Homing Occurs: Upon every Enable
+  * Homing Direction: **CCW (toward home position)**
+  * Homing Torque Limit: 40%
+  * Speed (RPM): 100.00
+  * Accel/Decel (RPM/s): 2,500
+  * Precision Homing: Use Precision Homing (enabled)
+  * Home Offset Move Distance: 5mm from hardstop
+
+#### Rail 2 (1m Precision Rail)
+- **NEMA 23 ClearPath-SDSK Model CPM-SDSK-2321S-RLS** (servo motor with integrated drive)
+- **1 meter linear rail system** with standard precision positioning
+
+**REQUIRED MOTOR CONFIGURATION (using Teknic ClearPath-MSP software):**
+- Input Resolution: **800 pulses per revolution** (standard precision for short distance)
+- Input Format: Step and Direction
+- Torque Limit: 50%
+- HLFB Output: ASG-POSITION WITH MEASURED TORQUE
+- Homing Configuration:
+  * Homing Mode: Normal
+  * Homing Style: User seeks home; ClearPath ASG signals when homing is complete
+  * Homing Occurs: Upon every Enable
+  * Homing Direction: **CW (away from home position)**
+  * Homing Torque Limit: 40%
+  * Speed (RPM): 100.00
+  * Accel/Decel (RPM/s): 2,000
+  * Precision Homing: Use Precision Homing (enabled)
+  * Home Offset Move Distance: 5mm from hardstop
+
+### 3. PNEUMATIC HANDOFF SYSTEM
+- **Pneumatic cylinder** for Rail 2 labware pickup/dropoff operations
+- **Pressure sensor** for pneumatic system monitoring (minimum pressure threshold)
+- **Solenoid valves** for cylinder extend/retract control
+- **Compressed air supply system** with adequate capacity for automation cycles
+
+### 4. SENSOR SYSTEM
+- **Labware detection sensors** at each workcell position
+- **Handoff position sensors** for cross-rail transfer detection
+- **Home position sensors** for each rail reference
+- **Pressure monitoring sensor** for pneumatic system validation
+
+### 5. FEEDBACK & CONTROL
+- **CL-ENCDR-DFIN Encoder Input Adapter** (for MPG handwheel manual control)
+- **MPG handwheel encoder** (manual positioning interface for both rails)
+- **Position feedback systems** integrated with ClearPath motors
+
+### 6. POWER SYSTEM
+- **IPC-5 DC Power Supply** (350/500W, 75VDC output for motor power)
+- **POWER4-STRIP DC Bus Distribution Strip** (power distribution)
+- **24VDC supply** for logic, sensors, and pneumatics
+
+### 7. SAFETY SYSTEMS
+- **Emergency stop (E-stop) circuit** with normally closed contacts
+- **Collision zone monitoring** for Rail 1/Rail 2 interaction safety
+- **Pressure monitoring system** with automatic fault detection
+- **Cross-rail safety interlocks** preventing simultaneous collision zone access
+## SYSTEM LAYOUT & POSITIONS
+
+### Rail 1 (8.2m Long-Distance Rail)
+- **Home Position**: 0mm (reference position)
+- **Staging Position**: 150mm (intermediate staging area)
+- **Handoff Position**: 35mm (transfer point to Rail 2)
+- **Workcell 2**: 3700mm (sample processing station)
+- **Workcell 1**: 5700mm (primary analysis station)
+
+### Rail 2 (1m Precision Rail)
+- **Home Position**: 0mm (reference position)
+- **Workcell 3**: 95mm (specialized handling station)
+- **Handoff Position**: 900mm (transfer point from Rail 1)
+
+### Collision Zone Management
+- **Collision Zone**: 500-700mm on Rail 1 (where Rails 1 and 2 can interfere)
+- **Automatic Cylinder Management**: Cylinder retracts automatically when Rail 1 enters collision zone
+- **Safety Interlocks**: Prevents simultaneous Rail 1 and Rail 2 access to handoff area
+
+## COMMUNICATION INTERFACES
+- **Serial (USB)**: Direct command interface and diagnostics (115200 baud)
+- **Ethernet**: Remote command interface and monitoring with configurable IP
+- **Comprehensive Help System**: Type "help" for available commands, "help <command>" for specific usage
+- **Command Categories**: Rail control, system management, positioning, labware automation
+
+## USAGE
+
+### OPERATIONAL MODES
+
+#### A. AUTOMATED MODE (Default)
+- **Cross-Rail Automation**: Automatic labware transfer between Rails 1 and 2
+- **Collision Avoidance**: Intelligent coordination prevents rail interference
+- **Labware Tracking**: Persistent state tracking across all workcells
+- **Pneumatic Integration**: Automatic cylinder control for labware handling
+- **Safety Monitoring**: Continuous pressure, position, and collision zone monitoring
+
+#### B. MANUAL MODE
+- **Individual Rail Control**: Direct command control for each rail independently
+- **Manual Positioning**: MPG handwheel encoder for precise positioning
+- **Component Testing**: Individual control of pneumatics, sensors, and motors
+- **Maintenance Operations**: Step-by-step control for troubleshooting and calibration
+
+### BASIC SETUP AND INITIALIZATION
+
+### BASIC SETUP AND INITIALIZATION
+
+#### 1. Motor Configuration
+Configure both ClearPath motors using Teknic ClearPath-MSP software:
+- Rail 1: 3200 pulses/rev, CCW homing, 2500 RPM/s accel
+- Rail 2: 800 pulses/rev, CW homing, 2000 RPM/s accel
+- Load configurations to motor memory and perform auto-tuning
+
+#### 2. System Startup
+Connect via Serial or Ethernet and run these commands:
+- `system,state` - Check overall system status
+- `rail1,init` - Initialize Rail 1 motor
+- `rail2,init` - Initialize Rail 2 motor
+- `system,home` - Home both rails sequentially
+- `system,state` - Verify all systems ready
+
+#### 3. System Validation
+- `rail1,status` - Check Rail 1 motor status
+- `rail2,status` - Check Rail 2 motor status
+- `system,state` - Verify all sensor readings and pressure
+- `labware,audit` - Validate labware tracking state
+
+### POSITION TEACHING AND CONFIGURATION
+
+### POSITION TEACHING AND CONFIGURATION
+
+#### Rail-Specific Position Teaching
+**Rail 1 Position Teaching:**
+- `encoder,enable,rail1` - Enable handwheel for Rail 1
+- Use handwheel to position Rail 1 precisely
+- `teach,rail1,wc1` - Teach Workcell 1 position
+- `teach,rail1,wc2` - Teach Workcell 2 position
+- `teach,rail1,staging` - Teach staging position
+- `teach,rail1,handoff` - Teach handoff position
+
+**Rail 2 Position Teaching:**
+- `encoder,enable,rail2` - Enable handwheel for Rail 2
+- Use handwheel to position Rail 2 precisely
+- `teach,rail2,wc3` - Teach Workcell 3 position
+- `teach,rail2,handoff` - Teach handoff position
+
+**Verify Taught Positions:**
+- `teach,status` - Show all current positions
+- `rail1,move-wc1,no-labware` - Test Rail 1 movements
+- `rail2,move-wc3,no-labware` - Test Rail 2 movements
+
+#### Alternative Teaching Methods
+**Direct Positioning Method:**
+- `rail1,move-mm-to,5700,no-labware` - Position Rail 1 to 5700mm
+- `teach,rail1,wc1` - Teach current position as WC1
+
+**Incremental Positioning Method:**
+- `jog,rail1,increment,1` - Set 1mm jog increment
+- `jog,rail1,+` - Jog forward
+- `jog,rail1,-` - Jog backward
+- `teach,rail1,wc1` - Teach final position
+
+### MANUAL OPERATION COMMANDS
+
+### MANUAL OPERATION COMMANDS
+
+#### Rail Movement Control
+**Absolute Positioning:**
+- `rail1,move-wc1,no-labware` - Move Rail 1 to Workcell 1
+- `rail1,move-wc2,with-labware` - Move Rail 1 to Workcell 2 with labware
+- `rail2,move-wc3,no-labware` - Move Rail 2 to Workcell 3
+
+**Relative Positioning:**
+- `rail1,move-rel,100,no-labware` - Move Rail 1 forward 100mm
+- `rail2,move-rel,-50,no-labware` - Move Rail 2 backward 50mm
+
+**Direct Millimeter Positioning:**
+- `rail1,move-mm-to,3700,no-labware` - Move Rail 1 to 3700mm position
+- `rail2,move-mm-to,95,with-labware` - Move Rail 2 to 95mm position
+
+#### Pneumatic Control
+- `rail2,extend` - Extend Rail 2 cylinder
+- `rail2,retract` - Retract Rail 2 cylinder
+
+#### Manual Positioning Interface
+- `encoder,enable,rail1` - Enable handwheel control for Rail 1
+- `encoder,enable,rail2` - Enable handwheel control for Rail 2
+- `encoder,disable` - Return to automated control
+- `encoder,multiplier,5` - Set handwheel sensitivity (1, 10, or 100)
+- `encoder,velocity,50` - Set maximum handwheel velocity
+
+### AUTOMATED OPERATION COMMANDS
+
+### AUTOMATED OPERATION COMMANDS
+
+#### High-Level Automation
+- `goto,wc1,with-labware` - Automated movement to Workcell 1
+- `goto,wc2,no-labware` - Automated movement to Workcell 2  
+- `goto,wc3,with-labware` - Automated movement to Workcell 3
+
+#### Labware Management
+- `labware,status` - Display current labware tracking state
+- `labware,audit` - Automatically validate and fix labware state
+- `labware,reset` - Reset labware tracking to known state
+
+#### System Control
+- `system,state` - Comprehensive system status display
+- `system,home` - Sequential homing of both rails
+- `system,reset` - Clear operational state for clean automation
+
+### DIAGNOSTICS AND TROUBLESHOOTING
+
+### DIAGNOSTICS AND TROUBLESHOOTING
+
+#### Help System
+- `help` - Display all available commands
+- `rail1,help` - Rail 1 specific commands
+- `rail2,help` - Rail 2 specific commands
+- `goto,help` - Cross-rail automation commands
+- `teach,help` - Position teaching system
+- `encoder,help` - Manual control interface
+- `system,help` - System management commands
+
+#### Status and Monitoring
+- `system,state` - Overall system readiness assessment
+- `rail1,status` - Detailed Rail 1 motor status
+- `rail2,status` - Detailed Rail 2 motor status
+- `network,status` - Ethernet connection information
+- `teach,status` - Position configuration status
+
+#### Logging and History
+- `log,on,250` - Enable logging every 250ms
+- `log,off` - Disable periodic logging
+- `log,now` - Log current system state immediately
+- `log,history` - View complete operation log
+- `log,errors` - View only error entries
+- `log,last,20` - View last 20 log entries
+- `log,stats` - View logging statistics
+
+#### Fault Management
+- `rail1,clear-fault` - Clear Rail 1 motor faults
+- `rail2,clear-fault` - Clear Rail 2 motor faults
+- `rail1,abort` - Emergency stop Rail 1
+- `rail2,abort` - Emergency stop Rail 2
+- `system,reset` - System-wide fault recovery
+
+## POSITION TEACHING SYSTEM
+
+### Factory Default Positions
+The system includes hardcoded factory default positions used when no taught positions exist:
+
+**Rail 1 Defaults:**
+- Home: 0mm
+- Staging: 150mm  
+- Handoff: 35mm
+- Workcell 2: 3700mm
+- Workcell 1: 5700mm
+
+**Rail 2 Defaults:**
+- Home: 0mm
+- Workcell 3: 95mm
+- Handoff: 900mm
+
+### Taught Position System
+- **User-Defined Positions**: Override factory defaults with field-adjustable positions
+- **SD Card Persistence**: Automatically saved to SD card for power cycle survival
+- **Automatic Loading**: Taught positions loaded at startup if SD card present
+- **Rail-Specific Teaching**: Each rail can have independently taught positions
+
+### Position Priority Hierarchy
+1. **Taught Positions** (highest priority) - User-defined positions
+2. **SD Card Positions** (medium priority) - Loaded at startup
+3. **Factory Defaults** (lowest priority) - Fallback values
+
+### Teaching Workflow
+1. **Initialize System**: `system,home` to establish reference
+2. **Position Motor**: Use handwheel, direct positioning, or jog commands
+3. **Capture Position**: `teach,rail1,wc1` (captures current position)
+4. **Auto-Save**: Position automatically saved to SD card
+5. **Test Position**: `rail1,move-wc1,no-labware` to verify accuracy
+6. **Configuration Management**: `teach,status` to view all positions
+
+## TYPICAL WORKFLOWS
+
+### Initial System Setup
+Power up system and connect via Serial (115200 baud) or Ethernet:
+- `system,state` - Check system readiness
+- `rail1,init` - Initialize Rail 1
+- `rail2,init` - Initialize Rail 2  
+- `system,home` - Home both rails
+- `system,state` - Verify all systems ready
+
+### Position Teaching (Handwheel Method)
+- `system,home` - Establish reference
+- `encoder,enable,rail1` - Enable handwheel for Rail 1
+- Manually position using handwheel
+- `teach,rail1,wc1` - Capture Workcell 1 position
+- `rail1,move-wc1,no-labware` - Test taught position
+- Repeat for other positions
+- `teach,status` - Verify all positions
+
+### Daily Operation Startup
+System automatically loads taught positions from SD card:
+- `system,state` - Verify system readiness
+- `labware,audit` - Validate labware tracking
+- Begin automated operations
+
+### Cross-Rail Automation
+- `goto,wc1,with-labware` - Automated Rail 1 → WC1 with labware handling
+- `goto,wc3,with-labware` - Automated cross-rail transfer Rail 1 → Rail 2 → WC3
+- `goto,wc2,no-labware` - Automated Rail 1 → WC2 without labware
+
+### Maintenance and Troubleshooting
+- `encoder,enable,rail1` - Enable manual control
+- Perform maintenance operations
+- `rail1,clear-fault` - Clear any faults
+- `system,reset` - Reset to clean state
+- `encoder,disable` - Return to automated mode
+
+### Error Diagnosis
+- `log,errors` - View recent errors
+- `rail1,status` - Check Rail 1 specific status
+- `rail2,status` - Check Rail 2 specific status
+- `system,state` - Overall system assessment
+
+## SAFETY FEATURES
+
+### Emergency Stop Integration
+- **Hardware E-Stop**: Immediately stops all motion and pneumatic operations
+- **Software Monitoring**: Continuous E-stop state checking during operations
+- **Safe Recovery**: Systematic restart procedures after E-stop events
+
+### Collision Prevention
+- **Collision Zone Detection**: Automatic detection when Rail 1 enters Rail 2 interaction zone
+- **Cylinder Safety**: Automatic cylinder retraction during collision zone movements
+- **Cross-Rail Interlocks**: Prevents simultaneous access to handoff positions
+
+### Pressure Monitoring
+- **Continuous Monitoring**: Real-time pressure sensor reading and validation
+- **Automatic Fault Detection**: System alerts when pressure drops below operational threshold
+- **Safe Operation Enforcement**: Pneumatic operations blocked during insufficient pressure
+
+### Position Validation
+- **Travel Limit Enforcement**: Software limits prevent over-travel on both rails
+- **Position Verification**: Automatic validation of motor position after movements
+- **Homing Verification**: Comprehensive homing sequence validation with timeout protection
+
+## NETWORK CONFIGURATION
+
+### Ethernet Interface
+- **Default IP Configuration**: Static IP assignment (configurable)
+- **Remote Command Interface**: Full command set available via network
+- **Status Monitoring**: Real-time system monitoring via network connection
+- **Multiple Client Support**: Simultaneous Serial and Ethernet connections
+
+### Network Commands
+- `network,status` - Show current network configuration
+- `network,disconnect` - Safely disconnect network clients
+
+## ADVANCED FEATURES
+
+### Smart Homing
+- **Distance-Based Optimization**: Faster homing when motor position is known
+- **Precision Approach**: Automatic switching to precision mode near home
+- **Rail-Specific Parameters**: Optimized homing speeds and distances for each rail
+
+### Labware Automation
+- **Persistent State Tracking**: Maintains labware location across power cycles
+- **Cross-Rail Coordination**: Intelligent handoff between Rail 1 and Rail 2
+- **Automatic Validation**: Self-correcting labware state with audit function
+
+### Velocity Optimization
+- **Load-Aware Speeds**: Different velocities for loaded vs. unloaded carriages
+- **Distance-Based Deceleration**: Smooth deceleration for precision positioning
+- **Rail-Specific Tuning**: Optimized motion profiles for each rail's characteristics
+
+## TROUBLESHOOTING GUIDE
+
+### Common Issues and Solutions
+
+#### Motor Not Initializing
+Check motor power and connections:
+- `rail1,clear-fault` - Clear any existing faults
+- `rail1,init` - Retry initialization
+- `system,state` - Verify system status
+
+#### Homing Failures
+Ensure rails are clear of obstructions:
+- `system,reset` - Clear any fault states
+- `system,home` - Retry homing sequence
+
+#### Pneumatic System Issues
+Check air supply and pressure:
+- `system,state` - View pressure status
+- `rail2,retract` - Manually test cylinder operation
+
+#### Position Teaching Problems
+- `teach,reset` - Return to factory defaults
+- `teach,status` - Verify position configuration
+- Re-teach positions using handwheel method
+
+#### Network Connection Issues
+- `network,status` - Check current network state
+- `network,disconnect` - Reset network connections
+- Check Ethernet cable and IP configuration
+
+### Error Code Reference
+- **E-STOP_ACTIVE**: Emergency stop circuit engaged - check E-stop button and wiring
+- **MOTOR_FAULT**: Motor alerts present - check motor power, connections, and configuration
+- **INSUFFICIENT_PRESSURE**: Pneumatic pressure below threshold - check air supply
+- **HOMING_TIMEOUT**: Homing sequence exceeded time limit - check for obstructions
+- **POSITION_OUT_OF_RANGE**: Commanded position exceeds travel limits - verify position values
+- **COLLISION_ZONE_VIOLATION**: Unsafe rail interaction detected - check cylinder position
+
+## MAINTENANCE REQUIREMENTS
+
+### Regular Maintenance
+- **Daily**: Visual inspection of rails, verify system,state shows all systems ready
+- **Weekly**: Check pneumatic pressure, verify position accuracy
+- **Monthly**: Verify taught positions, test emergency stop function
+- **Quarterly**: Motor auto-tuning verification, comprehensive system calibration
+
+### Calibration Procedures
+- **Position Teaching**: Re-teach positions when mechanical adjustments are made
+- **Motor Tuning**: Re-run ClearPath auto-tuning after significant mechanical changes
+- **Pressure Calibration**: Verify pressure sensor readings and thresholds
+
+NOTE: This dual-rail system provides high-precision automation with intelligent cross-rail coordination. The rail-specific motor configurations (Rail 1: 3200 pulses/rev, Rail 2: 800 pulses/rev) optimize performance for each rail's specific requirements - high precision for the long 8.2m Rail 1, and standard precision for the short 1m Rail 2.
 - [API Reference](#api-reference)
 - [File Structure](#file-structure)
 - [Dependencies](#dependencies)
@@ -69,664 +512,4 @@ A comprehensive Arduino-based control system for dual overhead rail transportati
 
 ---
 
-## Quick Start
-
-### Basic Initialization
-```cpp
-#include "MotorController.h"
-#include "Sensors.h"
-#include "ValveController.h"
-#include "Logging.h"
-
-void setup() {
-    Serial.begin(115200);
-    
-    // Initialize all systems
-    initMotorSystem();
-    initSensorSystem(true);    // true = CCIO board available
-    initValveSystem(true);     // true = CCIO board available
-    initEncoderControl(true, false);
-    
-    // Home both motors
-    initiateHomingSequenceAll();
-    while (!isAllHomingComplete()) {
-        checkAllHomingProgress();
-        handleEStop();
-        delay(10);
-    }
-    
-    // Enable logging
-    logging.logInterval = 250;  // Log every 250ms
-}
-
-void loop() {
-    handleEStop();              // Critical safety monitoring
-    checkAllHomingProgress();   
-    processAllFaultClearing();  
-    updateAllSensors();
-    processEncoderInput();
-    
-    // Periodic logging
-    if (logging.logInterval > 0 && 
-        waitTimeReached(millis(), logging.previousLogTime, logging.logInterval)) {
-        logging.previousLogTime = millis();
-        logSystemState();
-    }
-}
-```
-
-### Basic Movement Examples
-```cpp
-// Move to predefined positions
-moveToPositionFromCurrent(1, RAIL1_WC2_PICKUP_DROPOFF_POS, true);  // Rail 1 to WC2, loaded
-moveToPositionFromCurrent(2, RAIL2_WC3_PICKUP_DROPOFF_POS, false); // Rail 2 to WC3, empty
-
-// Move to specific coordinates
-moveToPositionMm(1, 3700.0, true);    // Rail 1 to 3700mm, loaded carriage
-moveToPositionMm(2, 750.0, false);    // Rail 2 to 750mm, empty carriage
-
-// Pneumatic control
-extendValve();                         // Extend pneumatic cylinder
-retractValve();                        // Retract pneumatic cylinder
-```
-
----
-
-## Motor Control
-
-### System Initialization and Safety
-
-#### Core Functions
-```cpp
-initMotorSystem();                     // Initialize both motors
-handleEStop();                         // Monitor E-stop (call in main loop)
-isEStopActive();                       // Check E-stop status
-isMotorReady(int rail);               // Check motor readiness
-isMotorMoving(int rail);              // Check if motor is moving
-getMotorPositionMm(int rail);         // Get current position in mm
-stopMotion(int rail);                 // Stop specific motor
-stopAllMotion();                      // Emergency stop all motors
-```
-
-### Position-Based Movement
-
-#### Predefined Positions
-```cpp
-// Move to named positions with load consideration
-moveToPositionFromCurrent(int rail, PositionTarget toPos, bool carriageLoaded);
-
-// Examples:
-moveToPositionFromCurrent(1, RAIL1_HOME_POS, false);
-moveToPositionFromCurrent(1, RAIL1_WC2_PICKUP_DROPOFF_POS, true);
-moveToPositionFromCurrent(2, RAIL2_WC3_PICKUP_DROPOFF_POS, false);
-```
-
-**Available Positions:**
-- **Rail 1**: `HOME`, `WC2_PICKUP_DROPOFF`, `WC1_PICKUP_DROPOFF`, `STAGING`, `HANDOFF`
-- **Rail 2**: `HOME`, `HANDOFF`, `WC3_PICKUP_DROPOFF`
-
-#### Coordinate-Based Movement
-```cpp
-// Move to specific coordinates in millimeters
-moveToPositionMm(int rail, double positionMm, bool carriageLoaded);
-moveRelativeMm(int rail, double relativeMm, bool carriageLoaded);
-
-// Examples:
-moveToPositionMm(1, 3700.0, true);      // Rail 1 to 3700mm, loaded
-moveRelativeMm(2, 50.0, false);     // Rail 2 forward 50mm, empty
-```
-
-### Homing Operations
-
-#### Individual and Dual Motor Homing
-```cpp
-// Individual motor homing
-initiateHomingSequence(int rail);
-checkHomingProgress(int rail);
-isHomingInProgress(int rail);
-isHomingComplete(int rail);
-
-// Dual motor homing
-initiateHomingSequenceAll();
-checkAllHomingProgress();
-isAllHomingComplete();
-```
-
-### Manual Jogging
-
-#### Jog Operations
-```cpp
-// Basic jogging with configurable parameters
-jogMotor(int rail, bool direction, double customIncrement, bool carriageLoaded);
-
-// Jog configuration
-setJogIncrement(int rail, double increment);
-setJogSpeed(int rail, int speedRpm);
-getJogIncrement(int rail);
-getJogSpeed(int rail);
-```
-
-### Fault Management
-
-#### Fault Detection and Recovery
-```cpp
-// Fault management
-clearMotorFaults(int rail);
-processAllFaultClearing();
-hasMotorFault(int rail);
-isFaultClearingInProgress(int rail);
-clearMotorFaultWithStatus(int rail);   // Immediate status return
-```
-
----
-
-## Pneumatic Valve Control
-
-### Basic Valve Operations
-```cpp
-// Valve control
-extendValve();                         // Extend pneumatic cylinder
-retractValve();                        // Retract pneumatic cylinder
-getValvePosition();                    // Get current valve state
-
-// Position validation
-isCylinderRetracted();                 // Hardware sensor feedback
-isCylinderExtended();                  // Hardware sensor feedback
-isCylinderActuallyRetracted();         // Validated position
-isCylinderActuallyExtended();          // Validated position
-validateValvePosition();               // Position/sensor match check
-```
-
-### Safety Features
-- **Sensor Validation**: Hardware feedback confirms valve position
-- **Position Mismatch Detection**: Alerts when commanded position doesn't match sensors
-- **Pressure Monitoring**: Ensures sufficient system pressure for operation
-
----
-
-## Sensor System
-
-### Carriage and Labware Detection
-```cpp
-// Carriage position sensors
-isCarriageAtWC1();                     // Rail 1 - Work Cell 1
-isCarriageAtWC2();                     // Rail 1 - Work Cell 2  
-isCarriageAtWC3();                     // Rail 2 - Work Cell 3
-isCarriageAtRail1Handoff();            // Rail 1 - Handoff position
-isCarriageAtRail2Handoff();            // Rail 2 - Handoff position
-
-// Labware detection sensors
-isLabwarePresentAtWC1();               // Plate at Work Cell 1
-isLabwarePresentAtWC2();               // Plate at Work Cell 2
-isLabwarePresentAtWC3();               // Plate at Work Cell 3
-isLabwarePresentAtHandoff();           // Plate at handoff position
-
-// System monitoring
-updateAllSensors();                    // Update all sensor readings
-getPressurePsi();                      // Current system pressure
-isPressureSufficient();                // Pressure adequacy check
-isPressureWarningLevel();              // Low pressure warning
-```
-
-### Sensor Integration
-- **CCIO-8 Expansion**: Support for additional I/O via CCIO boards
-- **Real-time Updates**: Continuous sensor monitoring in main loop
-- **Error Detection**: Sensor fault detection and reporting
-
----
-
-## Manual Control (MPG/Handwheel)
-
-### Encoder System Setup
-```cpp
-// Initialize encoder system
-initEncoderControl(bool swapDirection, bool indexInverted);
-
-// Enable/disable control
-enableEncoderControl(int rail);        // Control specific rail
-disableEncoderControl();               // Disable handwheel control
-isEncoderControlActive();              // Check if active
-getActiveEncoderRail();                // Get controlled rail (1, 2, or 0)
-```
-
-### Precision Control
-```cpp
-// Set precision multipliers
-setEncoderMultiplier(0.1);             // x1: Fine (0.1mm per count)
-setEncoderMultiplier(1.0);             // x10: Medium (1.0mm per count)
-setEncoderMultiplier(10.0);            // x100: Coarse (10.0mm per count)
-
-// Velocity control
-setEncoderVelocity(150);               // Set movement speed (50-400 RPM)
-getEncoderVelocity();                  // Get current velocity setting
-```
-
-### Encoder Features
-- **Real-time Response**: 50Hz update rate for smooth control
-- **Travel Limit Protection**: Automatic boundary enforcement
-- **Quadrature Error Detection**: Automatic error recovery
-- **Rail Switching**: Easy switching between Rail 1 and Rail 2
-- **Safety Integration**: Auto-disable on faults or E-stop
-
-### Encoder Status and Diagnostics
-```cpp
-printEncoderStatus();                  // Comprehensive status display
-hasQuadratureError();                  // Check for encoder errors
-clearQuadratureError();                // Reset and clear errors
-processEncoderInput();                 // Process handwheel input (call in loop)
-```
-
----
-
-## Logging System
-
-### Real-Time System Monitoring
-
-The logging system provides comprehensive, color-coded monitoring of the entire dual-rail system with ANSI terminal colors for enhanced readability.
-
-#### Logged Parameters
-- **Valve States**: Pneumatic cylinder position with sensor validation
-- **Sensors**: All carriage and labware sensors for both rails
-- **Motor Status**: State, homing status, HLFB for both rails
-- **Position Data**: Current position, targets, travel information
-- **Velocity Data**: Current velocity, limits, utilization percentage
-- **System Status**: E-stop, air pressure, network client connections
-- **MPG Status**: Manual pulse generator state and active rail
-
-#### Color Coding System
-- 🟢 **Green**: Normal/healthy states (homed, sensors active, sufficient pressure)
-- 🟡 **Yellow**: Active states (moving, extended, not homed)
-- 🔴 **Red**: Problem states (faults, low pressure, E-stop triggered)
-- 🔵 **Cyan**: Section headers for easy scanning
-- ⚠️ **Red [!]**: Critical position/sensor mismatches
-
-### Command Interface
-
-#### Basic Logging Commands
-```bash
-log on [interval]        # Enable periodic logging (100-60000ms, default: 250ms)
-log off                  # Disable periodic logging
-log now                  # Log current system state immediately
-```
-
-#### History and Diagnostics
-```bash
-log history              # Show complete operation log history
-log errors               # Show only errors and warnings
-log last [count]         # Show last N entries (default: 10, max: 50)
-log stats                # Show log buffer statistics and status
-log help                 # Display detailed help information
-```
-
-#### Example Log Output
-```
-[LOG] Valves: Cylinder=RETRACTED | Sensors: R1-WC1=ABSENT, R1-WC1-Lab=ABSENT, R1-WC2=PRESENT, R1-WC2-Lab=PRESENT, R1-HANDOFF=ABSENT, R2-WC3=PRESENT, R2-WC3-Lab=ABSENT, R2-HANDOFF=ABSENT, HANDOFF-Lab=ABSENT | System: E-Stop=RELEASED, Pressure=45.25 PSI, Clients=1 | R1-Motor: State=IDLE, Homed=YES, HLFB=ASSERTED | R1-Position: 3700.00mm (54824 counts), Target=None, LastTarget=5700.00mm | R1-Velocity: 0.0RPM, Limits: 800RPM/2500RPM/s | R2-Motor: State=MOVING, Homed=YES, HLFB=NOT_ASSERTED | R2-Position: 650.00mm (9635 counts), Target=Moving..., LastTarget=None | R2-Velocity: 250.0RPM (42%), Limits: 600RPM/2500RPM/s | MPG: ON x10 (10.00mm/rot) on Rail 1
-```
-
-### Memory Optimization
-
-The logging system uses memory-efficient patterns:
-- **PROGMEM Storage**: Format strings stored in flash memory
-- **sprintf_P()**: Flash-based string formatting
-- **Streaming Output**: Direct printing without large buffers
-- **Modular Architecture**: Separate functions for each log section
-
----
-
-## Velocity Configuration
-
-### Automatic Velocity Selection
-
-The system automatically selects appropriate velocities based on multiple factors:
-
-#### 1. Rail-Specific Load-Dependent Velocities
-For normal positioning movements where labware presence affects speed:
-
-```cpp
-// Rail 1 velocities
-RAIL1_LOADED_CARRIAGE_VELOCITY_RPM    = 325 RPM    // Conservative with load
-RAIL1_EMPTY_CARRIAGE_VELOCITY_RPM     = 800 RPM    // Faster when empty
-
-// Rail 2 velocities  
-RAIL2_LOADED_CARRIAGE_VELOCITY_RPM    = 250 RPM    // Conservative with load
-RAIL2_EMPTY_CARRIAGE_VELOCITY_RPM     = 600 RPM    // Faster when empty
-
-// Access via function
-int32_t velocity = getCarriageVelocityRpm(rail, carriageLoaded);
-```
-
-#### 2. Homing Operation Velocities
-Conservative, precise movement during homing sequences:
-```cpp
-HOME_APPROACH_VELOCITY_RPM = 40 RPM    // Slow, precise homing speed
-```
-
-#### 3. Jogging Operation Velocities
-Manual control with user-configurable speeds:
-```cpp
-// Default jog speeds (user-configurable)
-RAIL1_DEFAULT_JOG_SPEED_RPM = 200 RPM
-RAIL2_DEFAULT_JOG_SPEED_RPM = 150 RPM
-
-// Default jog increments
-RAIL1_DEFAULT_JOG_INCREMENT_MM = 10.0 mm
-RAIL2_DEFAULT_JOG_INCREMENT_MM = 5.0 mm
-```
-
-#### 4. Encoder/MPG Operation Velocities
-Manual pulse generator control with configurable speeds:
-```cpp
-ENCODER_MIN_VELOCITY_RPM     = 50 RPM     // Minimum handwheel speed
-ENCODER_MAX_VELOCITY_RPM     = 400 RPM    // Maximum handwheel speed  
-ENCODER_DEFAULT_VELOCITY_RPM = 200 RPM    // Default handwheel speed
-```
-
-### Velocity Selection Logic
-
-#### Positioning Functions
-```cpp
-// Use load-dependent rail-specific speeds
-int32_t velocity = getCarriageVelocityRpm(rail, carriageLoaded);
-```
-
-#### Homing Functions
-```cpp
-// Use fixed conservative homing speed
-int32_t velocity = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
-```
-
-#### Jogging Functions
-```cpp
-// Use user-configurable jog speed
-int32_t velocity = rpmToPps(getJogSpeedRef(rail));
-```
-
-#### Encoder/MPG Functions
-```cpp
-// Use encoder module's velocity management
-int32_t velocity = rpmToPps(currentVelocityRpm);
-```
-
----
-
-## Command Interface
-
-### Motor Control Commands
-```bash
-# Homing operations
-home 1                   # Home Rail 1
-home 2                   # Home Rail 2  
-home all                 # Home both rails
-
-# Position movements
-move 1 wc2 loaded        # Rail 1 to WC2 with loaded carriage
-move 2 wc3 empty         # Rail 2 to WC3 with empty carriage
-move 1 3700.5 loaded     # Rail 1 to 3700.5mm with loaded carriage
-
-# Manual jogging
-jog 1 forward 50         # Rail 1 forward 50mm
-jog 2 backward 10        # Rail 2 backward 10mm
-
-# Status and diagnostics
-status 1                 # Rail 1 status
-status all               # Both rails status
-position 1               # Rail 1 position info
-```
-
-### Pneumatic Control Commands
-```bash
-# Valve control
-valve extend             # Extend pneumatic cylinder
-valve retract            # Retract pneumatic cylinder
-valve status             # Show valve position and sensors
-```
-
-### Sensor Commands
-```bash
-# Sensor monitoring
-sensors                  # Show all sensor readings
-pressure                 # Show system pressure
-```
-
-### MPG/Encoder Commands
-```bash
-# Encoder control
-mpg enable 1             # Enable handwheel control for Rail 1
-mpg enable 2             # Enable handwheel control for Rail 2
-mpg disable              # Disable handwheel control
-mpg precision 1          # Set fine precision (0.1mm/count)
-mpg precision 10         # Set medium precision (1.0mm/count)
-mpg precision 100        # Set coarse precision (10.0mm/count)
-mpg velocity 150         # Set handwheel velocity to 150 RPM
-mpg status               # Show encoder status
-```
-
----
-
-## Safety Features
-
-### Emergency Stop System
-- **Hardware Integration**: Direct E-stop input monitoring
-- **Immediate Response**: Instant motion halt and motor disable
-- **State Preservation**: System maintains fault state until manually cleared
-- **Recovery Process**: Structured fault clearing and re-enable sequence
-
-### Travel Limits
-- **Rail 1**: 0-8000mm (software enforced)
-- **Rail 2**: 0-1000mm (software enforced)
-- **Boundary Checking**: Prevents movement beyond safe limits
-- **Position Validation**: Continuous position monitoring
-
-### Fault Protection
-- **Motor Alert Detection**: Comprehensive motor fault monitoring
-- **Automatic Recovery**: Structured fault clearing procedures
-- **Move Prevention**: Blocks operations during fault conditions
-- **Status Reporting**: Detailed fault information and recovery status
-
-### Sensor Validation
-- **Position Confirmation**: Hardware sensors validate pneumatic positions
-- **Mismatch Detection**: Alerts when sensors don't match expected states
-- **Labware Detection**: Prevents unsafe operations without proper load detection
-
----
-
-## Position Reference
-
-### Rail 1 Positions (8200mm rail, 8000mm usable)
-
-| Position | Name | Distance | Description |
-|----------|------|----------|-------------|
-| `RAIL1_HOME_POS` | Home | 0mm | Reference/start position |
-| `RAIL1_WC2_PICKUP_DROPOFF_POS` | Work Cell 2 | 3700mm | Pickup/dropoff at WC2 |
-| `RAIL1_WC1_PICKUP_DROPOFF_POS` | Work Cell 1 | 5700mm | Pickup/dropoff at WC1 |
-| `RAIL1_STAGING_POS` | Staging | 7500mm | Intermediate staging area |
-| `RAIL1_HANDOFF_POS` | Handoff | 8000mm | Transfer to Rail 2 |
-
-### Rail 2 Positions (1000mm rail)
-
-| Position | Name | Distance | Description |
-|----------|------|----------|-------------|
-| `RAIL2_HOME_POS` | Home | 0mm | Reference/start position |
-| `RAIL2_HANDOFF_POS` | Handoff | 500mm | Transfer from Rail 1 |
-| `RAIL2_WC3_PICKUP_DROPOFF_POS` | Work Cell 3 | 900mm | Pickup/dropoff at WC3 |
-
-### Coordinate System
-- **Origin**: Home position (0mm) for each rail
-- **Direction**: Positive direction away from motor
-- **Resolution**: ~0.135mm per motor step (7400 pulses/mm)
-- **Accuracy**: ±0.1mm positioning accuracy
-
----
-
-## API Reference
-
-### Core System Functions
-
-#### Initialization
-```cpp
-void initMotorSystem();                // Initialize motor controllers
-void initSensorSystem(bool hasCCIO);   // Initialize sensor system
-void initValveSystem(bool hasCCIO);    // Initialize pneumatic system
-void initEncoderControl(bool swap, bool invert);  // Initialize handwheel
-```
-
-#### Safety and Monitoring
-```cpp
-void handleEStop();                    // Emergency stop monitoring
-bool isEStopActive();                  // Check E-stop status
-void updateAllSensors();               // Update all sensor readings
-void processEncoderInput();            // Process handwheel input
-```
-
-#### Movement and Positioning
-```cpp
-bool moveToPositionFromCurrent(int rail, PositionTarget pos, bool loaded);
-bool moveToPositionMm(int rail, double positionMm, bool loaded);
-bool moveRelativeMm(int rail, double relativeMm, bool loaded);
-bool jogMotor(int rail, bool direction, double increment, bool loaded);
-```
-
-#### Status and Information
-```cpp
-bool isMotorReady(int rail);          // Motor readiness check
-bool isMotorMoving(int rail);         // Movement status
-double getMotorPositionMm(int rail);  // Current position
-bool isHomingComplete(int rail);      // Homing status
-```
-
-### Sensor Functions
-```cpp
-// Carriage detection
-bool isCarriageAtWC1();
-bool isCarriageAtWC2();
-bool isCarriageAtWC3();
-bool isCarriageAtRail1Handoff();
-bool isCarriageAtRail2Handoff();
-
-// Labware detection
-bool isLabwarePresentAtWC1();
-bool isLabwarePresentAtWC2();
-bool isLabwarePresentAtWC3();
-bool isLabwarePresentAtHandoff();
-
-// System monitoring
-uint16_t getPressurePsi();
-bool isPressureSufficient();
-bool isPressureWarningLevel();
-```
-
-### Valve Control Functions
-```cpp
-void extendValve();                   // Extend pneumatic cylinder
-void retractValve();                  // Retract pneumatic cylinder
-ValvePosition getValvePosition();     // Get valve state
-bool isCylinderRetracted();           // Hardware sensor check
-bool isCylinderExtended();            // Hardware sensor check
-bool validateValvePosition();         // Position validation
-```
-
-### Logging Functions
-```cpp
-void logSystemState();                // Log complete system state
-void printValveSection();             // Log valve status
-void printSensorSection();            // Log sensor states
-void printMotorSection(int rail);     // Log motor status
-void printSystemSection();            // Log system status
-```
-
----
-
-## File Structure
-
-```
-overhead_rail/
-├── overhead_rail.ino              # Main Arduino sketch
-├── README.md                      # This documentation
-│
-├── Motor Control
-│   ├── MotorController.h          # Motor control header
-│   ├── MotorController.cpp        # Motor control implementation
-│   ├── EncoderController.h        # Handwheel/MPG header
-│   └── EncoderController.cpp      # Handwheel/MPG implementation
-│
-├── Pneumatics & Sensors
-│   ├── ValveController.h          # Pneumatic valve control header
-│   ├── ValveController.cpp        # Pneumatic valve implementation
-│   ├── Sensors.h                  # Sensor system header
-│   └── Sensors.cpp                # Sensor system implementation
-│
-├── Communication & Control
-│   ├── CommandController.h        # Command processing header
-│   ├── CommandController.cpp      # Command processing implementation
-│   ├── Commands.h                 # Command definitions header
-│   ├── Commands.cpp               # Command implementations
-│   ├── EthernetController.h       # Network communication header
-│   └── EthernetController.cpp     # Network communication implementation
-│
-├── Logging & Utilities
-│   ├── Logging.h                  # Logging system header
-│   ├── Logging.cpp                # Logging system implementation
-│   ├── LogHistory.h               # Operation history header
-│   ├── LogHistory.cpp             # Operation history implementation
-│   ├── OutputManager.h            # Console output management header
-│   ├── OutputManager.cpp          # Console output implementation
-│   └── Utils.h                    # Utility functions header
-│   └── Utils.cpp                  # Utility functions implementation
-│
-├── Configuration
-│   ├── PositionConfig.h           # Position configuration header
-│   └── PositionConfig.cpp         # Position configuration implementation
-│
-└── Documentation
-    ├── LOGGING_README.md          # Logging system documentation
-    ├── VELOCITY_USAGE_GUIDE.md    # Velocity configuration guide
-    └── OverheadRail_SystemDiagram.pdf  # System diagram
-```
-
----
-
-## Dependencies
-
-### Hardware Requirements
-- **ClearCore Controller Board** by Teknic
-- **ClearPath Motors** (2x) with appropriate configuration
-- **CL-ENCRD-DFIN Encoder Adapter Board** (for handwheel control)
-- **Quadrature Encoder/Handwheel** (for manual control)
-- **CCIO-8 Expansion Board** (optional, for additional I/O)
-- **Pneumatic System** with pressure monitoring
-- **Sensor Hardware** (optical sensors for position detection)
-
-### Software Requirements
-- **Arduino IDE** or **PlatformIO**
-- **ClearCore Library** by Teknic
-- **Arduino Core** for ClearCore platform
-
-### Network Requirements (Optional)
-- **Ethernet Connection** for remote monitoring and control
-- **Compatible Terminal** with ANSI color support for enhanced logging display
-
----
-
-## Getting Started
-
-1. **Hardware Setup**: Connect ClearCore controller, motors, sensors, and optional components
-2. **Library Installation**: Install ClearCore library in Arduino IDE
-3. **Configuration**: Adjust position constants and sensor assignments in header files
-4. **Upload Code**: Compile and upload to ClearCore controller
-5. **Homing**: Execute homing sequence for both rails
-6. **Testing**: Use command interface to test movement and sensor functionality
-7. **Integration**: Integrate with your application-specific control logic
-
-### Initial Setup Checklist
-- [ ] ClearCore controller properly wired
-- [ ] Motors configured and connected
-- [ ] E-stop circuit functional
-- [ ] Sensors connected and tested
-- [ ] Pneumatic system pressurized
-- [ ] Encoder/handwheel connected (if using)
-- [ ] Network connection established (if using)
-- [ ] Code compiled and uploaded
-- [ ] Homing sequence completed
-- [ ] Basic movement tests passed
-
-This comprehensive system provides a complete foundation for dual-rail overhead transportation with safety, precision, monitoring, and ease of use. All functions include comprehensive error checking and status reporting for reliable industrial operation.
+NOTE: This dual-rail system provides high-precision automation with intelligent cross-rail coordination. The rail-specific motor configurations (Rail 1: 3200 pulses/rev, Rail 2: 800 pulses/rev) optimize performance for each rail's specific requirements - high precision for the long 8.2m Rail 1, and standard precision for the short 1m Rail 2.
