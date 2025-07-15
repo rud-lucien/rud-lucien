@@ -380,7 +380,7 @@ void processEncoderInput()
     }
     
     // Calculate base velocity and apply dynamic scaling
-    int32_t baseVelocityPps = rpmToPps(currentVelocityRpm);
+    int32_t baseVelocityPps = rpmToPps(currentVelocityRpm, activeEncoderRail);
     int32_t velocityPps = (int32_t)(baseVelocityPps * currentVelocityScale);
     
     // Apply the existing 50% boost for MPG responsiveness

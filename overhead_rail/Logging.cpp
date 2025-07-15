@@ -206,11 +206,12 @@ void printVelocitySection(int railNumber)
     
     // Get velocity directly from motor connector
     MotorDriver& motor = getMotorByRail(railNumber);
-    double currentVelocityRpm = abs((double)motor.VelocityRefCommanded() * 60.0 / PULSES_PER_REV);
+    int32_t railPulsesPerRev = (railNumber == 1) ? RAIL1_PULSES_PER_REV : RAIL2_PULSES_PER_REV;
+    double currentVelocityRpm = abs((double)motor.VelocityRefCommanded() * 60.0 / railPulsesPerRev);
     
     // Get velocity limits based on rail
     double maxVelocityRpm = (railNumber == 1) ? RAIL1_EMPTY_CARRIAGE_VELOCITY_RPM : RAIL2_EMPTY_CARRIAGE_VELOCITY_RPM;
-    double accelerationRpmPerSec = (double)MAX_ACCEL_RPM_PER_SEC;
+    double accelerationRpmPerSec = (double)getRailAccelerationRpmPerSec(railNumber);
     
     sprintf_P(velocityInfo, FMT_VELOCITY_SECTION,
         railNumber, currentVelocityRpm, maxVelocityRpm, accelerationRpmPerSec

@@ -235,6 +235,22 @@ int32_t getCarriageVelocityRpm(int rail, bool carriageLoaded) {
     }
 }
 
+// Get rail-specific acceleration
+int32_t getRailAccelerationRpmPerSec(int rail) {
+    if (rail == 1) {
+        return RAIL1_MAX_ACCEL_RPM_PER_SEC;
+    } else if (rail == 2) {
+        return RAIL2_MAX_ACCEL_RPM_PER_SEC;
+    } else {
+        // Invalid rail number - this should not happen in normal operation
+        // Default to Rail 1 acceleration but log an error
+        char msg[MEDIUM_MSG_SIZE];
+        sprintf_P(msg, PSTR("ERROR: Invalid rail number %d in getRailAccelerationRpmPerSec"), rail);
+        Console.serialError(msg);
+        return RAIL1_MAX_ACCEL_RPM_PER_SEC;
+    }
+}
+
 //=============================================================================
 // SYSTEM INITIALIZATION AND SAFETY
 //=============================================================================
@@ -406,7 +422,7 @@ alert_concatenation_complete:
     Console.serialError(msg);
 }
 
-bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocityRpm, int32_t accelRpmPerSec)
+bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocityRpm, int32_t accelRpmPerSec, int rail)
 {
     char msg[SMALL_MSG_SIZE];
     sprintf_P(msg, FMT_INITIALIZING, motorName);
@@ -438,8 +454,8 @@ bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocity
     motor.HlfbCarrier(MotorDriver::HLFB_CARRIER_482_HZ);
 
     // Set velocity and acceleration limits (silently - details not critical for operator)
-    int32_t velMax = rpmToPps(velocityRpm);
-    int32_t accelMax = rpmPerSecToPpsPerSec(accelRpmPerSec);
+    int32_t velMax = rpmToPps(velocityRpm, rail);
+    int32_t accelMax = rpmPerSecToPpsPerSec(accelRpmPerSec, rail);
     
     motor.VelMax(velMax);
     motor.AccelMax(accelMax);
@@ -554,6 +570,7 @@ bool initRailMotor(int railNumber)
     MotorDriver* motor;
     MotorState* motorState;
     int32_t velocityRpm;
+    int32_t accelRpmPerSec;
     const char* railName;
     
     // Select rail-specific parameters
@@ -561,11 +578,13 @@ bool initRailMotor(int railNumber)
         motor = &RAIL1_MOTOR;
         motorState = &rail1MotorState;
         velocityRpm = RAIL1_LOADED_CARRIAGE_VELOCITY_RPM;
+        accelRpmPerSec = RAIL1_MAX_ACCEL_RPM_PER_SEC;
         railName = "Rail 1";
     } else if (railNumber == 2) {
         motor = &RAIL2_MOTOR;
         motorState = &rail2MotorState;
         velocityRpm = RAIL2_LOADED_CARRIAGE_VELOCITY_RPM;
+        accelRpmPerSec = RAIL2_MAX_ACCEL_RPM_PER_SEC;
         railName = "Rail 2";
     } else {
         Console.serialError(F("Invalid rail number. Must be 1 or 2."));
@@ -573,7 +592,7 @@ bool initRailMotor(int railNumber)
     }
     
     // Initialize the motor with rail-specific settings
-    bool ready = initSingleMotor(*motor, railName, velocityRpm, MAX_ACCEL_RPM_PER_SEC);
+    bool ready = initSingleMotor(*motor, railName, velocityRpm, accelRpmPerSec, railNumber);
     
     if (ready) {
         *motorState = MOTOR_STATE_IDLE;
@@ -612,14 +631,28 @@ bool initMotorManager()
 // UNIT CONVERSION UTILITIES
 //=============================================================================
 
-int32_t rpmToPps(double rpm)
+int32_t rpmToPps(double rpm, int rail)
 {
-    return (int32_t)((rpm * PULSES_PER_REV) / 60.0);
+    if (rail == 1) {
+        return (int32_t)((rpm * RAIL1_PULSES_PER_REV) / 60.0);
+    } else if (rail == 2) {
+        return (int32_t)((rpm * RAIL2_PULSES_PER_REV) / 60.0);
+    } else {
+        // Default to Rail 1 for backward compatibility
+        return (int32_t)((rpm * RAIL1_PULSES_PER_REV) / 60.0);
+    }
 }
 
-int32_t rpmPerSecToPpsPerSec(double rpmPerSec)
+int32_t rpmPerSecToPpsPerSec(double rpmPerSec, int rail)
 {
-    return (int32_t)((rpmPerSec * PULSES_PER_REV) / 60.0);
+    if (rail == 1) {
+        return (int32_t)((rpmPerSec * RAIL1_PULSES_PER_REV) / 60.0);
+    } else if (rail == 2) {
+        return (int32_t)((rpmPerSec * RAIL2_PULSES_PER_REV) / 60.0);
+    } else {
+        // Default to Rail 1 for backward compatibility
+        return (int32_t)((rpmPerSec * RAIL1_PULSES_PER_REV) / 60.0);
+    }
 }
 
 int32_t rail1MmToPulses(double mm)
@@ -1115,7 +1148,7 @@ bool initiateHomingSequence(int rail) {
     setOperationInProgress(1); // 1 = Rail homing operation
     
     // Set homing velocity and direction
-    int32_t homingVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
+    int32_t homingVelPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM, rail);
     setMotorVelocity(rail, homingVelPps);
     
     // Move in homing direction (relative move to trigger HLFB change)
@@ -1358,8 +1391,8 @@ bool isSmartHomingBeneficial(int rail, int32_t* estimatedTimeSavingsMs) {
     // Standard homing: full distance at slow speed
     // Smart homing: most distance at fast speed, small portion at slow speed
     
-    int32_t fastVelocityPps = rpmToPps(HOME_FAST_APPROACH_VELOCITY_RPM);
-    int32_t slowVelocityPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
+    int32_t fastVelocityPps = rpmToPps(HOME_FAST_APPROACH_VELOCITY_RPM, rail);
+    int32_t slowVelocityPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM, rail);
     int32_t precisionDistancePulses = getHomePrecisionDistancePulses(rail);
     
     // Standard approach time (all at slow speed)
@@ -1454,7 +1487,7 @@ bool initiateSmartHomingSequence(int rail) {
     
     // Phase 1: Fast approach
     if (fastPhaseDistancePulses > 0) {
-        int32_t fastVelocityPps = rpmToPps(HOME_FAST_APPROACH_VELOCITY_RPM);
+        int32_t fastVelocityPps = rpmToPps(HOME_FAST_APPROACH_VELOCITY_RPM, rail);
         setMotorVelocity(rail, fastVelocityPps);
         
         int homingDirection = getHomingDirection(rail);
@@ -1490,7 +1523,7 @@ bool initiateSmartHomingSequence(int rail) {
     }
     
     // Phase 2: Precision approach (same as standard homing)
-    int32_t precisionVelocityPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM);
+    int32_t precisionVelocityPps = rpmToPps(HOME_APPROACH_VELOCITY_RPM, rail);
     setMotorVelocity(rail, precisionVelocityPps);
     
     // Continue with precision homing to find hardstop
@@ -1545,7 +1578,7 @@ int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32
     // Safeguard against division by zero
     if (decelDistanceMm <= 0) {
         // If deceleration distance is invalid, use minimum velocity for safety
-        return rpmToPps(config.minVelocityRPM);
+        return rpmToPps(config.minVelocityRPM, rail);
     }
     
     // Calculate deceleration ratio using integer math (0-1000 range for precision)
@@ -1555,7 +1588,7 @@ int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32
     int32_t decelRatioSquared1000 = (decelRatio1000 * decelRatio1000) / 1000;
     
     // Calculate minimum velocity in PPS
-    int32_t minVelocityPps = rpmToPps(config.minVelocityRPM);
+    int32_t minVelocityPps = rpmToPps(config.minVelocityRPM, rail);
     
     // Calculate target velocity using integer math with quadratic curve
     int32_t velocityRange = maxVelocityPps - minVelocityPps;
@@ -1609,7 +1642,7 @@ bool moveToPositionFromCurrent(int rail, PositionTarget target, bool carriageLoa
     // Calculate movement distance and select velocity
     double moveDistanceMm = abs(pulsesToMm(movePulses, rail));
     int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
-    int32_t velocityPps = rpmToPps(velocityRpm);
+    int32_t velocityPps = rpmToPps(velocityRpm, rail);
     
     // Set velocity and initiate move
     setMotorVelocity(rail, velocityPps);
@@ -1658,7 +1691,7 @@ bool moveToPositionMm(int rail, double targetMm, bool carriageLoaded) {
     // Calculate movement distance and select velocity
     double moveDistanceMm = abs(pulsesToMm(movePulses, rail));
     int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
-    int32_t velocityPps = rpmToPps(velocityRpm);
+    int32_t velocityPps = rpmToPps(velocityRpm, rail);
     
     // Set velocity and initiate move
     setMotorVelocity(rail, velocityPps);
@@ -1710,7 +1743,7 @@ bool moveRelativeMm(int rail, double distanceMm, bool carriageLoaded) {
     // Calculate movement distance and select velocity
     double moveDistanceMm = abs(distanceMm);
     int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
-    int32_t velocityPps = rpmToPps(velocityRpm);
+    int32_t velocityPps = rpmToPps(velocityRpm, rail);
     
     // Set velocity and initiate move
     setMotorVelocity(rail, velocityPps);
@@ -1787,7 +1820,7 @@ bool jogMotor(int rail, bool direction, double customIncrement, bool carriageLoa
     
     // Convert to pulses and set velocity
     int32_t jogPulses = mmToPulses(jogDistanceMm, rail);
-    int32_t jogVelocityPps = rpmToPps(cappedSpeedRpm);
+    int32_t jogVelocityPps = rpmToPps(cappedSpeedRpm, rail);
     
     setMotorVelocity(rail, jogVelocityPps);
     motor.Move(jogPulses);

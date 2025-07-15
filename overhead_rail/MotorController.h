@@ -24,9 +24,13 @@
 //=============================================================================
 // MOTOR & MOTION PARAMETERS
 //=============================================================================
-// Common Motor Configuration
-#define PULSES_PER_REV 800                 // Motor steps per revolution
-#define MAX_ACCEL_RPM_PER_SEC 2500         // Maximum acceleration
+// Rail-Specific Motor Configuration
+#define RAIL1_PULSES_PER_REV 3200          // Rail 1 motor steps per revolution (higher resolution for 8.2m rail)
+#define RAIL2_PULSES_PER_REV 800           // Rail 2 motor steps per revolution (lower resolution for 1m rail)
+
+// Rail-Specific Acceleration Configuration
+#define RAIL1_MAX_ACCEL_RPM_PER_SEC 2500   // Rail 1 acceleration (longer rail, can handle higher accel)
+#define RAIL2_MAX_ACCEL_RPM_PER_SEC 2000   // Rail 2 acceleration (shorter rail, precision movements, slightly lower)
 
 // Rail-Specific Velocity Configuration
 // Rail 1 (8.2m travel) - Longer distances, can handle higher speeds
@@ -39,18 +43,19 @@
 
 // Rail 1 Parameters (8.2m travel)
 #define RAIL1_MM_PER_REV 53.98             // Travel per revolution
-// Integer math optimization: 800 pulses / 53.98mm = 14.823 pulses/mm
-// Use scaled integer: 1482.3 * 100 = 148230 (pulses per 100mm)
-#define RAIL1_PULSES_PER_MM_SCALED 148230  // Pulses per 100mm (for integer math)
-#define RAIL1_PULSES_PER_MM (PULSES_PER_REV / RAIL1_MM_PER_REV)  // Keep for compatibility
+// Integer math optimization: 3200 pulses / 53.98mm = 59.292 pulses/mm
+// Use scaled integer: 5929.2 * 100 = 592920 (pulses per 100mm)
+#define RAIL1_PULSES_PER_MM_SCALED 592920  // Pulses per 100mm (for integer math) - higher resolution
+#define RAIL1_PULSES_PER_MM (RAIL1_PULSES_PER_REV / RAIL1_MM_PER_REV)  // Keep for compatibility
 #define RAIL1_LENGTH_MM 8200               // Total rail length
 #define RAIL1_MAX_TRAVEL_MM 8000           // Usable travel distance
 
 // Rail 2 Parameters (1m travel)
-#define RAIL2_MM_PER_REV 53.98             // Travel per revolution  
-// Integer math optimization: Same as Rail 1 (same mechanical setup)
-#define RAIL2_PULSES_PER_MM_SCALED 148230  // Pulses per 100mm (for integer math)
-#define RAIL2_PULSES_PER_MM (PULSES_PER_REV / RAIL2_MM_PER_REV)  // Keep for compatibility
+#define RAIL2_MM_PER_REV 53.98             // Travel per revolution (same mechanical setup)
+// Integer math optimization: 800 pulses / 53.98mm = 14.823 pulses/mm
+// Use scaled integer: 1482.3 * 100 = 148230 (pulses per 100mm)
+#define RAIL2_PULSES_PER_MM_SCALED 148230  // Pulses per 100mm (for integer math) - lower resolution
+#define RAIL2_PULSES_PER_MM (RAIL2_PULSES_PER_REV / RAIL2_MM_PER_REV)  // Keep for compatibility
 #define RAIL2_LENGTH_MM 1000               // Total rail length
 #define RAIL2_MAX_TRAVEL_MM 1000           // Usable travel distance
 
@@ -290,14 +295,14 @@ void handleEStop();
 void setupEStopInterrupt();               // Initialize interrupt-based E-stop monitoring
 void eStopInterruptHandler();             // Interrupt service routine for E-stop
 void printMotorAlerts(MotorDriver &motor, const char* motorName);
-bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocityRpm, int32_t accelRpmPerSec);
+bool initSingleMotor(MotorDriver &motor, const char* motorName, int32_t velocityRpm, int32_t accelRpmPerSec, int rail);
 bool initEStop();
 bool initRailMotor(int railNumber);
 bool initMotorManager();
 
 // Unit Conversion Utilities
-int32_t rpmToPps(double rpm);
-int32_t rpmPerSecToPpsPerSec(double rpmPerSec);
+int32_t rpmToPps(double rpm, int rail);
+int32_t rpmPerSecToPpsPerSec(double rpmPerSec, int rail);
 int32_t rail1MmToPulses(double mm);
 int32_t rail2MmToPulses(double mm);
 double rail1PulsesToMm(int32_t pulses);
@@ -320,6 +325,7 @@ MotorDriver& getMotorByRail(int rail);
 const char* getMotorName(int rail);
 double getMotorPositionMm(int rail);
 int32_t getCarriageVelocityRpm(int rail, bool carriageLoaded);  // Get rail-specific velocity
+int32_t getRailAccelerationRpmPerSec(int rail);               // Get rail-specific acceleration
 
 // Smart Homing Helper Functions
 int32_t getHomePrecisionDistancePulses(int rail);
