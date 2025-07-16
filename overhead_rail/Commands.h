@@ -13,19 +13,16 @@
 #include "EncoderController.h"
 #include "EthernetController.h"
 #include "LogHistory.h"
-#include "PositionConfig.h" 
-#include "RailAutomation.h" 
-#include "SystemState.h"    
+#include "PositionConfig.h"
+#include "RailAutomation.h"
+#include "SystemState.h"
 
 //=============================================================================
 // COMMAND CONSTANTS
 //=============================================================================
 
-// Buffer size for command argument processing
-#define COMMAND_BUFFER_SIZE 256
-
 // Maximum number of commands (set generously to avoid manual updates)
-#define MAX_COMMANDS 20
+#define COMMAND_SIZE 15
 
 // Structure for subcommand lookup
 struct SubcommandInfo
@@ -41,7 +38,7 @@ int findSubcommandCode(const char *subcommand, const SubcommandInfo *commandTabl
 //=============================================================================
 
 // Global Command Tree and Commander Object
-extern Commander::systemCommand_t API_tree[MAX_COMMANDS];
+extern Commander::systemCommand_t API_tree[COMMAND_SIZE];
 extern const size_t API_tree_size;
 extern Commander commander;
 

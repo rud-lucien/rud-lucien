@@ -454,7 +454,7 @@ bool checkHandoffSystemReadiness() {
 bool checkHandoffCollisionSafety(HandoffDirection dir, HandoffDestination dest) {
     // Check for the dangerous scenario where both carriages have labware
     bool rail1HasLabware = isLabwarePresentAtWC1() || isLabwarePresentAtWC2();
-    bool rail2HasLabware = isLabwarePresentOnRail2() || isLabwarePresentAtHandoff();
+    bool rail2HasLabware = isLabwarePresentOnRail2() || isLabwarePresentAtRail1Handoff();
     
     if (rail1HasLabware && rail2HasLabware) {
         Console.error(F("CARRIAGE_COLLISION_RISK"));
@@ -513,7 +513,7 @@ bool moveSourceRailToHandoffPosition() {
         return moveRail1CarriageToHandoff(hasLabware);
     } else {
         // Moving Rail 2 to handoff - check if labware is present  
-        bool hasLabware = isLabwarePresentOnRail2() || isLabwarePresentAtHandoff();
+        bool hasLabware = isLabwarePresentOnRail2() || isLabwarePresentAtRail1Handoff();
         return moveRail2CarriageToHandoff(hasLabware);
     }
 }
@@ -560,7 +560,7 @@ bool verifyHandoffLabwareTransfer() {
     }
     
     // Enhanced verification: Check both source and destination labware states
-    bool labwareAtHandoff = isLabwarePresentAtHandoff();
+    bool labwareAtHandoff = isLabwarePresentAtRail1Handoff();
     bool sourceStillHasLabware = false;
     bool sourceExpectedEmpty = false;
     

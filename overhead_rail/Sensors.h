@@ -23,7 +23,7 @@
 #define CARRIAGE_SENSOR_RAIL2_HANDOFF_PIN CLEARCORE_PIN_CCIOA0    // CCIO IO-0: Rail 2 handoff position
 #define LABWARE_SENSOR_RAIL2_PIN CLEARCORE_PIN_CCIOA1             // CCIO IO-1: Rail 2 carriage-mounted labware sensor
 #define CARRIAGE_SENSOR_RAIL1_HANDOFF_PIN CLEARCORE_PIN_CCIOA2    // CCIO IO-2: Rail 1 handoff position
-#define LABWARE_SENSOR_HANDOFF_PIN CLEARCORE_PIN_CCIOA3           // CCIO IO-3: Handoff labware sensor
+#define LABWARE_SENSOR_RAIL1_HANDOFF_PIN CLEARCORE_PIN_CCIOA3     // CCIO IO-3: Rail 1 handoff labware sensor
 #define PNEUMATICS_CYLINDER_VALVE_PIN CLEARCORE_PIN_CCIOA4        // CCIO IO-4: Valve write (pneumatics control)
 #define CYLINDER_RETRACTED_SENSOR_PIN CLEARCORE_PIN_CCIOA5        // CCIO IO-5: Cylinder retracted sensor
 #define CYLINDER_EXTENDED_SENSOR_PIN CLEARCORE_PIN_CCIOA6         // CCIO IO-6: Cylinder extended sensor
@@ -36,9 +36,9 @@
 extern bool hasCCIO;
 
 // Pressure sensor constants (using integer math with 100x scaling for precision)
-const uint16_t MIN_SAFE_PRESSURE_SCALED = 2175;    // 21.75 PSI * 100 (minimum for valve operation)
+const uint16_t MIN_SAFE_PRESSURE_SCALED = 3000;    // 30.0 PSI * 100 (minimum for valve operation - matches valve controller)
 const uint16_t MAX_PRESSURE_SCALED = 8700;         // 87.0 PSI * 100 (6 bar maximum range)
-const uint16_t PRESSURE_WARNING_THRESHOLD_SCALED = 2500;  // 25.0 PSI * 100 (warning threshold)
+const uint16_t PRESSURE_WARNING_THRESHOLD_SCALED = 3000;  // 30.0 PSI * 100 (warning threshold - same as minimum)
 
 // Pressure monitoring intervals (milliseconds)
 const unsigned long PRESSURE_MONITORING_INTERVAL_MS = 10000;  // 10 seconds for periodic pressure checks
@@ -139,7 +139,7 @@ bool isCarriageAtRail2Handoff();
 bool isLabwarePresentAtWC1();       // Rail 1 labware at WC1
 bool isLabwarePresentAtWC2();       // Rail 1 labware at WC2
 bool isLabwarePresentOnRail2();     // Rail 2 carriage-mounted labware sensor
-bool isLabwarePresentAtHandoff();   // Handoff area labware
+bool isLabwarePresentAtRail1Handoff();   // Rail 1 handoff area labware
 
 // Cylinder position functions
 bool isCylinderRetracted();

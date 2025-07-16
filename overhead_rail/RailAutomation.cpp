@@ -30,7 +30,7 @@ const char FMT_CYLINDER_SAFETY[] PROGMEM = "Collision zone movement - cylinder %
 bool isLabwareCurrentlyOnRail1() {
     // Check if labware is detected at any Rail 1 position
     return isLabwarePresentAtWC1() || isLabwarePresentAtWC2() || 
-           (isCarriageAtRail1Handoff() && isLabwarePresentAtHandoff());
+           (isCarriageAtRail1Handoff() && isLabwarePresentAtRail1Handoff());
 }
 
 bool isLabwareCurrentlyOnRail2() {
@@ -40,7 +40,7 @@ bool isLabwareCurrentlyOnRail2() {
     bool rail2AtHandoffWithLabware = false;
     
     // Only check handoff if CCIO is available (handoff sensors require CCIO)
-    if (isCarriageAtRail2Handoff() && isLabwarePresentAtHandoff()) {
+    if (isCarriageAtRail2Handoff() && isLabwarePresentAtRail1Handoff()) {
         rail2AtHandoffWithLabware = true;
     }
     
@@ -146,7 +146,27 @@ bool ensureCylinderRetractedForSafeMovement(bool movementInCollisionZone) {
         return false;
     }
     
-    sprintf_P(msg, FMT_CYLINDER_SAFETY, "retracted - safe to proceed");
+    // Add settling time with user feedback
+    sprintf_P(msg, FMT_CYLINDER_SAFETY, "retracted - allowing pneumatic settling");
+    Console.serialInfo(msg);
+    
+    // Use a short delay with timeout monitoring (watchdog safe)
+    unsigned long startTime = millis();
+    while (millis() - startTime < CYLINDER_RETRACTION_SETTLE_TIME_MS) {
+        // Allow other systems to process during wait
+        yield(); 
+        
+        // Check for emergency conditions during wait
+        if (isEStopActive()) {
+            Console.error(F("ESTOP_ACTIVATED_DURING_SETTLING"));
+            return false;
+        }
+        
+        // Small delay to prevent busy waiting
+        delay(10);
+    }
+    
+    sprintf_P(msg, FMT_CYLINDER_SAFETY, "settled - safe to proceed");
     Console.serialInfo(msg);
     return true;
 }

@@ -58,9 +58,9 @@ int findSubcommandCode(const char *subcommand, const SubcommandInfo *commandTabl
 
 bool cmd_print_help(char *args, CommandCaller *caller)
 {
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     char *trimmed = trimLeadingSpaces(localArgs);
 
@@ -73,162 +73,98 @@ bool cmd_print_help(char *args, CommandCaller *caller)
     }
     else
     {
-        // No specific command requested; print general help.
-        // Pass a pointer to the Serial stream.
-
-        // Print general help information.
-        Console.println(F("--------------------------------------------------"));
-        Console.println(F("Overhead Rail System Command Help:"));
-        Console.println(F("--------------------------------------------------"));
-
-        commander.printHelp(caller, true, true);
-
-        Console.println(F("--------------------------------------------------"));
+        // Print comprehensive help information with detailed command descriptions
+        Console.acknowledge(F("DISPLAYING_HELP:"));
+        Console.println(F("=================================================="));
+        Console.println(F("Overhead Rail System Command Help"));
+        Console.println(F("=================================================="));
+        Console.println();
+        
+        Console.println(F("SYSTEM COMMANDS:"));
+        Console.println(F("  help           - Display this comprehensive help information"));
+        Console.println(F("  system,state   - Display comprehensive system status with readiness assessment"));
+        Console.println(F("  system,home    - Home both rails sequentially (Rail 1 first, then Rail 2)"));
+        Console.println(F("  system,init    - Initialize all motor systems"));
+        Console.println(F("  system,clear   - Clear motor faults for system readiness"));
+        Console.println(F("  system,reset   - Clear operational state for clean automation"));
+        Console.println(F("  system,help    - Display detailed system command instructions"));
+        Console.println();
+        
+        Console.println(F("AUTOMATION COMMANDS:"));
+        Console.println(F("  goto,wc1,with-labware    - Move to WC1 with labware"));
+        Console.println(F("  goto,wc2,no-labware      - Move to WC2 without labware"));
+        Console.println(F("  goto,wc3,with-labware    - Move to WC3 with labware"));
+        Console.println(F("  goto,help                - Display detailed goto instructions"));
+        Console.println();
+        Console.println(F("  labware,status  - Display current labware tracking state"));
+        Console.println(F("  labware,audit   - Automatically validate and fix labware state"));
+        Console.println(F("  labware,reset   - Clear all labware tracking"));
+        Console.println(F("  labware,help    - Display detailed labware automation instructions"));
+        Console.println();
+        
+        Console.println(F("RAIL CONTROL COMMANDS:"));
+        Console.println(F("  rail1,init              - Initialize Rail 1 motor system"));
+        Console.println(F("  rail1,home              - Home Rail 1 carriage"));
+        Console.println(F("  rail1,move-wc1,no-labware      - Move empty carriage to WC1"));
+        Console.println(F("  rail1,move-wc2,with-labware    - Move carriage with labware to WC2"));
+        Console.println(F("  rail1,move-staging,no-labware  - Move empty carriage to staging"));
+        Console.println(F("  rail1,move-handoff,with-labware - Move carriage with labware to handoff"));
+        Console.println(F("  rail1,status            - Show comprehensive Rail 1 diagnostics"));
+        Console.println(F("  rail1,help              - Display detailed Rail 1 instructions"));
+        Console.println();
+        Console.println(F("  rail2,init              - Initialize Rail 2 motor system"));
+        Console.println(F("  rail2,home              - Home Rail 2 carriage"));
+        Console.println(F("  rail2,extend            - Extend pneumatic drive"));
+        Console.println(F("  rail2,retract           - Retract pneumatic drive"));
+        Console.println(F("  rail2,move-wc3,no-labware      - Move empty carriage to WC3"));
+        Console.println(F("  rail2,move-handoff,with-labware - Move carriage with labware to handoff"));
+        Console.println(F("  rail2,status            - Show comprehensive Rail 2 diagnostics"));
+        Console.println(F("  rail2,help              - Display detailed Rail 2 instructions"));
+        Console.println();
+        
+        Console.println(F("POSITION TEACHING:"));
+        Console.println(F("  teach,1,staging    - Teach Rail 1 staging position"));
+        Console.println(F("  teach,1,wc1        - Teach Rail 1 WC1 position"));
+        Console.println(F("  teach,2,wc3        - Teach Rail 2 WC3 position"));
+        Console.println(F("  teach,status       - Show all taught positions"));
+        Console.println(F("  teach,reset        - Reset all positions to factory defaults"));
+        Console.println(F("  teach,help         - Display detailed teaching instructions"));
+        Console.println();
+        
+        Console.println(F("MANUAL CONTROL:"));
+        Console.println(F("  encoder,enable,1   - Enable encoder control for Rail 1"));
+        Console.println(F("  encoder,disable    - Disable encoder control"));
+        Console.println(F("  encoder,status     - Display encoder status and settings"));
+        Console.println(F("  encoder,help       - Display detailed encoder instructions"));
+        Console.println();
+        Console.println(F("  jog,1,+,10         - Jog Rail 1 forward 10mm"));
+        Console.println(F("  jog,2,-,5          - Jog Rail 2 backward 5mm"));
+        Console.println(F("  jog,status         - Display jog settings for all rails"));
+        Console.println(F("  jog,help           - Display detailed jog instructions"));
+        Console.println();
+        
+        Console.println(F("LOGGING & DIAGNOSTICS:"));
+        Console.println(F("  log,on,250         - Enable periodic logging every 250ms"));
+        Console.println(F("  log,off            - Disable periodic logging"));
+        Console.println(F("  log,now            - Log system state immediately"));
+        Console.println(F("  log,history        - Show complete operation log history"));
+        Console.println(F("  log,errors         - Show only errors and warnings"));
+        Console.println(F("  log,help           - Display detailed logging instructions"));
+        Console.println();
+        
+        Console.println(F("NETWORK:"));
+        Console.println(F("  network,status     - Display network status and client info"));
+        Console.println(F("  network,disconnect - Disconnect current client"));
+        Console.println(F("  network,help       - Display detailed network instructions"));
+        Console.println();
+        
+        Console.println(F("=================================================="));
+        Console.println(F("Use '<command>,help' for detailed command-specific help."));
+        Console.println(F("Examples: system,help  rail1,help  goto,help  log,help"));
+        Console.println(F("=================================================="));
         return true;
     }
 }
-
-Commander commander;
-
-Commander::systemCommand_t API_tree[] = {
-    systemCommand("help", "Display help information for all commands", cmd_print_help),
-    systemCommand("h", "Display help information for all commands", cmd_print_help),
-    systemCommand("H", "Display help information for all commands", cmd_print_help),
-
-    // Logging command
-    systemCommand("log", "Logging controls and history:\r\n"
-                         "  log,on,[interval] - Enable periodic logging (interval in ms, default 250)\r\n"
-                         "  log,off           - Disable periodic logging\r\n"
-                         "  log,now           - Log system state immediately\r\n"
-                         "  log,history       - Show complete operation log history\r\n"
-                         "  log,errors        - Show only errors and warnings for quick debugging\r\n"
-                         "  log,last,[count]  - Show last N log entries (default: 10)\r\n"
-                         "  log,stats         - Show log buffer statistics and overflow info\r\n"
-                         "  log,help          - Display detailed logging information",
-                  cmd_log),
-
-    // Labware automation command
-    systemCommand("labware", "Labware automation and state management:\r\n"
-                             "  labware,status      - Display current labware tracking state and operation history\r\n"
-                             "  labware,audit       - Automatically validate and fix labware state\r\n"
-                             "  labware,reset       - Clear all labware tracking and reset operation history\r\n"
-                             "  labware,help        - Display detailed labware automation instructions",
-                  cmd_labware),
-
-    // Automated labware movement command
-    systemCommand("goto", "Automated work cell movement with labware tracking:\r\n"
-                          "  goto,<location>,<status>  - Move to work cell with labware status\r\n"
-                          "  Locations: wc1, wc2, wc3\r\n"
-                          "  Status: with-labware, no-labware\r\n"
-                          "  Examples:\r\n"
-                          "    goto,wc1,with-labware   - Move to WC1 with labware\r\n"
-                          "    goto,wc2,no-labware     - Move to WC2 without labware\r\n"
-                          "    goto,wc3,with-labware   - Move to WC3 with labware\r\n"
-                          "  goto,help               - Display detailed goto command instructions",
-                  cmd_goto),
-
-    // System state command to display comprehensive system status
-    systemCommand("system", "System commands:\r\n"
-                            "  system,state    - Display comprehensive system status with readiness assessment\r\n"
-                            "  system,home     - Home both rails sequentially (Rail 1 first, then Rail 2)\r\n"
-                            "  system,reset    - Clear operational state for clean automation (motor faults, encoder, etc.)\r\n"
-                            "  system,help     - Display detailed instructions for system commands\r\n"
-                            "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
-                  cmd_system),
-
-    // Encoder control commands
-    systemCommand("encoder", "Manual Pulse Generator (MPG) handwheel control:\r\n"
-                             "  encoder,enable,<rail>    - Enable encoder control for Rail 1 or 2\r\n"
-                             "  encoder,disable          - Disable encoder control\r\n"
-                             "  encoder,multiplier,<X>   - Set encoder multiplier (X = 1, 10, or 100)\r\n"
-                             "  encoder,velocity,<RPM>   - Set encoder velocity (50-400 RPM)\r\n"
-                             "  encoder,status           - Display current encoder status and settings\r\n"
-                             "  encoder,help             - Display detailed setup and usage instructions",
-                  cmd_encoder),
-
-    // Jog command
-    systemCommand("jog", "Manual jogging control for dual-rail system:\r\n"
-                         "  jog,<rail>,+,[mm]        - Jog rail forward by increment or custom distance\r\n"
-                         "  jog,<rail>,-,[mm]        - Jog rail backward by increment or custom distance\r\n"
-                         "  jog,<rail>,increment,<mm> - Set default jog increment for rail\r\n"
-                         "  jog,<rail>,speed,<rpm>   - Set jog speed for rail\r\n"
-                         "  jog,<rail>,status        - Display jog settings for specific rail\r\n"
-                         "  jog,status               - Display jog settings for all rails\r\n"
-                         "  jog,help                 - Display detailed usage instructions",
-                  cmd_jog),
-
-    // Network management command
-    systemCommand("network", "Network management:\r\n"
-                             "  network,status     - Display current network status and client info\r\n"
-                             "  network,disconnect - Disconnect the current client\r\n"
-                             "  network,help       - Display detailed network management instructions",
-                  cmd_network),
-
-    // Teach position command
-    systemCommand("teach", "Position teaching system with automatic SD card persistence:\r\n"
-                           "  teach,<rail>,<position>  - Teach current position and auto-save to SD card\r\n"
-                           "  teach,<rail>,status      - Show taught positions for specific rail\r\n"
-                           "  teach,status             - Show all taught positions and system status\r\n"
-                           "  teach,<rail>,reset       - Reset rail positions to factory defaults\r\n"
-                           "  teach,reset              - Reset all positions to factory defaults\r\n"
-                           "  \r\n"
-                           "  Rail 1 positions: staging, wc1, wc2, handoff\r\n"
-                           "  Rail 2 positions: handoff, wc3\r\n"
-                           "  \r\n"
-                           "  Examples:\r\n"
-                           "    teach,1,staging        - Teach Rail 1 staging position\r\n"
-                           "    teach,2,wc3            - Teach Rail 2 WC3 position\r\n"
-                           "    teach,1,status         - Show Rail 1 position status\r\n"
-                           "    teach,1,reset          - Reset Rail 1 to defaults",
-                  cmd_teach),
-
-    // Rail 1 control command
-    systemCommand("rail1", "Rail 1 Control Commands:\r\n"
-                           "  rail1,init          - Initialize Rail 1 motor system\r\n"
-                           "  rail1,clear-fault   - Clear motor fault condition\r\n"
-                           "  rail1,abort         - Abort current operation gracefully\r\n"
-                           "  rail1,stop          - Emergency stop motor movement\r\n"
-                           "  rail1,home          - Home carriage to reference position\r\n"
-                           "  rail1,move-wc1,no-labware     - Move empty carriage to WC1\r\n"
-                           "  rail1,move-wc1,with-labware   - Move carriage with labware to WC1\r\n"
-                           "  rail1,move-wc2,no-labware     - Move empty carriage to WC2\r\n"
-                           "  rail1,move-wc2,with-labware   - Move carriage with labware to WC2\r\n"
-                           "  rail1,move-staging,no-labware     - Move empty carriage to staging position\r\n"
-                           "  rail1,move-staging,with-labware   - Move carriage with labware to staging position\r\n"
-                           "  rail1,move-handoff,no-labware - Move empty carriage to handoff\r\n"
-                           "  rail1,move-handoff,with-labware - Move carriage with labware to handoff\r\n"
-                           "  rail1,move-mm-to,X,no-labware - Move empty carriage to absolute position X mm\r\n"
-                           "  rail1,move-mm-to,X,with-labware - Move carriage with labware to absolute position X mm\r\n"
-                           "  rail1,move-rel,X,no-labware   - Move empty carriage X mm relative to current position\r\n"
-                           "  rail1,move-rel,X,with-labware - Move carriage with labware X mm relative to current position\r\n"
-                           "  rail1,status        - Show comprehensive system status and diagnostics\r\n"
-                           "  rail1,help          - Display detailed usage instructions",
-                  cmd_rail1),
-
-    // Rail 2 control command
-    systemCommand("rail2", "Rail 2 Control Commands:\r\n"
-                           "  rail2,init          - Initialize Rail 2 motor system\r\n"
-                           "  rail2,clear-fault   - Clear motor fault condition\r\n"
-                           "  rail2,abort         - Abort current operation gracefully\r\n"
-                           "  rail2,stop          - Emergency stop motor movement\r\n"
-                           "  rail2,extend        - Extend pneumatic drive\r\n"
-                           "  rail2,retract       - Retract pneumatic drive\r\n"
-                           "  rail2,home          - Home carriage to reference position\r\n"
-                           "  rail2,move-wc3,no-labware     - Move empty carriage to WC3\r\n"
-                           "  rail2,move-wc3,with-labware   - Move carriage with labware to WC3\r\n"
-                           "  rail2,move-handoff,no-labware - Move empty carriage to handoff\r\n"
-                           "  rail2,move-handoff,with-labware - Move carriage with labware to handoff\r\n"
-                           "  rail2,move-mm-to,X,no-labware - Move empty carriage to absolute position X mm\r\n"
-                           "  rail2,move-mm-to,X,with-labware - Move carriage with labware to absolute position X mm\r\n"
-                           "  rail2,move-rel,X,no-labware   - Move empty carriage X mm relative to current position\r\n"
-                           "  rail2,move-rel,X,with-labware - Move carriage with labware X mm relative to current position\r\n"
-                           "  rail2,status        - Show comprehensive system status and diagnostics\r\n"
-                           "  rail2,help          - Display detailed usage instructions\r\n"
-                           "  SAFETY: Cylinder auto-retracts for ANY movement involving collision zone (500-700mm)",
-                  cmd_rail2),
-};
-
-const size_t API_tree_size = sizeof(API_tree) / sizeof(Commander::systemCommand_t);
 
 // ============================================================
 // Log Command Implementation
@@ -237,9 +173,9 @@ const size_t API_tree_size = sizeof(API_tree) / sizeof(Commander::systemCommand_
 bool cmd_log(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -431,9 +367,9 @@ static const size_t SYSTEM_COMMAND_COUNT = sizeof(SYSTEM_COMMANDS) / sizeof(Subc
 bool cmd_system(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -544,9 +480,9 @@ static const size_t RAIL2_POSITION_COUNT = sizeof(RAIL2_POSITIONS) / sizeof(Subc
 bool cmd_teach(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -580,10 +516,12 @@ bool cmd_teach(char *args, CommandCaller *caller)
 
     // First check if param1 is a global command
     int globalCmdCode = findSubcommandCode(param1, GLOBAL_TEACH_COMMANDS, GLOBAL_TEACH_COMMAND_COUNT);
-    
-    if (globalCmdCode != -1) {
+
+    if (globalCmdCode != -1)
+    {
         // Handle global commands
-        switch (globalCmdCode) {
+        switch (globalCmdCode)
+        {
         case 0: // "help" - Display help information
             Console.acknowledge(F("DISPLAYING_TEACH_HELP: Position teaching system guide follows:"));
             Console.println(F("============================================"));
@@ -745,9 +683,9 @@ static const size_t RAIL2_COMMAND_COUNT = sizeof(RAIL2_COMMANDS) / sizeof(Subcom
 bool cmd_rail2(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -1033,7 +971,7 @@ bool cmd_rail2(char *args, CommandCaller *caller)
         // Labware detection
         Console.serialInfo(F("LABWARE DETECTION:"));
         Console.serialInfo(isLabwarePresentOnRail2() ? F("  Rail 2 Labware Present: YES") : F("  Rail 2 Labware Present: NO"));
-        Console.serialInfo(isLabwarePresentAtHandoff() ? F("  Handoff Labware Present: YES") : F("  Handoff Labware Present: NO"));
+        Console.serialInfo(isLabwarePresentAtRail1Handoff() ? F("  Handoff Labware Present: YES") : F("  Handoff Labware Present: NO"));
 
         // Collision zone analysis
         Console.serialInfo(F("COLLISION ZONE ANALYSIS:"));
@@ -1106,9 +1044,9 @@ static const size_t RAIL1_COMMAND_COUNT = sizeof(RAIL1_COMMANDS) / sizeof(Subcom
 bool cmd_rail1(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -1362,7 +1300,7 @@ bool cmd_rail1(char *args, CommandCaller *caller)
         Console.serialInfo(F("LABWARE DETECTION:"));
         Console.serialInfo(isLabwarePresentAtWC1() ? F("  WC1 Labware Present: YES") : F("  WC1 Labware Present: NO"));
         Console.serialInfo(isLabwarePresentAtWC2() ? F("  WC2 Labware Present: YES") : F("  WC2 Labware Present: NO"));
-        Console.serialInfo(isLabwarePresentAtHandoff() ? F("  Handoff Labware Present: YES") : F("  Handoff Labware Present: NO"));
+        Console.serialInfo(isLabwarePresentAtRail1Handoff() ? F("  Handoff Labware Present: YES") : F("  Handoff Labware Present: NO"));
 
         Console.serialInfo(F("============================================"));
         return true;
@@ -1394,9 +1332,9 @@ static const size_t LABWARE_COMMAND_COUNT = sizeof(LABWARE_COMMANDS) / sizeof(Su
 bool cmd_labware(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -1537,9 +1475,9 @@ const size_t GOTO_LOCATION_COUNT = sizeof(GOTO_LOCATIONS) / sizeof(GOTO_LOCATION
 bool cmd_goto(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -1751,9 +1689,9 @@ static const size_t NETWORK_COMMAND_COUNT = sizeof(NETWORK_COMMANDS) / sizeof(Su
 bool cmd_network(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -1874,9 +1812,9 @@ static const size_t ENCODER_COMMAND_COUNT = sizeof(ENCODER_COMMANDS) / sizeof(Su
 bool cmd_encoder(char *args, CommandCaller *caller)
 {
     // Create a local copy of arguments
-    char localArgs[COMMAND_BUFFER_SIZE];
-    strncpy(localArgs, args, COMMAND_BUFFER_SIZE);
-    localArgs[COMMAND_BUFFER_SIZE - 1] = '\0';
+    char localArgs[COMMAND_SIZE];
+    strncpy(localArgs, args, COMMAND_SIZE);
+    localArgs[COMMAND_SIZE - 1] = '\0';
 
     // Skip leading spaces
     char *trimmed = trimLeadingSpaces(localArgs);
@@ -2285,3 +2223,145 @@ bool cmd_jog(char *args, CommandCaller *caller)
 
     return true;
 }
+
+Commander commander;
+
+Commander::systemCommand_t API_tree[] = {
+    systemCommand("help", "Display help information for all commands", cmd_print_help),
+    systemCommand("h", "Display help information for all commands", cmd_print_help),
+    systemCommand("H", "Display help information for all commands", cmd_print_help),
+
+    // Logging command
+    systemCommand("log", "Logging controls and history:\r\n"
+                         "  log,on,[interval] - Enable periodic logging (interval in ms, default 250)\r\n"
+                         "  log,off           - Disable periodic logging\r\n"
+                         "  log,now           - Log system state immediately\r\n"
+                         "  log,history       - Show complete operation log history\r\n"
+                         "  log,errors        - Show only errors and warnings for quick debugging\r\n"
+                         "  log,last,[count]  - Show last N log entries (default: 10)\r\n"
+                         "  log,stats         - Show log buffer statistics and overflow info\r\n"
+                         "  log,help          - Display detailed logging information",
+                  cmd_log),
+
+    // Labware automation command
+    systemCommand("labware", "Labware automation and state management:\r\n"
+                             "  labware,status      - Display current labware tracking state and operation history\r\n"
+                             "  labware,audit       - Automatically validate and fix labware state\r\n"
+                             "  labware,reset       - Clear all labware tracking and reset operation history\r\n"
+                             "  labware,help        - Display detailed labware automation instructions",
+                  cmd_labware),
+
+    // Automated labware movement command
+    systemCommand("goto", "Automated work cell movement with labware tracking:\r\n"
+                          "  goto,<location>,<status>  - Move to work cell with labware status\r\n"
+                          "  Locations: wc1, wc2, wc3\r\n"
+                          "  Status: with-labware, no-labware\r\n"
+                          "  Examples:\r\n"
+                          "    goto,wc1,with-labware   - Move to WC1 with labware\r\n"
+                          "    goto,wc2,no-labware     - Move to WC2 without labware\r\n"
+                          "    goto,wc3,with-labware   - Move to WC3 with labware\r\n"
+                          "  goto,help               - Display detailed goto command instructions",
+                  cmd_goto),
+
+    // System state command to display comprehensive system status
+    systemCommand("system", "System commands:\r\n"
+                            "  system,state    - Display comprehensive system status with readiness assessment\r\n"
+                            "  system,home     - Home both rails sequentially (Rail 1 first, then Rail 2)\r\n"
+                            "  system,reset    - Clear operational state for clean automation (motor faults, encoder, etc.)\r\n"
+                            "  system,help     - Display detailed instructions for system commands\r\n"
+                            "                    (Use 'log,history' or 'log,errors' for operation troubleshooting)",
+                  cmd_system),
+
+    // Encoder control commands
+    systemCommand("encoder", "Manual Pulse Generator (MPG) handwheel control:\r\n"
+                             "  encoder,enable,<rail>    - Enable encoder control for Rail 1 or 2\r\n"
+                             "  encoder,disable          - Disable encoder control\r\n"
+                             "  encoder,multiplier,<X>   - Set encoder multiplier (X = 1, 10, or 100)\r\n"
+                             "  encoder,velocity,<RPM>   - Set encoder velocity (50-400 RPM)\r\n"
+                             "  encoder,status           - Display current encoder status and settings\r\n"
+                             "  encoder,help             - Display detailed setup and usage instructions",
+                  cmd_encoder),
+
+    // Jog command
+    systemCommand("jog", "Manual jogging control for dual-rail system:\r\n"
+                         "  jog,<rail>,+,[mm]        - Jog rail forward by increment or custom distance\r\n"
+                         "  jog,<rail>,-,[mm]        - Jog rail backward by increment or custom distance\r\n"
+                         "  jog,<rail>,increment,<mm> - Set default jog increment for rail\r\n"
+                         "  jog,<rail>,speed,<rpm>   - Set jog speed for rail\r\n"
+                         "  jog,<rail>,status        - Display jog settings for specific rail\r\n"
+                         "  jog,status               - Display jog settings for all rails\r\n"
+                         "  jog,help                 - Display detailed usage instructions",
+                  cmd_jog),
+
+    // Network management command
+    systemCommand("network", "Network management:\r\n"
+                             "  network,status     - Display current network status and client info\r\n"
+                             "  network,disconnect - Disconnect the current client\r\n"
+                             "  network,help       - Display detailed network management instructions",
+                  cmd_network),
+
+    // Teach position command
+    systemCommand("teach", "Position teaching system with automatic SD card persistence:\r\n"
+                           "  teach,<rail>,<position>  - Teach current position and auto-save to SD card\r\n"
+                           "  teach,<rail>,status      - Show taught positions for specific rail\r\n"
+                           "  teach,status             - Show all taught positions and system status\r\n"
+                           "  teach,<rail>,reset       - Reset rail positions to factory defaults\r\n"
+                           "  teach,reset              - Reset all positions to factory defaults\r\n"
+                           "  \r\n"
+                           "  Rail 1 positions: staging, wc1, wc2, handoff\r\n"
+                           "  Rail 2 positions: handoff, wc3\r\n"
+                           "  \r\n"
+                           "  Examples:\r\n"
+                           "    teach,1,staging        - Teach Rail 1 staging position\r\n"
+                           "    teach,2,wc3            - Teach Rail 2 WC3 position\r\n"
+                           "    teach,1,status         - Show Rail 1 position status\r\n"
+                           "    teach,1,reset          - Reset Rail 1 to defaults",
+                  cmd_teach),
+
+    // Rail 1 control command
+    systemCommand("rail1", "Rail 1 Control Commands:\r\n"
+                           "  rail1,init          - Initialize Rail 1 motor system\r\n"
+                           "  rail1,clear-fault   - Clear motor fault condition\r\n"
+                           "  rail1,abort         - Abort current operation gracefully\r\n"
+                           "  rail1,stop          - Emergency stop motor movement\r\n"
+                           "  rail1,home          - Home carriage to reference position\r\n"
+                           "  rail1,move-wc1,no-labware     - Move empty carriage to WC1\r\n"
+                           "  rail1,move-wc1,with-labware   - Move carriage with labware to WC1\r\n"
+                           "  rail1,move-wc2,no-labware     - Move empty carriage to WC2\r\n"
+                           "  rail1,move-wc2,with-labware   - Move carriage with labware to WC2\r\n"
+                           "  rail1,move-staging,no-labware     - Move empty carriage to staging position\r\n"
+                           "  rail1,move-staging,with-labware   - Move carriage with labware to staging position\r\n"
+                           "  rail1,move-handoff,no-labware - Move empty carriage to handoff\r\n"
+                           "  rail1,move-handoff,with-labware - Move carriage with labware to handoff\r\n"
+                           "  rail1,move-mm-to,X,no-labware - Move empty carriage to absolute position X mm\r\n"
+                           "  rail1,move-mm-to,X,with-labware - Move carriage with labware to absolute position X mm\r\n"
+                           "  rail1,move-rel,X,no-labware   - Move empty carriage X mm relative to current position\r\n"
+                           "  rail1,move-rel,X,with-labware - Move carriage with labware X mm relative to current position\r\n"
+                           "  rail1,status        - Show comprehensive system status and diagnostics\r\n"
+                           "  rail1,help          - Display detailed usage instructions",
+                  cmd_rail1),
+
+    // Rail 2 control command
+    systemCommand("rail2", "Rail 2 Control Commands:\r\n"
+                           "  rail2,init          - Initialize Rail 2 motor system\r\n"
+                           "  rail2,clear-fault   - Clear motor fault condition\r\n"
+                           "  rail2,abort         - Abort current operation gracefully\r\n"
+                           "  rail2,stop          - Emergency stop motor movement\r\n"
+                           "  rail2,extend        - Extend pneumatic drive\r\n"
+                           "  rail2,retract       - Retract pneumatic drive\r\n"
+                           "  rail2,home          - Home carriage to reference position\r\n"
+                           "  rail2,move-wc3,no-labware     - Move empty carriage to WC3\r\n"
+                           "  rail2,move-wc3,with-labware   - Move carriage with labware to WC3\r\n"
+                           "  rail2,move-handoff,no-labware - Move empty carriage to handoff\r\n"
+                           "  rail2,move-handoff,with-labware - Move carriage with labware to handoff\r\n"
+                           "  rail2,move-mm-to,X,no-labware - Move empty carriage to absolute position X mm\r\n"
+                           "  rail2,move-mm-to,X,with-labware - Move carriage with labware to absolute position X mm\r\n"
+                           "  rail2,move-rel,X,no-labware   - Move empty carriage X mm relative to current position\r\n"
+                           "  rail2,move-rel,X,with-labware - Move carriage with labware X mm relative to current position\r\n"
+                           "  rail2,status        - Show comprehensive system status and diagnostics\r\n"
+                           "  rail2,help          - Display detailed usage instructions\r\n"
+                           "  SAFETY: Cylinder auto-retracts for ANY movement involving collision zone (500-700mm)",
+                  cmd_rail2),
+};
+
+const size_t API_tree_size = sizeof(API_tree) / sizeof(Commander::systemCommand_t);

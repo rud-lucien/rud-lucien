@@ -5,7 +5,7 @@
 // PROGMEM STRING CONSTANTS FOR MEMORY EFFICIENCY
 //=============================================================================
 // Format strings for sprintf_P()
-const char FMT_SENSOR_SECTION[] PROGMEM = " | Sensors: R1-WC1=%s, R1-WC1-Lab=%s, R1-WC2=%s, R1-WC2-Lab=%s, R1-HANDOFF=%s, R2-WC3=%s, R2-Carriage-Lab=%s, R2-HANDOFF=%s, HANDOFF-Lab=%s";
+const char FMT_SENSOR_SECTION[] PROGMEM = " | Sensors: R1-WC1-Carr=%s, R1-WC1-Lab=%s, R1-WC2-Carr=%s, R1-WC2-Lab=%s, R1-HANDOFF-Carr=%s, R1-HANDOFF-Lab=%s, R2-WC3-Carr=%s, R2-Lab=%s, R2-HANDOFF-Carr=%s";
 const char FMT_SYSTEM_SECTION[] PROGMEM = " | System: E-Stop=%s, Pressure=%d.%02d PSI%s, Clients=%d";
 const char FMT_MOTOR_SECTION[] PROGMEM = " | R%d-Motor: State=%s, Homed=%s, HLFB=%s";
 const char FMT_POSITION_UNHOMED[] PROGMEM = " | R%d-Position: UNKNOWN (not homed), Target=None, LastTarget=None";
@@ -88,6 +88,10 @@ void printValveSection()
     bool actuallyExtended = isCylinderActuallyExtended();
     bool positionValidated = validateValvePosition();
     
+    // Get raw sensor readings
+    bool retractedSensorActive = readDigitalSensor(cylinderRetractedSensor);
+    bool extendedSensorActive = readDigitalSensor(cylinderExtendedSensor);
+    
     if (valveState == VALVE_POSITION_RETRACTED) {
         if (positionValidated && actuallyRetracted) {
             Console.print(F("Cylinder=\x1b[32mRETRACTED\x1b[0m"));
@@ -101,6 +105,21 @@ void printValveSection()
             Console.print(F("Cylinder=\x1b[1;31mEXTENDED?\x1b[1;31m[!]\x1b[0m"));
         }
     }
+    
+    // Add individual sensor readings for debugging
+    Console.print(F(" (Ret:"));
+    if (retractedSensorActive) {
+        Console.print(F("\x1b[32mACTIVE\x1b[0m"));
+    } else {
+        Console.print(F("\x1b[90mINACTIVE\x1b[0m"));
+    }
+    Console.print(F(" Ext:"));
+    if (extendedSensorActive) {
+        Console.print(F("\x1b[33mACTIVE\x1b[0m"));
+    } else {
+        Console.print(F("\x1b[90mINACTIVE\x1b[0m"));
+    }
+    Console.print(F(")"));
 }
 
 void printSensorSection()
@@ -112,10 +131,10 @@ void printSensorSection()
         isCarriageAtWC2() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isLabwarePresentAtWC2() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isCarriageAtRail1Handoff() ? PSTR("PRESENT") : PSTR("ABSENT"),
+        isLabwarePresentAtRail1Handoff() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isCarriageAtWC3() ? PSTR("PRESENT") : PSTR("ABSENT"),
         isLabwarePresentOnRail2() ? PSTR("PRESENT") : PSTR("ABSENT"),
-        isCarriageAtRail2Handoff() ? PSTR("PRESENT") : PSTR("ABSENT"),
-        isLabwarePresentAtHandoff() ? PSTR("PRESENT") : PSTR("ABSENT")
+        isCarriageAtRail2Handoff() ? PSTR("PRESENT") : PSTR("ABSENT")
     );
     
     printColoredSensorSection(sensorInfo);

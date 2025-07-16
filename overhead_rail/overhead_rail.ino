@@ -37,6 +37,12 @@ void setup()
     Console.serialInfo(F("Initializing handwheel interface..."));
     initEncoderControl(true, false);
 
+    // First set up the CCIO board
+    Console.serialInfo(F("Initializing CCIO-8 expansion boards..."));
+    CcioPort.Mode(Connector::CCIO);
+    CcioPort.PortOpen();
+
+
     // CCIO board detection
     ccioBoardCount = CcioMgr.CcioCount();
     bool hasCCIOBoard = (ccioBoardCount > 0);
@@ -93,7 +99,9 @@ void loop()
     checkMoveProgress();
 
     // System monitoring
-    updateAllSensors();
+    if (ccioBoardCount > 0) {
+        updateAllSensors();
+    }
     updateLabwareSystemState();
 
     // Manual control

@@ -1,6 +1,8 @@
 #include "EncoderController.h"
 #include "Utils.h"
 #include "OutputManager.h"
+#include "ValveController.h"  // For cylinder safety checks
+#include "RailAutomation.h"   // For collision zone constants
 
 //=============================================================================
 // CONSOLE OUTPUT FORMAT STRINGS
@@ -327,6 +329,30 @@ void processEncoderInput()
             sprintf_P(msg, FMT_AT_POSITIVE_LIMIT, scaledToMm(maxTravelScaled));
             Console.serialWarning(msg);
             lastPositiveWarning = currentTime;
+        }
+    }
+    
+    // **RAIL 2 COLLISION ZONE SAFETY CHECK**
+    // Block MPG movement into collision zone (500-700mm) when cylinder is extended
+    if (activeEncoderRail == 2) {
+        double currentPos = scaledToMm(mpgBasePositionScaled + (mpgBaseEncoderCount * currentMultiplierScaled));
+        double targetPositionMm = scaledToMm(targetPositionScaled);
+        
+        // Check if movement would enter collision zone from any direction
+        bool movementEntersCollisionZone = 
+            (currentPos < RAIL2_COLLISION_ZONE_START && targetPositionMm >= RAIL2_COLLISION_ZONE_START) ||  // Entering from home side
+            (currentPos > RAIL2_COLLISION_ZONE_END && targetPositionMm <= RAIL2_COLLISION_ZONE_END) ||      // Entering from far side
+            (targetPositionMm >= RAIL2_COLLISION_ZONE_START && targetPositionMm <= RAIL2_COLLISION_ZONE_END); // Target inside zone
+        
+        if (movementEntersCollisionZone && !isCylinderActuallyRetracted()) {
+            // Block movement and provide user feedback (limited to prevent spam)
+            static unsigned long lastCollisionWarning = 0;
+            unsigned long currentTime = millis();
+            if (waitTimeReached(currentTime, lastCollisionWarning, 1000)) {
+                Console.serialWarning(F("Collision zone blocked - retract cylinder first"));
+                lastCollisionWarning = currentTime;
+            }
+            return; // Block the movement
         }
     }
     

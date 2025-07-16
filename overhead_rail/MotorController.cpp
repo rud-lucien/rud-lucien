@@ -1561,6 +1561,35 @@ bool initiateSmartHomingSequence(int rail) {
 // Scale factor for fixed-point math in deceleration calculations
 #define SCALE_FACTOR 100
 
+bool shouldUseDeceleration(int rail, bool carriageLoaded, double moveDistanceMm) {
+    RailDecelerationConfig& config = getDecelerationConfig(rail);
+    
+    // First check: Is deceleration globally enabled for this rail?
+    if (!config.enableDeceleration) {
+        return false;
+    }
+    
+    // Second check: Empty carriages should move at full speed without deceleration
+    if (!carriageLoaded) {
+        return false; // Empty carriages use constant high velocity
+    }
+    
+    // Third check: Only use deceleration for moves that are long enough to benefit
+    // Short moves don't need deceleration as they're already at low velocity
+    const double minDistanceForDeceleration = 10.0; // mm - moves shorter than this don't benefit
+    if (moveDistanceMm < minDistanceForDeceleration) {
+        return false;
+    }
+    
+    // Fourth check: Validate rail number
+    if (rail != 1 && rail != 2) {
+        return false; // Invalid rail
+    }
+    
+    // All conditions met: Use deceleration for loaded carriages on longer moves
+    return true;
+}
+
 int32_t getDecelerationDistanceScaled(int rail, int32_t moveDistanceScaledMm) {
     RailDecelerationConfig& config = getDecelerationConfig(rail);
     
@@ -1573,12 +1602,14 @@ int32_t getDecelerationDistanceScaled(int rail, int32_t moveDistanceScaledMm) {
     }
 }
 
-int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32_t totalMoveDistanceMm, int32_t maxVelocityPps) {
-    RailDecelerationConfig& config = getDecelerationConfig(rail);
-    
-    if (!config.enableDeceleration) {
-        return maxVelocityPps;
+int32_t calculateDeceleratedVelocity(int rail, int32_t distanceToTargetMm, int32_t totalMoveDistanceMm, int32_t maxVelocityPps, bool carriageLoaded) {
+    // Use the new shouldUseDeceleration function to determine if deceleration should be applied
+    double totalMoveDistanceMmDouble = (double)totalMoveDistanceMm / 100.0; // Convert back from scaled
+    if (!shouldUseDeceleration(rail, carriageLoaded, totalMoveDistanceMmDouble)) {
+        return maxVelocityPps; // No deceleration needed
     }
+    
+    RailDecelerationConfig& config = getDecelerationConfig(rail);
     
     // Use the enhanced deceleration distance calculation
     int32_t decelDistanceMm = getDecelerationDistanceScaled(rail, totalMoveDistanceMm * SCALE_FACTOR) / SCALE_FACTOR;
@@ -1654,12 +1685,18 @@ bool moveToPositionFromCurrent(int rail, PositionTarget target, bool carriageLoa
     
     // Calculate movement distance and select velocity
     double moveDistanceMm = abs(pulsesToMm(movePulses, rail));
-    int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
+    int32_t velocityRpm = selectMoveVelocityByDistance(rail, moveDistanceMm, carriageLoaded);
     int32_t velocityPps = rpmToPps(velocityRpm, rail);
     
     // Set velocity and initiate move
     setMotorVelocity(rail, velocityPps);
     motor.Move(movePulses);
+    
+    // Initialize movement tracking with carriage state
+    MotorTargetState& targetState = getTargetState(rail);
+    targetState.carriageLoaded = carriageLoaded;
+    targetState.targetPositionPulses = targetPulses;
+    targetState.startPositionPulses = currentPulses;
     
     // Log the movement
     sprintf_P(msg, FMT_MOVE_TO_POSITION, motorName, getPositionName(target), 
@@ -1703,12 +1740,18 @@ bool moveToPositionMm(int rail, double targetMm, bool carriageLoaded) {
     
     // Calculate movement distance and select velocity
     double moveDistanceMm = abs(pulsesToMm(movePulses, rail));
-    int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
+    int32_t velocityRpm = selectMoveVelocityByDistance(rail, moveDistanceMm, carriageLoaded);
     int32_t velocityPps = rpmToPps(velocityRpm, rail);
     
     // Set velocity and initiate move
     setMotorVelocity(rail, velocityPps);
     motor.Move(movePulses);
+    
+    // Initialize movement tracking with carriage state
+    MotorTargetState& targetState = getTargetState(rail);
+    targetState.carriageLoaded = carriageLoaded;
+    targetState.targetPositionPulses = targetPulses;
+    targetState.startPositionPulses = currentPulses;
     
     // Log the movement
     sprintf_P(msg, FMT_MOVE_TO_MM, motorName, targetMm, targetPulses, velocityRpm,
@@ -1749,18 +1792,24 @@ bool moveRelativeMm(int rail, double distanceMm, bool carriageLoaded) {
     
     if (movePulses == 0) {
         sprintf_P(msg, PSTR("%s: Zero distance move requested"), motorName);
-        Console.serialInfo(msg);
+               Console.serialInfo(msg);
         return true;
     }
     
     // Calculate movement distance and select velocity
     double moveDistanceMm = abs(distanceMm);
-    int32_t velocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
+    int32_t velocityRpm = selectMoveVelocityByDistance(rail, moveDistanceMm, carriageLoaded);
     int32_t velocityPps = rpmToPps(velocityRpm, rail);
     
     // Set velocity and initiate move
     setMotorVelocity(rail, velocityPps);
     motor.Move(movePulses);
+    
+    // Initialize movement tracking with carriage state
+    MotorTargetState& targetState = getTargetState(rail);
+    targetState.carriageLoaded = carriageLoaded;
+    targetState.targetPositionPulses = mmToPulses(targetMm, rail);
+    targetState.startPositionPulses = mmToPulses(currentMm, rail);
     
     // Log the movement
     sprintf_P(msg, FMT_RELATIVE_MOVE, motorName, distanceMm, movePulses, velocityRpm,
@@ -1915,33 +1964,50 @@ int getJogSpeed(int rail) {
 //=============================================================================
 
 int32_t selectMoveVelocityByDistance(int rail, double moveDistanceMm, bool carriageLoaded) {
-    // Get base velocity based on carriage load
-    int32_t baseVelocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
+    // For empty carriages: use single high-speed velocity regardless of distance
+    if (!carriageLoaded) {
+        if (rail == 1) {
+            return RAIL1_EMPTY_CARRIAGE_VELOCITY_RPM;
+        } else if (rail == 2) {
+            return RAIL2_EMPTY_CARRIAGE_VELOCITY_RPM;
+        }
+        // Fallback for invalid rail
+        return getCarriageVelocityRpm(rail, carriageLoaded);
+    }
     
-    // Apply distance-based adjustments for better motion profiles
-    int32_t adjustedVelocityRpm = baseVelocityRpm;
+    // For loaded carriages: use distance-based velocity selection with rail-specific thresholds
+    int32_t selectedVelocityRpm;
     
-    if (moveDistanceMm < 10.0) {
-        // Very short moves: reduce to 40% of base speed
-        adjustedVelocityRpm = (baseVelocityRpm * 40) / 100;
-    } else if (moveDistanceMm < 50.0) {
-        // Short moves: reduce to 60% of base speed
-        adjustedVelocityRpm = (baseVelocityRpm * 60) / 100;
-    } else if (moveDistanceMm < 200.0) {
-        // Medium moves: reduce to 80% of base speed
-        adjustedVelocityRpm = (baseVelocityRpm * 80) / 100;
+    if (rail == 1) {
+        // Rail 1 loaded carriage velocity selection
+        if (moveDistanceMm <= RAIL1_LOADED_SHORT_MOVE_THRESHOLD_MM) {
+            selectedVelocityRpm = RAIL1_LOADED_SHORT_MOVE_VELOCITY_RPM;
+        } else if (moveDistanceMm <= RAIL1_LOADED_MEDIUM_MOVE_THRESHOLD_MM) {
+            selectedVelocityRpm = RAIL1_LOADED_MEDIUM_MOVE_VELOCITY_RPM;
+        } else {
+            selectedVelocityRpm = RAIL1_LOADED_LONG_MOVE_VELOCITY_RPM;
+        }
+    } else if (rail == 2) {
+        // Rail 2 loaded carriage velocity selection
+        if (moveDistanceMm <= RAIL2_LOADED_SHORT_MOVE_THRESHOLD_MM) {
+            selectedVelocityRpm = RAIL2_LOADED_SHORT_MOVE_VELOCITY_RPM;
+        } else if (moveDistanceMm <= RAIL2_LOADED_MEDIUM_MOVE_THRESHOLD_MM) {
+            selectedVelocityRpm = RAIL2_LOADED_MEDIUM_MOVE_VELOCITY_RPM;
+        } else {
+            selectedVelocityRpm = RAIL2_LOADED_LONG_MOVE_VELOCITY_RPM;
+        }
     } else {
-        // Long moves: use full base speed
-        adjustedVelocityRpm = baseVelocityRpm;
+        // Fallback for invalid rail
+        selectedVelocityRpm = getCarriageVelocityRpm(rail, carriageLoaded);
     }
     
     // Ensure minimum velocity for reliable operation
     const int32_t minVelocityRpm = 30;
-    if (adjustedVelocityRpm < minVelocityRpm) {
-        adjustedVelocityRpm = minVelocityRpm;
+    if (selectedVelocityRpm < minVelocityRpm) {
+        selectedVelocityRpm = minVelocityRpm;
     }
     
-    return adjustedVelocityRpm;
+    return selectedVelocityRpm;
 }
 
 //=============================================================================
@@ -2007,6 +2073,9 @@ bool checkMovementProgress(int rail) {
         targetState.lastPositionCheck = currentPosition;
     }
     
+    // Update deceleration velocity based on distance to target
+    updateDecelerationVelocity(rail);
+    
     // Check for overall timeout
     if (checkMovementTimeout(rail, MOVEMENT_TIMEOUT_MS)) {
         char msg[MEDIUM_MSG_SIZE];
@@ -2037,8 +2106,10 @@ void updateDecelerationVelocity(int rail) {
     
     // Calculate decelerated velocity
     int32_t maxVelocityPps = getCurrentMotorVelocity(rail); // Use rail-specific velocity limit
+    // Use the stored carriage state from movement tracking
+    bool carriageLoaded = targetState.carriageLoaded;
     int32_t newVelocityPps = calculateDeceleratedVelocity(rail, (int32_t)(distanceToTargetMm * 100), 
-                                                         (int32_t)(totalMoveDistanceMm * 100), maxVelocityPps);
+                                                         (int32_t)(totalMoveDistanceMm * 100), maxVelocityPps, carriageLoaded);
     
     // Only update if velocity should change significantly
     int32_t currentVelocity = getCurrentMotorVelocity(rail);

@@ -8,8 +8,8 @@
 //=============================================================================
 // Streamlined format strings for operator clarity
 const char FMT_SENSOR_INIT_SUMMARY[] PROGMEM = "Sensor system: %d sensors initialized (%s)";
-const char FMT_SENSOR_STATUS_SUMMARY[] PROGMEM = "Sensors - Carriages: R1-Input=%s R1-Output=%s WC3=%s Handoff=%s | Labware: WC2-R1=%s Handoff-R1=%s Rail2=%s | Rail1-Home: Rail=%s Carriage=%s | Cylinder: %s | Pressure: %.1f PSI%s";
-const char FMT_SENSOR_STATUS_LIMITED[] PROGMEM = "Sensors - Carriages: R1-Input=%s R1-Output=%s WC3=%s | Labware: WC2-R1=%s | Rail1-Home: Rail=%s Carriage=%s | Pressure: %.1f PSI%s [Limited: No CCIO]";
+const char FMT_SENSOR_STATUS_SUMMARY[] PROGMEM = "Sensors - Carriages: R1-Input=%s R1-Output=%s WC3=%s Handoff=%s | Labware: WC2-R1=%s Handoff-R1=%s Rail2=%s | Rail1-Home: Rail=%s Carriage=%s | Cylinder: %s (Ret:%s Ext:%s) | Pressure: %.1f PSI%s";
+const char FMT_SENSOR_STATUS_LIMITED[] PROGMEM = "Sensors - Carriages: R1-Input=%s R1-Output=%s WC3=%s | Labware: WC2-R1=%s | Rail1-Home: Rail=%s Carriage=%s | Cylinder: %s (Ret:%s Ext:%s) | Pressure: %.1f PSI%s [Limited: No CCIO]";
 
 // Legacy format strings (preserved for detailed status functions)
 const char FMT_SENSOR_INIT_CCIO[] PROGMEM = "Initialized sensor '%s' on CCIO pin (CLEARCORE_PIN_CCIOA#)";
@@ -100,7 +100,7 @@ void initSensorSystem(bool hasCCIOBoard)
     initDigitalSensor(carriageSensorRail1Handoff, CARRIAGE_SENSOR_RAIL1_HANDOFF_PIN, true, "Carriage_R1_Handoff");
     initDigitalSensor(carriageSensorRail2Handoff, CARRIAGE_SENSOR_RAIL2_HANDOFF_PIN, true, "Carriage_R2_Handoff");
     initDigitalSensor(labwareSensorRail2, LABWARE_SENSOR_RAIL2_PIN, true, "Labware_Rail2");
-    initDigitalSensor(labwareSensorHandoff, LABWARE_SENSOR_HANDOFF_PIN, true, "Labware_Handoff");
+    initDigitalSensor(labwareSensorHandoff, LABWARE_SENSOR_RAIL1_HANDOFF_PIN, true, "Labware_R1_Handoff");
     initDigitalSensor(cylinderRetractedSensor, CYLINDER_RETRACTED_SENSOR_PIN, true, "Cylinder_Retracted");
     initDigitalSensor(cylinderExtendedSensor, CYLINDER_EXTENDED_SENSOR_PIN, true, "Cylinder_Extended");
 
@@ -164,7 +164,7 @@ void initPressureSensor()
     
     // Check if pressure is sufficient for valve operation and warn if needed
     if (!isPressureSufficient()) {
-        Console.serialWarning(F("System pressure below minimum threshold (21.75 PSI) - Valve operations may be unreliable"));
+        Console.serialWarning(F("System pressure below minimum threshold (30.0 PSI) - Valve operations may be unreliable"));
     }
 
     // Individual pressure sensor initialization messages removed for cleaner startup
@@ -299,6 +299,18 @@ bool isPressureSufficient()
 bool isPressureWarningLevel()
 {
     uint16_t pressureScaled = readPressureScaled(airPressureSensor);
+    
+    // DEBUG: Log actual values being compared
+    static unsigned long lastDebugOutput = 0;
+    if (millis() - lastDebugOutput > 5000) {  // Debug every 5 seconds max
+        char debugMsg[100];
+        sprintf(debugMsg, "DEBUG: pressureScaled=%u, PRESSURE_WARNING_THRESHOLD_SCALED=%u, result=%s", 
+                pressureScaled, PRESSURE_WARNING_THRESHOLD_SCALED, 
+                (pressureScaled < PRESSURE_WARNING_THRESHOLD_SCALED) ? "WARNING" : "OK");
+        Console.serialDiagnostic(debugMsg);
+        lastDebugOutput = millis();
+    }
+    
     return pressureScaled < PRESSURE_WARNING_THRESHOLD_SCALED;
 }
 
@@ -312,16 +324,14 @@ bool isCarriageAtWC3() { return carriageSensorWC3.currentState; }
 
 bool isCarriageAtRail1Handoff() { 
     if (!hasCCIO) {
-        Console.serialError(F("Cannot read Rail 1 handoff sensor: CCIO board not detected"));
-        return false;
+        return false; // Silently return false when CCIO not available
     }
     return carriageSensorRail1Handoff.currentState; 
 }
 
 bool isCarriageAtRail2Handoff() { 
     if (!hasCCIO) {
-        Console.serialError(F("Cannot read Rail 2 handoff sensor: CCIO board not detected"));
-        return false;
+        return false; // Silently return false when CCIO not available
     }
     return carriageSensorRail2Handoff.currentState; 
 }
@@ -334,16 +344,14 @@ bool isLabwarePresentAtWC1() { return labwareSensorWC1.currentState; }
 bool isLabwarePresentAtWC2() { return labwareSensorWC2.currentState; }
 bool isLabwarePresentOnRail2() { 
     if (!hasCCIO) {
-        Console.serialError(F("Cannot read Rail 2 labware sensor: CCIO board not detected"));
-        return false;
+        return false; // Silently return false when CCIO not available
     }
     return labwareSensorRail2.currentState; 
 }
 
-bool isLabwarePresentAtHandoff() { 
+bool isLabwarePresentAtRail1Handoff() { 
     if (!hasCCIO) {
-        Console.serialError(F("Cannot read handoff labware sensor: CCIO board not detected"));
-        return false;
+        return false; // Silently return false when CCIO not available
     }
     return labwareSensorHandoff.currentState; 
 }
@@ -354,16 +362,14 @@ bool isLabwarePresentAtHandoff() {
 
 bool isCylinderRetracted() { 
     if (!hasCCIO) {
-        Console.serialError(F("Cannot read cylinder sensors: CCIO board not detected"));
-        return false;
+        return false; // Silently return false when CCIO not available
     }
     return cylinderPosition.retracted && cylinderPosition.positionKnown; 
 }
 
 bool isCylinderExtended() { 
     if (!hasCCIO) {
-        Console.serialError(F("Cannot read cylinder sensors: CCIO board not detected"));
-        return false;
+        return false; // Silently return false when CCIO not available
     }
     return cylinderPosition.extended && cylinderPosition.positionKnown; 
 }
@@ -385,26 +391,31 @@ void printAllSensorStatus()
     
     if (hasCCIO) {
         sprintf_P(msg, FMT_SENSOR_STATUS_SUMMARY,
-                carriageSensorWC1.currentState ? "PRESENT" : "absent",
-                carriageSensorWC2.currentState ? "PRESENT" : "absent", 
-                carriageSensorWC3.currentState ? "PRESENT" : "absent",
-                carriageSensorRail2Handoff.currentState ? "PRESENT" : "absent",
-                labwareSensorWC2.currentState ? "DETECTED" : "none",
-                labwareSensorHandoff.currentState ? "DETECTED" : "none",
-                labwareSensorRail2.currentState ? "DETECTED" : "none",
-                carriageSensorRail1Handoff.currentState ? "PRESENT" : "absent",
-                carriageSensorWC1.currentState ? "PRESENT" : "absent",
+                carriageSensorWC1.currentState ? "PRESENT" : "ABSENT",
+                carriageSensorWC2.currentState ? "PRESENT" : "ABSENT", 
+                carriageSensorWC3.currentState ? "PRESENT" : "ABSENT",
+                carriageSensorRail2Handoff.currentState ? "PRESENT" : "ABSENT",
+                labwareSensorWC2.currentState ? "DETECTED" : "NONE",
+                labwareSensorHandoff.currentState ? "DETECTED" : "NONE",
+                labwareSensorRail2.currentState ? "DETECTED" : "NONE",
+                carriageSensorRail1Handoff.currentState ? "PRESENT" : "ABSENT",
+                carriageSensorWC1.currentState ? "PRESENT" : "ABSENT",
                 cylinderPosition.positionKnown ? (cylinderPosition.retracted ? "RETRACTED" : "EXTENDED") : "UNKNOWN",
+                cylinderRetractedSensor.currentState ? "ACTIVE" : "INACTIVE",
+                cylinderExtendedSensor.currentState ? "ACTIVE" : "INACTIVE",
                 getPressurePsi(),
                 isPressureWarningLevel() ? " [LOW]" : "");
     } else {
         sprintf_P(msg, FMT_SENSOR_STATUS_LIMITED,
-                carriageSensorWC1.currentState ? "PRESENT" : "absent",
-                carriageSensorWC2.currentState ? "PRESENT" : "absent", 
-                carriageSensorWC3.currentState ? "PRESENT" : "absent",
-                labwareSensorWC2.currentState ? "DETECTED" : "none",
-                carriageSensorRail1Handoff.currentState ? "PRESENT" : "absent",
-                carriageSensorWC1.currentState ? "PRESENT" : "absent",
+                carriageSensorWC1.currentState ? "PRESENT" : "ABSENT",
+                carriageSensorWC2.currentState ? "PRESENT" : "ABSENT", 
+                carriageSensorWC3.currentState ? "PRESENT" : "ABSENT",
+                labwareSensorWC2.currentState ? "DETECTED" : "NONE",
+                carriageSensorRail1Handoff.currentState ? "PRESENT" : "ABSENT",
+                carriageSensorWC1.currentState ? "PRESENT" : "ABSENT",
+                "UNAVAILABLE",
+                "UNAVAILABLE",
+                "UNAVAILABLE",
                 getPressurePsi(),
                 isPressureWarningLevel() ? " [LOW]" : "");
     }
@@ -431,7 +442,7 @@ void printPressureStatus()
     Console.serialInfo(msg);
 
     if (!isPressureSufficient()) {
-        Console.serialWarning(F("Pressure below minimum threshold for safe valve operation (21.75 PSI)"));
+        Console.serialWarning(F("Pressure below minimum threshold for safe valve operation (30.0 PSI)"));
     }
 }
 

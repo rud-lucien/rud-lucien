@@ -245,7 +245,7 @@ bool processCommand(const char *rawCommand, Stream *output, const char *sourceTa
             }
         }
 
-        // Execute the command (placeholder for now - will be implemented when Commands.h is ready)
+        // Execute the command (direct dispatch to Commands.cpp functions)
         bool success = executeCommand(originalCommand, output);
 
         // For non-async commands, clear the operation state if it was set

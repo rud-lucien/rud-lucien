@@ -164,7 +164,7 @@ void updateRail1LabwareFromSensor(Location sensorLocation) {
             sensorReading = isLabwarePresentAtWC2();
             break;
         case LOCATION_HANDOFF:
-            sensorReading = isLabwarePresentAtHandoff();
+            sensorReading = isLabwarePresentAtRail1Handoff();
             break;
         default:
             Console.serialError(F("updateRail1LabwareFromSensor: Invalid sensor location"));
@@ -429,7 +429,7 @@ void printSensorReadings() {
     Console.serialInfo(isLabwarePresentAtWC1() ? F("  WC1: LABWARE_PRESENT") : F("  WC1: NO_LABWARE"));
     Console.serialInfo(isLabwarePresentAtWC2() ? F("  WC2: LABWARE_PRESENT") : F("  WC2: NO_LABWARE"));
     Console.serialInfo(isLabwarePresentOnRail2() ? F("  Rail 2 Carriage: LABWARE_PRESENT") : F("  Rail 2 Carriage: NO_LABWARE"));
-    Console.serialInfo(isLabwarePresentAtHandoff() ? F("  Handoff: LABWARE_PRESENT") : F("  Handoff: NO_LABWARE"));
+    Console.serialInfo(isLabwarePresentAtRail1Handoff() ? F("  Handoff: LABWARE_PRESENT") : F("  Handoff: NO_LABWARE"));
     
     Console.serialInfo(F(""));
 }
@@ -458,7 +458,7 @@ void updateRail1LabwareStateAfterHoming() {
     
     // Rail 1 homes to position 0mm (handoff location)
     // Check the handoff sensor for labware presence
-    bool labwareDetected = isLabwarePresentAtHandoff();
+    bool labwareDetected = isLabwarePresentAtRail1Handoff();
     
     // Update Rail 1 state with sensor reading
     labwareSystem.rail1.hasLabware = labwareDetected;

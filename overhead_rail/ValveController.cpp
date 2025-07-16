@@ -76,8 +76,8 @@ void initValveSystem(bool hasCCIOBoard)
     // Configure valve control pin as output
     pinMode(cylinderValve.controlPin, OUTPUT);
     
-    // Ensure valve starts in retracted position (de-energized)
-    digitalWrite(cylinderValve.controlPin, LOW);
+    // Ensure valve starts in retracted position (energized with inverted logic)
+    digitalWrite(cylinderValve.controlPin, HIGH);
     
     // Mark as initialized
     cylinderValve.initialized = true;
@@ -136,9 +136,9 @@ void setValvePosition(ValvePosition position)
     }
     
     // Set digital output based on position
-    // LOW = RETRACTED (spring return, de-energized)
-    // HIGH = EXTENDED (energized)
-    bool outputState = (position == VALVE_POSITION_EXTENDED);
+    // HIGH = RETRACTED (spring return, de-energized) - INVERTED LOGIC
+    // LOW = EXTENDED (energized) - INVERTED LOGIC
+    bool outputState = (position == VALVE_POSITION_RETRACTED);
     digitalWrite(cylinderValve.controlPin, outputState);
     
     // Update internal state
