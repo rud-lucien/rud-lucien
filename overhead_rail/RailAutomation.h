@@ -40,6 +40,7 @@
 #define RAIL2_COLLISION_ZONE_START 500     // Start of collision risk zone with Rail 1 (mm)
 #define RAIL2_COLLISION_ZONE_END   700     // End of collision risk zone with Rail 1 (mm)
 #define RAIL2_SAFE_ZONE_END (RAIL2_COLLISION_ZONE_START - 1)  // Last safe position before collision zone
+#define CYLINDER_RETRACTION_SETTLE_TIME_MS 500  // Time to allow pneumatic settling after retraction
 
 //=============================================================================
 // RAIL AUTOMATION FUNCTION DECLARATIONS

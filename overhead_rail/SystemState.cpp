@@ -487,6 +487,115 @@ bool homeSystemRails()
 }
 
 //=============================================================================
+// SYSTEM MOTOR FAULT CLEARING FUNCTION
+//=============================================================================
+bool clearSystemMotorFaults()
+{
+    char msg[MEDIUM_MSG_SIZE];
+    bool anyFaultsCleared = false;
+    bool allClearSuccessful = true;
+    
+    Console.serialInfo(F("SYSTEM CLEAR: Checking motor fault states"));
+    
+    // Check each rail for faults
+    for (uint8_t railId = FIRST_RAIL_ID; railId <= LAST_RAIL_ID; railId++) {
+        if (hasMotorFault(railId)) {
+            anyFaultsCleared = true;
+            sprintf_P(msg, PSTR("Rail %d: Motor fault detected - clearing"), railId);
+            Console.serialInfo(msg);
+            
+            if (clearMotorFaultWithStatus(railId)) {
+                sprintf_P(msg, PSTR("Rail %d: Motor faults cleared successfully"), railId);
+                Console.serialInfo(msg);
+            } else {
+                sprintf_P(msg, PSTR("Rail %d: Failed to clear motor faults"), railId);
+                Console.serialError(msg);
+                allClearSuccessful = false;
+            }
+        } else {
+            sprintf_P(msg, PSTR("Rail %d: No motor faults detected"), railId);
+            Console.serialInfo(msg);
+        }
+    }
+    
+    // Summary message
+    if (!anyFaultsCleared) {
+        Console.serialInfo(F("SYSTEM CLEAR: No faults detected"));
+        Console.acknowledge(F("CLEAR_NOT_NEEDED"));
+    } else if (allClearSuccessful) {
+        Console.serialInfo(F("SYSTEM CLEAR: All faults cleared"));
+        Console.acknowledge(F("CLEAR_SUCCESS"));
+    } else {
+        Console.serialWarning(F("SYSTEM CLEAR: Partial success"));
+        Console.error(F("CLEAR_PARTIAL"));
+    }
+    
+    return anyFaultsCleared ? allClearSuccessful : true;
+}
+
+//=============================================================================
+// SYSTEM MOTOR INITIALIZATION FUNCTION  
+//=============================================================================
+bool initSystemMotors()
+{
+    char msg[MEDIUM_MSG_SIZE];
+    bool anyMotorsInitialized = false;
+    bool allInitSuccessful = true;
+    
+    Console.serialInfo(F("SYSTEM INIT: Checking motor states"));
+    
+    // Pre-check: Verify E-Stop is not active
+    if (isEStopActive()) {
+        Console.error(F("SYSTEM INIT: E-Stop active - cannot initialize"));
+        Console.error(F("INIT_ESTOP_ACTIVE"));
+        return false;
+    }
+    
+    // Check each rail for initialization needs
+    for (uint8_t railId = FIRST_RAIL_ID; railId <= LAST_RAIL_ID; railId++) {
+        if (hasMotorFault(railId)) {
+            sprintf_P(msg, PSTR("Rail %d: Has faults - clear first"), railId);
+            Console.serialWarning(msg);
+            allInitSuccessful = false;
+            continue;
+        }
+        
+        // Check if motor needs initialization
+        if (!isMotorReady(railId)) {
+            anyMotorsInitialized = true;
+            sprintf_P(msg, PSTR("Rail %d: Initializing"), railId);
+            Console.serialInfo(msg);
+            
+            if (initRailMotor(railId)) {
+                sprintf_P(msg, PSTR("Rail %d: Initialized successfully"), railId);
+                Console.serialInfo(msg);
+            } else {
+                sprintf_P(msg, PSTR("Rail %d: Init failed"), railId);
+                Console.serialError(msg);
+                allInitSuccessful = false;
+            }
+        } else {
+            sprintf_P(msg, PSTR("Rail %d: Already initialized"), railId);
+            Console.serialInfo(msg);
+        }
+    }
+    
+    // Summary message
+    if (!anyMotorsInitialized) {
+        Console.serialInfo(F("SYSTEM INIT: All motors ready"));
+        Console.acknowledge(F("INIT_NOT_NEEDED"));
+    } else if (allInitSuccessful) {
+        Console.serialInfo(F("SYSTEM INIT: All motors initialized"));
+        Console.acknowledge(F("INIT_SUCCESS"));
+    } else {
+        Console.serialWarning(F("SYSTEM INIT: Partial success"));
+        Console.error(F("INIT_PARTIAL"));
+    }
+    
+    return anyMotorsInitialized ? allInitSuccessful : true;
+}
+
+//=============================================================================
 // TIMEOUT RESET FUNCTIONS
 //=============================================================================
 void resetSystemTimeouts()

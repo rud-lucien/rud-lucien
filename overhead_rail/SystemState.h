@@ -57,6 +57,12 @@ void resetSystemState();
 // System homing function
 bool homeSystemRails();
 
+// System motor fault clearing function
+bool clearSystemMotorFaults();
+
+// System motor initialization function
+bool initSystemMotors();
+
 // Timeout reset functions (for system reset)
 void resetSystemTimeouts();
 

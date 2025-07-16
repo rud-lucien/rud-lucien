@@ -462,7 +462,9 @@ CommandType getCommandType(const char *originalCommand)
 
             // Automated subcommands (block everything except emergency/read-only)
             if (strstr(originalCommand, ",home") != nullptr ||
-                strstr(originalCommand, ",reset") != nullptr)
+                strstr(originalCommand, ",reset") != nullptr ||
+                strstr(originalCommand, ",clear") != nullptr ||
+                strstr(originalCommand, ",init") != nullptr)
             {
                 return CMD_AUTOMATED;
             }
@@ -475,7 +477,8 @@ CommandType getCommandType(const char *originalCommand)
         if (strcmp(firstWord, "teach") == 0)
         {
             // Read-only subcommands (allowed during operations)
-            if (strstr(originalCommand, ",status") != nullptr)
+            if (strstr(originalCommand, ",status") != nullptr ||
+                strstr(originalCommand, ",help") != nullptr)
             {
                 return CMD_READ_ONLY;
             }
@@ -853,14 +856,18 @@ int determineOperationTypeFromCommand(const char *command)
     }
 
     // Position teaching operations
-    if (strcmp(firstWord, "teach") == 0 && strstr(command, ",status") == nullptr)
+    if (strcmp(firstWord, "teach") == 0 && 
+        strstr(command, ",status") == nullptr &&
+        strstr(command, ",help") == nullptr)
     {
         return 5; // Position teaching operation
     }
 
     // System configuration operations
     if (strcmp(firstWord, "system") == 0 && 
-        (strstr(command, ",reset") != nullptr))
+        (strstr(command, ",reset") != nullptr ||
+         strstr(command, ",clear") != nullptr ||
+         strstr(command, ",init") != nullptr))
     {
         return 6; // System configuration operation
     }

@@ -419,10 +419,12 @@ bool cmd_log(char *args, CommandCaller *caller)
 
 // Define the system subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
 static const SubcommandInfo SYSTEM_COMMANDS[] = {
-    {"help", 3},
+    {"clear", 0},
+    {"help", 1},
     {"home", 2},
-    {"reset", 1},
-    {"state", 0}};
+    {"init", 3},
+    {"reset", 4},
+    {"state", 5}};
 
 static const size_t SYSTEM_COMMAND_COUNT = sizeof(SYSTEM_COMMANDS) / sizeof(SubcommandInfo);
 
@@ -451,21 +453,10 @@ bool cmd_system(char *args, CommandCaller *caller)
 
     switch (commandCode)
     {
-    case 0: // state
-        Console.acknowledge(F("DISPLAYING_SYSTEM_STATE: Comprehensive system status follows:"));
-        printSystemState();
-        return true;
+    case 0: // clear
+        return clearSystemMotorFaults();
 
-    case 1: // reset
-        Console.acknowledge(F("SYSTEM_RESET_INITIATED: Clearing operational state for clean automation"));
-        resetSystemState();
-        return true;
-
-    case 2: // home
-        Console.acknowledge(F("SYSTEM_HOME_INITIATED: Sequential homing of both rails"));
-        return homeSystemRails();
-
-    case 3: // help
+    case 1: // help
         Console.acknowledge(F("DISPLAYING_SYSTEM_HELP: System command guide follows:"));
         Console.println(F("============================================"));
         Console.println(F("System State Commands"));
@@ -474,6 +465,14 @@ bool cmd_system(char *args, CommandCaller *caller)
         Console.println(F("  system,state        - Display comprehensive system status"));
         Console.println(F("                        (motors, sensors, pneumatics, network, safety)"));
         Console.println(F("                        Includes overall readiness assessment and error summary"));
+        Console.println(F(""));
+        Console.println(F("INITIALIZATION COMMANDS:"));
+        Console.println(F("  system,init         - Initialize all motor systems"));
+        Console.println(F("                        Initializes motors that need it, skips ready motors"));
+        Console.println(F("                        Required after system startup or motor faults"));
+        Console.println(F("  system,clear        - Clear motor faults for system readiness"));
+        Console.println(F("                        Clears faults only on motors that have them"));
+        Console.println(F("                        Use before init if motors are faulted"));
         Console.println(F(""));
         Console.println(F("HOMING COMMAND:"));
         Console.println(F("  system,home         - Home both rails sequentially (Rail 1 first, then Rail 2)"));
@@ -485,26 +484,31 @@ bool cmd_system(char *args, CommandCaller *caller)
         Console.println(F("                        Clears motor faults, resets encoder, syncs hardware state"));
         Console.println(F("                        Prepares system for fresh goto commands"));
         Console.println(F(""));
-        Console.println(F("DISPLAYED INFORMATION:"));
-        Console.println(F("- Motor Status: HLFB, homing status, position for both rails"));
-        Console.println(F("- Sensor Status: All position sensors, labware detection, pressure"));
-        Console.println(F("- Pneumatic Systems: Valve position, cylinder sensors, air pressure"));
-        Console.println(F("- Labware Detection: Tracking status for all work cells"));
-        Console.println(F("- Network Status: Ethernet initialization, link status, clients"));
-        Console.println(F("- Manual Controls: MPG (encoder) status, active rail, multiplier"));
-        Console.println(F("- Safety Systems: Emergency stop, position limits"));
-        Console.println(F("- System Activity: Uptime, last command, overall readiness"));
-        Console.println(F("- Automation Readiness: YES/NO with specific error details"));
-        Console.println(F(""));
-        Console.println(F("RELATED COMMANDS:"));
-        Console.println(F("- Use 'log history' for historical system operation data"));
-        Console.println(F("- Use 'log errors' for troubleshooting past issues"));
-        Console.println(F("- Individual subsystem commands: encoder, network, labware"));
+        Console.println(F("SYSTEM,STATE DISPLAYS:"));
+        Console.println(F("- Motor status, sensors, pneumatics, network, safety"));
+        Console.println(F("- Labware tracking and automation readiness"));
+        Console.println(F("- Overall system health with error summary"));
         Console.println(F("============================================"));
         return true;
 
+    case 2: // home
+        return homeSystemRails();
+
+    case 3: // init
+        return initSystemMotors();
+
+    case 4: // reset
+        Console.acknowledge(F("SYSTEM_RESET_INITIATED: Clearing operational state for clean automation"));
+        resetSystemState();
+        return true;
+
+    case 5: // state
+        Console.acknowledge(F("DISPLAYING_SYSTEM_STATE: Comprehensive system status follows:"));
+        printSystemState();
+        return true;
+
     default:
-        Console.error(F("Unknown system command. Available: state, home, reset, help"));
+        Console.error(F("Unknown system command. Available: state, clear, init, home, reset, help"));
         return false;
     }
 }
@@ -513,12 +517,13 @@ bool cmd_system(char *args, CommandCaller *caller)
 // Teach Position Command Implementation
 // ============================================================
 
-// Define the teach subcommands lookup table (MUST BE SORTED ALPHABETICALLY)
-static const SubcommandInfo TEACH_COMMANDS[] = {
-    {"reset", 0},
-    {"status", 1}};
+// Define global teach commands lookup table (MUST BE SORTED ALPHABETICALLY)
+static const SubcommandInfo GLOBAL_TEACH_COMMANDS[] = {
+    {"help", 0},
+    {"reset", 1},
+    {"status", 2}};
 
-static const size_t TEACH_COMMAND_COUNT = sizeof(TEACH_COMMANDS) / sizeof(SubcommandInfo);
+static const size_t GLOBAL_TEACH_COMMAND_COUNT = sizeof(GLOBAL_TEACH_COMMANDS) / sizeof(SubcommandInfo);
 
 // Define Rail 1 position lookup table (MUST BE SORTED ALPHABETICALLY)
 static const SubcommandInfo RAIL1_POSITIONS[] = {
@@ -549,8 +554,8 @@ bool cmd_teach(char *args, CommandCaller *caller)
     // Check for empty argument
     if (strlen(trimmed) == 0)
     {
-        Console.error(F("Missing parameters. Usage: teach,<rail|status|reset>,[position|status|reset]"));
-        Console.error(F("Examples: teach 1 staging, teach status, teach reset"));
+        Console.error(F("Missing parameters. Usage: teach,<rail|status|reset|help>,[position]"));
+        Console.error(F("Examples: teach 1 staging, teach status, teach reset, teach help"));
         return false;
     }
 
@@ -560,7 +565,7 @@ bool cmd_teach(char *args, CommandCaller *caller)
 
     if (param1 == NULL)
     {
-        Console.error(F("Invalid format. Usage: teach,<rail|status|reset>,[position|status|reset]"));
+        Console.error(F("Invalid format. Usage: teach,<rail|status|reset|help>,[position]"));
         return false;
     }
 
@@ -573,32 +578,83 @@ bool cmd_teach(char *args, CommandCaller *caller)
         param1[i] = tolower(param1[i]);
     }
 
-    // Handle global commands first
-    if (strcmp(param1, "status") == 0)
-    {
-        // Global status command
-        teachShowStatus();
-        return true;
-    }
-    else if (strcmp(param1, "reset") == 0)
-    {
-        // Global reset command
-        return teachResetAllPositions();
+    // First check if param1 is a global command
+    int globalCmdCode = findSubcommandCode(param1, GLOBAL_TEACH_COMMANDS, GLOBAL_TEACH_COMMAND_COUNT);
+    
+    if (globalCmdCode != -1) {
+        // Handle global commands
+        switch (globalCmdCode) {
+        case 0: // "help" - Display help information
+            Console.acknowledge(F("DISPLAYING_TEACH_HELP: Position teaching system guide follows:"));
+            Console.println(F("============================================"));
+            Console.println(F("Position Teaching System Commands"));
+            Console.println(F("============================================"));
+            Console.println(F("GLOBAL COMMANDS:"));
+            Console.println(F("  teach,status             - Show all taught positions and system status"));
+            Console.println(F("                             Displays both rails with position values and validation"));
+            Console.println(F("  teach,reset              - Reset all positions to factory defaults"));
+            Console.println(F("                             Clears all custom positions and restores original values"));
+            Console.println(F("  teach,help               - Display this comprehensive help guide"));
+            Console.println(F(""));
+            Console.println(F("POSITION TEACHING:"));
+            Console.println(F("  teach,<rail>,<position>  - Teach current position and auto-save to SD card"));
+            Console.println(F("                             Rail must be at desired position before teaching"));
+            Console.println(F("                             Position is immediately saved to persistent storage"));
+            Console.println(F(""));
+            Console.println(F("RAIL 1 POSITIONS:"));
+            Console.println(F("  teach,1,staging          - Teach Rail 1 staging position"));
+            Console.println(F("                             (coordination position for Rail 1-2 transfers)"));
+            Console.println(F("  teach,1,wc1              - Teach Rail 1 WC1 pickup/dropoff position"));
+            Console.println(F("  teach,1,wc2              - Teach Rail 1 WC2 pickup/dropoff position"));
+            Console.println(F("  teach,1,handoff          - Teach Rail 1 handoff position"));
+            Console.println(F("                             (transfer point to Rail 2, typically same as home)"));
+            Console.println(F(""));
+            Console.println(F("RAIL 2 POSITIONS:"));
+            Console.println(F("  teach,2,handoff          - Teach Rail 2 handoff position"));
+            Console.println(F("                             (receive point from Rail 1)"));
+            Console.println(F("  teach,2,wc3              - Teach Rail 2 WC3 pickup/dropoff position"));
+            Console.println(F(""));
+            Console.println(F("TEACHING WORKFLOW:"));
+            Console.println(F("1. Home the rail to establish reference position"));
+            Console.println(F("2. Move carriage to desired position using manual controls"));
+            Console.println(F("3. Execute teach command to capture and save position"));
+            Console.println(F("4. Verify with 'teach,status' command"));
+            Console.println(F("5. Test movement with rail movement commands"));
+            Console.println(F(""));
+            Console.println(F("PERSISTENT STORAGE:"));
+            Console.println(F("- All positions automatically saved to SD card"));
+            Console.println(F("- Positions restored on system startup"));
+            Console.println(F("- Factory defaults available as backup"));
+            Console.println(F("- Position validation ensures reasonable values"));
+            Console.println(F("============================================"));
+            return true;
+
+        case 1: // "reset" - Reset all positions
+            return teachResetAllPositions();
+
+        case 2: // "status" - Show all positions
+            teachShowStatus();
+            return true;
+
+        default:
+            // Should never reach here due to previous check
+            break;
+        }
     }
 
-    // Check if param1 is a rail number
+    // If not a global command, check if param1 is a rail number
     int rail = atoi(param1);
     if (rail != 1 && rail != 2)
     {
-        Console.error(F("Invalid rail number or command. Use: 1, 2, status, or reset"));
-        Console.error(F("Examples: teach 1 staging, teach 2 wc3, teach status"));
+        Console.error(F("Invalid rail number or command. Use: 1, 2, status, reset, or help"));
+        Console.error(F("Examples: teach 1 staging, teach 2 wc3, teach status, teach help"));
         return false;
     }
 
     // We have a valid rail number, check for second parameter
     if (param2 == NULL)
     {
-        Console.error(F("Missing position or command. Usage: teach,<rail>,<position|status|reset>"));
+        Console.error(F("Missing position. Usage: teach,<rail>,<position>"));
         if (rail == 1)
         {
             Console.error(F("Rail 1 positions: staging, wc1, wc2, handoff"));
@@ -607,7 +663,6 @@ bool cmd_teach(char *args, CommandCaller *caller)
         {
             Console.error(F("Rail 2 positions: handoff, wc3"));
         }
-        Console.error(F("Commands: status, reset"));
         return false;
     }
 
@@ -616,24 +671,6 @@ bool cmd_teach(char *args, CommandCaller *caller)
     for (int i = 0; param2[i]; i++)
     {
         param2[i] = tolower(param2[i]);
-    }
-
-    // Check for rail-specific commands first
-    int cmdCode = findSubcommandCode(param2, TEACH_COMMANDS, TEACH_COMMAND_COUNT);
-
-    switch (cmdCode)
-    {
-    case 0: // "reset" - Reset rail positions
-        return teachResetRail(rail);
-
-    case 1: // "status" - Show rail status
-        Console.acknowledge((String(F("DISPLAYING_RAIL")) + String(rail) + F("_TEACH_STATUS: Position status follows:")).c_str());
-        teachShowRail(rail);
-        return true;
-
-    default:
-        // Not a command, try to find position
-        break;
     }
 
     // Try to find the position for the specified rail
