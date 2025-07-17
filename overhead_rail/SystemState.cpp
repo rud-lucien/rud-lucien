@@ -26,46 +26,235 @@ SystemStateStruct SystemStateData = {
 //=============================================================================
 void printSystemState()
 {
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("COMPREHENSIVE SYSTEM STATE REPORT"));
-    Console.serialDiagnostic(F("================================================================================"));
+    Console.println(F(""));
+    Console.println(F("COMPREHENSIVE SYSTEM STATE REPORT"));
+    Console.println(F("================================================================================"));
     
-    // Motor system state - use existing functions from MotorController.cpp
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("MOTOR STATUS:"));
-    Console.serialDiagnostic(F("-------------"));
-    printAllMotorStatus();  // This calls printMotorStatus for both rails
+    // Motor system state - direct output without tags
+    Console.println(F(""));
+    Console.println(F("MOTOR STATUS:"));
+    Console.println(F("-------------"));
     
-    // Sensor states - use existing comprehensive function from Sensors.cpp
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("SENSOR STATUS:"));
-    Console.serialDiagnostic(F("--------------"));
-    printAllSensorStatus();
+    // Use Console.print for both serial and network clients
+    Console.print(F("System Status:\n"));
+    Console.print(F("  Uptime: "));
     
-    // Pneumatic system - use existing functions from ValveController.cpp and Sensors.cpp
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("PNEUMATIC SYSTEMS:"));
-    Console.serialDiagnostic(F("------------------"));
-    printPressureStatus();
-    printValveDetailedStatus();  // Use detailed version for comprehensive system state
+    char timeBuffer[80];
+    unsigned long uptimeSeconds = timeDiff(millis(), systemStartTime) / 1000;
+    formatHumanReadableTime(uptimeSeconds, timeBuffer, sizeof(timeBuffer));
+    Console.print(timeBuffer);
+    Console.print(F("\n\n"));
     
-    // Labware system - use existing function from LabwareAutomation.cpp
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("LABWARE DETECTION:"));
-    Console.serialDiagnostic(F("------------------"));
-    printLabwareSystemStatus();
+    // Motor status for both rails
+    for (uint8_t railId = 1; railId <= 2; railId++) {
+        Console.print(F("Rail ")); Console.print(railId); Console.print(F(" Status:\n"));
+        
+        // Motor state - more informative than separate ready/moving flags
+        Console.print(F("  Motor State: "));
+        MotorState state = updateMotorState(railId);
+        switch (state) {
+            case MOTOR_STATE_NOT_READY:
+                printColoredState("NOT_READY");
+                break;
+            case MOTOR_STATE_IDLE:
+                printColoredState("IDLE");
+                break;
+            case MOTOR_STATE_MOVING:
+                printColoredState("MOVING");
+                break;
+            case MOTOR_STATE_HOMING:
+                printColoredState("HOMING");
+                break;
+            case MOTOR_STATE_FAULTED:
+                printColoredState("FAULTED");
+                break;
+            default:
+                printColoredState("UNKNOWN");
+                break;
+        }
+        Console.print(F("\n"));
+        
+        Console.print(F("  Homed: ")); printColoredYesNo(isHomingComplete(railId)); Console.print(F("\n"));
+        
+        // Position display - show UNKNOWN if not homed
+        Console.print(F("  Position: "));
+        if (isHomingComplete(railId)) {
+            Console.print(getMotorPositionMm(railId)); Console.print(F(" mm"));
+        } else {
+            printColoredState("UNKNOWN");
+        }
+        Console.print(F("\n"));
+        
+        // HLFB Status - hardware-level feedback
+        MotorDriver& motor = getMotorByRail(railId);
+        Console.print(F("  HLFB Status: "));
+        switch (motor.HlfbState()) {
+            case MotorDriver::HLFB_ASSERTED:
+                Console.print(F("Asserted (Motor hardware confirms it's at the target position)"));
+                break;
+            case MotorDriver::HLFB_DEASSERTED:
+                Console.print(F("Deasserted (Motor hardware indicates it's either moving or has a problem)"));
+                break;
+            case MotorDriver::HLFB_UNKNOWN:
+            default:
+                Console.print(F("Unknown (Hardware status cannot be determined)"));
+                break;
+        }
+        Console.print(F("\n"));
+        
+        if (hasMotorFault(railId)) {
+            Console.print(F("  Motor Fault: ACTIVE\n"));
+        } else {
+            Console.print(F("  No faults\n"));
+        }
+        Console.print(F("\n"));
+    }
     
-    // Network status - use existing function from EthernetController.cpp
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("NETWORK STATUS:"));
-    Console.serialDiagnostic(F("---------------"));
-    printEthernetStatus();
+    // Sensor states - direct output without tags
+    Console.println(F(""));
+    Console.println(F("SENSOR STATUS:"));
+    Console.println(F("--------------"));
     
-    // Manual controls - use existing function from EncoderController.cpp
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("MANUAL CONTROLS (MPG):"));
-    Console.serialDiagnostic(F("----------------------"));
-    printEncoderStatus();
+    // Use Console.print for both serial and network clients
+    Console.print(F("Carriage Sensors:\n"));
+    Console.print(F("  WC1: ")); printColoredActiveInactive(isCarriageAtWC1()); Console.print(F("\n"));
+    Console.print(F("  WC2: ")); printColoredActiveInactive(isCarriageAtWC2()); Console.print(F("\n"));
+    Console.print(F("  WC3: ")); printColoredActiveInactive(isCarriageAtWC3()); Console.print(F("\n"));
+    Console.print(F("  Rail1 Handoff: ")); printColoredActiveInactive(isCarriageAtRail1Handoff()); Console.print(F("\n"));
+    Console.print(F("  Rail2 Handoff: ")); printColoredActiveInactive(isCarriageAtRail2Handoff()); Console.print(F("\n"));
+    Console.print(F("\n"));
+    
+    Console.print(F("Labware Sensors:\n"));
+    Console.print(F("  WC1: ")); printColoredActiveInactive(isLabwarePresentAtWC1()); Console.print(F("\n"));
+    Console.print(F("  WC2: ")); printColoredActiveInactive(isLabwarePresentAtWC2()); Console.print(F("\n"));
+    Console.print(F("  Rail2: ")); printColoredActiveInactive(isLabwarePresentOnRail2()); Console.print(F("\n"));
+    Console.print(F("  Handoff: ")); printColoredActiveInactive(isLabwarePresentAtRail1Handoff()); Console.print(F("\n"));
+    Console.print(F("\n"));
+    
+    Console.print(F("Cylinder Sensors:\n"));
+    Console.print(F("  Extended: ")); printColoredActiveInactive(isCylinderExtended()); Console.print(F("\n"));
+    Console.print(F("  Retracted: ")); printColoredActiveInactive(isCylinderRetracted()); Console.print(F("\n"));
+    
+    // Pneumatic system - direct output without tags
+    Console.println(F(""));
+    Console.println(F("PNEUMATIC SYSTEMS:"));
+    Console.println(F("------------------"));
+    
+    // Use Console.print for both serial and network clients
+    Console.print(F("Air Pressure: ")); Console.print(getPressurePsi()); Console.print(F(" PSI"));
+    Console.print(F(" ")); printColoredSufficient(isPressureSufficient()); Console.print(F("\n"));
+    Console.print(F("\n"));
+    
+    Console.print(F("Valve Status:\n"));
+    Console.print(F("  Current Position: ")); Console.print(getValvePositionName(getValvePosition())); Console.print(F("\n"));
+    Console.print(F("  Valve Output: ")); Console.print(digitalRead(PNEUMATIC_CYLINDER_VALVE_PIN) ? "HIGH" : "LOW"); Console.print(F("\n"));
+    
+    // Validate position
+    Console.print(F("  Position Validation: "));
+    if (validateValvePosition()) {
+        printColoredPassed(true);
+        Console.print(F(" (Controller state matches sensor readings)\n"));
+    } else {
+        printColoredPassed(false);
+        Console.print(F(" (Controller state does not match sensors - check wiring/sensors)\n"));
+    }
+    
+    // Labware automation - high-level tracking state
+    Console.println(F(""));
+    Console.println(F("LABWARE AUTOMATION:"));
+    Console.println(F("-------------------"));
+    
+    // Rail 1 labware state
+    Console.print(F("  Rail 1: "));
+    if (labwareSystem.rail1.hasLabware) {
+        Console.print(F("\x1b[32mHAS_LABWARE\x1b[0m at "));
+        Console.print(getLocationName(labwareSystem.rail1.lastKnownLocation));
+        Console.print(F(" (confidence: "));
+        Console.print(getConfidenceName(labwareSystem.rail1.confidence));
+        Console.print(F(")"));
+    } else {
+        Console.print(F("\x1b[90mNO_LABWARE\x1b[0m (confidence: "));
+        Console.print(getConfidenceName(labwareSystem.rail1.confidence));
+        Console.print(F(")"));
+    }
+    Console.print(F("\n"));
+    
+    // Rail 2 labware state
+    Console.print(F("  Rail 2: "));
+    if (labwareSystem.rail2.hasLabware) {
+        Console.print(F("\x1b[32mHAS_LABWARE\x1b[0m"));
+        if (labwareSystem.rail2.labwareSource != LOCATION_UNKNOWN) {
+            Console.print(F(" from "));
+            Console.print(getLocationName(labwareSystem.rail2.labwareSource));
+        }
+        Console.print(F(" (confidence: "));
+        Console.print(getConfidenceName(labwareSystem.rail2.confidence));
+        Console.print(F(")"));
+    } else {
+        Console.print(F("\x1b[90mNO_LABWARE\x1b[0m (confidence: "));
+        Console.print(getConfidenceName(labwareSystem.rail2.confidence));
+        Console.print(F(")"));
+    }
+    Console.print(F("\n"));
+    
+    // Automation status
+    Console.print(F("  Automation: "));
+    if (labwareSystem.automationEnabled) {
+        Console.print(F("\x1b[32mENABLED\x1b[0m"));
+    } else {
+        Console.print(F("\x1b[90mDISABLED\x1b[0m"));
+    }
+    Console.print(F("\n"));
+    
+    // Conflict status
+    Console.print(F("  Conflicts: "));
+    if (labwareSystem.dualLabwareConflict) {
+        Console.print(F("\x1b[1;31mDUAL_LABWARE_CONFLICT\x1b[0m"));
+    } else {
+        Console.print(F("\x1b[32mNONE\x1b[0m"));
+    }
+    Console.print(F("\n"));
+    
+    // Last audit info
+    Console.print(F("  Last Audit: "));
+    if (labwareSystem.lastSystemAudit > 0) {
+        char timeBuffer[80];
+        unsigned long timeSinceAudit = timeDiff(millis(), labwareSystem.lastSystemAudit) / 1000;
+        formatHumanReadableTime(timeSinceAudit, timeBuffer, sizeof(timeBuffer));
+        Console.print(timeBuffer);
+        Console.print(F(" ago"));
+    } else {
+        Console.print(F("\x1b[90mNever performed\x1b[0m"));
+    }
+    Console.print(F("\n"));
+    
+    // Network status - direct output without tags
+    Console.println(F(""));
+    Console.println(F("NETWORK STATUS:"));
+    Console.println(F("---------------"));
+    
+    // Use Console.print for both serial and network clients
+    Console.print(F("Ethernet Status:\n"));
+    Console.print(F("  Connected Clients: ")); Console.print(getConnectedClientCount()); Console.print(F("\n"));
+    
+    // Manual controls - direct output without tags
+    Console.println(F(""));
+    Console.println(F("MANUAL CONTROLS (MPG):"));
+    Console.println(F("----------------------"));
+    
+    // Use Console.print for both serial and network clients
+    Console.print(F("MPG Status:\n"));
+    Console.print(F("  Active: "));
+    if (encoderControlActive) {
+        Console.print(F("\x1b[32mYES\x1b[0m"));
+    } else {
+        Console.print(F("\x1b[90mNO\x1b[0m"));
+    }
+    Console.print(F("\n"));
+    if (encoderControlActive) {
+        Console.print(F("  Active Rail: ")); Console.print(activeEncoderRail); Console.print(F("\n"));
+        Console.print(F("  Multiplier: ")); Console.print(currentMultiplierScaled / 100.0); Console.print(F("x\n"));
+    }
     
     // Safety systems and custom state
     printSafetySystemState();
@@ -73,8 +262,8 @@ void printSystemState()
     // System activity and readiness summary
     printSystemReadinessState();
     
-    Console.serialDiagnostic(F("================================================================================"));
-    Console.serialDiagnostic(F(""));
+    Console.println(F("================================================================================"));
+    Console.println(F(""));
 }
 
 //=============================================================================
@@ -82,20 +271,41 @@ void printSystemState()
 //=============================================================================
 void printSafetySystemState()
 {
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("SAFETY SYSTEMS:"));
-    Console.serialDiagnostic(F("---------------"));
+    Console.println(F(""));
+    Console.println(F("SAFETY SYSTEMS:"));
+    Console.println(F("---------------"));
     
-    // Emergency stop status
-    char msg[MEDIUM_MSG_SIZE];
-    sprintf_P(msg, PSTR("  Emergency Stop: %s"), 
-              SystemStateData.emergencyStopActivated ? "ACTIVATED" : "Normal");
-    Console.serialDiagnostic(msg);
+    // Emergency stop status - check actual hardware state
+    Console.print(F("  Emergency Stop: "));
+    if (isEStopActive()) {
+        Console.print(F("\x1b[1;31mACTIVE\x1b[0m (UNSAFE - System disabled)"));
+    } else {
+        Console.print(F("\x1b[32mINACTIVE\x1b[0m (Safe - System operational)"));
+    }
+    Console.print(F("\n"));
     
-    // System limits
-    sprintf_P(msg, PSTR("  Position Limits: %s"), 
-              SystemStateData.atPositionLimit ? "AT-LIMIT" : "OK");
-    Console.serialDiagnostic(msg);
+    // Position limits - check if any rail is at travel boundaries
+    Console.print(F("  Position Limits: "));
+    bool anyRailAtLimit = false;
+    for (uint8_t railId = 1; railId <= 2; railId++) {
+        if (isHomingComplete(railId)) {
+            float position = getMotorPositionMm(railId);
+            float maxTravel = (railId == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
+            
+            // Check if at or very close to limits (within 5mm)
+            if (position <= 5.0 || position >= (maxTravel - 5.0)) {
+                anyRailAtLimit = true;
+                break;
+            }
+        }
+    }
+    
+    if (anyRailAtLimit) {
+        Console.print(F("\x1b[1;31mNEAR-LIMIT\x1b[0m (Rail approaching travel boundary)"));
+    } else {
+        Console.print(F("\x1b[32mOK\x1b[0m (All rails within safe travel range)"));
+    }
+    Console.print(F("\n"));
 }
 
 //=============================================================================
@@ -103,102 +313,95 @@ void printSafetySystemState()
 //=============================================================================
 void printSystemReadinessState()
 {
-    Console.serialDiagnostic(F(""));
-    Console.serialDiagnostic(F("SYSTEM ACTIVITY & READINESS:"));
-    Console.serialDiagnostic(F("----------------------------"));
+    Console.println(F(""));
+    Console.println(F("SYSTEM ACTIVITY & READINESS:"));
+    Console.println(F("----------------------------"));
     
     char msg[MEDIUM_MSG_SIZE];
+    char timeBuffer[80];
     
     // System timing
-    unsigned long uptime = millis() - systemStartTime;
-    sprintf_P(msg, PSTR("  System Uptime: %lu seconds"), uptime / MILLISECONDS_PER_SECOND);
-    Console.serialDiagnostic(msg);
+    unsigned long uptime = timeDiff(millis(), systemStartTime);
+    unsigned long uptimeSeconds = uptime / MILLISECONDS_PER_SECOND;
+    formatHumanReadableTime(uptimeSeconds, timeBuffer, sizeof(timeBuffer));
+    sprintf_P(msg, PSTR("  System Uptime: %s"), timeBuffer);
+    Console.println(msg);
     
     // Command activity from global variables
     if (lastExecutedCommand[0] != STRING_TERMINATOR) {
-        sprintf_P(msg, PSTR("  Last Command: %s"), lastExecutedCommand);
-        Console.serialDiagnostic(msg);
+        Console.print(F("  Last Command: "));
+        Console.print(F("\x1b[33m")); // Yellow for command
+        Console.print(lastExecutedCommand);
+        Console.print(F("\x1b[0m"));
+        Console.println(F(""));
         
-        unsigned long timeSinceCommand = millis() - lastCommandTime;
-        sprintf_P(msg, PSTR("  Time Since Command: %lu seconds"), timeSinceCommand / MILLISECONDS_PER_SECOND);
-        Console.serialDiagnostic(msg);
+        unsigned long timeSinceCommand = timeDiff(millis(), lastCommandTime);
+        unsigned long timeSinceCommandSeconds = timeSinceCommand / MILLISECONDS_PER_SECOND;
+        formatHumanReadableTime(timeSinceCommandSeconds, timeBuffer, sizeof(timeBuffer));
+        sprintf_P(msg, PSTR("  Time Since Command: %s"), timeBuffer);
+        Console.println(msg);
         
-        sprintf_P(msg, PSTR("  Command Result: %s"), lastCommandSuccess ? "SUCCESS" : "FAILED");
-        Console.serialDiagnostic(msg);
+        Console.print(F("  Command Result: "));
+        if (lastCommandSuccess) {
+            Console.print(F("\x1b[32mSUCCESS\x1b[0m"));
+        } else {
+            Console.print(F("\x1b[1;31mFAILED\x1b[0m"));
+        }
+        Console.println(F(""));
     } else {
-        Console.serialDiagnostic(F("  Last Command: None"));
+        Console.println(F("  Last Command: None"));
     }
     
     // Overall system readiness assessment
     bool systemReady = isSystemReadyForAutomation();
-    Console.serialDiagnostic(F(""));
-    sprintf_P(msg, PSTR("  OVERALL SYSTEM STATUS: %s"), 
-              systemReady ? "READY FOR AUTOMATION" : "NOT READY");
-    Console.serialDiagnostic(msg);
+    Console.println(F(""));
+    Console.print(F("  OVERALL SYSTEM STATUS: "));
+    if (systemReady) {
+        Console.print(F("\x1b[1;32mREADY FOR AUTOMATION\x1b[0m"));
+    } else {
+        Console.print(F("\x1b[1;31mNOT READY\x1b[0m"));
+    }
+    Console.println(F(""));
     
     if (!systemReady) {
-        sprintf_P(msg, PSTR("  Error Summary: %s"), getSystemErrorSummary());
-        Console.serialDiagnostic(msg);
+        Console.print(F("  Error Summary: "));
+        Console.print(F("\x1b[1;31m"));
+        Console.print(getSystemErrorSummary());
+        Console.print(F("\x1b[0m"));
+        Console.println(F(""));
     }
 }
 
-//=============================================================================
-// LEGACY COMPATIBILITY FUNCTIONS (for header interface)
-//=============================================================================
-void printMotorSystemState()
-{
-    Console.serialDiagnostic(F("Motor Status:"));
-    printAllMotorStatus();  // Use existing comprehensive function
-}
-
-void printSensorSystemState()
-{
-    Console.serialDiagnostic(F("Sensor Status:"));
-    printAllSensorStatus();  // Use existing comprehensive function
-}
-
-void printValveSystemState()
-{
-    Console.serialDiagnostic(F("Pneumatic Systems:"));
-    printPressureStatus();   // Use existing function
-    printValveDetailedStatus();  // Use detailed version for consistency
-}
-
-void printNetworkSystemState()
-{
-    Console.serialDiagnostic(F("Network Status:"));
-    printEthernetStatus();   // Use existing function
-}
-
-void printEncoderSystemState()
-{
-    Console.serialDiagnostic(F("Manual Controls:"));
-    printEncoderStatus();    // Use existing function
-}
-
-void printLabwareSystemState()
-{
-    Console.serialDiagnostic(F("Labware Detection:"));
-    printLabwareSystemStatus();  // Use existing function
-}
 
 //=============================================================================
 // SYSTEM READINESS AND UTILITY FUNCTIONS
 //=============================================================================
 bool isSystemReadyForAutomation()
 {
-    // Check emergency stop
-    if (SystemStateData.emergencyStopActivated) {
+    // Check emergency stop - use actual hardware state
+    if (isEStopActive()) {
         return false;
     }
     
-    // Check position limits
-    if (SystemStateData.atPositionLimit) {
-        return false;
+    // Check position limits - check if any rail is near travel boundaries
+    for (uint8_t railId = 1; railId <= 2; railId++) {
+        if (isHomingComplete(railId)) {
+            float position = getMotorPositionMm(railId);
+            float maxTravel = (railId == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
+            
+            // Check if at or very close to limits (within 5mm)
+            if (position <= 5.0 || position >= (maxTravel - 5.0)) {
+                return false;
+            }
+        }
     }
     
     // Check motor readiness for both rails
     for (uint8_t railId = FIRST_RAIL_ID; railId <= LAST_RAIL_ID; railId++) {
+        // Check motor initialization first
+        if (!isMotorReady(railId)) {
+            return false;
+        }
         if (!isHomingComplete(railId)) {
             return false;
         }
@@ -230,38 +433,75 @@ const char* getSystemErrorSummary()
     static String errorMsg = "";
     errorMsg = "";
     
-    if (SystemStateData.emergencyStopActivated) {
-        errorMsg += "EMERGENCY_STOP ";
+    // Safety errors first (highest priority)
+    if (isEStopActive()) {
+        if (errorMsg.length() > 0) errorMsg += " | ";
+        errorMsg += "EMERGENCY STOP ACTIVE";
     }
     
-    if (SystemStateData.atPositionLimit) {
-        errorMsg += "POSITION_LIMIT ";
-    }
-    
-    // Check motors
+    // Motor system errors
+    String motorErrors = "";
     for (uint8_t railId = FIRST_RAIL_ID; railId <= LAST_RAIL_ID; railId++) {
+        String railErrors = "";
+        
+        // Check motor initialization (most common issue)
+        if (!isMotorReady(railId)) {
+            railErrors += "not initialized";
+        }
+        
+        // Check homing status
         if (!isHomingComplete(railId)) {
-            errorMsg += "RAIL" + String(railId) + "_NOT_HOMED ";
+            if (railErrors.length() > 0) railErrors += ", ";
+            railErrors += "not homed";
         }
+        
+        // Check motor faults
         if (hasMotorFault(railId)) {
-            errorMsg += "RAIL" + String(railId) + "_MOTOR_FAULT ";
+            if (railErrors.length() > 0) railErrors += ", ";
+            railErrors += "motor fault";
+        }
+        
+        // Add rail-specific errors to motor errors
+        if (railErrors.length() > 0) {
+            if (motorErrors.length() > 0) motorErrors += "; ";
+            motorErrors += "Rail " + String(railId) + ": " + railErrors;
         }
     }
     
-    // Check pressure
-    if (!isPressureSufficient()) {
-        errorMsg += "LOW_PRESSURE ";
+    if (motorErrors.length() > 0) {
+        if (errorMsg.length() > 0) errorMsg += " | ";
+        errorMsg += "MOTORS: " + motorErrors;
     }
     
-    // Check cylinder sensors
+    // Position limit warnings
+    for (uint8_t railId = 1; railId <= 2; railId++) {
+        if (isHomingComplete(railId)) {
+            float position = getMotorPositionMm(railId);
+            float maxTravel = (railId == 1) ? RAIL1_MAX_TRAVEL_MM : RAIL2_MAX_TRAVEL_MM;
+            
+            // Check if at or very close to limits (within 5mm)
+            if (position <= 5.0 || position >= (maxTravel - 5.0)) {
+                if (errorMsg.length() > 0) errorMsg += " | ";
+                errorMsg += "POSITION: Rail " + String(railId) + " near travel limit";
+                break; // Only report once if any rail is near limit
+            }
+        }
+    }
+    
+    // Pneumatic system errors
+    if (!isPressureSufficient()) {
+        if (errorMsg.length() > 0) errorMsg += " | ";
+        errorMsg += "PNEUMATICS: Low air pressure";
+    }
+    
+    // Cylinder sensor errors
     if (isCylinderActuallyRetracted() && isCylinderActuallyExtended()) {
-        errorMsg += "CYLINDER_SENSOR_ERROR ";
+        if (errorMsg.length() > 0) errorMsg += " | ";
+        errorMsg += "SENSORS: Cylinder position conflict";
     }
     
     if (errorMsg.length() == 0) {
         errorMsg = "NONE";
-    } else {
-        errorMsg.trim();  // Remove trailing space
     }
     
     return errorMsg.c_str();

@@ -122,9 +122,6 @@ void loop()
         if (!isPressureSufficient()) {
             Console.serialWarning(F("System pressure below minimum threshold"));
         }
-        if (isPressureWarningLevel()) {
-            Console.serialWarning(F("System pressure approaching minimum threshold"));
-        }
         lastPressureCheck = currentTime;
     }
     

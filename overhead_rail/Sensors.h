@@ -25,8 +25,8 @@
 #define CARRIAGE_SENSOR_RAIL1_HANDOFF_PIN CLEARCORE_PIN_CCIOA2    // CCIO IO-2: Rail 1 handoff position
 #define LABWARE_SENSOR_RAIL1_HANDOFF_PIN CLEARCORE_PIN_CCIOA3     // CCIO IO-3: Rail 1 handoff labware sensor
 #define PNEUMATICS_CYLINDER_VALVE_PIN CLEARCORE_PIN_CCIOA4        // CCIO IO-4: Valve write (pneumatics control)
-#define CYLINDER_RETRACTED_SENSOR_PIN CLEARCORE_PIN_CCIOA5        // CCIO IO-5: Cylinder retracted sensor
-#define CYLINDER_EXTENDED_SENSOR_PIN CLEARCORE_PIN_CCIOA6         // CCIO IO-6: Cylinder extended sensor
+#define CYLINDER_EXTENDED_SENSOR_PIN CLEARCORE_PIN_CCIOA5        // CCIO IO-5: Cylinder extended sensor
+#define CYLINDER_RETRACTED_SENSOR_PIN CLEARCORE_PIN_CCIOA6         // CCIO IO-6: Cylinder retracted sensor
 
 //=============================================================================
 // SENSOR CONSTANTS

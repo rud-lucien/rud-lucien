@@ -25,8 +25,8 @@
 // MOTOR & MOTION PARAMETERS
 //=============================================================================
 // Rail-Specific Motor Configuration
-#define RAIL1_PULSES_PER_REV 3200 // Rail 1 motor steps per revolution (higher resolution for 8.2m rail)
-#define RAIL2_PULSES_PER_REV 800  // Rail 2 motor steps per revolution (lower resolution for 1m rail)
+#define RAIL1_PULSES_PER_REV 6400 // Rail 1 motor steps per revolution (higher resolution for 8.2m rail)
+#define RAIL2_PULSES_PER_REV 6400  // Rail 2 motor steps per revolution (lower resolution for 1m rail)
 
 // Rail-Specific Acceleration Configuration
 #define RAIL1_MAX_ACCEL_RPM_PER_SEC 1500 // Rail 1 acceleration (longer rail, can handle higher accel)

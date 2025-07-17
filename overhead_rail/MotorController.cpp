@@ -315,33 +315,33 @@ void handleEStop()
         unsigned long currentTime = millis();
         
         // Debounce the interrupt to prevent false triggers
-        if (currentTime - lastInterruptDebounce > E_STOP_INTERRUPT_DEBOUNCE_MS) {
-            // Verify E-stop is still active (not a false trigger from electrical noise)
-            if (isEStopActive()) {
-                Console.serialError(F("E-STOP TRIGGERED! (Hardware Interrupt)"));
-                
-                // Immediate emergency shutdown
-                stopAllMotion();
-                RAIL1_MOTOR.EnableRequest(false);
-                RAIL2_MOTOR.EnableRequest(false);
-                
-                // Abort homing operations
-                if (rail1HomingInProgress) {
-                    Console.serialInfo(F("Aborting Rail 1 homing operation"));
-                    abortHoming(1);
-                }
-                if (rail2HomingInProgress) {
-                    Console.serialInfo(F("Aborting Rail 2 homing operation"));
-                    abortHoming(2);
-                }
-                
-                // Set motor states to faulted
-                rail1MotorState = MOTOR_STATE_FAULTED;
-                rail2MotorState = MOTOR_STATE_FAULTED;
-                eStopWasActive = true;
+        if (timeDiff(currentTime, lastInterruptDebounce) > E_STOP_INTERRUPT_DEBOUNCE_MS) {
+            // Trust the interrupt - it fired, so E-Stop was pressed
+            Console.serialError(F("E-STOP TRIGGERED! (Hardware Interrupt)"));
+            
+            // Immediate emergency shutdown
+            stopAllMotion();
+            RAIL1_MOTOR.EnableRequest(false);
+            RAIL2_MOTOR.EnableRequest(false);
+            
+            // Abort homing operations
+            if (rail1HomingInProgress) {
+                Console.serialInfo(F("Aborting Rail 1 homing operation"));
+                abortHoming(1);
             }
+            if (rail2HomingInProgress) {
+                Console.serialInfo(F("Aborting Rail 2 homing operation"));
+                abortHoming(2);
+            }
+            
+            // Set motor states to faulted
+            rail1MotorState = MOTOR_STATE_FAULTED;
+            rail2MotorState = MOTOR_STATE_FAULTED;
+            eStopWasActive = true;
+            
             lastInterruptDebounce = currentTime;
         }
+        // Note: Debounced interrupts are silently ignored (not actionable for operators)
         eStopInterruptTriggered = false;  // Clear the interrupt flag
     }
 
@@ -355,32 +355,12 @@ void handleEStop()
     // Check for E-stop release (polling is sufficient for this)
     bool eStopActive = isEStopActive();
     
-    // Handle E-stop activation via polling (backup if interrupt missed or not available)
-    if (eStopActive && !eStopWasActive) {
-        Console.serialError(F("E-STOP TRIGGERED! (Polling Backup)"));
-        
-        // Same emergency shutdown as interrupt handler
-        stopAllMotion();
-        RAIL1_MOTOR.EnableRequest(false);
-        RAIL2_MOTOR.EnableRequest(false);
-        
-        if (rail1HomingInProgress) {
-            Console.serialInfo(F("Aborting Rail 1 homing operation"));
-            abortHoming(1);
-        }
-        if (rail2HomingInProgress) {
-            Console.serialInfo(F("Aborting Rail 2 homing operation"));
-            abortHoming(2);
-        }
-        
-        rail1MotorState = MOTOR_STATE_FAULTED;
-        rail2MotorState = MOTOR_STATE_FAULTED;
-    }
+    // Polling is now only used for E-Stop RELEASE detection
+    // (Interrupt handles activation much faster and more reliably)
     
     // Report when E-stop is released
     if (!eStopActive && eStopWasActive) {
-        Console.serialInfo(F("E-STOP RELEASED - System remains in fault state until cleared"));
-        Console.serialInfo(F("Use fault clearing commands to re-enable motors"));
+        Console.serialInfo(F("E-STOP RELEASED - Use fault clearing commands to re-enable"));
     }
 
     eStopWasActive = eStopActive;
@@ -910,7 +890,11 @@ void printAllMotorStatus()
     // Show system uptime first
     Console.print("[INFO] System Status:\n");
     Console.print("  Uptime: ");
-    printHumanReadableTime(millis() / 1000);
+    
+    char timeBuffer[80];
+    unsigned long uptimeSeconds = timeDiff(millis(), systemStartTime) / 1000;
+    formatHumanReadableTime(uptimeSeconds, timeBuffer, sizeof(timeBuffer));
+    Console.print(timeBuffer);
     Console.print("\n\n");
     
     printMotorStatus(1);
@@ -1323,7 +1307,10 @@ void completeHomingSequence(int rail) {
     unsigned long homingDuration = timeDiff(millis(), homingState.homingStartTime);
     sprintf_P(msg, FMT_HOMING_COMPLETED, motorName);
     Console.serialInfo(msg);
-    printHumanReadableTime(homingDuration / 1000);
+    
+    char timeBuffer[80];
+    formatHumanReadableTime(homingDuration / 1000, timeBuffer, sizeof(timeBuffer));
+    Console.print(timeBuffer);
     Console.print("\n");
     
     // Automatically update labware state from sensors after successful homing

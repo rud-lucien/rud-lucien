@@ -1,5 +1,6 @@
 #include "Logging.h"
 #include "Utils.h"
+#include "ValveController.h"
 
 //=============================================================================
 // PROGMEM STRING CONSTANTS FOR MEMORY EFFICIENCY
@@ -92,6 +93,9 @@ void printValveSection()
     bool retractedSensorActive = readDigitalSensor(cylinderRetractedSensor);
     bool extendedSensorActive = readDigitalSensor(cylinderExtendedSensor);
     
+    // Get actual valve output state
+    bool valveOutputHigh = digitalRead(PNEUMATIC_CYLINDER_VALVE_PIN);
+    
     if (valveState == VALVE_POSITION_RETRACTED) {
         if (positionValidated && actuallyRetracted) {
             Console.print(F("Cylinder=\x1b[32mRETRACTED\x1b[0m"));
@@ -106,16 +110,22 @@ void printValveSection()
         }
     }
     
-    // Add individual sensor readings for debugging
-    Console.print(F(" (Ret:"));
+    // Add valve output state and sensor readings for debugging
+    Console.print(F(" (Valve:"));
+    if (valveOutputHigh) {
+        Console.print(F("\x1b[35mHIGH\x1b[0m"));
+    } else {
+        Console.print(F("\x1b[36mLOW\x1b[0m"));
+    }
+    Console.print(F(" RetractSensor:"));
     if (retractedSensorActive) {
         Console.print(F("\x1b[32mACTIVE\x1b[0m"));
     } else {
         Console.print(F("\x1b[90mINACTIVE\x1b[0m"));
     }
-    Console.print(F(" Ext:"));
+    Console.print(F(" ExtendSensor:"));
     if (extendedSensorActive) {
-        Console.print(F("\x1b[33mACTIVE\x1b[0m"));
+        Console.print(F("\x1b[32mACTIVE\x1b[0m"));
     } else {
         Console.print(F("\x1b[90mINACTIVE\x1b[0m"));
     }
@@ -291,7 +301,7 @@ void printColoredSensorSection(const char* sensorInfo)
             ptr += 7;
         }
         else if (strncmp(ptr, "ABSENT", 6) == 0) {
-            Console.print(F("ABSENT"));
+            Console.print(F("\x1b[90mABSENT\x1b[0m"));
             ptr += 6;
         }
         else {
@@ -314,6 +324,34 @@ void printColoredSystemSection(const char* systemInfo)
         else if (strncmp(ptr, "RELEASED", 8) == 0) {
             Console.print(F("\x1b[32mRELEASED\x1b[0m"));
             ptr += 8;
+        }
+        else if (strncmp(ptr, "Pressure=", 9) == 0) {
+            Console.print(F("Pressure="));
+            ptr += 9;
+            
+            // Find the end of the pressure value (before " PSI")
+            const char* pressureStart = ptr;
+            while (*ptr && strncmp(ptr, " PSI", 4) != 0) {
+                ptr++;
+            }
+            
+            // Check if this is followed by " (LOW)" to determine color
+            bool isLowPressure = (strncmp(ptr + 4, " (LOW)", 6) == 0);
+            
+            // Print pressure value with appropriate color
+            if (isLowPressure) {
+                Console.print(F("\x1b[1;31m")); // Red for low pressure
+            } else {
+                Console.print(F("\x1b[32m")); // Green for sufficient pressure
+            }
+            
+            // Print the pressure value
+            while (pressureStart < ptr) {
+                Console.write(*pressureStart);
+                pressureStart++;
+            }
+            
+            Console.print(F("\x1b[0m")); // Reset color
         }
         else if (strncmp(ptr, " (LOW)", 6) == 0) {
             Console.print(F("\x1b[1;31m (LOW)\x1b[0m"));

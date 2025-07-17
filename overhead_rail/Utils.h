@@ -47,4 +47,14 @@ void formatHumanReadableTime(unsigned long secondsAgo, char* buffer, size_t buff
 // Format absolute time (milliseconds since startup) to HH:MM:SS format
 void formatAbsoluteTime(unsigned long timeMs, char *buffer);
 
+//=============================================================================
+// COLOR OUTPUT FUNCTIONS
+//=============================================================================
+// Print colored state values for system status output
+void printColoredState(const char* state);
+void printColoredYesNo(bool value);
+void printColoredActiveInactive(bool active);
+void printColoredSufficient(bool sufficient);
+void printColoredPassed(bool passed);
+
 #endif // UTILS_H

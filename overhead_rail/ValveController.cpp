@@ -56,9 +56,9 @@ void initValveSystem(bool hasCCIOBoard)
     
     // Initialize valve structure
     cylinderValve.controlPin = PNEUMATIC_CYLINDER_VALVE_PIN;
-    cylinderValve.currentPosition = VALVE_POSITION_RETRACTED; // Default to spring return position
     cylinderValve.lastOperationTime = 0;
     cylinderValve.initialized = false;
+    // Note: currentPosition will be set after we verify actual cylinder position
     
     // Reset error tracking
     lastValveOperationFailed = false;
@@ -71,54 +71,79 @@ void initValveSystem(bool hasCCIOBoard)
         return;
     }
 
-    Console.serialInfo(F("Initializing valve system with safety verification..."));
+    Console.serialInfo(F("Initializing valve system..."));
 
     // Configure valve control pin as output
     pinMode(cylinderValve.controlPin, OUTPUT);
     
-    // Ensure valve starts in retracted position (energized with inverted logic)
+    // Allow CCIO board and sensors to stabilize after initialization
+    delay(100);
+    
+    // Check current sensor state before any changes
+    updateAllSensors(); // Make sure sensor readings are current
+    bool initialExtended = readDigitalSensor(cylinderExtendedSensor);
+    bool initialRetracted = readDigitalSensor(cylinderRetractedSensor);
+    
+    // Ensure valve starts in retracted position (energized HIGH for retraction)
+    Console.serialInfo(F("Setting cylinder to retracted position..."));
     digitalWrite(cylinderValve.controlPin, HIGH);
+    
+    // Give cylinder time to move to retracted position and sensors to stabilize
+    delay(1500); // Increased from 1000ms to allow for full travel + sensor stabilization
+    
+    // Check sensor state after valve change
+    updateAllSensors(); // Make sure sensor readings are current after delay
+    bool afterExtended = readDigitalSensor(cylinderExtendedSensor);
+    bool afterRetracted = readDigitalSensor(cylinderRetractedSensor);
     
     // Mark as initialized
     cylinderValve.initialized = true;
     
-    // SAFETY: Explicitly verify cylinder is in retracted position
-    // This is critical for collision avoidance with Rail 1
+    // Check if cylinder actually moved to retracted position
+    if (afterRetracted && !afterExtended) {
+        Console.serialInfo(F("Cylinder successfully retracted - system ready"));
+        cylinderValve.currentPosition = VALVE_POSITION_RETRACTED;
+    } else if (afterExtended && !afterRetracted) {
+        Console.serialWarning(F("Cylinder failed to retract - check pressure or mechanical issues"));
+        // Update controller state to match physical reality
+        cylinderValve.currentPosition = VALVE_POSITION_EXTENDED;
+    } else {
+        Console.serialWarning(F("Cylinder position unclear - sensor malfunction"));
+        // Keep default retracted state but mark as uncertain
+        cylinderValve.currentPosition = VALVE_POSITION_RETRACTED;
+    }
+    
+    // SAFETY: Final verification with longer timeout for startup conditions
     if (isPressureSufficientForValve()) {
-        // Attempt explicit retraction to ensure safe state (operation details tracked internally)
-        ValveOperationResult result = retractCylinder(VALVE_SENSOR_TIMEOUT_MS);
+        // Allow extra time for startup conditions - sensors may still be settling
+        unsigned long startupTimeout = VALVE_SENSOR_TIMEOUT_MS * 2; // Double normal timeout
         
-        if (result == VALVE_OP_SUCCESS && isCylinderActuallyRetracted()) {
-            char msg[MEDIUM_MSG_SIZE];
-            sprintf_P(msg, FMT_VALVE_INIT_SUCCESS, "RETRACTED - Rail 2 carriage safe");
-            Console.serialInfo(msg);
-        } else if (result == VALVE_OP_ALREADY_AT_POSITION && isCylinderActuallyRetracted()) {
-            char msg[MEDIUM_MSG_SIZE];
-            sprintf_P(msg, FMT_VALVE_INIT_SUCCESS, "RETRACTED - Rail 2 carriage safe");
-            Console.serialInfo(msg);
+        // Only do verification if sensors showed unclear state
+        if (afterRetracted && !afterExtended) {
+            // Sensors already confirmed retracted position - no need for re-verification
+            Console.serialInfo(F("Valve system: Initialization complete - Rail 2 collision-safe"));
         } else {
-            Console.serialError(F("SAFETY CRITICAL: Cannot confirm cylinder retraction during startup!"));
-            Console.serialError(F("Rail 2 carriage may not be in safe position - manual verification required"));
+            // Attempt explicit retraction with extended timeout for startup
+            ValveOperationResult result = retractCylinder(startupTimeout);
             
-            // Log detailed failure information for troubleshooting
-            char msg[MEDIUM_MSG_SIZE];
-            sprintf_P(msg, PSTR("Retraction result: %s"), getValveOperationResultName(result));
-            Console.serialError(msg);
-            
-            if (result == VALVE_OP_SUCCESS || result == VALVE_OP_ALREADY_AT_POSITION) {
-                Console.serialError(F("Operation succeeded but sensor verification failed"));
-                Console.serialError(F("Check cylinder sensors and mechanical operation"));
+            if (result == VALVE_OP_SUCCESS && isCylinderActuallyRetracted()) {
+                Console.serialInfo(F("Valve system: Initialization complete - Rail 2 collision-safe"));
+            } else if (result == VALVE_OP_ALREADY_AT_POSITION && isCylinderActuallyRetracted()) {
+                Console.serialInfo(F("Valve system: Initialization complete - Rail 2 collision-safe"));
+            } else {
+                Console.serialWarning(F("Valve system: Sensor verification incomplete during startup - manual verification recommended"));
+                
+                // Set warning but don't prevent system startup
+                lastValveOperationFailed = true;
+                strcpy(lastValveFailureDetails, "Startup sensor verification incomplete");
             }
-            
-            // Set error state but don't prevent initialization
-            lastValveOperationFailed = true;
-            strcpy(lastValveFailureDetails, "Startup safety verification failed");
         }
     } else {
-        // Low pressure warning with consolidated messaging
+        // Low pressure warning
         uint16_t currentPressure = readPressureScaled(airPressureSensor);
         char msg[MEDIUM_MSG_SIZE];
-        sprintf_P(msg, FMT_VALVE_INIT_PRESSURE_WARNING, currentPressure / 100, currentPressure % 100);
+        sprintf_P(msg, PSTR("Valve system: Low pressure (%d.%02d PSI) - verify cylinder position manually"), 
+                 currentPressure / 100, currentPressure % 100);
         Console.serialWarning(msg);
     }
 }
@@ -136,8 +161,8 @@ void setValvePosition(ValvePosition position)
     }
     
     // Set digital output based on position
-    // HIGH = RETRACTED (spring return, de-energized) - INVERTED LOGIC
-    // LOW = EXTENDED (energized) - INVERTED LOGIC
+    // HIGH = RETRACTED (energized for retraction)
+    // LOW = EXTENDED (de-energized for extension)
     bool outputState = (position == VALVE_POSITION_RETRACTED);
     digitalWrite(cylinderValve.controlPin, outputState);
     
@@ -429,7 +454,7 @@ unsigned long getTimeSinceLastValveOperation()
     {
         return 0;
     }
-    return millis() - lastValveOperationTime;
+    return timeDiff(millis(), lastValveOperationTime);
 }
 
 //=============================================================================

@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include "OutputManager.h"
 
 //=============================================================================
 // PROGMEM STRING CONSTANTS
@@ -165,6 +166,67 @@ void formatAbsoluteTime(unsigned long timeMs, char *buffer)
 
     // Format as HH:MM:SS
     snprintf(buffer, 12, "%02lu:%02lu:%02lu", hours, minutes, seconds);
+}
+
+//=============================================================================
+// COLOR OUTPUT FUNCTIONS
+//=============================================================================
+void printColoredState(const char* state) {
+    if (strcmp(state, "NOT_READY") == 0 || strcmp(state, "FAULTED") == 0) {
+        Console.print(F("\x1b[1;31m")); // Red for critical errors
+        Console.print(state);
+        Console.print(F("\x1b[0m"));
+    }
+    else if (strcmp(state, "IDLE") == 0) {
+        Console.print(F("\x1b[32m")); // Green for ready states
+        Console.print(state);
+        Console.print(F("\x1b[0m"));
+    }
+    else if (strcmp(state, "MOVING") == 0 || strcmp(state, "HOMING") == 0) {
+        Console.print(F("\x1b[33m")); // Yellow for transitional states
+        Console.print(state);
+        Console.print(F("\x1b[0m"));
+    }
+    else if (strcmp(state, "UNKNOWN") == 0) {
+        Console.print(F("\x1b[90m")); // Gray for unknown states
+        Console.print(state);
+        Console.print(F("\x1b[0m"));
+    }
+    else {
+        Console.print(state); // No color for other states
+    }
+}
+
+void printColoredYesNo(bool value) {
+    if (value) {
+        Console.print(F("\x1b[32mYes\x1b[0m")); // Green for Yes
+    } else {
+        Console.print(F("\x1b[1;31mNo\x1b[0m")); // Red for No
+    }
+}
+
+void printColoredActiveInactive(bool active) {
+    if (active) {
+        Console.print(F("\x1b[32mACTIVE\x1b[0m")); // Green for active
+    } else {
+        Console.print(F("\x1b[90mINACTIVE\x1b[0m")); // Gray for inactive
+    }
+}
+
+void printColoredSufficient(bool sufficient) {
+    if (sufficient) {
+        Console.print(F("\x1b[32m(SUFFICIENT)\x1b[0m")); // Green for sufficient
+    } else {
+        Console.print(F("\x1b[1;31m(LOW)\x1b[0m")); // Red for low
+    }
+}
+
+void printColoredPassed(bool passed) {
+    if (passed) {
+        Console.print(F("\x1b[32mPASSED\x1b[0m")); // Green for passed
+    } else {
+        Console.print(F("\x1b[1;31mFAILED\x1b[0m")); // Red for failed
+    }
 }
 
 //=============================================================================

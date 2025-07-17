@@ -299,19 +299,7 @@ bool isPressureSufficient()
 bool isPressureWarningLevel()
 {
     uint16_t pressureScaled = readPressureScaled(airPressureSensor);
-    
-    // DEBUG: Log actual values being compared
-    static unsigned long lastDebugOutput = 0;
-    if (millis() - lastDebugOutput > 5000) {  // Debug every 5 seconds max
-        char debugMsg[100];
-        sprintf(debugMsg, "DEBUG: pressureScaled=%u, PRESSURE_WARNING_THRESHOLD_SCALED=%u, result=%s", 
-                pressureScaled, PRESSURE_WARNING_THRESHOLD_SCALED, 
-                (pressureScaled < PRESSURE_WARNING_THRESHOLD_SCALED) ? "WARNING" : "OK");
-        Console.serialDiagnostic(debugMsg);
-        lastDebugOutput = millis();
-    }
-    
-    return pressureScaled < PRESSURE_WARNING_THRESHOLD_SCALED;
+    return pressureScaled <= PRESSURE_WARNING_THRESHOLD_SCALED;
 }
 
 //=============================================================================

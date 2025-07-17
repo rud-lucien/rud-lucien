@@ -49,7 +49,7 @@ int findSubcommandCode(const char *subcommand, const SubcommandInfo *commandTabl
             left = mid + 1;
     }
 
-    return 0; // Not found - return 0 (default case)
+    return -1; // Not found - return -1 (invalid command)
 }
 
 // ============================================================

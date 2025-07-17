@@ -30,20 +30,14 @@
 // Comprehensive system state collection function
 void printSystemState();
 
-// Individual component state functions for modularity
-void printMotorSystemState();
-void printSensorSystemState();
-void printValveSystemState();
-void printNetworkSystemState();
+// Component state printing functions
 void printSafetySystemState();
-void printEncoderSystemState();
-void printLabwareSystemState();
 void printSystemReadinessState();
 
 // Utility functions for state determination
 bool isSystemReadyForAutomation();
 bool hasSystemErrors();
-const char* getSystemErrorSummary();
+const char *getSystemErrorSummary();
 
 // State management functions
 void setEmergencyStop(bool activated);
